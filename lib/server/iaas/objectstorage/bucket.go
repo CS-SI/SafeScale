@@ -21,6 +21,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/graymeta/stow"
 )
 
@@ -38,9 +40,6 @@ type bucket struct {
 
 // newBucket ...
 func newBucket(location stow.Location, bucketName string) (*bucket, error) {
-	if location == nil {
-		panic("location is nil!")
-	}
 	return &bucket{
 		location: location,
 		Name:     bucketName,
@@ -49,11 +48,17 @@ func newBucket(location stow.Location, bucketName string) (*bucket, error) {
 
 // CreateObject ...
 func (b *bucket) CreateObject(objectName string) (Object, error) {
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s)", objectName)).In()
+	defer tracer.Out()
+
 	return newObject(b, objectName)
 }
 
 // GetObject ...
 func (b *bucket) GetObject(objectName string) (Object, error) {
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s)", objectName)).In()
+	defer tracer.Out()
+
 	o, err := newObject(b, objectName)
 	if err != nil {
 		return nil, err
@@ -66,6 +71,9 @@ func (b *bucket) GetObject(objectName string) (Object, error) {
 
 // ListObjects list objects of a Bucket
 func (b *bucket) List(path, prefix string) ([]string, error) {
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s, %s)", path, prefix)).In()
+	defer tracer.Out()
+
 	list := []string{}
 
 	fullPath := buildFullPath(path, prefix)
@@ -90,6 +98,13 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 
 // Browse walks through the objects in the Bucket and executes callback on each Object found
 func (b *bucket) Browse(path, prefix string, callback func(Object) error) error {
+	if b == nil {
+		return utils.InvalidInstanceError()
+	}
+
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s, '%s')", path, prefix)).In()
+	defer tracer.Out()
+
 	fullPath := buildFullPath(path, prefix)
 
 	err := stow.Walk(b.container, path, 100,
@@ -98,6 +113,7 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 				return err
 			}
 			if strings.Index(item.Name(), fullPath) == 0 {
+
 				return callback(newObjectFromStow(b, item))
 			}
 			return nil
@@ -108,6 +124,10 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 
 // Clear empties a bucket
 func (b *bucket) Clear(path, prefix string) error {
+	if b == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	fullPath := buildFullPath(path, prefix)
 
 	return stow.Walk(b.container, path, 100,
@@ -130,6 +150,10 @@ func (b *bucket) Clear(path, prefix string) error {
 
 // DeleteObject deletes an object from a bucket
 func (b *bucket) DeleteObject(objectName string) error {
+	if b == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	o, err := newObject(b, objectName)
 	if err != nil {
 		return err
@@ -139,6 +163,10 @@ func (b *bucket) DeleteObject(objectName string) error {
 
 // ReadObject ...
 func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (Object, error) {
+	if b == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	o, err := newObject(b, objectName)
 	if err != nil {
 		return nil, err
@@ -152,6 +180,10 @@ func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to 
 
 // WriteObject ...
 func (b *bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata ObjectMetadata) (Object, error) {
+	if b == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	o, err := newObject(b, objectName)
 	if err != nil {
 		return nil, err
@@ -171,6 +203,10 @@ func (b *bucket) WriteMultiPartObject(
 	chunkSize int,
 	metadata ObjectMetadata,
 ) (Object, error) {
+
+	if b == nil {
+		return nil, utils.InvalidInstanceError()
+	}
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -192,6 +228,10 @@ func (b *bucket) GetName() string {
 // GetCount returns the count of objects in the Bucket
 // 'path' corresponds to stow prefix, and 'prefix' allows to filter what to count
 func (b *bucket) GetCount(path, prefix string) (int64, error) {
+	if b == nil {
+		return 0, utils.InvalidInstanceError()
+	}
+
 	// log.Debugf("objectstorage.bucket.GetCount(%s,%s) called", path, prefix)
 	// defer log.Debugf("objectstorage.Location.Count(%s,%s) done", path, prefix)
 
@@ -217,6 +257,10 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 
 // GetSize returns the total size of the Objects inside the Bucket
 func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
+	if b == nil {
+		return 0, "", utils.InvalidInstanceError()
+	}
+
 	var err error
 	var totalSize int64
 
