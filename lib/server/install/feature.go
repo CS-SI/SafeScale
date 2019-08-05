@@ -474,6 +474,8 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
 		v["DefaultRouteIP"] = networkCfg.GatewayIP
 		v["EndpointIP"] = networkCfg.EndpointIP
+		v["Masters"] = cluster.ListMasters(f.task)
+		v["MasterNames"] = cluster.ListMasterNames(f.task)
 		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
 		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
 		if _, ok := v["Username"]; !ok {
