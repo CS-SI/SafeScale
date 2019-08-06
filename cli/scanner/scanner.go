@@ -366,7 +366,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			hostName := "scanhost-" + template.Name
 			hostHandler := handlers.NewHostHandler(serviceProvider)
 
-			host, err := hostHandler.Create(context.Background(), hostName, net.Name, "Ubuntu 18.04", true, template.Name, false)
+			host, err := hostHandler.Create(context.Background(), hostName, net.Name, img.ID, true, nil, false)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
