@@ -363,44 +363,21 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			host, _, err := serviceProvider.CreateHost(resources.HostRequest{
-				ResourceName: hostName,
-				PublicIP:     true,
-				ImageID:      img.ID,
-				TemplateID:   template.ID,
-				Networks:     []*resources.Network{net},
-			})
-			if err != nil {
-				return err
-			}
+			hostHandler := handlers.NewHostHandler(serviceProvider)
 
-			err = metadata.NewHost(serviceProvider).Carry(host).Write()
+			host, err := hostHandler.Create(context.Background(), hostName, net.Name, img.ID, true, nil, false)
 			if err != nil {
+				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
 
 			defer func() {
 				log.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.ID)
-				delerr := serviceProvider.DeleteHost(host.ID)
+				delerr := hostHandler.Delete(context.Background(), host.ID)
 				if delerr != nil {
 					log.Warnf("Error deleting host '%s'", host.ID)
 				}
-
-				md, err := metadata.LoadHost(serviceProvider, host.ID)
-				if err != nil {
-					log.Warnf("Error loading host metadata of '%s'", hostName)
-				} else {
-					mdDeleteErr := md.Delete()
-					if mdDeleteErr != nil {
-						log.Warnf("Error deleting metadata of '%s'", hostName)
-					}
-				}
 			}()
-
-			if err != nil {
-				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
-				return err
-			}
 
 			sshSvc := handlers.NewSSHHandler(serviceProvider)
 			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
