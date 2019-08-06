@@ -189,9 +189,7 @@ func (s *Stack) createICMPRules(groupID string) error {
 		return err
 	}
 	ruleOpts = secrules.CreateOpts{
-		Direction: secrules.DirIngress,
-		//		PortRangeMin:   0,
-		//		PortRangeMax:   18,
+		Direction:      secrules.DirIngress,
 		EtherType:      secrules.EtherType6,
 		SecGroupID:     groupID,
 		Protocol:       secrules.ProtocolICMP,
@@ -204,9 +202,7 @@ func (s *Stack) createICMPRules(groupID string) error {
 
 	// Outbound = egress == going to Outside
 	ruleOpts = secrules.CreateOpts{
-		Direction: secrules.DirEgress,
-		//		PortRangeMin:   0,
-		//		PortRangeMax:   18,
+		Direction:      secrules.DirEgress,
 		EtherType:      secrules.EtherType4,
 		SecGroupID:     groupID,
 		Protocol:       secrules.ProtocolICMP,
@@ -217,9 +213,7 @@ func (s *Stack) createICMPRules(groupID string) error {
 		return err
 	}
 	ruleOpts = secrules.CreateOpts{
-		Direction: secrules.DirEgress,
-		//		PortRangeMin:   0,
-		//		PortRangeMax:   18,
+		Direction:      secrules.DirEgress,
 		EtherType:      secrules.EtherType6,
 		SecGroupID:     groupID,
 		Protocol:       secrules.ProtocolICMP,
@@ -264,6 +258,12 @@ func (s *Stack) InitDefaultSecurityGroup() error {
 	}
 
 	err = s.createUDPRules(group.ID)
+	if err != nil {
+		secgroups.Delete(s.NetworkClient, group.ID)
+		return err
+	}
+
+	err = s.createICMPRules(group.ID)
 	if err != nil {
 		secgroups.Delete(s.NetworkClient, group.ID)
 		return err
