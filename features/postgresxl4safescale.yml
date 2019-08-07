@@ -44,7 +44,7 @@ feature:
                             exit 0
 
             add:
-                pace: config,image,stack,secret,firewall,start
+                pace: config,image,stack,secret,network,firewall,start
                 steps:
                     config:
                         targets:
@@ -220,7 +220,7 @@ feature:
 
                                         # Define cluster topology
                                         cat <<-SQLEOF | psql
-                            ALTER ROLE postgres WITH SUPERUSER LOGIN PASSWORD \$(cat /run/secrets/safescale.postgresxl.password);
+                            ALTER ROLE postgres WITH SUPERUSER LOGIN PASSWORD '\$(cat /run/secrets/safescale.postgresxl.password)';
 
                             {{ range $i, $e := .Masters }}
                             CREATE NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 55432);
@@ -375,14 +375,7 @@ feature:
                                         - ${SF_ETCDIR}/postgresxl4safescale/gtm-master/options:/etc/pgxl/options:ro
                                         - ${SF_VARDIR}/postgresxl4safescale/gtm-master:/var/lib/pgsql/data
                                     networks:
-                                        - net
-                                    # ports:
-                                    #     # - published: 55431
-                                    #     #   target: 5432
-                                    #     #   mode: host
-                                    #     - published: 56666
-                                    #       target: 6666
-                                    #       mode: host
+                                        - postgresxl4safescale_net
                                     deploy:
                                         mode: replicated
                                         replicas: 1
@@ -417,14 +410,7 @@ feature:
                                         - ${SF_ETCDIR}/postgresxl4safescale/gtm-slave/options:/etc/pgxl/options:ro
                                         - ${SF_VARDIR}/postgresxl4safescale/gtm-slave:/var/lib/pgsql/data
                                     networks:
-                                        - net
-                                    # ports:
-                                    #     # - published: 55431
-                                    #     #   target: 5432
-                                    #     #   mode: host
-                                    #     - published: 56666
-                                    #       target: 6666
-                                    #       mode: host
+                                        - postgresxl4safescale_net
                                     deploy:
                                         mode: replicated
                                         replicas: 1
@@ -459,11 +445,8 @@ feature:
                                         - ${SF_ETCDIR}/postgresxl4safescale/gtm-proxy/options:/etc/pgxgl/options:ro
                                         - ${SF_VARDIR}/postgresxl4safescale/gtm-proxy:/var/lib/pgsql/data
                                     networks:
-                                        - net
+                                        - postgresxl4safescale_net
                                     ports:
-                                        # - published: 55431
-                                        #   target: 5432
-                                        #   mode: host
                                         - published: 56666
                                           target: 6666
                                           mode: host
@@ -500,14 +483,11 @@ feature:
                                         - ${SF_ETCDIR}/postgresxl4safescale/coordinator/options:/etc/pgxl/options:ro
                                         - ${SF_VARDIR}/postgresxl4safescale/coordinator:/var/lib/pgsql/data
                                     networks:
-                                        - net
+                                        - postgresxl4safescale_net
                                     ports:
                                         - published: 55432
                                           target: 5432
                                           mode: host
-                                        # - published: 56667
-                                        #   target: 6666
-                                        #   mode: host
                                     deploy:
                                         mode: global
                                         placement:
@@ -541,14 +521,11 @@ feature:
                                         - ${SF_ETCDIR}/postgresxl4safescale/data/options:/etc/pgxl/options:ro
                                         - ${SF_VARDIR}/postgresxl4safescale/data:/var/lib/pgsql/data
                                     networks:
-                                        - net
+                                        - postgresxl4safescale_net
                                     ports:
                                         - published: 55433
                                           target: 5432
                                           mode: host
-                                    #     # - published: 56666
-                                    #     #   target: 6666
-                                    #     #   mode: host
                                     deploy:
                                         mode: global
                                         placement:
@@ -577,10 +554,8 @@ feature:
                                     external: true
 
                             networks:
-                                net:
-                                    driver: overlay
-                                    attachable: true
-                                    internal: false
+                                postgresxl4safescale_net:
+                                    external: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/postgres4safescale/stack.yml
                             exit 0
@@ -596,6 +571,18 @@ feature:
                             echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresxl.password - || exit 193
                             exit 0
 
+                    network:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            if ! docker network ls --filter 'Name=postgresxl4safescale_net' {{ "--format '{{.Name}}'" }} | grep "^postgresxl4safescale$"; then
+                                docker network create -d overlay --scope swarm --attachable postgresxl4safescale_net
+                            fi
+                            exit 0
+
                     firewall:
                         targets:
                             hosts: no
@@ -603,6 +590,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
+                            # INGRESS_CIDR=$(docker network inspect ingress | jq -r .[0].IPAM.Config[0].Subnet)
+                            # sfFirewallAdd --zone=trusted --add-source=${INGRESS_CIDR}
                             sfFirewallAdd --zone=trusted --add-interface=docker_gwbridge
                             sfFirewallReload
                             exit 0
@@ -640,6 +629,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
+                            docker network rm postgresxl4safescale_net || true
                             sfRemoveDockerImage postgresxl4safescale:latest
                             docker secret rm safescale.postgresxl.password &>/dev/null
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
