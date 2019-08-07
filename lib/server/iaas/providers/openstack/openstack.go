@@ -230,6 +230,13 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 	return p.tenantParameters
 }
 
+// GetCapabilities returns the capabilities of the provider
+func (p *provider) GetCapabilities() providers.Capabilities {
+	return providers.Capabilities{
+		PrivateVirtualIp: true,
+	}
+}
+
 // init registers the openstack provider
 func init() {
 	iaas.Register("openstack", &provider{})

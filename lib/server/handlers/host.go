@@ -48,7 +48,7 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(ctx context.Context, name string, net string, os string, public bool, sizing *resources.SizingRequirements, force bool) (*resources.Host, error)
+	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool) (*resources.Host, error)
 	List(ctx context.Context, all bool) ([]*resources.Host, error)
 	ForceInspect(ctx context.Context, ref string) (*resources.Host, error)
 	Inspect(ctx context.Context, ref string) (*resources.Host, error)
@@ -210,11 +210,34 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 // 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, los string, public bool, sizing *resources.SizingRequirements, force bool,
+	name string, net string, los string, public bool, sizingParam interface{}, force bool,
 ) (*resources.Host, error) {
 
 	log.Debugf(">>> lib.server.handlers.HostHandler::Create(%s)", name)
 	defer log.Debugf("<<< lib.server.handlers.HostHandler::Create(%s)", name)
+
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, utils.InvalidParameterError("ctx", "can't be nil")
+	}
+	if name == "" {
+		return nil, utils.InvalidParameterError("name", "can't be empty string")
+	}
+
+	var (
+		sizing       *resources.SizingRequirements
+		templateName string
+	)
+	switch sizingParam.(type) {
+	case *resources.SizingRequirements:
+		sizing = sizingParam.(*resources.SizingRequirements)
+	case string:
+		templateName = sizingParam.(string)
+	default:
+		return nil, utils.InvalidParameterError("sizing", "must be *resources.SizingRequirements or string")
+	}
 
 	host, err := handler.service.GetHostByName(name)
 	if err != nil {
@@ -225,29 +248,40 @@ func (handler *HostHandler) Create(
 		return nil, logicErr(fmt.Errorf("failed to create host '%s': name is already used", name))
 	}
 
-	var networks []*resources.Network
-	var gw *resources.Host
-	if len(net) != 0 {
+	var (
+		networks       []*resources.Network
+		defaultNetwork *resources.Network
+		primaryGateway *resources.Host
+		// secondaryGateway *resources.Host
+		defaultRouteIP string
+	)
+	if net != "" && net != "net-safescale" {
 		networkHandler := NewNetworkHandler(handler.service)
-		n, err := networkHandler.Inspect(ctx, net)
+		defaultNetwork, err = networkHandler.Inspect(ctx, net)
 		if err != nil {
 			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				return nil, infraErr(err)
 			}
 			return nil, infraErrf(err, "failed to get network resource data: '%s'", net)
 		}
-		if n == nil {
+		if defaultNetwork == nil {
 			return nil, logicErr(fmt.Errorf("failed to find network '%s'", net))
 		}
-		networks = append(networks, n)
-		mgw, err := metadata.LoadHost(handler.service, n.GatewayID)
+		networks = append(networks, defaultNetwork)
+
+		mgw, err := metadata.LoadHost(handler.service, defaultNetwork.GatewayID)
 		if err != nil {
 			return nil, infraErr(err)
 		}
 		if mgw == nil {
 			return nil, logicErr(fmt.Errorf("failed to find gateway of network '%s'", net))
 		}
-		gw = mgw.Get()
+		primaryGateway = mgw.Get()
+		if defaultNetwork.VIP != nil {
+			defaultRouteIP = defaultNetwork.VIP.PrivateIP
+		} else {
+			defaultRouteIP = primaryGateway.GetPrivateIP()
+		}
 	} else {
 		net, err := handler.getOrCreateDefaultNetwork()
 		if err != nil {
@@ -256,37 +290,36 @@ func (handler *HostHandler) Create(
 		networks = append(networks, net)
 	}
 
-	// templates, err := handler.service.SelectTemplatesBySize(
-	// 	resources.SizingRequirements{
-	// 		MinCores:    cpu,
-	// 		MinRAMSize:  ram,
-	// 		MinDiskSize: disk,
-	// 		MinGPU:      gpuNumber,
-	// 		MinFreq:     freq,
-	// 	}, force)
-	templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
-	if err != nil {
-		return nil, infraErrf(err, "failed to find template corresponding to requested resources")
-	}
-	var template resources.HostTemplate
-	if len(templates) > 0 {
-		template = templates[0]
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
-		if template.CPUFreq > 0 {
-			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+	var template *resources.HostTemplate
+	if sizing != nil {
+		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
+		if err != nil {
+			return nil, infraErrf(err, "failed to find template corresponding to requested resources")
 		}
-		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
-			if template.GPUType != "" {
-				msg += fmt.Sprintf(" %s", template.GPUType)
+		if len(templates) > 0 {
+			template = templates[0]
+			msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
+			if template.CPUFreq > 0 {
+				msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 			}
+			msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+			if template.GPUNumber > 0 {
+				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
+				if template.GPUType != "" {
+					msg += fmt.Sprintf(" %s", template.GPUType)
+				}
+			}
+			msg += ")"
+			log.Infof(msg)
+		} else {
+			log.Errorf("failed to find template corresponding to requested resources")
+			return nil, logicErrf(fmt.Errorf(""), "failed to find template corresponding to requested resources")
 		}
-		msg += ")"
-		log.Infof(msg)
 	} else {
-		log.Errorf("failed to find template corresponding to requested resources")
-		return nil, logicErrf(fmt.Errorf(""), "failed to find template corresponding to requested resources")
+		template, err = handler.service.SelectTemplateByName(templateName)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var img *resources.Image
@@ -308,7 +341,8 @@ func (handler *HostHandler) Create(
 		TemplateID:     template.ID,
 		PublicIP:       public,
 		Networks:       networks,
-		DefaultGateway: gw,
+		DefaultRouteIP: defaultRouteIP,
+		DefaultGateway: primaryGateway,
 	}
 
 	var userData *userdata.Content
@@ -336,18 +370,51 @@ func (handler *HostHandler) Create(
 		return nil, throwErrf("error populating host properties: host.Properties is nil !")
 	}
 
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
-		hostSizingV1.Template = hostRequest.TemplateID
-		hostSizingV1.RequestedSize = &propsv1.HostSize{
-			Cores:     sizing.MinCores,
-			RAMSize:   sizing.MinRAMSize,
-			DiskSize:  sizing.MinDiskSize,
-			GPUNumber: sizing.MinGPU,
-			CPUFreq:   sizing.MinFreq,
+	// Updates host metadata
+	mh := metadata.NewHost(handler.service)
+	err = mh.Carry(host).Write()
+	if err != nil {
+		return nil, infraErrf(err, "Metadata creation failed")
+	}
+	log.Infof("Compute resource created: '%s'", host.Name)
+
+	// Starting from here, remove metadata if exiting with error
+	defer func() {
+		if err != nil {
+			derr := mh.Delete()
+			if derr != nil {
+				log.Errorf("failed to remove host metadata after host creation failure")
+			}
 		}
-		return nil
-	})
+	}()
+
+	if sizing != nil {
+		err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			hostSizingV1 := v.(*propsv1.HostSizing)
+			hostSizingV1.Template = hostRequest.TemplateID
+			hostSizingV1.RequestedSize = &propsv1.HostSize{
+				Cores:     sizing.MinCores,
+				RAMSize:   sizing.MinRAMSize,
+				DiskSize:  sizing.MinDiskSize,
+				GPUNumber: sizing.MinGPU,
+				CPUFreq:   sizing.MinFreq,
+			}
+			return nil
+		})
+	} else {
+		err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			hostSizingV1 := v.(*propsv1.HostSizing)
+			hostSizingV1.Template = hostRequest.TemplateID
+			hostSizingV1.RequestedSize = &propsv1.HostSize{
+				Cores:     template.Cores,
+				RAMSize:   template.RAMSize,
+				DiskSize:  template.DiskSize,
+				GPUNumber: template.GPUNumber,
+				CPUFreq:   template.CPUFreq,
+			}
+			return nil
+		})
+	}
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -411,22 +478,11 @@ func (handler *HostHandler) Create(
 	}
 
 	// Updates host metadata
-	mh := metadata.NewHost(handler.service)
-	err = mh.Carry(host).Write()
+	err = mh.Write()
 	if err != nil {
 		return nil, infraErrf(err, "Metadata creation failed")
 	}
 	log.Infof("Compute resource created: '%s'", host.Name)
-
-	// Starting from here, remove metadata if exiting with error
-	defer func() {
-		if err != nil {
-			derr := mh.Delete()
-			if derr != nil {
-				log.Errorf("failed to remove host metadata after host creation failure")
-			}
-		}
-	}()
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
@@ -442,16 +498,18 @@ func (handler *HostHandler) Create(
 
 	_, err = sshCfg.WaitServerReady("phase1", sshDefaultTimeout)
 	if err != nil {
-		if client.IsTimeoutError(err) {
-			return nil, infraErrf(err, "Timeout creating a host")
+		derr := err
+		err = nil
+		if client.IsTimeoutError(derr) {
+			return nil, infraErrf(derr, "Timeout waiting host '%s' to become ready", host.Name)
 		}
 
-		if client.IsProvisioningError(err) {
-			log.Errorf("%+v", err)
-			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check safescaled logs", host.Name)
+		if client.IsProvisioningError(derr) {
+			log.Errorf("%+v", derr)
+			return nil, fmt.Errorf("failed to provision host '%s', please check safescaled logs", host.Name)
 		}
 
-		return nil, infraErr(err)
+		return nil, infraErrf(derr, "failed to wait host '%s' to become ready", host.Name)
 	}
 
 	// Updates host link with networks
@@ -506,12 +564,12 @@ func (handler *HostHandler) Create(
 	_, err = sshCfg.WaitServerReady("ready", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
-			return nil, infraErrf(err, "Timeout creating a host")
+			return nil, infraErrf(err, "Timeout creating host '%s'", host.Name)
 		}
 
 		if client.IsProvisioningError(err) {
 			log.Errorf("%+v", err)
-			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check safescaled logs", host.Name)
+			return nil, fmt.Errorf("Error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
 		return nil, infraErr(err)
@@ -521,7 +579,7 @@ func (handler *HostHandler) Create(
 	select {
 	case <-ctx.Done():
 		log.Warnf("Host creation cancelled by safescale")
-		err = fmt.Errorf("Host creation canceld by safescale")
+		err = fmt.Errorf("Host creation cancelled by safescale")
 		return nil, err
 	default:
 	}

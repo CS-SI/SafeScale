@@ -186,7 +186,7 @@ substring_diff() {
 ensure_network_connectivity() {
     {{- if .AddGateway }}
         route del -net default &>/dev/null
-        route add -net default gw {{ .GatewayIP }}
+        route add -net default gw {{ .DefaultRouteIP }}
     {{- else }}
     :
     {{- end}}
@@ -211,7 +211,7 @@ configure_network() {
                 configure_network_debian
             else
                 echo "PROVISIONING_ERROR: failed to determine how to configure network"
-                fail 196
+                fail 192
             fi
             ;;
 
@@ -226,17 +226,18 @@ configure_network() {
 
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 197
+            fail 193
             ;;
     esac
 
     {{- if .IsGateway }}
-    configure_as_gateway
+    configure_as_gateway || fail 194
+    install_keepalived || fail 195
     {{- end }}
 
     check_for_network || {
         echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
-        fail 217
+        fail 196
     }
 }
 
@@ -260,7 +261,7 @@ EOF
 auto ${IF}
 iface ${IF} inet dhcp
 {{- if .AddGateway }}
-  up route add -net default gw {{ .GatewayIP }} || true
+  up route add -net default gw {{ .DefaultRouteIP }} || true
 {{- end}}
 EOF
         fi
@@ -317,7 +318,7 @@ network:
         use-routes: false
       routes:
       - to: 0.0.0.0/0
-        via: {{ .GatewayIP }}
+        via: {{ .DefaultRouteIP }}
         scope: global
         on-link: true
 {{- else }}
@@ -398,7 +399,7 @@ EOF
     configure_dhclient
 
     {{- if .AddGateway }}
-    echo "GATEWAY={{ .GatewayIP }}" >/etc/sysconfig/network
+    echo "GATEWAY={{ .DefaultRouteIP }}" >/etc/sysconfig/network
     {{- end }}
 
     enable_svc network
@@ -419,7 +420,8 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-    ping -n -c1 -w30 -i5 www.google.com || return 1
+    #ping -n -c1 -w30 -i5 www.google.com || return 1
+    wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
     [ ! -z "$PU_IF" ] && {
         check_for_ip $PU_IF || return 1
     }
@@ -438,23 +440,29 @@ configure_as_gateway() {
             grep -v "net.ipv4.ip_forward=" $i >${i}.new
             mv -f ${i}.new ${i}
         done
-        echo "net.ipv4.ip_forward=1" >/etc/sysctl.d/98-forward.conf
-        systemctl restart systemd-sysctl
+        cat >/etc/sysctl.d/21-gateway.conf <<-EOF
+net.ipv4.ip_forward=1
+net.ipv4.ip_nonlocal_bind=1
+EOF
+        case $LINUX_KIND in
+            ubuntu) systemctl restart systemd-sysctl;;
+            *)      sysctl -p;;
+        esac
     fi
 
-    [ ! -z $PU_IF ] && {
+    if [ ! -z $PU_IF ]; then
         # Dedicated public interface available...
 
         # Allows ping
         sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
-        # Allow smasquerading on public zone
+        # Allows masquerading on public zone
         sfFirewallAdd --zone=public --add-masquerade
-    } || {
+    else
         # No dedicated public interface...
 
         # Enables masquerading on trusted zone
         sfFirewallAdd --zone=trusted --add-masquerade
-    }
+    fi
 
     # Allows default services on public zone
     sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
@@ -467,6 +475,73 @@ configure_as_gateway() {
     systemctl restart ssh
 
     echo done
+}
+
+install_keepalived() {
+    case $LINUX_KIND in
+        ubuntu|debian)
+            sfApt update && sfApt -y install keepalived || return 1
+            ;;
+
+        redhat|centos)
+            yum install -qy keepalived || return 1
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            return 1
+            ;;
+    esac
+
+    NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
+
+    cat >/etc/keepalived/keepalived.conf <<-EOF
+vrrp_instance vrrp_group_gws_internal {
+    state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+    interface ${PR_IFs[0]}
+    virtual_router_id 1
+    priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
+    advert_int 2
+    authentication {
+        auth_type PASS
+        auth_pass password
+    }
+{{ if eq .IsPrimaryGateway true }}
+    # Unicast specific option, this is the IP of the interface keepalived listens on
+    unicast_src_ip {{ .PrimaryGatewayPrivateIP }}
+    # Unicast specific option, this is the IP of the peer instance
+    unicast_peer {
+        {{ .SecondaryGatewayPrivateIP }}
+    }
+{{ else }}
+    unicast_src_ip {{ .SecondaryGatewayPrivateIP }}
+    unicast_peer {
+        {{ .PrimaryGatewayPrivateIP }}
+    }
+{{ end }}
+    virtual_ipaddress {
+        {{ .PrivateVIP }}/${NETMASK}
+    }
+}
+
+# vrrp_instance vrrp_group_gws_external {
+#     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+#     interface ${PU_IF}
+#     virtual_router_id 2
+#     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
+#     advert_int 2
+#     authentication {
+#         auth_type PASS
+#         auth_pass password
+#     }
+#     virtual_ipaddress {
+#         {{ .PublicVIP }}/${NETMASK}
+#     }
+# }
+EOF
+
+    sfService enable keepalived
+    sfService restart keepalived || return 1
+    return 0
 }
 
 configure_dns_legacy() {
@@ -521,7 +596,7 @@ EOF
 configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
 
-{{- if not .GatewayIP }}
+{{- if not .DefaultRouteIP }}
     rm -f /etc/resolv.conf
     ln -s /run/systemd/resolve/resolv.conf /etc
 {{- end }}
@@ -606,7 +681,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils
-            sfApt install -qy systemd pciutils || fail 211
+            sfApt install -qy systemd pciutils || fail 210
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
             ;;
@@ -622,7 +697,7 @@ EOF
             if dpkg --compare-versions $(sfGetFact "linux version") ge 17.10; then
                 sfApt install -y systemd pciutils netplan.io || fail 211
             else
-                sfApt install -y systemd pciutils || fail 211
+                sfApt install -y systemd pciutils || fail 212
             fi
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
@@ -636,7 +711,7 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -qy systemd pciutils yum-utils || fail 211
+            yum install -qy systemd pciutils yum-utils || fail 213
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -650,14 +725,14 @@ EOF
 install_packages() {
      case $LINUX_KIND in
         ubuntu|debian)
-            sfApt install -y -qq jq zip time zip &>/dev/null || fail 213
+            sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
             ;;
         redhat|centos)
-            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 214
+            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 215
+            fail 216
             ;;
      esac
 }
@@ -700,12 +775,11 @@ force_dbus_restart() {
 update_kernel_settings() {
     cat >/etc/sysctl.d/20-safescale.conf <<-EOF
 vm.max_map_count=262144
-
-# To allow to bring up an interface with an IP that is not considered local (not part of the /etc/network/interfaces|/etc/sysconfig/network-scripts)
-# In other words, to allow Virtual IP
-net.ipv4.ip_nonlocal_bind=1
 EOF
-    sysctl -p
+    case $LINUX_KIND in
+        ubuntu) systemctl restart systemd-sysctl;;
+        *)      sysctl -p;;
+    esac
 }
 
 # ---- Main
@@ -721,7 +795,7 @@ configure_network
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
-update_kernel_settings || fail 216
+update_kernel_settings || fail 217
 
 echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 # For compatibility with previous user_data implementation (until v19.03.x)...

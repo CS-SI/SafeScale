@@ -27,9 +27,20 @@ fail() {
 	exit $1
 }
 
+mkdir -p /opt/safescale/etc &>/dev/null
+mkdir -p /opt/safescale/var/log &>/dev/null
+mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
+chmod -R 0640 /opt/safescale
+find /opt/safescale -type d -exec chmod ug+x {} \;
+
+exec 1<&-
+exec 2<&-
+exec 1<>/opt/safescale/var/log/user_data.phase1.log
+exec 2>&1
+set -x
+
 LINUX_KIND=
 VERSION_ID=
-export DEBIAN_FRONTEND=noninteractive
 
 sfDetectFacts() {
 	[ -f /etc/os-release ] && {
@@ -49,43 +60,7 @@ sfDetectFacts() {
 		}
 	}
 }
-
-sfFinishPreviousInstall() {
-	local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
-	if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
-}
-# export -f sfFinishPreviousInstall
-
-sfWaitForApt() {
-	sfFinishPreviousInstall || true
-	sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/{lock/lock-frontend}
-}
-
-sfWaitLockfile() {
-	local ROUNDS=600
-	name=$1
-	shift
-	params="$@"
-	echo "check $name lock"
-	echo ${params}
-	if fuser ${params} &>/dev/null; then
-		echo "${name} is locked, waiting... "
-		local i
-		for i in $(seq $ROUNDS); do
-			sleep 6
-			fuser ${params} &>/dev/null || break
-		done
-		if [ $i -ge $ROUNDS ]; then
-			echo "Timed out waiting (1 hour!) for ${name} lock!"
-			exit 100
-		else
-			t=$(($i*6))
-			echo "${name} is unlocked (waited $t seconds), continuing."
-		fi
-	else
-		echo "${name} is ready"
-	fi
-}
+sfDetectFacts
 
 create_user() {
 	echo "Creating user {{.User}}..."
@@ -145,15 +120,9 @@ EOF
 	echo done
 }
 
-check_for_network() {
-	ping -n -c1 -w5 www.google.com || return 1
-	return 0
-}
-
 put_hostname_in_hosts() {
 	HON=$(hostname)
 	ping -n -c1 -w5 $HON 2>/dev/null || echo "127.0.1.1 $HON" >>/etc/hosts
-	grep $HON /etc/hosts || echo "127.0.1.1 $HON" >>/etc/hosts #Make sure it's there
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
@@ -163,83 +132,37 @@ disable_cloudinit_network_autoconf() {
 	echo "network: {config: disabled}" >$fname
 }
 
-enable_firewall() {
-    case $LINUX_KIND in
-        debian|ubuntu)
-            sfService stop apt-daily.service &>/dev/null
-            systemctl kill --kill-who=all apt-daily.service &>/dev/null
-
-            # systemctl status firewalld &>/dev/null || {
-            # 	sfApt install -qy ufw &>/dev/null
-            # 	systemctl enable ufw
-            # 	systemctl start ufw
-            # }
-            # ufw reset
-            # ufw default deny incoming
-            # ufw default allow outgoing
-            # ufw allow OpenSSH
-            # ufw enable
-            ;;
-
-    esac
+disable_services() {
+	case $LINUX_KIND in
+		debian|ubuntu)
+			sfService stop apt-daily.service &>/dev/null
+			systemctl kill --kill-who=all apt-daily.service &>/dev/null
+			;;
+	esac
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
-    route del -net default &>/dev/null
-    route add -net default gw {{ .GatewayIP }}
+	{{- if .AddGateway }}
+		route del -net default &>/dev/null
+		route add -net default gw {{ .DefaultRouteIP }}
+	{{- else }}
+	:
+	{{- end}}
 }
-
-{{- if .IsGateway }}
-custom_gcp_gateway() {
-    sudo sysctl -w net.ipv4.ip_forward=1
-    sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-    sudo echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/20-natgw.conf
-    case $LINUX_KIND in
-        debian|ubuntu)
-            sudo DEBIAN_FRONTEND=noninteractive apt-get -yq install iptables-persistent
-            ;;
-    esac
-}
-
-if check_for_network; then
-    enable_firewall
-fi
-{{- else}}
-if check_for_network; then
-    enable_firewall
-fi
-{{- end}}
 
 # ---- Main
 
-if [[ -s "/opt/safescale/var/state/user_data.phase1.done" ]]; then
-    set -x
-    set +x
-else
-    mkdir -p /opt/safescale/etc &>/dev/null
-    mkdir -p /opt/safescale/var/log &>/dev/null
-    mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
-    chmod -R 0640 /opt/safescale
-    find /opt/safescale -type d -exec chmod ug+x {} \;
+export DEBIAN_FRONTEND=noninteractive
 
-    exec 1<&-
-    exec 2<&-
-    exec 1<>/opt/safescale/var/log/user_data.phase1.log
-    exec 2>&1
-    set -x
+put_hostname_in_hosts
+disable_cloudinit_network_autoconf
+disable_services
+create_user
+ensure_network_connectivity
 
-    sfDetectFacts
+touch /etc/cloud/cloud-init.disabled
 
-    put_hostname_in_hosts
-    disable_cloudinit_network_autoconf
-
-    create_user
-
-    touch /etc/cloud/cloud-init.disabled
-
-    echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
-    set +x
-fi
-
+echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+set +x
 exit 0

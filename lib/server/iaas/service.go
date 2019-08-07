@@ -57,7 +57,8 @@ type Service interface {
 	GetMetadataBucket() objectstorage.Bucket
 	ListHostsByName() (map[string]*resources.Host, error)
 	SearchImage(string) (*resources.Image, error)
-	SelectTemplatesBySize(resources.SizingRequirements, bool) ([]resources.HostTemplate, error)
+	SelectTemplatesBySize(resources.SizingRequirements, bool) ([]*resources.HostTemplate, error)
+	SelectTemplateByName(string) (*resources.HostTemplate, error)
 	WaitHostState(string, HostState.Enum, time.Duration) error
 	WaitVolumeState(string, VolumeState.Enum, time.Duration) (*resources.Volume, error)
 
@@ -101,11 +102,11 @@ func RankDRF(t *resources.HostTemplate) float32 {
 
 // ByRankDRF implements sort.Interface for []HostTemplate based on
 // the Dominant Resource Fairness
-type ByRankDRF []resources.HostTemplate
+type ByRankDRF []*resources.HostTemplate
 
 func (a ByRankDRF) Len() int           { return len(a) }
 func (a ByRankDRF) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByRankDRF) Less(i, j int) bool { return RankDRF(&a[i]) < RankDRF(&a[j]) }
+func (a ByRankDRF) Less(i, j int) bool { return RankDRF(a[i]) < RankDRF(a[j]) }
 
 // // HostAccess an host and the SSH Key Pair
 // type HostAccess struct {
@@ -229,6 +230,20 @@ func (svc *service) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	return svc.reduceTemplates(allTemplates), nil
 }
 
+// SelectTemplateByName returns the template by its name
+func (svc *service) SelectTemplateByName(name string) (*resources.HostTemplate, error) {
+	allTemplates, err := svc.Provider.ListTemplates(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range allTemplates {
+		if i.Name == name {
+			return &i, nil
+		}
+	}
+	return nil, utils.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
+}
+
 func (svc *service) reduceTemplates(tpls []resources.HostTemplate) []resources.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if svc.whitelistTemplateRE != nil {
@@ -262,13 +277,13 @@ func filterBlacklistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
 
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) ([]resources.HostTemplate, error) {
+func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) ([]*resources.HostTemplate, error) {
 	if svc == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 
 	templates, err := svc.ListTemplates(false)
-	var selectedTpls []resources.HostTemplate
+	var selectedTpls []*resources.HostTemplate
 	scannerTemplates := map[string]bool{}
 	if err != nil {
 		return nil, err
@@ -391,10 +406,10 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	}
 
 	for _, template := range templates {
-		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f RAM, and %d Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
 		msg = msg + " %s"
 		if sizing.MinCores > 0 && template.Cores < sizing.MinCores {
-			log.Debugf(msg, "too few cores")
+			log.Debugf(msg, "not enough cores")
 			continue
 		}
 		if sizing.MaxCores > 0 && template.Cores > sizing.MaxCores {
@@ -402,7 +417,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			continue
 		}
 		if sizing.MinRAMSize > 0.0 && template.RAMSize < sizing.MinRAMSize {
-			log.Debugf(msg, "too few RAM")
+			log.Debugf(msg, "not enough RAM")
 			continue
 		}
 		if sizing.MaxRAMSize > 0.0 && template.RAMSize > sizing.MaxRAMSize {
@@ -410,12 +425,12 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			continue
 		}
 		if template.DiskSize > 0 && sizing.MinDiskSize > 0 && template.DiskSize < sizing.MinDiskSize {
-			log.Debugf(msg, "too few disk size")
+			log.Debugf(msg, "not enough disk")
 			continue
 		}
 
 		if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo {
-			selectedTpls = append(selectedTpls, template)
+			selectedTpls = append(selectedTpls, &template)
 		}
 	}
 
@@ -573,11 +588,6 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		return nil, nil, nil, err
 	}
 
-	password, err := utils.GeneratePassword(16)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
-	}
-
 	// Create host
 	hostReq := resources.HostRequest{
 		ResourceName:   request.ResourceName,
@@ -586,9 +596,9 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		KeyPair:        kp,
 		PublicIP:       request.PublicIP,
 		Networks:       request.Networks,
+		DefaultRouteIP: request.DefaultRouteIP,
 		DefaultGateway: request.DefaultGateway,
 		TemplateID:     request.TemplateID,
-		Password:       password,
 	}
 	host, userData, err := svc.CreateHost(hostReq)
 	if err != nil {

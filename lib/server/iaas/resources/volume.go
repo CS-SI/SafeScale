@@ -46,6 +46,7 @@ func NewVolume() *Volume {
 	}
 }
 
+// OK ...
 func (v *Volume) OK() bool {
 	result := true
 	result = result && v.ID != ""

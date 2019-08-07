@@ -25,7 +25,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
+	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -101,9 +101,13 @@ type Stack struct {
 	authOpts stacks.AuthenticationOptions
 	cfgOpts  stacks.ConfigurationOptions
 
-	defaultSecurityGroupName string
-	SecurityGroup            *secgroups.SecurityGroup
-	ProviderNetworkID        string
+	// DefaultSecurityGroupName is the name of the default security groupa
+	DefaultSecurityGroupName string
+	// DefaultSecurityGroupDescription contains a description for the default security groupa
+	DefaultSecurityGroupDescription string
+	// SecurityGroup is an instance of the default security group
+	SecurityGroup     *secgroups.SecGroup
+	ProviderNetworkID string
 
 	// versions contains the last version supported for each service
 	versions map[string]string

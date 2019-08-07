@@ -63,6 +63,17 @@ type Stack interface {
 	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 
+	// CreateVIP ...
+	CreateVIP(string, string) (*resources.VIP, error)
+	// AddPublicIPToVIP adds a public IP to VIP
+	AddPublicIPToVIP(*resources.VIP) error
+	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
+	BindHostToVIP(*resources.VIP, *resources.Host) error
+	// UnbindHostFromVIP removes the bind between the VIP and a host
+	UnbindHostFromVIP(*resources.VIP, *resources.Host) error
+	// DeleteVIP deletes the port corresponding to the VIP
+	DeleteVIP(*resources.VIP) error
+
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error)
 	// GetHost returns the host identified by id or updates content of a *resources.Host

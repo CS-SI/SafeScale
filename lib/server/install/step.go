@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 const (
@@ -232,7 +233,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 	results := stepResults{}
 
 	if is.Serial || s.Serialize {
-		subtask := concurrency.NewTask(is.Worker.feature.task, is.taskRunOnHost)
+		subtask := concurrency.NewTask(is.Worker.feature.task)
 
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
@@ -244,8 +245,8 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			if err != nil {
 				return nil, err
 			}
-			_ = subtask.Run(map[string]interface{}{"host": h, "variables": cloneV})
-			results[h.Name] = subtask.GetResult().(stepResult)
+			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
+			results[h.Name] = result.(stepResult)
 			subtask.Reset()
 			// if !results[h.Name].Successful() {
 			// 	log.Infof("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
@@ -264,15 +265,19 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			if err != nil {
 				return nil, err
 			}
-			subtask := concurrency.NewTask(is.Worker.feature.task, is.taskRunOnHost).Start(map[string]interface{}{
+			subtask := concurrency.NewTask(is.Worker.feature.task).Start(is.taskRunOnHost, data.Map{
 				"host":      h,
 				"variables": cloneV,
 			})
 			subtasks[h.Name] = subtask
 		}
 		for k, s := range subtasks {
-			s.Wait()
-			results[k] = s.GetResult().(stepResult)
+			result, err := s.Wait()
+			if err != nil {
+				log.Debugf("%s(%s):step(%s)@%s: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				continue
+			}
+			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
 				log.Debugf("%s(%s):step(%s)@%s: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, results.ErrorMessages())
@@ -287,34 +292,23 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
-func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
+func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	// Get parameters
-	p := params.(map[string]interface{})
+	p := params.(data.Map)
 	host := p["host"].(*pb.Host)
 	variables := p["variables"].(Variables)
-
-	var err error
-	defer func() {
-		if err != nil {
-			tr.Fail(err)
-		} else {
-			tr.Done()
-		}
-	}()
 
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
-		tr.StoreResult(stepResult{success: false, err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())})
-		return
+		return stepResult{success: false, err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())}, nil
 	}
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
 		err := UploadStringToRemoteFile(is.OptionsFileContent, host, srvutils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
 		if err != nil {
-			tr.StoreResult(stepResult{success: false, err: err})
-			return
+			return stepResult{success: false, err: err}, nil
 		}
 	}
 
@@ -324,8 +318,7 @@ func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
-		tr.StoreResult(stepResult{success: false, err: err})
-		return
+		return stepResult{success: false, err: err}, nil
 	}
 
 	//command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s %s/options.json; fi; exit $rc", filename, filename, srvutils.TempFolder)
@@ -334,13 +327,12 @@ func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
 	// Executes the script on the remote host
 	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, client.DefaultConnectionTimeout, is.WallTime)
 	if err != nil {
-		tr.StoreResult(stepResult{success: false, err: err})
-		return
+		return stepResult{success: false, err: err}, nil
 	}
 	err = nil
 	ok := retcode == 0
 	if !ok {
 		err = fmt.Errorf("step '%s' failed (retcode=%d)", is.Name, retcode)
 	}
-	tr.StoreResult(stepResult{success: ok, err: err})
+	return stepResult{success: ok, err: err}, nil
 }

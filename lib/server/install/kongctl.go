@@ -25,8 +25,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	safescale "github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/metadata"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
@@ -42,14 +45,27 @@ var kongProxyCheckedCache = utils.NewMapCache()
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
-	host      *pb.Host
+	network *resources.Network
+	// host      *pb.Host
 	safescale safescale.Client
+
+	primaryGateway            *resources.Host
+	primaryGatewayPrivateIP   string
+	primaryGatewayPublicIP    string
+	secondaryGateway          *resources.Host
+	secondaryGatewayPrivateIP string
+	secondaryGatewayPublicIP  string
 }
 
 // NewKongController ...
-func NewKongController(host *pb.Host) (*KongController, error) {
-	if host == nil {
-		panic("host is nil!")
+// func NewKongController(host *pb.Host) (*KongController, error) {
+func NewKongController(svc iaas.Service, network *resources.Network) (*KongController, error) {
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "can't be nil")
+	}
+	// if host == nil {
+	if network == nil {
+		return nil, utils.InvalidParameterError("network", "can't be nil")
 	}
 
 	// Check if reverseproxy feature is installed on host
@@ -57,20 +73,46 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find a feature called 'kong4gateway'")
 	}
+	var (
+		primaryGateway, secondaryGateway *resources.Host
+	)
 	present := false
-	if anon, ok := kongProxyCheckedCache.Get(host.Name); ok {
+	if anon, ok := kongProxyCheckedCache.Get(network.Name); ok {
 		present = anon.(bool)
 	} else {
-		setErr := kongProxyCheckedCache.SetBy(host.Name, func() (interface{}, error) {
-			target := NewNodeTarget(host)
+		setErr := kongProxyCheckedCache.SetBy(network.Name, func() (interface{}, error) {
+			mh, err := metadata.LoadHost(svc, network.GatewayID)
 			if err != nil {
-				return nil, err
+				return false, err
 			}
+			primaryGateway = mh.Get()
+			pbHost := srvutils.ToPBHost(primaryGateway)
+			target := NewNodeTarget(pbHost)
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway: %s", err.Error())
+				return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), pbHost.Name)
 			}
-			return results.Successful(), nil
+			if !results.Successful() {
+				return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", pbHost.Name)
+			}
+
+			if network.SecondaryGatewayID != "" {
+				mh, err := metadata.LoadHost(svc, network.SecondaryGatewayID)
+				if err != nil {
+					return false, err
+				}
+				secondaryGateway = mh.Get()
+				pbHost := srvutils.ToPBHost(secondaryGateway)
+				target := NewNodeTarget(pbHost)
+				results, err := rp.Check(target, Variables{}, Settings{})
+				if err != nil {
+					return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), pbHost.Name)
+				}
+				if !results.Successful() {
+					return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", pbHost.Name)
+				}
+			}
+			return true, nil
 		})
 		if setErr != nil {
 			return nil, setErr
@@ -81,10 +123,20 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 		return nil, fmt.Errorf("'kong4gateway' feature isn't installed on gateway")
 	}
 
-	return &KongController{
-		host:      host,
-		safescale: safescale.New(),
-	}, nil
+	ctrl := KongController{
+		network: network,
+		// host:      host,
+		safescale:               safescale.New(),
+		primaryGateway:          primaryGateway,
+		primaryGatewayPrivateIP: primaryGateway.GetPrivateIP(),
+		primaryGatewayPublicIP:  primaryGateway.GetPublicIP(),
+		secondaryGateway:        secondaryGateway,
+	}
+	if secondaryGateway != nil {
+		ctrl.secondaryGatewayPrivateIP = secondaryGateway.GetPrivateIP()
+		ctrl.secondaryGatewayPublicIP = secondaryGateway.GetPublicIP()
+	}
+	return &ctrl, nil
 }
 
 // Apply applies the rule to Kong proxy
@@ -99,6 +151,19 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 	}
 
 	var sourceControl map[string]interface{}
+
+	// Sets the values useable in all cases
+	if k.network.VIP != nil {
+		// w.variables["EndpointIP"] = network.VIP.PublicIP
+		(*values)["EndpointIP"] = k.network.VIP.PublicIP
+		(*values)["DefaultRouteIP"] = k.network.VIP.PrivateIP
+	} else {
+		(*values)["EndpointIP"] = k.primaryGatewayPublicIP
+		(*values)["DefaultRouteIP"] = k.primaryGatewayPrivateIP
+	}
+	// Legacy...
+	(*values)["PublicIP"] = (*values)["EndpointIP"]
+	(*values)["GatewayIP"] = (*values)["DefaultRouteIP"]
 
 	// Analyzes the rule...
 	var url string
@@ -270,7 +335,7 @@ func (k *KongController) buildSourceControlContent(rules map[string]interface{})
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := safescale.New().Ssh.Run(k.host.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
+	retcode, stdout, _, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, "", err
 	}
@@ -285,10 +350,11 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 	return response, httpcode, nil
 }
 
+// post creates a rule
 func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, Variables, error) {
 	propagated := Variables{}
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.host.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
+	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -308,10 +374,11 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 	return response, httpcode, propagated, nil
 }
 
+// put updates or creates a rule
 func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, Variables, error) {
 	propagated := Variables{}
 	cmd := fmt.Sprintf(curlPut, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.host.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
+	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -332,9 +399,10 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 	return response, httpcode, propagated, nil
 }
 
+// patch updates an existing rule
 func (k *KongController) patch(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, Variables, error) {
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.host.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
+	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, "", nil, err
 	}

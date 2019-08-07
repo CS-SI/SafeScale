@@ -88,6 +88,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		*sizing,
 		in.GetGateway().GetImageId(),
 		in.GetGateway().GetName(),
+		in.FailOver,
 	)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())

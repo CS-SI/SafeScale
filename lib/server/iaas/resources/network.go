@@ -45,16 +45,20 @@ type NetworkRequest struct {
 	CIDR string
 	// DNSServers
 	DNSServers []string
+	// HA tells if 2 gateways and a VIP needs to be created; the VIP IP address will be used as gateway
+	HA bool
 }
 
 // Network representes a virtual network
 type Network struct {
-	ID         string                    `json:"id,omitempty"`         // ID for the network (from provider)
-	Name       string                    `json:"name,omitempty"`       // Name of the network
-	CIDR       string                    `json:"mask,omitempty"`       // network in CIDR notation
-	GatewayID  string                    `json:"gateway_id,omitempty"` // contains the id of the host acting as gateway for the network
-	IPVersion  IPVersion.Enum            `json:"ip_version,omitempty"` // IPVersion is IPv4 or IPv6 (see IPVersion)
-	Properties *serialize.JSONProperties `json:"properties,omitempty"` // contains optional supplemental information
+	ID                 string                    `json:"id,omitempty"`                   // ID for the network (from provider)
+	Name               string                    `json:"name,omitempty"`                 // Name of the network
+	CIDR               string                    `json:"mask,omitempty"`                 // network in CIDR notation
+	GatewayID          string                    `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
+	SecondaryGatewayID string                    `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
+	VIP                *VIP                      `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
+	IPVersion          IPVersion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
+	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
 }
 
 // NewNetwork ...
@@ -64,6 +68,7 @@ func NewNetwork() *Network {
 	}
 }
 
+// OK ...
 func (n *Network) OK() bool {
 	result := true
 	if n == nil {
@@ -109,4 +114,14 @@ func (n *Network) Deserialize(buf []byte) error {
 	}
 
 	return nil
+}
+
+// VIP is a structure containint information needed to manage VIP (virtual IP)
+type VIP struct {
+	ID        string
+	Name      string
+	NetworkID string
+	PrivateIP string
+	PublicIP  string
+	Hosts     []*Host
 }

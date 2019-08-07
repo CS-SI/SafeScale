@@ -328,6 +328,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
+	// caps := p.GetCapabilities()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -347,6 +348,13 @@ func (p *provider) GetName() string {
 // GetTenantParameters returns the tenant parameters as-is
 func (p *provider) GetTenantParameters() map[string]interface{} {
 	return p.tenantParameters
+}
+
+// GetCapabilities returns the capabilities of the provider
+func (p *provider) GetCapabilities() providers.Capabilities {
+	return providers.Capabilities{
+		PrivateVirtualIp: true,
+	}
 }
 
 func init() {

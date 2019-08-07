@@ -186,7 +186,7 @@ substring_diff() {
 ensure_network_connectivity() {
     {{- if .AddGateway }}
         route del -net default &>/dev/null
-        route add -net default gw {{ .GatewayIP }}
+        route add -net default gw {{ .DefaultRouteIP }}
     {{- else }}
     :
     {{- end}}
@@ -232,6 +232,7 @@ configure_network() {
 
     {{- if .IsGateway }}
     configure_as_gateway
+    install_keepalived
     {{- end }}
 
     check_for_network || {
@@ -260,7 +261,7 @@ EOF
 auto ${IF}
 iface ${IF} inet dhcp
 {{- if .AddGateway }}
-  up route add -net default gw {{ .GatewayIP }} || true
+  up route add -net default gw {{ .DefaultRouteIP }} || true
 {{- end}}
 EOF
         fi
@@ -317,7 +318,7 @@ network:
         use-routes: false
       routes:
       - to: 0.0.0.0/0
-        via: {{ .GatewayIP }}
+        via: {{ .DefaultRouteIP }}
         scope: global
         on-link: true
 {{- else }}
@@ -398,7 +399,7 @@ EOF
     configure_dhclient
 
     {{- if .AddGateway }}
-    echo "GATEWAY={{ .GatewayIP }}" >/etc/sysconfig/network
+    echo "GATEWAY={{ .DefaultRouteIP }}" >/etc/sysconfig/network
     {{- end }}
 
     enable_svc network
@@ -416,10 +417,11 @@ check_for_ip() {
 }
 
 # Checks network is set correctly
-# - DNS and routes (by pinging a FQDN)
+# - DNS and routes (by 'wget'ing a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-    ping -n -c1 -w30 -i5 www.google.com || return 1
+    #ping -n -c1 -w30 -i5 www.google.com || return 1
+    wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
     [ ! -z "$PU_IF" ] && {
         check_for_ip $PU_IF || return 1
     }
@@ -438,8 +440,14 @@ configure_as_gateway() {
             grep -v "net.ipv4.ip_forward=" $i >${i}.new
             mv -f ${i}.new ${i}
         done
-        echo "net.ipv4.ip_forward=1" >/etc/sysctl.d/98-forward.conf
-        systemctl restart systemd-sysctl
+        cat >/etc/sysctl.d/21-gateway.conf <<-EOF
+net.ipv4.ip_forward=1
+net.ipv4.ip_nonlocal_bind=1
+EOF
+        case $LINUX_KIND in
+            ubuntu) systemctl restart systemd-sysctl;;
+            *)      sysctl -p;;
+        esac
     fi
 
     [ ! -z $PU_IF ] && {
@@ -467,6 +475,72 @@ configure_as_gateway() {
     systemctl restart ssh
 
     echo done
+}
+
+
+install_keepalived() {
+    case $LINUX_KIND in
+        ubuntu|debian)
+            sfApt update && sfApt -y install keepalived || return 1
+            ;;
+
+        redhat|centos)
+            yum install -qy keepalived || return 1
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            return 1
+            ;;
+    esac
+
+    cat >/etc/keepalived/keepalived.conf <<-EOF
+vrrp_instance vrrp_group_gws_internal {
+    state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+    interface ${PR_IFs[0]}
+    virtual_router_id 1
+    priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
+    advert_int 2
+    authentication {
+        auth_type PASS
+        auth_pass password
+    }
+{{ if eq .IsPrimaryGateway true }}
+    # Unicast specific option, this is the IP of the interface keepalived listens on
+    unicast_src_ip {{ .PrimaryGatewayPrivateIP }}
+    # Unicast specific option, this is the IP of the peer instance
+    unicast_peer {
+        {{ .SecondaryGatewayPrivateIP }}
+    }
+{{ else }}
+    unicast_src_ip {{ .SecondaryGatewayPrivateIP }}
+    unicast_peer {
+        {{ .PrimaryGatewayPrivateIP }}
+    }
+{{ end }}
+    virtual_ipaddress {
+        {{ .PrivateVIP }}
+    }
+}
+
+# vrrp_instance vrrp_group_gws_external {
+#     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+#     interface ${PU_IF}
+#     virtual_router_id 2
+#     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
+#     advert_int 2
+#     authentication {
+#         auth_type PASS
+#         auth_pass password
+#     }
+#     virtual_ipaddress {
+#         {{ .PublicVIP }}
+#     }
+# }
+EOF
+
+    sfService enable keepalived
+    sfService restart keepalived || return 1
+    return 0
 }
 
 configure_dns_legacy() {
@@ -521,7 +595,7 @@ EOF
 configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
 
-{{- if not .GatewayIP }}
+{{- if not .DefaultRouteIP }}
     rm -f /etc/resolv.conf
     ln -s /run/systemd/resolve/resolv.conf /etc
 {{- end }}
@@ -702,10 +776,11 @@ force_dbus_restart() {
 update_kernel_settings() {
     cat >/etc/sysctl.d/20-safescale.conf <<-EOF
 vm.max_map_count=262144
-
-net.ipv4.ip_nonlocal_bind=1
 EOF
-    sysctl -p
+    case $LINUX_KIND in
+        ubuntu) systemctl restart systemd-sysctl;;
+        *)      sysctl -p;;
+    esac
 }
 
 # ---- Main
