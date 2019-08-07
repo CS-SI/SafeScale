@@ -48,7 +48,7 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(ctx context.Context, name string, net string, os string, public bool, sizing *resources.SizingRequirements, force bool) (*resources.Host, error)
+	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool) (*resources.Host, error)
 	List(ctx context.Context, all bool) ([]*resources.Host, error)
 	ForceInspect(ctx context.Context, ref string) (*resources.Host, error)
 	Inspect(ctx context.Context, ref string) (*resources.Host, error)
@@ -210,11 +210,34 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 // 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, los string, public bool, sizing *resources.SizingRequirements, force bool,
+	name string, net string, los string, public bool, sizingParam interface{}, force bool,
 ) (*resources.Host, error) {
 
 	log.Debugf(">>> lib.server.handlers.HostHandler::Create(%s)", name)
 	defer log.Debugf("<<< lib.server.handlers.HostHandler::Create(%s)", name)
+
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, utils.InvalidParameterError("ctx", "can't be nil")
+	}
+	if name == "" {
+		return nil, utils.InvalidParameterError("name", "can't be empty string")
+	}
+
+	var (
+		sizing       *resources.SizingRequirements
+		templateName string
+	)
+	switch sizingParam.(type) {
+	case *resources.SizingRequirements:
+		sizing = sizingParam.(*resources.SizingRequirements)
+	case string:
+		templateName = sizingParam.(string)
+	default:
+		return nil, utils.InvalidParameterError("sizing", "must be *resources.SizingRequirements or string")
+	}
 
 	host, err := handler.service.GetHostByName(name)
 	if err != nil {
@@ -232,7 +255,7 @@ func (handler *HostHandler) Create(
 		// secondaryGateway *resources.Host
 		defaultRouteIP string
 	)
-	if net != "" {
+	if net != "" && net != "net-safescale" {
 		networkHandler := NewNetworkHandler(handler.service)
 		defaultNetwork, err = networkHandler.Inspect(ctx, net)
 		if err != nil {
@@ -255,15 +278,6 @@ func (handler *HostHandler) Create(
 		}
 		primaryGateway = mgw.Get()
 		if defaultNetwork.VIP != nil {
-			// mgw, err = metadata.LoadHost(handler.service, defaultNetwork.SecondaryGatewayID)
-			// if err != nil {
-			// 	return nil, infraErr(err)
-			// }
-			// if mgw == nil {
-			// 	return nil, logicErr(fmt.Errorf("failed to find secondary gateway of network '%s'", net))
-			// }
-			// secondaryGateway = mgw.Get()
-
 			defaultRouteIP = defaultNetwork.VIP.PrivateIP
 		} else {
 			defaultRouteIP = primaryGateway.GetPrivateIP()
@@ -276,37 +290,36 @@ func (handler *HostHandler) Create(
 		networks = append(networks, net)
 	}
 
-	// templates, err := handler.service.SelectTemplatesBySize(
-	// 	resources.SizingRequirements{
-	// 		MinCores:    cpu,
-	// 		MinRAMSize:  ram,
-	// 		MinDiskSize: disk,
-	// 		MinGPU:      gpuNumber,
-	// 		MinFreq:     freq,
-	// 	}, force)
-	templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
-	if err != nil {
-		return nil, infraErrf(err, "failed to find template corresponding to requested resources")
-	}
-	var template resources.HostTemplate
-	if len(templates) > 0 {
-		template = templates[0]
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
-		if template.CPUFreq > 0 {
-			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+	var template *resources.HostTemplate
+	if sizing != nil {
+		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
+		if err != nil {
+			return nil, infraErrf(err, "failed to find template corresponding to requested resources")
 		}
-		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
-			if template.GPUType != "" {
-				msg += fmt.Sprintf(" %s", template.GPUType)
+		if len(templates) > 0 {
+			template = templates[0]
+			msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
+			if template.CPUFreq > 0 {
+				msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 			}
+			msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+			if template.GPUNumber > 0 {
+				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
+				if template.GPUType != "" {
+					msg += fmt.Sprintf(" %s", template.GPUType)
+				}
+			}
+			msg += ")"
+			log.Infof(msg)
+		} else {
+			log.Errorf("failed to find template corresponding to requested resources")
+			return nil, logicErrf(fmt.Errorf(""), "failed to find template corresponding to requested resources")
 		}
-		msg += ")"
-		log.Infof(msg)
 	} else {
-		log.Errorf("failed to find template corresponding to requested resources")
-		return nil, logicErrf(fmt.Errorf(""), "failed to find template corresponding to requested resources")
+		template, err = handler.service.SelectTemplateByName(templateName)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var img *resources.Image
@@ -375,18 +388,33 @@ func (handler *HostHandler) Create(
 		}
 	}()
 
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
-		hostSizingV1.Template = hostRequest.TemplateID
-		hostSizingV1.RequestedSize = &propsv1.HostSize{
-			Cores:     sizing.MinCores,
-			RAMSize:   sizing.MinRAMSize,
-			DiskSize:  sizing.MinDiskSize,
-			GPUNumber: sizing.MinGPU,
-			CPUFreq:   sizing.MinFreq,
-		}
-		return nil
-	})
+	if sizing != nil {
+		err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			hostSizingV1 := v.(*propsv1.HostSizing)
+			hostSizingV1.Template = hostRequest.TemplateID
+			hostSizingV1.RequestedSize = &propsv1.HostSize{
+				Cores:     sizing.MinCores,
+				RAMSize:   sizing.MinRAMSize,
+				DiskSize:  sizing.MinDiskSize,
+				GPUNumber: sizing.MinGPU,
+				CPUFreq:   sizing.MinFreq,
+			}
+			return nil
+		})
+	} else {
+		err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			hostSizingV1 := v.(*propsv1.HostSizing)
+			hostSizingV1.Template = hostRequest.TemplateID
+			hostSizingV1.RequestedSize = &propsv1.HostSize{
+				Cores:     template.Cores,
+				RAMSize:   template.RAMSize,
+				DiskSize:  template.DiskSize,
+				GPUNumber: template.GPUNumber,
+				CPUFreq:   template.CPUFreq,
+			}
+			return nil
+		})
+	}
 	if err != nil {
 		return nil, infraErr(err)
 	}
