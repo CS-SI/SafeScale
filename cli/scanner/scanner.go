@@ -309,19 +309,19 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			IPVersion: IPVersion.IPv4,
 			Name:      netName,
 		})
-		if err == nil {
-			defer func() {
-				delerr := serviceProvider.DeleteNetwork(net.ID)
-				if delerr != nil {
-					log.Warnf("Error deleting network '%s'", net.ID)
-				}
-			}()
-		} else {
+		if err != nil {
 			return errors.Wrapf(err, "Error waiting for server ready: %v", err)
 		}
 		if net == nil {
 			return errors.Errorf("Failure creating network")
 		}
+
+		defer func() {
+			delerr := serviceProvider.DeleteNetwork(net.ID)
+			if delerr != nil {
+				log.Warnf("Error deleting network '%s'", net.ID)
+			}
+		}()
 
 		_, err = metadata.SaveNetwork(serviceProvider, net)
 		if err != nil {
@@ -365,7 +365,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			hostName := "scanhost-" + template.Name
 			hostHandler := handlers.NewHostHandler(serviceProvider)
 
-			host, err := hostHandler.Create(context.Background(), hostName, net.Name, img.ID, true, nil, false)
+			host, err := hostHandler.Create(context.Background(), hostName, net.Name, "Ubuntu 18.04", true, template.Name, false)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
@@ -387,23 +387,23 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			}
 			_, nerr := ssh.WaitServerReady("ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
-				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
+				log.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
 			}
 			c, err := ssh.Command(cmd)
 			if err != nil {
-				log.Warnf("template [%s] : Problem creating ssh command: %v", template.Name, err)
+				log.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
 			_, cout, _, err := c.RunWithTimeout(8 * time.Minute) // FIXME Hardcoded timeout
 			if err != nil {
-				log.Warnf("template [%s] : Problem running ssh command: %v", template.Name, err)
+				log.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
 				return err
 			}
 
 			daCPU, err := createCPUInfo(cout)
 			if err != nil {
-				log.Warnf("template [%s] : Problem building cpu info: %v", template.Name, err)
+				log.Warnf("template [%s]: Problem building cpu info: %v", template.Name, err)
 				return err
 			}
 
