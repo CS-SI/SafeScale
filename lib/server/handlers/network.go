@@ -160,7 +160,7 @@ func (handler *NetworkHandler) Create(
 
 	log.Debugf("Creating compute resource '%s' ...", gwname)
 
-	var template resources.HostTemplate
+	var template *resources.HostTemplate
 	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
 		return nil, infraErrf(err, "Error creating network: Error selecting template")
@@ -657,14 +657,14 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 			if network.VIP != nil {
 				err = handler.service.UnbindHostFromVIP(network.VIP, mh.Get())
 				if err != nil {
-					log.Errorf("failed to unbind host to VIP: %v", err)
+					log.Errorf("failed to unbind primary gateway from VIP: %v", err)
 				}
 			}
 
 			err = handler.service.DeleteGateway(network.GatewayID)
 			// allow no gateway, but log it
 			if err != nil {
-				log.Errorf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+				log.Errorf("Failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
 			}
 			err = mh.Delete()
 			if err != nil {
@@ -680,14 +680,14 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 			if network.VIP != nil {
 				err = handler.service.UnbindHostFromVIP(network.VIP, mh.Get())
 				if err != nil {
-					log.Errorf("failed to unbind host to VIP: %v", err)
+					log.Errorf("failed to unbind secondary gateway from VIP: %v", err)
 				}
 			}
 
-			err = handler.service.DeleteGateway(network.GatewayID)
+			err = handler.service.DeleteGateway(network.SecondaryGatewayID)
 			// allow no gateway, but log it
 			if err != nil {
-				log.Errorf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+				log.Errorf("Failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
 			}
 			err = mh.Delete()
 			if err != nil {
