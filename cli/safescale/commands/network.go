@@ -118,6 +118,10 @@ var networkCreate = cli.Command{
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
+		cli.BoolFlag{
+			Name:  "failover",
+			Usage: "If you want gateways fail-over",
+		},
 		cli.StringFlag{
 			Name: "S, sizing",
 			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
@@ -165,13 +169,10 @@ var networkCreate = cli.Command{
 			return err
 		}
 		netdef := pb.NetworkDefinition{
-			Cidr: c.String("cidr"),
-			Name: c.Args().Get(0),
+			Cidr:     c.String("cidr"),
+			Name:     c.Args().Get(0),
+			FailOver: c.Bool("with-failover"),
 			Gateway: &pb.GatewayDefinition{
-				// Cpu:  int32(c.Int("cpu")),
-				// Disk: int32(c.Int("disk")),
-				// Ram:  float32(c.Float64("ram")),
-				// CpuFreq: ??,
 				ImageId: c.String("os"),
 				Name:    c.String("gwname"),
 				Sizing:  def.Sizing,

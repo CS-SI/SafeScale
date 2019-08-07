@@ -79,10 +79,20 @@ service DataService{
 // safescale network delete net1
 // safescale network inspect net1
 
+message VirtualIp {
+    string id = 1;
+    string name = 2;
+    string network_id = 3;
+    string private_ip = 4;
+    string public_ip = 5;
+    repeated Host hosts = 6;
+}
+
 message NetworkDefinition{
     string name = 2;
     string cidr = 3;
     GatewayDefinition gateway = 4;
+    bool fail_over = 5;
 }
 
 message GatewayDefinition{
@@ -101,8 +111,10 @@ message Network{
     string name = 2;
     string cidr = 3;
     string gateway_id = 4;
+    string secondary_gateway_id = 5;
+    VirtualIp virtual_ip = 6;
+    bool failover = 7;
 }
-
 
 message NetworkList{
     repeated Network networks = 1;

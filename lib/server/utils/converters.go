@@ -269,11 +269,18 @@ func ToPBImage(in *resources.Image) *pb.Image {
 
 // ToPBNetwork convert a network from api to protocolbuffer format
 func ToPBNetwork(in *resources.Network) *pb.Network {
+	var pbVIP pb.VirtualIp
+	if in.VIP != nil {
+		pbVIP = ToPBVirtualIp(*in.VIP)
+	}
 	return &pb.Network{
-		Id:        in.ID,
-		Name:      in.Name,
-		Cidr:      in.CIDR,
-		GatewayId: in.GatewayID,
+		Id:                 in.ID,
+		Name:               in.Name,
+		Cidr:               in.CIDR,
+		GatewayId:          in.GatewayID,
+		SecondaryGatewayId: in.SecondaryGatewayID,
+		VirtualIp:          &pbVIP,
+		Failover:           in.SecondaryGatewayID != "",
 	}
 }
 
@@ -311,4 +318,19 @@ func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
 		MaxRAMSize:  src.MaxRamSize,
 		MinDiskSize: int(src.MinDiskSize),
 	}
+}
+
+// ToPBVirtualIp converts a resources.VIP to a pb.VirtualIp
+func ToPBVirtualIp(src resources.VIP) pb.VirtualIp {
+	dest := pb.VirtualIp{
+		Id:        src.ID,
+		NetworkId: src.NetworkID,
+		PrivateIp: src.PrivateIP,
+		PublicIp:  src.PublicIP,
+		Hosts:     []*pb.Host{},
+	}
+	for _, i := range src.Hosts {
+		dest.Hosts = append(dest.Hosts, ToPBHost(i))
+	}
+	return dest
 }

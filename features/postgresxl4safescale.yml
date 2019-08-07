@@ -1,0 +1,642 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: swarm
+
+    requirements:
+        features:
+            - docker
+            - docker-compose
+
+    parameters:
+        - PurgeOnRemoval=no
+
+    install:
+        bash:
+            check:
+                pace: docker
+                steps:
+                    docker:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'postgresxl4safescale:latest' || exit 192
+                            exit 0
+
+            add:
+                pace: config,image,stack,secret,network,firewall,start
+                steps:
+                    config:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/postgresxl4safescale/{gtm-master,gtm-slave,gtm-proxy,coordinator,data}/options
+                            mkdir -p ${SF_ETCDIR}/postgresxl4safescale/build
+                            mkdir -p ${SF_VARDIR}/postgresxl4safescale/{gtm-master,gtm-slave,gtm-proxy,coordinator,data}
+                            mkdir -p ${SF_LOGDIR}/postgresxl4safescale/{gtm-master,gtm-slave,gtm-proxy,coordinator,data}
+                            chown -R 1003:safescale ${SF_VARDIR}/postgresxl4safescale/{gtm-master,gtm-slave,gtm-proxy,coordinator,data}
+                            chmod -R 0700 ${SF_VARDIR}/postgresxl4safescale/{gtm-master,gtm-slave,gtm-proxy,coordinator,data}
+
+                            cat >${SF_ETCDIR}/postgresxl4safescale/postgresql.conf <<-EOF
+                            listen_addresses = '*'
+                            max_connections = 500
+                            data_directory = '/var/lib/pgsql/data'
+                            wal_level = replica
+                            synchronous_commit = on
+                            shared_buffers = 128MB
+                            timezone = 'UTC'
+                            log_timezone = 'UTC'
+                            autovacuum = on
+                            track_counts = on
+
+                            # Locale
+                            lc_messages = 'en_US.UTF-8'
+                            lc_monetary = 'en_US.UTF-8'
+                            lc_numeric = 'en_US.UTF-8'
+                            lc_time = 'en_US.UTF-8'
+                            default_text_search_config = 'pg_catalog.english'
+
+                            include_if_exists = '/etc/pgxl/coordinator.conf'
+                            include_if_exists = '/etc/pgxl/data.conf'
+                            include_dir = '/etc/pgxl/options'
+                            EOF
+
+                            cat >${SF_ETCDIR}/postgresxl4safescale/gtm-master/gtm.conf <<-EOF
+                            startup = act
+                            listen_addresses = '*'
+                            nodename = gtmmaster
+                            port = 6666
+                            synchronous_backup = true
+                            EOF
+
+                            cat >${SF_ETCDIR}/postgresxl4safescale/gtm-slave/gtm.conf <<-EOF
+                            startup = standby
+                            listen_addresses = '*'
+                            nodename = gtmslave
+                            port = 6666
+                            active_host = tasks.postgresxl4safescale_gtm-master
+                            active_port = 6666
+                            #keepalives_count = 3
+                            #keepalives_interval = 10
+                            synchronous_backup = true
+                            EOF
+
+                            INDEX={{ range $i, $e := .Masters }}{{ if eq $e.PrivateIP $.HostIP }}{{ $i }}{{ end }}{{ end }}
+
+                            cat >${SF_ETCDIR}/postgresxl4safescale/gtm-proxy/gtm_proxy.conf <<-EOF
+                            listen_addresses = '*'
+                            nodename = gtmproxy${INDEX}
+                            port = 6666
+                            gtm_host = tasks.postgresxl4safescale_gtm-master
+                            gtm_port = 6666
+                            gtm_connect_retry_interval = 30
+                            comm_timeout = 10
+                            EOF
+
+                            cat >${SF_ETCDIR}/postgresxl4safescale/coordinator/coordinator.conf <<-EOF
+                            pgxc_node_name=coord${INDEX}
+                            gtm_host = tasks.postgresxl4safescale_gtm-proxy
+                            gtm_port = 6666
+                            EOF
+
+                            cat >${SF_ETCDIR}/postgresxl4safescale/data/data.conf <<-EOF
+                            pooler_port = 6666
+                            pgxc_node_name=data${INDEX}
+                            gtm_host = tasks.postgresxl4safescale_gtm-proxy
+                            gtm_port = 6666
+                            EOF
+
+                            GWBRIDGE_SUBNET=$(docker network inspect docker_gwbridge | jq -r .[0].IPAM.Config[0].Subnet)
+                            cat >${SF_ETCDIR}/postgresxl4safescale/pg_hba.conf <<-HBAEOF
+                            # TYPE  DATABASE        USER            ADDRESS             METHOD
+                            local   all             all                                 trust
+                            host    all             all             127.0.0.0/8         trust
+                            host    all             all             ${GWBRIDGE_SUBNET}  trust
+                            host    all             all             {{.CIDR}}           scram-sha-256
+                            HBAEOF
+                            exit 0
+
+                    image:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/postgresxl4safescale/build/docker-entrypoint.sh <<-EOF
+                            #!/bin/bash
+
+                            KIND=\$1
+                            shift
+
+                            PGSQL_DATA=/var/lib/pgsql/data
+
+                            update_postgresqlconf() {
+                                rm -f \${PGSQL_DATA}/postgresql.conf
+                                ln -sf /etc/pgxl/postgresql.conf \${PGSQL_DATA}
+                            }
+
+                            update_gtmconf() {
+                                rm -f \${PGSQL_DATA}/gtm.conf
+                                ln -sf /etc/pgxl/gtm.conf \${PGSQL_DATA}
+                            }
+
+                            update_gtmproxyconf() {
+                                rm -f \${PGSQL_DATA}/gtm_proxy.conf
+                                ln -sf /etc/pgxl/gtm_proxy.conf \${PGSQL_DATA}
+                            }
+
+                            update_pghbaconf() {
+                                rm -f \${PGSQL_DATA}/pg_hba.conf
+                                ln -sf /etc/pgxl/pg_hba.conf \${PGSQL_DATA}
+                            }
+
+                            INDEX={{ range $i, $e := .Masters }}{{ if eq $e.PrivateIP $.HostIP }}{{ $i }}{{ end }}{{ end }}
+                            case \$KIND in
+                                gtm-master)
+                                    NODENAME=gtmmaster
+                                    ;;
+                                gtm-slave)
+                                    NODENAME=gtmslave
+                                    ;;
+                                gtm-proxy)
+                                    NODENAME=gtmproxy\$INDEX
+                                    ;;
+                                coordinator)
+                                    NODENAME=coord\$INDEX
+                                    NODETYPE=--coordinator
+                                    ;;
+                                data)
+                                    NODENAME=data\$INDEX
+                                    NODETYPE=--datanode
+                                    ;;
+                            esac
+
+                            if [ ! -f \${PGSQL_DATA}/PG_VERSION ]; then
+                                mkdir -p \${PGSQL_DATA}
+                                rm -rf \${PGSQL_DATA}/*
+                                case \$KIND in
+                                    gtm-master|gtm-slave)
+                                        initgtm -Z gtm -D \${PGSQL_DATA}
+                                        ;;
+                                    gtm-proxy)
+                                        initgtm -Z gtm_proxy -D \${PGSQL_DATA}
+                                        ;;
+                                    coordinator|data)
+                                        initdb -D \${PGSQL_DATA} --nodename \$NODENAME
+                                        ;;
+                                esac
+
+                                if [ "\$KIND" == "coordinator" -o "\$KIND" == "data" ]; then
+                                    update_postgresqlconf
+                                    update_pghbaconf
+                                    postgres \$NODETYPE -h localhost -D \${PGSQL_DATA} >/dev/stdout 2>&1 &
+                                    pid=\$!
+                                    if [ -n \$pid ]; then
+                                        sleep 20
+
+                                        # Define cluster topology
+                                        cat <<-SQLEOF | psql
+                            ALTER ROLE postgres WITH SUPERUSER LOGIN PASSWORD '\$(cat /run/secrets/safescale.postgresxl.password)';
+
+                            {{ range $i, $e := .Masters }}
+                            CREATE NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 55432);
+                            ALTER NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 55432);
+                            CREATE NODE data{{ $i }} WITH (TYPE = 'datanode', HOST = '{{ $e.PrivateIP }}',  PORT = 55433);
+                            ALTER NODE data{{ $i }} WITH (TYPE = 'datanode', HOST = '{{ $e.PrivateIP }}',  PORT = 55433);
+                            {{ end }}
+                            SELECT pgxc_pool_reload();
+                            SQLEOF
+
+                                        if [ "\$KIND" = "coordinator" ]; then
+                                            # define the prefered data server for coordinator (both services on same host)
+                                            cat <<-SQLEOF | psql
+                            ALTER NODE data\$INDEX WITH (PRIMARY, PREFERRED);
+                            SELECT pgxc_pool_reload();
+                            SQLEOF
+                                        fi
+                                        cat <<-SQLEOF | psql -h localhost
+                            SELECT * FROM pgxc_node;
+                            SQLEOF
+
+                                        kill -s SIGINT \$pid
+                                        rm -f \${PGSQL_DATA}/postmaster.pid
+                                    fi
+                                fi
+                            fi
+
+                            # starts process based on first parameter
+                            case \$KIND in
+                                gtm-master)
+                                    update_postgresqlconf
+                                    update_gtmconf
+                                    update_pghbaconf
+                                    exec gtm -l /dev/stdout -D \${PGSQL_DATA} \$@
+                                    ;;
+                                gtm-slave)
+                                    update_postgresqlconf
+                                    update_gtmconf
+                                    update_pghbaconf
+                                    exec gtm -l /dev/stdout -D \${PGSQL_DATA} \$@
+                                    ;;
+                                gtm-proxy)
+                                    update_postgresqlconf
+                                    update_gtmproxyconf
+                                    update_pghbaconf
+                                    exec gtm_proxy -l /dev/stdout -D \${PGSQL_DATA} \$@
+                                    ;;
+                                coordinator)
+                                    exec postgres --coordinator -D \${PGSQL_DATA} \$@ >/dev/stdout 2>&1
+                                    ;;
+                                data)
+                                    exec postgres --datanode -D \${PGSQL_DATA} \$@ >/dev/stdout 2>&1
+                                    ;;
+                                *)
+                                    update_postgresqlconf
+                                    update_pghbaconf
+                                    exec postgres -D \${PGSQL_DATA} \$@ >/dev/stdout 2>&1
+                                    ;;
+                            esac
+                            EOF
+
+                            PARALLEL=$(sfGetFact "2/3 of threads")
+
+                            cat >${SF_ETCDIR}/postgresxl4safescale/build/Dockerfile <<-EOF
+                            FROM debian:stable-slim AS builder
+
+                            ARG DEBIAN_FRONTEND=noninteractive
+                            ARG RELEASE=10r1.1
+                            ARG PARALLEL=1
+
+                            RUN apt update \
+                             && apt install -y wget \
+                                               build-essential wget flex bison \
+                                               zlib1g-dev libreadline-dev libssl-dev libxml2-dev libxslt-dev \
+                                               locales \
+                             && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+                            ENV LANG en_US.UTF-8
+                            ENV LANGUAGE en_US:en
+                            ENV LC_ALL en_US.UTF-8
+
+                            RUN mkdir -p /usr/local/src
+                            WORKDIR /usr/local/src
+
+                            RUN wget https://www.postgres-xl.org/downloads/postgres-xl-\${RELEASE}.tar.gz \
+                             && tar zxvf postgres-xl-\${RELEASE}.tar.gz
+                            WORKDIR /usr/local/src/postgres-xl-\${RELEASE}
+
+                            RUN ./configure --prefix=/usr/local \
+                                            --sysconfdir=/etc/postgres-xl \
+                                            --with-openssl \
+                                            --without-systemd || cat config.log && exit 0
+
+                            RUN make -j$PARALLEL \
+                             && make install
+
+                            RUN cd contrib \
+                             && make -j$PARALLEL \
+                             && make install
+
+                            RUN rm -rf /usr/local/src/postgres-xl*
+
+                            FROM debian:stable-slim
+                            ARG DEBIAN_FRONTEND=noninteractive
+
+                            # dependencies
+                            RUN apt update \
+                             && apt install -y zlib1g-dev libreadline-dev libssl-dev libxml2-dev libxslt-dev \
+                                               locales \
+                                               vim net-tools inetutils-ping dnsutils procps nmap \
+                             && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+                            ENV LANG en_US.UTF-8
+                            ENV LANGUAGE en_US:en
+                            ENV LC_ALL en_US.UTF-8
+
+                            COPY --from=builder /usr/local/ /usr/local/
+                            RUN useradd -u 1003 -d /home/postgres -m postgres \
+                             && mkdir -p /etc/pgxl/options /var/lib/pgsql \
+                             && chown -R postgres:postgres /var/lib/pgsql \
+                             && chmod u+rwx,g+rx-w,o-rwx /var/lib/pgsql
+
+                            EXPOSE 5432 6666
+
+                            COPY docker-entrypoint.sh /
+                            RUN chmod a+rx-w /docker-entrypoint.sh
+
+                            USER postgres
+                            WORKDIR /home/postgres
+
+                            ENTRYPOINT ["/docker-entrypoint.sh"]
+                            EOF
+
+                            docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl4safescale:latest ${SF_ETCDIR}/postgresxl4safescale/build || exit 192
+                            exit 0
+
+                    stack:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/postgresxl4safescale/stack.yml <<-EOF
+                            version: '3.7'
+                            services:
+                                gtm-master:
+                                    image: postgresxl4safescale:latest
+                                    command: gtm-master
+                                    volumes:
+                                        - ${SF_ETCDIR}/postgresxl4safescale/postgresql.conf:/etc/pgxl/postgresql.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/pg_hba.conf:/etc/pgxl/pg_hba.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/gtm-master/gtm.conf:/etc/pgxl/gtm.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/gtm-master/options:/etc/pgxl/options:ro
+                                        - ${SF_VARDIR}/postgresxl4safescale/gtm-master:/var/lib/pgsql/data
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 256M
+                                            reservations:
+                                                memory: 64M
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 2s
+                                            max_attempts: 3
+                                            window: 120s
+                                    # healthcheck:
+                                    #     test: ["CMD", "pg_isready", "-U", "postgres"]
+                                    #     interval: 10s
+                                    #     timeout: 5s
+                                    #     retries: 5
+                                    secrets:
+                                        - safescale.postgresxl.password
+
+                                gtm-slave:
+                                    image: postgresxl4safescale:latest
+                                    command: gtm-slave
+                                    volumes:
+                                        - ${SF_ETCDIR}/postgresxl4safescale/postgresql.conf:/etc/pgxl/postgresql.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/pg_hba.conf:/etc/pgxl/pg_hba.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/gtm-slave/gtm.conf:/etc/pgxl/gtm.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/gtm-slave/options:/etc/pgxl/options:ro
+                                        - ${SF_VARDIR}/postgresxl4safescale/gtm-slave:/var/lib/pgsql/data
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 256M
+                                            reservations:
+                                                memory: 64M
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 2s
+                                            max_attempts: 3
+                                            window: 120s
+                                    # healthcheck:
+                                    #     test: ["CMD", "pg_isready", "-U", "postgres"]
+                                    #     interval: 10s
+                                    #     timeout: 5s
+                                    #     retries: 5
+                                    secrets:
+                                        - safescale.postgresxl.password
+
+                                gtm-proxy:
+                                    image: postgresxl4safescale:latest
+                                    command: gtm-proxy
+                                    volumes:
+                                        - ${SF_ETCDIR}/postgresxl4safescale/postgresql.conf:/etc/pgxl/postgresql.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/pg_hba.conf:/etc/pgxl/pg_hba.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/gtm-proxy/gtm_proxy.conf:/etc/pgxl/gtm_proxy.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/gtm-proxy/options:/etc/pgxgl/options:ro
+                                        - ${SF_VARDIR}/postgresxl4safescale/gtm-proxy:/var/lib/pgsql/data
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    ports:
+                                        - published: 56666
+                                          target: 6666
+                                          mode: host
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 256M
+                                            reservations:
+                                                memory: 64M
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 2s
+                                            max_attempts: 3
+                                            window: 120s
+                                    # healthcheck:
+                                    #     test: ["CMD", "pg_isready", "-U", "postgres"]
+                                    #     interval: 10s
+                                    #     timeout: 5s
+                                    #     retries: 5
+                                    secrets:
+                                        - safescale.postgresxl.password
+
+                                coordinator:
+                                    image: postgresxl4safescale:latest
+                                    command: coordinator
+                                    volumes:
+                                        - ${SF_ETCDIR}/postgresxl4safescale/postgresql.conf:/etc/pgxl/postgresql.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/pg_hba.conf:/etc/pgxl/pg_hba.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/coordinator/coordinator.conf:/etc/pgxl/coordinator.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/coordinator/options:/etc/pgxl/options:ro
+                                        - ${SF_VARDIR}/postgresxl4safescale/coordinator:/var/lib/pgsql/data
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    ports:
+                                        - published: 55432
+                                          target: 5432
+                                          mode: host
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 1024M
+                                            reservations:
+                                                memory: 256M
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 2s
+                                            max_attempts: 3
+                                            window: 120s
+                                    # healthcheck:
+                                    #     test: ["CMD", "pg_isready", "-U", "postgres"]
+                                    #     interval: 10s
+                                    #     timeout: 5s
+                                    #     retries: 5
+                                    secrets:
+                                        - safescale.postgresxl.password
+
+                                data:
+                                    image: postgresxl4safescale:latest
+                                    command: data
+                                    volumes:
+                                        - ${SF_ETCDIR}/postgresxl4safescale/postgresql.conf:/etc/pgxl/postgresql.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/pg_hba.conf:/etc/pgxl/pg_hba.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/data/data.conf:/etc/pgxl/data.conf:ro
+                                        - ${SF_ETCDIR}/postgresxl4safescale/data/options:/etc/pgxl/options:ro
+                                        - ${SF_VARDIR}/postgresxl4safescale/data:/var/lib/pgsql/data
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    ports:
+                                        - published: 55433
+                                          target: 5432
+                                          mode: host
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 2048M
+                                            reservations:
+                                                memory: 256M
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 2s
+                                            max_attempts: 3
+                                            window: 120s
+                                    # healthcheck:
+                                    #     test: ["CMD", "pg_isready", "-U", "postgres"]
+                                    #     interval: 10s
+                                    #     timeout: 5s
+                                    #     retries: 5
+                                    secrets:
+                                        - safescale.postgresxl.password
+
+                            secrets:
+                                safescale.postgresxl.password:
+                                    external: true
+
+                            networks:
+                                postgresxl4safescale_net:
+                                    external: true
+                            EOF
+                            chmod go-rwx ${SF_ETCDIR}/postgres4safescale/stack.yml
+                            exit 0
+
+                    secret:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker secret rm safescale.postgresxl.password &>/dev/null || true
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresxl.password - || exit 193
+                            exit 0
+
+                    network:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            if ! docker network ls --filter 'Name=postgresxl4safescale_net' {{ "--format '{{.Name}}'" }} | grep "^postgresxl4safescale$"; then
+                                docker network create -d overlay --scope swarm --attachable postgresxl4safescale_net
+                            fi
+                            exit 0
+
+                    firewall:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            # INGRESS_CIDR=$(docker network inspect ingress | jq -r .[0].IPAM.Config[0].Subnet)
+                            # sfFirewallAdd --zone=trusted --add-source=${INGRESS_CIDR}
+                            sfFirewallAdd --zone=trusted --add-interface=docker_gwbridge
+                            sfFirewallReload
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker stack deploy -c ${SF_ETCDIR}/postgresxl4safescale/stack.yml postgresxl4safescale || exit 194
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl4safescale:latest postgresxl4safescale_gtm" || exit 195
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl4safescale:latest postgresxl4safescale_coordinator" || exit 196
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl4safescale:latest postgresxl4safescale_data" || exit 197
+                            exit 0
+
+            remove:
+                pace: stack,cleanup
+                steps:
+                    stack:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfRetry 5m 5 "docker stack rm postgresxl4safescale" || exit 198
+                            exit 0
+
+                    cleanup:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            docker network rm postgresxl4safescale_net || true
+                            sfRemoveDockerImage postgresxl4safescale:latest
+                            docker secret rm safescale.postgresxl.password &>/dev/null
+                            PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
+                            rm -rf ${SF_ETCDIR}/postgresxl4safescale ${SF_LOGDIR}/postgresxl4safescale
+                            if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then
+                                rm -rf ${SF_VARDIR}/postgresxl4safescale
+                            fi
+                            exit 0
+
+...

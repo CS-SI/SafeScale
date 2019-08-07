@@ -119,7 +119,7 @@ feature:
                                 enabled: true
                             setup.kibana:
                             {{- if .ClusterFlavor }}
-                                host: "https://{{ .GatewayIP }}/monitoring/kibana/"
+                                host: "https://{{ .DefaultRouteIP }}/monitoring/kibana/"
                             {{ else }}
                                 host: "{{.KibanaURL}}"
                             {{ end -}}

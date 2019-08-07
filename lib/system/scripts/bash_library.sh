@@ -488,6 +488,7 @@ sfRandomString() {
 	local charset="[:graph:]"
 	[ $# -ge 2 ] && charset="$2"
 	</dev/urandom tr -dc "$charset" | head -c${count}
+	return 0
 }
 export -f sfRandomString
 
@@ -546,7 +547,7 @@ sfDetectFacts() {
 	FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads/core"]} ))
 	val=$(( ${FACTS["threads"]} * 2 / 3 ))
 	[ $val -le 0 ] && val=1
-	FACTS["2/3 of threads"]=val
+	FACTS["2/3 of threads"]=$val
 
 	sfProbeGPU
 

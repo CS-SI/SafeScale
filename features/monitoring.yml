@@ -705,7 +705,7 @@ feature:
                       "paths": [ "/monitoring/grafana/" ],
                       "service": { "id": "{{ .grafana_http_svc }}" },
                       "source-control": {
-                          "whitelist": [ "{{ .CIDR }}", "{{ .PublicIP }}", "127.0.0.1" ]
+                          "whitelist": [ "{{ .CIDR }}", "{{ .EndpointIP }}", "127.0.0.1" ]
                       }
                   }
 

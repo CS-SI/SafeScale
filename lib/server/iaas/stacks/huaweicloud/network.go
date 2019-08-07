@@ -18,16 +18,18 @@ package huaweicloud
 
 import (
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	log "github.com/sirupsen/logrus"
-	"net"
-	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -650,4 +652,28 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 // DeleteGateway deletes the gateway associated with network identified by ID
 func (s *Stack) DeleteGateway(id string) error {
 	return s.DeleteHost(id)
+}
+
+// CreateVIP creates a private virtual IP
+// If public is set to true,
+func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
+	asu := true
+	sg := []string{s.SecurityGroup.ID}
+	options := ports.CreateOpts{
+		NetworkID:      networkID,
+		AdminStateUp:   &asu,
+		Name:           name,
+		SecurityGroups: &sg,
+	}
+	port, err := ports.Create(s.NetworkClient, options).Extract()
+	if err != nil {
+		return nil, err
+	}
+	vip := resources.VIP{
+		ID:        port.ID,
+		Name:      name,
+		NetworkID: networkID,
+		PrivateIP: port.FixedIPs[0].IPAddress,
+	}
+	return &vip, nil
 }
