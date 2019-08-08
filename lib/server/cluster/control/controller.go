@@ -385,10 +385,10 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (*pb.Host, er
 	found := false
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
-		found, _ := contains(nodesV1.PublicNodes, hostID)
-		if !found {
-			found, _ = contains(nodesV1.PrivateNodes, hostID)
-		}
+		// found, _ := contains(nodesV1.PublicNodes, hostID)
+		// if !found {
+		found, _ = contains(nodesV1.PrivateNodes, hostID)
+		// }
 		return nil
 	})
 	if err != nil {
