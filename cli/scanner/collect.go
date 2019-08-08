@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -21,6 +22,11 @@ type StoredCPUInfo struct {
 }
 
 func collect(tenantName string) error {
+	cmd := exec.Command("safescale", "tenant", "set", tenantName)
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
 	serviceProvider, err := iaas.UseService(tenantName)
 	if err != nil {
 		return err
@@ -36,7 +42,10 @@ func collect(tenantName string) error {
 
 	folder := fmt.Sprintf("images/%s/%s", serviceProvider.GetName(), region)
 
-	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+	err = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {

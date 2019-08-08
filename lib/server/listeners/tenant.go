@@ -44,7 +44,7 @@ var (
 // GetCurrentTenant contains the current tenant
 var GetCurrentTenant = getCurrentTenant
 
-// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
 		tenants, err := iaas.GetTenantNames()
@@ -67,7 +67,7 @@ func getCurrentTenant() *Tenant {
 // TenantListener server is used to implement SafeScale.safescale.
 type TenantListener struct{}
 
-// List registerd tenants
+// List registered tenants
 func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
 	log.Infoln("Listeners: receiving \"tenant list\"")
 	log.Debugln(">>> TenantListener::List()")
@@ -153,7 +153,7 @@ var (
 // GetCurrentStorageTenants contains the current tenant
 var GetCurrentStorageTenants = getCurrentStorageTenants
 
-// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func getCurrentStorageTenants() *StorageTenants {
 	//TODO-AJ should we select all tenants with storage, or still auto selecting tenant only when there is only one available tenant?
 	if currentStorageTenants == nil {
@@ -175,7 +175,7 @@ func getCurrentStorageTenants() *StorageTenants {
 	return currentStorageTenants
 }
 
-// StorageList list registerd storage tenants
+// StorageList lists registered storage tenants
 func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
 	log.Infoln("Listeners: receiving \"tenant storage-list\"")
 	log.Debugln(">>> TenantListener::StorageList()")

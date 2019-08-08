@@ -44,7 +44,7 @@ func cleanup() {
 	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("Failed to read the imput : ", err.Error())
+		fmt.Println("Failed to read the input : ", err.Error())
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
