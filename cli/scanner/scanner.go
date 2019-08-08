@@ -217,7 +217,7 @@ func RunScanner() {
 	}
 
 	if len(targetedProviders) < 1 {
-		log.Warn("No scannable tenant found. Consider adding '-scannable' to tenant name as stated in documentation")
+		log.Warn("No scannable tenant found. Consider marking a tennant as Scannable as stated in documentation")
 		return
 	}
 
@@ -248,19 +248,19 @@ func RunScanner() {
 }
 
 // isTenantScannable will return true if a tennant could be used by the scanner and false otherwise
-func isTenantScannable(tenant map[string]interface{}) (bool, error) {
+func isTenantScannable(tenant map[string]interface{}) (isScannable bool, err error) {
 	tenantCompute, found := tenant["compute"].(map[string]interface{})
 	if !found {
 		return false, nil
 	}
-	isScannable, found := tenantCompute["Scannable"].(bool)
+	isScannable, found = tenantCompute["Scannable"].(bool)
 	if !found {
 		return false, nil
 	}
 	return isScannable, nil
 }
 
-func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
+func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	if group != nil {
 		defer group.Done()
 	}
@@ -330,11 +330,14 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		}
 	}
 
-	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+	err = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+	if err != nil {
+		return err
+	}
 
 	var wg sync.WaitGroup
 
-	concurrency := math.Min(4, float64(len(templates)/2))
+	concurrency := math.Min(4, float64(len(templates)/2)) // FIXME Enjoy safety
 	sem := make(chan bool, int(concurrency))
 
 	hostAnalysis := func(template resources.HostTemplate) error {
@@ -457,8 +460,11 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	return nil
 }
 
-func dumpTemplates(service iaas.Service, tenant string) error {
-	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+func dumpTemplates(service iaas.Service, tenant string) (err error) {
+	err = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+	if err != nil {
+		return err
+	}
 
 	type TemplateList struct {
 		Templates []resources.HostTemplate `json:"templates,omitempty"`
@@ -487,8 +493,11 @@ func dumpTemplates(service iaas.Service, tenant string) error {
 	return nil
 }
 
-func dumpImages(service iaas.Service, tenant string) error {
-	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+func dumpImages(service iaas.Service, tenant string) (err error) {
+	err = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+	if err != nil {
+		return err
+	}
 
 	type ImageList struct {
 		Images []resources.Image `json:"images,omitempty"`
@@ -520,7 +529,7 @@ func dumpImages(service iaas.Service, tenant string) error {
 func main() {
 	log.Printf("%s version %s\n", os.Args[0], VERSION+", build "+REV+" ("+BUILD_DATE+")")
 
-	// time.Sleep(time.Duration(10) * time.Second)
+	time.Sleep(time.Duration(20) * time.Second)
 
 	RunScanner()
 }
