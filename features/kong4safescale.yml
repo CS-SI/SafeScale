@@ -1,0 +1,292 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: swarm
+
+    requirements:
+        features:
+            - postgresxl4safescale
+
+    install:
+        bash:
+            check:
+                pace: curl
+                steps:
+                    curl:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
+
+            add:
+                pace: image,stack,secret,start
+                steps:
+                    image:
+                        timeout: 10
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/kong4safescale/{build,includes}
+
+                            cat >${SF_ETCDIR}/kong4safescale/build/my-docker-entrypoint.sh <<-'EOF'
+                            #!/bin/sh
+
+                            # creates /root/.pgpass
+                            cat >/root/.pgpass <<-EOF2
+                            *:5432:*:postgres:$(cat /run/secrets/safescale.postgresxl.password)
+                            *:5432:kong4safescale:kong4safescale:$(cat /run/secrets/safescale.kong.db_password)
+                            EOF2
+                            chmod 0600 /root/.pgpass && chown root:root /root/.pgpass
+
+                            PSQL="psql -h tasks.postgresxl4safescale_coordinator -U postgres"
+
+                            # wait for database server
+                            while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done
+
+                            # Create database if needed
+                            if ! $PSQL kong4safescale -c '\q' &>/dev/null; then
+                                $PSQL <<-SQLEOF
+                            CREATE DATABASE kong4safescale;
+                            CREATE USER kong4safescale;
+                            #CREATE DATABASE kong4safescale-gui;
+                            SQLEOF
+                            fi
+
+                            # init/reset kong4safescale password and db ownership
+                            $PSQL <<-SQLEOF
+                            ALTER USER kong4safescale PASSWORD '$(cat /run/secrets/safescale.kong.db_password)';
+                            ALTER DATABASE kong4safescale OWNER TO kong4safescale;
+                            #ALTER DATABASE kong4safescale-gui OWNER TO kong4safescale;
+                            SQLEOF
+
+                            # kong migrations
+                            /docker-entrypoint.sh kong migrations bootstrap >/dev/null
+                            /docker-entrypoint.sh kong migrations up >/dev/null
+                            /docker-entrypoint.sh kong migrations finish >/dev/null
+
+                            # starts kong
+                            exec /docker-entrypoint.sh $*
+                            EOF
+
+                            # cat >${SF_ETCDIR}/kong4safescale/konga.userdb.data <<-EOF
+                            # module.exports = [
+                            #     {
+                            #         "username": "safescale",
+                            #         "email": "cladm@safescale",
+                            #         "firstName": "SafeScale",
+                            #         "lastName": "Administrator",
+                            #         "node_id": "https://127.0.0.1:8444",
+                            #         "admin": true,
+                            #         "active" : true,
+                            #         "password": "{{.Password}}"
+                            #     }
+                            # ]
+                            # EOF
+                            # chmod go-rwx ${SF_ETCDIR}/kong4gateway/konga.userdb.data
+
+                            cat >${SF_ETCDIR}/kong4safescale/build/kong.conf <<-EOF
+                            trusted_ips=0.0.0.0/0,::/0
+                            real_ip_header=X-Forwarded-For
+                            real_ip_recursive=on
+                            stream_listen = 0.0.0.0:6442
+                            nginx_stream_include = /etc/kong/includes/*.conf
+                            anonymous_reports = off
+                            EOF
+
+                            cat >${SF_ETCDIR}/kong4safescale/build/Dockerfile <<-EOF
+                            FROM kong:1.2
+
+                            RUN apk update && apk add git unzip postgresql-client
+                            RUN luarocks install kong-oidc \
+                             && luarocks install kong-prometheus-plugin
+
+                            RUN mkdir -p /etc/kong/includes \
+                             && setcap CAP_NET_BIND_SERVICE=+ep /usr/local/openresty/nginx/sbin/nginx
+
+                            COPY my-docker-entrypoint.sh /
+                            COPY kong.conf /etc/kong/kong.conf
+                            RUN chmod a+rx /my-docker-entrypoint.sh \
+                             && chmod a+r /etc/kong/kong.conf
+
+                            ENV KONG_PG_HOST=tasks.postgresxl4safescale_coordinator
+                            ENV KONG_PG_USER=kong4safescale
+                            ENV KONG_DATABASE=kong4safescale
+                            ENV KONG_PROXY_ACCESS_LOG=/dev/stdout
+                            ENV KONG_ADMIN_ACCESS_LOG=/dev/stdout
+                            ENV KONG_PROXY_ERROR_LOG=/dev/stderr
+                            ENV KONG_ADMIN_ERROR_LOG=/dev/stderr
+                            ENV KONG_ADMIN_LISTEN="0.0.0.0:8444 ssl"
+                            ENV KONG_PROXY_LISTEN="0.0.0.0:443 ssl"
+                            ENV KONG_PLUGINS=oidc,prometheus,ip-restriction
+
+                            ENTRYPOINT ["/my-docker-entrypoint.sh"]
+
+                            CMD ["kong", "docker-start"]
+                            EOF
+                            docker build -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || exit 192
+                            exit 0
+
+                    stack:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/kong4safescale/stack.yml <<-EOF
+                            version: '3.3'
+                            services:
+                                proxy:
+                                    image: kong4safescale:latest
+                                    volumes:
+                                        - ${SF_ETCDIR}/kong4safescale/includes:/etc/kong/includes:ro
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    ports:
+                                        - published: 443
+                                          target: 443
+                                          mode: host
+                                        - published: 6443
+                                          target: 6443
+                                          mode: host
+                                        - published: 8444
+                                          target: 8444
+                                          mode: host
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 256M
+                                            reservations:
+                                                memory: 64M
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 2s
+                                            max_attempts: 3
+                                            window: 120s
+                                    healthcheck:
+                                        test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
+                                        interval: 5s
+                                        retries: 10
+                                    secrets:
+                                        - safescale.postgresxl.password
+                                        - safescale.kong.db_password
+
+                            secrets:
+                                safescale.postgresxl.password:
+                                    external: true
+                                safescale.kong.db_password:
+                                    external: true
+
+                            networks:
+                                postgresxl4safescale_net:
+                                    external: true
+                            EOF
+
+                                # gui:
+                                #     image: pantsel/konga
+                                #     volumes:
+                                #         - ${SF_ETCDIR}/kong4safescale/konga.userdb.data:/usr/local/etc/userdb.data:ro
+                                #     environment:
+                                #         - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
+                                #         - DB_ADAPTER=postgres
+                                #         - DB_DATABASE=kong4gateway-gui
+                                #         - DB_USER=kong4gateway
+                                #         - DB_PASSWORD="${DB_PASSWORD}"
+                                #         - NODE_ENV=production
+                                #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
+                                #     network:
+                                #         - safescale-gw
+                                #     ports:
+                                #         - target: 1337
+                                #           published: 1337
+                                #           protocol: tcp
+                                #           mode: "host"
+                                #     deploy:
+                                #         mode: global
+                                #         placement:
+                                #             constraints:
+                                #                 - node.role == manager
+                                #         restart_policy:
+                                #             condition: on-failure
+                                #             delay: 5s
+                                #             max_attempts: 3
+                                #             window: 120s
+
+                            chmod go-rwx ${SF_ETCDIR}/kong4safescale/stack.yml
+                            exit 0
+
+                    secret:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker secret rm safescale.kong.db_password &>/dev/null || true
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || exit 193
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || exit 194
+                            sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || exit 195
+                            exit 0
+
+            remove:
+                pace: stop,cleanup
+                steps:
+                    stop:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker stack rm kong4safescale  || exit 196
+                            docker secret rm safescale.kong.db_password &>/dev/null
+                            exit 0
+
+                    cleanup:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            sfRemoveDockerImage kong4gateway:latest
+                            rm -rf ${SF_ETCDIR}/kong4safescale
+                            exit 0
+
+...
