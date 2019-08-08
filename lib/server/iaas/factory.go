@@ -351,12 +351,12 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
 	}
 
+	// FIXME Remove google custom code
 	if config.Type == "google" {
 		if config.ProjectId, ok = identity["project_id"].(string); !ok {
 			return config, fmt.Errorf("Problem parsing project_id")
 		}
 
-		// FIXME Add google stuff
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
 			ProjectId:    identity["project_id"].(string),
@@ -375,7 +375,6 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 			return config, err
 		}
 
-		// FIXME Here is the problem with google stuff...
 		config.Credentials = string(d1)
 	}
 	return config, nil
@@ -500,12 +499,12 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 		}
 	}
 
+	// FIXME Remove google custom code
 	if config.Type == "google" {
 		if config.ProjectId, ok = identity["project_id"].(string); !ok {
 			return config, fmt.Errorf("Problem parsing project_id")
 		}
 
-		// FIXME Add google stuff
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
 			ProjectId:    identity["project_id"].(string),
@@ -524,7 +523,6 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 			return config, err
 		}
 
-		// FIXME Here is the problem with google stuff...
 		config.Credentials = string(d1)
 	}
 

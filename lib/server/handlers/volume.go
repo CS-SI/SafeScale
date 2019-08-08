@@ -671,7 +671,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	select {
 	case <-ctx.Done():
 		log.Warnf("Volume detachment cancelled by user")
-		// Currently format is not registerd anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
+		// Currently format is not registered anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
 		err = handler.Attach(context.Background(), volumeName, hostName, mountPath, "ext4", true)
 		if err != nil {
 			return fmt.Errorf("failed to stop volume detachment")

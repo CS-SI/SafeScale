@@ -68,5 +68,5 @@ func TestCmds(t *testing.T) {
 func TestMain(m *testing.M) {
 	runOnlyInIntegrationTest("TEST_SCANNER")
 
-	RunScanner()
+	RunScanner("")
 }
