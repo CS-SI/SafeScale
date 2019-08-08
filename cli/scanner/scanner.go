@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -529,7 +530,23 @@ func dumpImages(service iaas.Service, tenant string) (err error) {
 func main() {
 	log.Printf("%s version %s\n", os.Args[0], VERSION+", build "+REV+" ("+BUILD_DATE+")")
 
-	time.Sleep(time.Duration(20) * time.Second)
+	safescaledPort := 50051
+
+	if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
+		num, err := strconv.Atoi(portCandidate)
+		if err == nil {
+			safescaledPort = num
+		}
+	}
+
+	timeout := time.Duration(1 * time.Second)
+	_, err := net.DialTimeout("tcp", "localhost:" + strconv.Itoa(safescaledPort), timeout)
+	if err != nil {
+		log.Error("You should run safescaled first, and set the tenant")
+		os.Exit(1)
+	}
+
+	// time.Sleep(time.Duration(20) * time.Second)
 
 	RunScanner()
 }
