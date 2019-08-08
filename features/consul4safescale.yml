@@ -39,11 +39,11 @@ feature:
                             exit 0
 
             add:
-                pace: config-all,config-server,config-agent,compose,start,server-started,agent-started
+                pace: config-all,config-server,config-agent,stack,compose,start-stack,start-on-gw,server-started,agent-started,agent-started-on-gw
                 steps:
                     config-all:
                         targets:
-                            gateways: no
+                            gateways: all
                             hosts: no
                             masters: all
                             nodes: all
@@ -53,9 +53,10 @@ feature:
                             cat >${SF_ETCDIR}/consul/consul.d/node-exporter.json <<-EOF
                             {
                                 "service": {
-                                    "name": "node-exporter",
-                                    "tags": ["monitor"],
-                                    "port": 9100
+                                    "name": "{{ .Hostname }}",
+                                    "tags": [ "monitoring" ],
+                                    "port": 9100,
+                                    "address": "{{ .HostIP }}"
                                 }
                             }
                             EOF
@@ -70,7 +71,7 @@ feature:
                         run: |
                             cat >${SF_ETCDIR}/consul/config.json <<-EOF
                             {
-                                "advertise_addr" : "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
+                                "advertise_addr" : "{{ .HostIP }}",
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
                                 "client_addr": "0.0.0.0",
                                 "data_dir": "/consul/data",
@@ -102,14 +103,14 @@ feature:
 
                     config-agent:
                         targets:
-                            gateways: no
+                            gateways: all
                             hosts: no
                             masters: no
                             nodes: all
                         run: |
                             cat >${SF_ETCDIR}/consul/config.json <<-EOF
                             {
-                                "advertise_addr" : "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
+                                "advertise_addr" : "{{ .HostIP }}",
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
                                 "client_addr": "0.0.0.0",
                                 "data_dir": "/consul/data",
@@ -132,14 +133,14 @@ feature:
                             chmod 0644 ${SF_ETCDIR}/consul/*.json
                             exit 0
 
-                    compose:
+                    stack:
                         targets:
                             gateways: no
                             hosts: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
-                            cat >${SF_ETCDIR}/consul/docker-compose.yml <<-EOF
+                            cat >${SF_ETCDIR}/consul/stack.yml <<-EOF
                             version: '3.3'
 
                             networks:
@@ -207,11 +208,37 @@ feature:
                                             constraints:
                                                 - node.role == worker
                             EOF
+                            chown safescale:safescale ${SF_ETCDIR}/consul/stack.yml
+                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul/stack.yml
+                            exit 0
+
+                    compose:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/consul/docker-compose.yml <<-EOF
+                            version: '2.1'
+
+                            services:
+                                agent:
+                                    image: consul:{{ .Version }}
+                                    command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
+                                    ports:
+                                        - "{{.HostIP}}:8500:8500"
+                                    volumes:
+                                        - ${SF_ETCDIR}/consul/config.json:/consul/config/config.json:ro
+                                        - ${SF_ETCDIR}/consul/consul.d:/consul/config/consul.d
+                                        - ${SF_VARDIR}/consul:/consul/data
+                                    restart: on-failure
+                            EOF
                             chown safescale:safescale ${SF_ETCDIR}/consul/docker-compose.yml
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul/docker-compose.yml
                             exit 0
 
-                    start:
+                    start-stack:
                         targets:
                             gateways: no
                             hosts: no
@@ -221,7 +248,17 @@ feature:
                             if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul-net"; then
                                 docker network create -d overlay consul-net || exit 194
                             fi
-                            docker stack deploy -c ${SF_ETCDIR}/consul/docker-compose.yml consul4safescale || exit 195
+                            docker stack deploy -c ${SF_ETCDIR}/consul/stack.yml consul4safescale || exit 195
+                            exit 0
+
+                    start-on-gw:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
+                        run: |
+                            docker-compose -f ${SF_ETCDIR}/consul/docker-compose.yml -p consul4safescale up -d || exit 196
                             exit 0
 
                     server-started:
@@ -231,7 +268,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_server" || exit 196
+                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_server" || exit 197
                             exit 0
 
                     agent-started:
@@ -241,25 +278,46 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_agent" || exit 197
+                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_agent" || exit 198
+                            exit 0
+
+                    agent-started-on-gw:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
+                        run: |
+                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_agent" || exit 198
                             exit 0
 
             remove:
-                pace: stop,cleanup
+                pace: stop-stack,stop-on-gw,cleanup
                 steps:
-                    stop:
+                    stop-stack:
                         targets:
                             gateways: no
                             hosts: yes
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm consul4safescale || exit 198
+                            docker stack rm consul4safescale || exit 199
                             exit 0
 
+                    stop-on-gw:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
+                        run: |
+                            if [ -f ${SF_ETCDIR}/consul/docker-compose.yml ]; then
+                                docker-compose -f ${SF_ETCDIR}/consul/docker-compose.yml -p consul4safescale rm --force --stop || exit 200
+                            fi
+                            exit 0
                     cleanup:
                         targets:
-                            gateways: no
+                            gateways: all
                             hosts: no
                             masters: all
                             nodes: all
