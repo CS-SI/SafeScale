@@ -258,7 +258,7 @@ func (handler *NetworkHandler) Create(
 			}
 		}()
 	}
-	if failover && secondaryErr == nil {
+	if failover && secondaryTask != nil {
 		secondaryResult, secondaryErr = secondaryTask.Wait()
 		if secondaryErr == nil {
 			secondaryGateway = secondaryResult.(data.Map)["host"].(*resources.Host)
@@ -295,7 +295,7 @@ func (handler *NetworkHandler) Create(
 
 	// Starts gateway(s) installation
 	primaryTask = primaryTask.Reset().Start(handler.waitForInstallPhase1OnGateway, primaryGateway)
-	if failover {
+	if failover && secondaryTask != nil {
 		secondaryTask = secondaryTask.Reset().Start(handler.waitForInstallPhase1OnGateway, secondaryGateway)
 	}
 	_, primaryErr = primaryTask.Wait()
@@ -304,13 +304,21 @@ func (handler *NetworkHandler) Create(
 		// return nil, err
 		return nil, primaryErr
 	}
-	if failover {
+	if failover && secondaryTask != nil {
 		_, secondaryErr = secondaryTask.Wait()
 		if secondaryErr != nil {
 			// err = secondaryErr // set to trigger defers
 			// return nil, err
 			return nil, secondaryErr
 		}
+	}
+
+	if primaryUserdata == nil {
+		return nil, logicErr(fmt.Errorf("error creating network: primaryUserdata is nil"))
+	}
+
+	if secondaryUserdata == nil {
+		return nil, logicErr(fmt.Errorf("error creating network: secondaryUserdata is nil"))
 	}
 
 	// Complement userdata for gateway(s) with allocated IP
@@ -330,7 +338,7 @@ func (handler *NetworkHandler) Create(
 		"host":     primaryGateway,
 		"userdata": primaryUserdata,
 	})
-	if failover {
+	if failover && secondaryTask != nil {
 		secondaryTask = secondaryTask.Reset().Start(handler.installPhase2OnGateway, data.Map{
 			"host":     secondaryGateway,
 			"userdata": secondaryUserdata,
@@ -341,7 +349,7 @@ func (handler *NetworkHandler) Create(
 		err = primaryErr // Set to trigger defers
 		return nil, err
 	}
-	if failover {
+	if failover && secondaryTask != nil {
 		_, secondaryErr = secondaryTask.Wait()
 		if secondaryErr != nil {
 			err = secondaryErr // set to trigger defers
@@ -456,8 +464,9 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 		return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 	}
 
+	log.Debugf("Provisioning gateway '%s', phase 1", gw.Name)
 	sshDefaultTimeout := utils.GetHostTimeout()
-	_, err = ssh.WaitServerReady("phase1", sshDefaultTimeout) // FIXME Phase1
+	_, err = ssh.WaitServerReady("phase1", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout waiting gateway '%s' to become ready", gw.Name)
@@ -498,11 +507,13 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	}
 	command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
 	sshHandler := NewSSHHandler(handler.service)
-	retcode, _, stderr, err := sshHandler.Run(task.GetContext(), gw.Name, command)
+
+	log.Debugf("Provisioning gateway '%s', phase 2", gw.Name)
+	returnCode, _, stderr, err := sshHandler.Run(task.GetContext(), gw.Name, command)
 	if err != nil {
 		return nil, err
 	}
-	if retcode != 0 {
+	if returnCode != 0 {
 		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: %s", gw.Name, stderr)
 	}
 	log.Infof("Gateway '%s' successfully configured.", gw.Name)
@@ -510,13 +521,16 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	// Reboot gateway
 	log.Debugf("Rebooting gateway '%s'", gw.Name)
 	command = "sudo systemctl reboot"
-	retcode, _, stderr, err = sshHandler.Run(task.GetContext(), gw.Name, command)
+	returnCode, _, stderr, err = sshHandler.Run(task.GetContext(), gw.Name, command)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO Test for failure with 15s !!!
 	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	sshDefaultTimeout := utils.GetHostTimeout()
 	_, err = ssh.WaitServerReady("ready", sshDefaultTimeout)
 	if err != nil {

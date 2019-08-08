@@ -867,7 +867,6 @@ func (handler *HostHandler) SSH(ctx context.Context, ref string) (*system.SSHCon
 	// }
 
 	sshHandler := NewSSHHandler(handler.service)
-	// sshConfig, err := sshHandler.GetConfig(host.ID)
 	sshConfig, err := sshHandler.GetConfig(ctx, ref)
 	if err != nil {
 		return nil, logicErr(err)
