@@ -460,12 +460,9 @@ EOF
         sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
         # Allows masquerading on public zone
         sfFirewallAdd --zone=public --add-masquerade
-    else
-        # No dedicated public interface...
-
-        # Enables masquerading on trusted zone
-        sfFirewallAdd --zone=trusted --add-masquerade
     fi
+    # Enables masquerading on trusted zone (mainly for docker networks)
+    sfFirewallAdd --zone=trusted --add-masquerade
 
     # Allows default services on public zone
     sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
