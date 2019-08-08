@@ -17,6 +17,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -196,7 +198,7 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 }
 
 // RunScanner ...
-func RunScanner() {
+func RunScanner(targetedTenant string) {
 	var targetedProviders []string
 	theProviders, err := iaas.GetTenants()
 	if err != nil {
@@ -222,6 +224,20 @@ func RunScanner() {
 		return
 	}
 
+	if targetedTenant != "" {
+		targetedTenantIsInTenantsList := false
+		for _, tenant := range targetedProviders {
+			if tenant == targetedTenant {
+				targetedTenantIsInTenantsList = true
+				break
+			}
+		}
+
+		if !targetedTenantIsInTenantsList {
+			log.Fatalf("Tenant %s not found.", targetedTenant)
+		}
+	}
+
 	// TODO Enable when several safescaled instances can run in parallel
 	/*
 		var wtg sync.WaitGroup
@@ -236,7 +252,17 @@ func RunScanner() {
 		wtg.Wait()
 	*/
 
+	if targetedTenant != "" {
+		fmt.Printf("Scanning only tenant %s", targetedTenant)
+	}
+
 	for _, tenantName := range targetedProviders {
+		if targetedTenant != "" {
+			if targetedTenant != tenantName {
+				continue
+			}
+		}
+
 		fmt.Printf("Working with tenant %s\n", tenantName)
 		err := analyzeTenant(nil, tenantName)
 		if err != nil {
@@ -264,6 +290,11 @@ func isTenantScannable(tenant map[string]interface{}) (isScannable bool, err err
 func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	if group != nil {
 		defer group.Done()
+	}
+
+	tenantCmd := exec.Command("safescale", "tenant", "set", theTenant)
+	if err := tenantCmd.Run(); err != nil {
+		return err
 	}
 
 	serviceProvider, err := iaas.UseService(theTenant)
@@ -297,7 +328,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	there := true
 	var net *resources.Network
 
-	netName := "net-safescale"
+	netName := "net-safescale" // FIXME Hardcoded string
 	if net, err = serviceProvider.GetNetwork(netName); net != nil && err == nil {
 		there = true
 		log.Warnf("Network '%s' already there", netName)
@@ -361,7 +392,6 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			// TODO If there is a file with today's date, skip it...
 			fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + theTenant + "#" + template.Name + ".json")
 			if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
-				// path/to/whatever exists
 				return nil
 			}
 
@@ -542,11 +572,38 @@ func main() {
 	timeout := time.Duration(1 * time.Second)
 	_, err := net.DialTimeout("tcp", "localhost:" + strconv.Itoa(safescaledPort), timeout)
 	if err != nil {
-		log.Error("You should run safescaled first, and set the tenant")
-		os.Exit(1)
+		log.Fatalf("You must run safescaled first...")
 	}
 
-	// time.Sleep(time.Duration(20) * time.Second)
+	cmd := exec.Command("safescale", "help")
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("You must have safescale in your $PATH")
+	}
 
-	RunScanner()
+	if len(os.Args) == 1 {
+		fmt.Println("Scanner will create one instance of each available template for ALL your tenants marked as 'Scannable' in your tenants.toml file")
+	} else {
+		fmt.Printf("Scanner will create one instance of each available template for the tenant '%s' of your tenants.toml file\n", os.Args[1])
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Are you sure ? [y]es [N]o: ")
+	text, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Failed to read the input : ", err.Error())
+		text = "n"
+	}
+	if strings.TrimRight(text, "\n") != "y" {
+		os.Exit(0)
+	}
+
+	fmt.Println("Scanner will start in 10 sec, this is your last chance to cancel with Control+C")
+	time.Sleep(time.Duration(10) * time.Second)
+
+	log.Info("Starting scanner...")
+	if len(os.Args) > 1 {
+		RunScanner(os.Args[1])
+	} else {
+		RunScanner("")
+	}
 }

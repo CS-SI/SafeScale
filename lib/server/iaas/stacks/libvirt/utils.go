@@ -66,7 +66,7 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	if !found {
 		return fmt.Errorf("Nothing registered with the name %s", name)
 	}
-	fmt.Println("Deregisterd : ", name)
+	fmt.Println("Deregistered : ", name)
 	return nil
 }
 
@@ -121,7 +121,7 @@ func infoHandler() {
 			channel, found := vmInfoWaiter.chansByName[hostName]
 			vmInfoWaiter.mutex.Unlock()
 			if !found {
-				panic(fmt.Sprintf("Info handler, Recived info from an unregisterd host: \n%s", message))
+				panic(fmt.Sprintf("Info handler, Recived info from an unregistered host: \n%s", message))
 			}
 			channel <- info
 			err = vmInfoWaiter.deregister(hostName)
