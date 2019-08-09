@@ -317,16 +317,17 @@ func (handler *NetworkHandler) Create(
 		return nil, logicErr(fmt.Errorf("error creating network: primaryUserdata is nil"))
 	}
 
-	if secondaryUserdata == nil {
-		return nil, logicErr(fmt.Errorf("error creating network: secondaryUserdata is nil"))
-	}
-
 	// Complement userdata for gateway(s) with allocated IP
 	primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.GetPrivateIP()
 	primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.GetPublicIP()
 	if failover {
 		primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.GetPrivateIP()
 		primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.GetPublicIP()
+
+		if secondaryUserdata == nil {
+			return nil, logicErr(fmt.Errorf("error creating network: secondaryUserdata is nil"))
+		}
+
 		secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
 		secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
 		secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
