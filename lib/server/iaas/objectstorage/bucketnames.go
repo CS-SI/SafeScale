@@ -27,21 +27,24 @@ import (
 
 const (
 	maxBucketNameLength = 63
-	// bucketNamePrefix is the begining of the name of the bucket for Metadata
+	// bucketNamePrefix is the beginning of the name of the bucket for Metadata
 	bucketNamePrefix = "0.safescale"
 	storageSuffix    = ".storage"
 	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 
 // BuildMetadataBucketName builds the name of the bucket/container that will store metadata
-func BuildMetadataBucketName(driver, region, domain, project string) (string, error) {
+func BuildMetadataBucketName(driver, region, domain, project string) (name string, err error) {
 	hash := fnv.New128a()
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
-	_, _ = hash.Write([]byte(sig))
+	_, err = hash.Write([]byte(sig))
+	if err != nil {
+		return "", err
+	}
 	hashed := hex.EncodeToString(hash.Sum(nil))
-	name := bucketNamePrefix + "-" + hashed
+	name = bucketNamePrefix + "-" + hashed
 
-		nameLen := len(name)
+	nameLen := len(name)
 	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
 		name += "." + suffix
 		if len(name) > maxBucketNameLength {
@@ -49,21 +52,29 @@ func BuildMetadataBucketName(driver, region, domain, project string) (string, er
 		}
 	}
 
-	// FIXME GCP Just ugly
+	// FIXME GCP, Remove specific driver code
 	if driver == "gcp" {
 		name = strings.Replace(name, ".", "-", -1)
 	}
 
-	return strings.ToLower(name), nil
+	name = strings.ToLower(name)
+
+	return name, nil
 }
 
 // BuildStorageBucketName builds the name of the bucket/container that will store metadata
-func BuildStorageBucketName(driver, region, domain, project string) (string, error) {
+func BuildStorageBucketName(driver, region, domain, project string) (name string, err error) {
 	hash := fnv.New128a()
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
-	_, _ = hash.Write([]byte(sig))
+	_, err = hash.Write([]byte(sig))
+	if err != nil {
+		return "", err
+	}
 	hashed := hex.EncodeToString(hash.Sum(nil))
-	name := bucketNamePrefix + "-" + hashed + storageSuffix
-	//TODO-AJ : user specific sorages?
-	return strings.ToLower(name), nil
+	name = bucketNamePrefix + "-" + hashed + storageSuffix
+
+	// TODO-AJ : user specific storage ?
+	name = strings.ToLower(name)
+
+	return name, nil
 }
