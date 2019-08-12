@@ -412,7 +412,7 @@ EOF
 
 check_for_ip() {
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
-    [ -z "$ip" ] && return 1
+    [ -z "$ip" ] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
     return 0
 }
 
@@ -420,8 +420,11 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-    #ping -n -c1 -w30 -i5 www.google.com || return 1
-    wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
+    if which wget; then
+      wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
+    else
+      ping -n -c1 -w30 -i5 www.google.com || return 1
+    fi
     [ ! -z "$PU_IF" ] && {
         check_for_ip $PU_IF || return 1
     }
@@ -749,7 +752,7 @@ add_common_repos() {
             # Install EPEL repo ...
             yum install -y epel-release
             # ... but don't enable it by default
-            yum-config-manager --disablerepo=epel &>/dev/null
+            yum-config-manager --disablerepo=epel &>/dev/null || true
             ;;
     esac
 }
