@@ -105,6 +105,36 @@ func dockerComposeFeature() *Feature {
 	}
 }
 
+// ntpServerFeature ...
+func ntpServerFeature() *Feature {
+	name := "ntpserver"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// ntpServerFeature ...
+func ntpClientFeature() *Feature {
+	name := "ntpclient"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
 // nVidiaDockerFeature ...
 func nVidiaDockerFeature() *Feature {
 	name := "nvidiadocker"
