@@ -1,0 +1,110 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    install:
+        bash:
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    dpkg -l | grep ansible &>/dev/null
+                                    ;;
+                                centos|rhel)
+                                    rpm -qa | grep ansible &>/dev/null
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+
+            add:
+                pace: ansible
+                steps:
+                    ansible:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                ubuntu)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    sfRetry 5m 3 "sfApt update"
+                                    apt-cache showpkg software-properties-common && apt-get install -y software-properties-common
+                                    apt-cache showpkg python-software-properties && apt-get install -y python-software-properties
+                                    apt-add-repository --yes --update ppa:ansible/ansible
+                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 3 "sfApt install -y ansible"
+                                    ;;
+                                debian)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    sfRetry 5m 3 "sfApt update"
+                                    echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
+                                    sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
+                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 3 "sfApt install -y ansible"
+                                    ;;
+                                centos|rhel)
+                                    yum install -y ansible || exit 192
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 195
+                                    ;;
+                            esac
+                            exit 0
+
+            remove:
+                pace: ansible
+                steps:
+                    ansible:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt && apt-get purge -y ansible*
+                                    apt-get autoremove -y
+                                    ;;
+                                centos|rhel)
+                                    yum remove -y ansible*
+                                    yum autoremove -y
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+
+...
