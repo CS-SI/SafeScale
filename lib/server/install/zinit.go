@@ -29,6 +29,7 @@ func init() {
 		dockerComposeFeature(),
 		ntpServerFeature(),
 		ntpClientFeature(),
+		ansibleFeature(),
 		nVidiaDockerFeature(),
 		mpichOsPkgFeature(),
 		mpichBuildFeature(),
