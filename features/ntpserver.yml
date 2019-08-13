@@ -1,0 +1,143 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    install:
+        bash:
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    dpkg -l | grep ntp &>/dev/null
+                                    ;;
+                                centos|rhel)
+                                    rpm -qa | grep ntp &>/dev/null
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+
+            add:
+                pace: ntp-server,firewall,ready
+                steps:
+                    ntp-server:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 3 "sfApt install -y ntp"
+                                    ;;
+                                centos|rhel)
+                                    yum install -y ntp || exit 192
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 195
+                                    ;;
+                            esac
+                            exit 0
+
+                    firewall:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: all
+                            nodes: all
+                        run: |
+                            # Makes sure firewalld is running, starting first its dependency dbus...
+                            sfService start dbus
+                            # then firewalld  itself
+                            sfService restart firewalld
+                            sfFirewallAdd --zone=public --add-port=123/udp --permanent
+                            sfFirewallReload
+
+                    ready:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfService enable ntp || exit 195
+                                    sfService restart ntp || exit 196
+                                    sfRetry 5m 5 sfService status ntp &>/dev/null
+                                    [ $? -ne 0 ] && exit 197
+                                    ;;
+                                centos|rhel)
+                                    sfService enable ntpd || exit 195
+                                    sfService restart ntpd || exit 196
+                                    sfRetry 5m 5 sfService status ntpd &>/dev/null
+                                    [ $? -ne 0 ] && exit 197
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+                            exit 0
+
+            remove:
+                pace: ntp-server
+                steps:
+                    ntp-server:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfService disable ntp
+                                    sfService stop ntp
+                                    sfWaitForApt && apt-get purge -y ntp*
+                                    apt-get autoremove -y
+                                    ;;
+                                centos|rhel)
+                                    sfService disable ntpd
+                                    sfService stop ntpd
+                                    yum remove -y ntp*
+                                    yum autoremove -y
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+
+...
