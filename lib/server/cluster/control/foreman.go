@@ -770,9 +770,12 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 		if err != nil {
 			return err
 		}
-		err = b.makers.JoinNodeToCluster(task, b, pbHost)
-		if err != nil {
-			return err
+
+		if b.makers.JoinMasterToCluster != nil {
+			err = b.makers.JoinNodeToCluster(task, b, pbHost)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
