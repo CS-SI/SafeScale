@@ -569,12 +569,10 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		task = concurrency.RootTask()
 	}
 
-	var (
-		nodeDef   *pb.HostDefinition
-		hostImage string
-	)
-
 	c.RLock(task)
+	nodeDef := complementHostDefinition(req, pb.HostDefinition{})
+	var hostImage string
+
 	properties := c.GetProperties(concurrency.RootTask())
 	if !properties.Lookup(Property.DefaultsV2) {
 		err := properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
@@ -603,10 +601,6 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		return nil, err
 	}
 
-	// pbNodeDef := pbutils.ToPBHostDefinition(&nodeDef)
-	if req != nil {
-		nodeDef = complementHostDefinition(req, *nodeDef)
-	}
 	if nodeDef.ImageId == "" {
 		nodeDef.ImageId = hostImage
 	}
