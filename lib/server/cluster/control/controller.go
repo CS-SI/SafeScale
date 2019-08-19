@@ -622,7 +622,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		subtask := task.New().Start(c.foreman.taskCreateNode, data.Map{
 			"index":   i + 1,
 			"type":    nodeType,
-			"nodeDef": *nodeDef,
+			"nodeDef": nodeDef,
 			"timeout": timeout,
 		})
 		subtasks = append(subtasks, subtask)
