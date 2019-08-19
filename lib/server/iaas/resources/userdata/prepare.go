@@ -193,9 +193,9 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 			}
 
 			if !problems && box != nil {
-				_, err := box.String(fmt.Sprintf("user_data%s.phase1.sh", suffixCandidate))
+				_, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", suffixCandidate))
 				problems = err != nil
-				_, err = box.String(fmt.Sprintf("user_data%s.phase2.sh", suffixCandidate))
+				_, err = box.String(fmt.Sprintf("userdata%s.phase2.sh", suffixCandidate))
 				problems = problems || (err != nil)
 
 				if !problems {
@@ -217,7 +217,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			tmplString, err := box.String(fmt.Sprintf("user_data%s.phase1.sh", provider))
+			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", provider))
 			if err != nil {
 				return nil, fmt.Errorf("error loading script template for phase1 : %s", err.Error())
 			}
@@ -244,7 +244,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 				return nil, err
 			}
 
-			tmplString, err := box.String(fmt.Sprintf("user_data%s.phase2.sh", provider))
+			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase2.sh", provider))
 			if err != nil {
 				return nil, fmt.Errorf("error loading script template: %s", err.Error())
 			}
