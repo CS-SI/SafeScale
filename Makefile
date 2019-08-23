@@ -83,17 +83,25 @@ ensure:
 	@while [ 1 -ne 0 ] ; do \
 		$$(dep ensure) && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
 	done
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing protobuf... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating gophercloud... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@while [ 1 -ne 0 ] ; do \
 		$$(dep ensure -update "github.com/gophercloud/gophercloud") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
 	done
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating stow... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@while [ 1 -ne 0 ] ; do \
 		$$(dep ensure -update "github.com/graymeta/stow") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
 	done
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running build steps specifics to version... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@while [ 1 -ne 0 ] ; do \
-		$$($(GO) version | grep 1.10 > /dev/null || dep ensure -update "golang.org/x/tools") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
+		$$($(GO) version | grep 1.10 > /dev/null) && break || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating golang tools... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
+		$$(dep ensure -update "golang.org/x/tools") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished golang tools update... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
 	done
-	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Building for go 1.10 takes more time..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Running steps for version 1.10 ... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" || true;
+	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Building for go 1.10 takes more time..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" || true;
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which stringer` && rm -rf ./vendor/golang.org/x/tools/cmd && govendor fetch golang.org/x/tools/cmd/stringer@release-branch.go1.10 && cd vendor/golang.org/x/tools/cmd/stringer && $(GO) build && mv ./stringer $(GOPATH)/bin || true
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which errcheck` && rm -rf ./vendor/github.com/kisielk && govendor fetch github.com/kisielk/errcheck@v1.0.1 && cd vendor/github.com/kisielk/errcheck && $(GO) build && mv ./errcheck $(GOPATH)/bin || true
 
