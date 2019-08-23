@@ -388,9 +388,12 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
 	if w.action == Action.Add && !s.SkipProxy {
-		err := w.setReverseProxy()
-		if err != nil {
-			return nil, err
+		// FIXME REVIEW the nil check for w.cluster, if not there and a feature is added to a gateway, it panics
+		if w.cluster != nil {
+			err := w.setReverseProxy()
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -644,11 +647,30 @@ func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, e
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
-func (w *worker) setReverseProxy() error {
+func (w *worker) setReverseProxy() (err error) {
 	rules, ok := w.feature.specs.Get("feature.proxy.rules").([]interface{})
 	if !ok || len(rules) <= 0 {
 		return nil
 	}
+
+	if w.cluster == nil {
+		return utils.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
+	}
+
+	if w.feature.task == nil {
+		return utils.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
+	}
+
+	// FIXME Look how it's done on previous version
+	/*
+	// here begins the old style
+	_, err = w.identifyAvailableGateway()
+	if err != nil {
+		return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
+	}
+
+	// here ends the old style
+	 */
 
 	svc := w.cluster.GetService(w.feature.task)
 	netprops := w.cluster.GetNetworkConfig(w.feature.task)
@@ -656,6 +678,7 @@ func (w *worker) setReverseProxy() error {
 	if err != nil {
 		return err
 	}
+
 	network := mn.Get()
 	kc, err := NewKongController(svc, network)
 	if err != nil {
@@ -697,7 +720,7 @@ func (w *worker) setReverseProxy() error {
 			cloneV["Hostname"] = h.Name
 			propagated, err := kc.Apply(rule, &cloneV)
 			if err != nil {
-				return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
+				return fmt.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
 			}
 			// Propagated contain k/v that have to be added to w.variables
 			for k, v := range propagated {
