@@ -80,11 +80,24 @@ getdevdeps: begin
 ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@if [ ! -d ./vendor ]; then printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; else printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating vendor dir..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi;
-	@(dep ensure)
+	@while [ 1 -ne 0 ] ; do \
+		$$(dep ensure); \
+		if [ $$? -eq 0 ]; then break; else printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi; \
+	done
 	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
-	@(dep ensure -update "github.com/gophercloud/gophercloud")
-	@(dep ensure -update "github.com/graymeta/stow")
-	@$(GO) version | grep 1.10 > /dev/null || dep ensure -update "golang.org/x/tools"
+	@while [ 1 -ne 0 ] ; do \
+		$$(dep ensure -update "github.com/gophercloud/gophercloud"); \
+		if [ $$? -eq 0 ]; then break; else printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi; \
+	done
+	@while [ 1 -ne 0 ] ; do \
+		$$(dep ensure -update "github.com/graymeta/stow"); \
+		if [ $$? -eq 0 ]; then break; else printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi; \
+	done
+	@while [ 1 -ne 0 ] ; do \
+		$$($(GO) version | grep 1.10 > /dev/null || dep ensure -update "golang.org/x/tools"); \
+		if [ $$? -eq 0 ]; then break; else printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi; \
+	done
+	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Building for go 1.10 takes more time..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which stringer` && rm -rf ./vendor/golang.org/x/tools/cmd && govendor fetch golang.org/x/tools/cmd/stringer@release-branch.go1.10 && cd vendor/golang.org/x/tools/cmd/stringer && $(GO) build && mv ./stringer $(GOPATH)/bin || true
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which errcheck` && rm -rf ./vendor/github.com/kisielk && govendor fetch github.com/kisielk/errcheck@v1.0.1 && cd vendor/github.com/kisielk/errcheck && $(GO) build && mv ./errcheck $(GOPATH)/bin || true
 
