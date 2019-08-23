@@ -35,7 +35,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
+                            sfRetry 5m 3 "curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null" || exit 700
 
             add:
 #                pace: config,secret,networks,start
