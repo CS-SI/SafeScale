@@ -37,8 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
-// FIXME Here is the missing piece
-
 const (
 	featureScriptTemplateContent = `#!/bin/bash -x
 
