@@ -481,19 +481,19 @@ func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string
 
 		msgOut, closeErr = ioutil.ReadAll(stdOut)
 		if closeErr != nil {
-			log.Debugf("Error recovering standard output of command: %v", closeErr)
+			log.Debugf("Error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
 			clean = false
 		}
 
 		msgErr, closeErr = ioutil.ReadAll(stderr)
 		if closeErr != nil {
-			log.Debugf("Error recovering standard error of command: %v", closeErr)
+			log.Debugf("Error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
 			clean = false
 		}
 
 		err = sc.Wait()
 		if err != nil {
-			log.Debugf("Error waiting for command: %v", err)
+			log.Debugf("Error waiting for command [%s]: %v", sc.Display(), err)
 			clean = false
 		}
 
