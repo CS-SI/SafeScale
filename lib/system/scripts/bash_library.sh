@@ -184,7 +184,7 @@ EOF
 	result=$(timeout $timeout bash -c fn)
 	rc=$?
 	unset fn
-	[ $rc -eq 0 ] && echo $result && return 0
+	[[ $rc -eq 0 ]] && echo $result && return 0
 	echo "sfRetry: timeout!"
 	return $rc
 }
@@ -215,7 +215,7 @@ EOF
 	result=$(timeout $timeout bash -c fn)
 	rc=$?
 	unset fn
-	[ $rc -eq 0 ] && echo $result && return 0
+	[[ $rc -eq 0 ]] && echo $result && return 0
 	echo "sfRetry: timeout!"
 	return $rc
 }
