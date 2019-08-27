@@ -719,12 +719,16 @@ func (w *worker) setReverseProxy() (err error) {
 			cloneV["HostIP"] = h.PrivateIp
 			cloneV["Hostname"] = h.Name
 			propagated, err := kc.Apply(rule, &cloneV)
+
+			// FIXME Check this later
 			if err != nil {
-				return fmt.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
-			}
-			// Propagated contain k/v that have to be added to w.variables
-			for k, v := range propagated {
-				w.variables[k] = v
+				log.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
+				// return fmt.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
+			} else {
+				// Propagated contain k/v that have to be added to w.variables
+				for k, v := range propagated {
+					w.variables[k] = v
+				}
 			}
 		}
 	}
