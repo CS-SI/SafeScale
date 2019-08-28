@@ -26,7 +26,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[override]]
   name = "go.opencensus.io"
-  version = "=v0.22.0"
+  revision = "9c377598961b706d1542bd2d84d538b5094d596e"
 
 [[override]]
   name = "google.golang.org/genproto"
