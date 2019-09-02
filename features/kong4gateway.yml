@@ -35,7 +35,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            sfNewRetry 3m 5 "curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null" || exit 700
+                            sfRetry 1m 5 "curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null" || exit 192
 
             add:
 #                pace: config,secret,networks,start
@@ -136,7 +136,7 @@ feature:
                             version: '2.1'
                             services:
                                 proxy:
-                                    image: kong4gateway
+                                    image: kong4gateway:latest
                                     environment:
                                         - KONG_DATABASE=postgres
                                         - KONG_PG_HOST={{ .HostIP }}
@@ -262,7 +262,7 @@ feature:
                     start:
                         targets:
                             hosts: no
-                            gateways: any
+                            gateways: all
                             masters: no
                             nodes: no
                         run: |
@@ -276,7 +276,7 @@ feature:
                     compose:
                         targets:
                             hosts: no
-                            gateways: any
+                            gateways: all
                             masters: no
                             nodes: no
                         run: |
