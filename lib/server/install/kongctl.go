@@ -86,14 +86,13 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 				return false, err
 			}
 			primaryGateway = mh.Get()
-			pbHost := srvutils.ToPBHost(primaryGateway)
-			target := NewNodeTarget(pbHost)
+			target := NewNodeTarget(srvutils.ToPBHost(primaryGateway))
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
-				return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), pbHost.Name)
+				return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), primaryGateway.Name)
 			}
 			if !results.Successful() {
-				return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", pbHost.Name)
+				return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", primaryGateway.Name)
 			}
 
 			if network.SecondaryGatewayID != "" {
@@ -102,14 +101,13 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 					return false, err
 				}
 				secondaryGateway = mh.Get()
-				pbHost := srvutils.ToPBHost(secondaryGateway)
-				target := NewNodeTarget(pbHost)
+				target := NewNodeTarget(srvutils.ToPBHost(secondaryGateway))
 				results, err := rp.Check(target, Variables{}, Settings{})
 				if err != nil {
-					return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), pbHost.Name)
+					return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), secondaryGateway.Name)
 				}
 				if !results.Successful() {
-					return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", pbHost.Name)
+					return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", secondaryGateway.Name)
 				}
 			}
 			return true, nil

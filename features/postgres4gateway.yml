@@ -105,25 +105,25 @@ feature:
                     #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || exit 192
                     #         exit 0
 
-                    network:
-                        targets:
-                            hosts: no
-                            gateways: any
-                            masters: no
-                            nodes: no
-                        run: |
-                            # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
-                            #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
-                            # fi
-                            if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
-                                docker network create --attachable -d bridge safescale-gw || exit 193
-                            fi
-                            exit 0
+                    # network:
+                    #     targets:
+                    #         hosts: no
+                    #         gateways: any
+                    #         masters: no
+                    #         nodes: no
+                    #     run: |
+                    #         # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
+                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
+                    #         # fi
+                    #         if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
+                    #             docker network create --attachable -d bridge safescale-gw || exit 193
+                    #         fi
+                    #         exit 0
 
                     start:
                         targets:
                             hosts: no
-                            gateways: any
+                            gateways: all
                             masters: no
                             nodes: no
                         run: |
