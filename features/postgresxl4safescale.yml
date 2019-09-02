@@ -26,6 +26,7 @@ feature:
             - docker-compose
 
     parameters:
+        - AdminPassword=
         - PurgeOnRemoval=no
 
     install:
@@ -44,7 +45,7 @@ feature:
                             exit 0
 
             add:
-                pace: config,image,stack,secret,network,firewall,start
+                pace: network,config,image,stack,secret,firewall,start
                 steps:
                     config:
                         targets:
@@ -71,6 +72,7 @@ feature:
                             log_timezone = 'UTC'
                             autovacuum = on
                             track_counts = on
+                            password_encryption = scram-sha-256
 
                             # Locale
                             lc_messages = 'en_US.UTF-8'
@@ -130,11 +132,13 @@ feature:
                             EOF
 
                             GWBRIDGE_SUBNET=$(docker network inspect docker_gwbridge | jq -r .[0].IPAM.Config[0].Subnet)
+                            OVERLAY_SUBNET=$(docker network inspect postgresxl4safescale_net | jq -r .[0].IPAM.Config[0].Subnet)
                             cat >${SF_ETCDIR}/postgresxl4safescale/pg_hba.conf <<-HBAEOF
                             # TYPE  DATABASE        USER            ADDRESS             METHOD
                             local   all             all                                 trust
                             host    all             all             127.0.0.0/8         trust
-                            host    all             all             ${GWBRIDGE_SUBNET}  trust
+                            host    all             all             ${GWBRIDGE_SUBNET}  scram-sha-256
+                            host    all             all             ${OVERLAY_SUBNET}   scram-sha-256
                             host    all             all             {{.CIDR}}           scram-sha-256
                             HBAEOF
                             exit 0
@@ -174,6 +178,12 @@ feature:
                                 ln -sf /etc/pgxl/pg_hba.conf \${PGSQL_DATA}
                             }
 
+                            wait_for_postgres() {
+                                local timeout=\$1
+                                [ ! -n \$timeout ] && timeout=60
+                                timeout \$timeout bash -c "while ! psql -c 'select 1' >/dev/null; do sleep 5; done"
+                            }
+
                             INDEX={{ range $i, $e := .Masters }}{{ if eq $e.PrivateIP $.HostIP }}{{ $i }}{{ end }}{{ end }}
                             case \$KIND in
                                 gtm-master)
@@ -206,22 +216,31 @@ feature:
                                         initgtm -Z gtm_proxy -D \${PGSQL_DATA}
                                         ;;
                                     coordinator|data)
-                                        initdb -D \${PGSQL_DATA} --nodename \$NODENAME
+                                        initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=scram-sha-256 --username=postgres --pwfile=/run/secrets/safescale.postgresxl.password
                                         ;;
                                 esac
+                            fi
 
-                                if [ "\$KIND" == "coordinator" -o "\$KIND" == "data" ]; then
-                                    update_postgresqlconf
-                                    update_pghbaconf
-                                    postgres \$NODETYPE -h localhost -D \${PGSQL_DATA} >/dev/stdout 2>&1 &
-                                    pid=\$!
-                                    if [ -n \$pid ]; then
-                                        sleep 20
+                            # set postgres password
+                            cat >\$HOME/.pgpass <<-EOF2
+                            *:5432:*:postgres:\$(cat /run/secrets/safescale.postgresxl.password)
+                            *:55432:*:postgres:\$(cat /run/secrets/safescale.postgresxl.password)
+                            *:55433:*:postgres:\$(cat /run/secrets/safescale.postgresxl.password)
+                            EOF2
+                            chmod 0600 \$HOME/.pgpass
+                            chown postgres:postgres \$HOME/.pgpass
 
-                                        # Define cluster topology
-                                        cat <<-SQLEOF | psql
-                            ALTER ROLE postgres WITH SUPERUSER LOGIN PASSWORD '\$(cat /run/secrets/safescale.postgresxl.password)';
+                            # initialize cluster topomogy
+                            if [ "\$KIND" == "coordinator" -o "\$KIND" == "data" ]; then
+                                update_postgresqlconf
+                                update_pghbaconf
+                                postgres \$NODETYPE -h localhost -D \${PGSQL_DATA} >/dev/stdout 2>&1 &
+                                pid=\$!
+                                if [ -n \$pid ]; then
+                                    wait_for_postgres 60
 
+                                    # Define cluster topology
+                                    cat <<-SQLEOF | psql
                             {{ range $i, $e := .Masters }}
                             CREATE NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 55432);
                             ALTER NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 55432);
@@ -230,21 +249,19 @@ feature:
                             {{ end }}
                             SELECT pgxc_pool_reload();
                             SQLEOF
-
-                                        if [ "\$KIND" = "coordinator" ]; then
-                                            # define the prefered data server for coordinator (both services on same host)
-                                            cat <<-SQLEOF | psql
+                                    if [ "\$KIND" = "coordinator" ]; then
+                                        # define the prefered data server for coordinator (both services on same host)
+                                        cat <<-SQLEOF | psql
                             ALTER NODE data\$INDEX WITH (PRIMARY, PREFERRED);
                             SELECT pgxc_pool_reload();
                             SQLEOF
-                                        fi
-                                        cat <<-SQLEOF | psql -h localhost
-                            SELECT * FROM pgxc_node;
-                            SQLEOF
-
-                                        kill -s SIGINT \$pid
-                                        rm -f \${PGSQL_DATA}/postmaster.pid
                                     fi
+
+                                    psql -c "SELECT * FROM pgxc_node;"
+
+                                    kill -s SIGINT \$pid
+                                    rm -f \${PGSQL_DATA}/postmaster.pid /tmp/.s.PGSQL.5432
+                                    sleep 10
                                 fi
                             fi
 
@@ -328,7 +345,7 @@ feature:
                             # dependencies
                             RUN apt update \
                              && apt install -y zlib1g-dev libreadline-dev libssl-dev libxml2-dev libxslt-dev \
-                                               locales \
+                                               locales netcat \
                                                vim net-tools inetutils-ping dnsutils procps nmap \
                              && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
                             ENV LANG en_US.UTF-8
@@ -568,7 +585,12 @@ feature:
                             nodes: no
                         run: |
                             docker secret rm safescale.postgresxl.password &>/dev/null || true
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresxl.password - || exit 193
+                            {{ if eq .AdminPassword "" }}
+                            PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+                            {{ else }}
+                            PASSWORD="{{ .AdminPassword }}"
+                            {{ end }}
+                            echo -n "$PASSWORD" | docker secret create safescale.postgresxl.password - || exit 193
                             exit 0
 
                     network:
@@ -590,8 +612,6 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            # INGRESS_CIDR=$(docker network inspect ingress | jq -r .[0].IPAM.Config[0].Subnet)
-                            # sfFirewallAdd --zone=trusted --add-source=${INGRESS_CIDR}
                             sfFirewallAdd --zone=trusted --add-interface=docker_gwbridge
                             sfFirewallReload
                             exit 0

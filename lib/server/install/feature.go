@@ -34,7 +34,7 @@ import (
 var (
 	// EmptyValues corresponds to no values for the feature
 	EmptyValues = map[string]interface{}{}
-	checkCache  = utils.NewMapCache()
+	// checkCache  = utils.NewMapCache()
 )
 
 // Variables defines the parameters a Installer may need
@@ -272,10 +272,10 @@ func (f *Feature) Applyable(t Target) bool {
 // Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
 func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
-	cacheKey := f.DisplayName() + "@" + t.Name()
-	if anon, ok := checkCache.Get(cacheKey); ok {
-		return anon.(Results), nil
-	}
+	// cacheKey := f.DisplayName() + "@" + t.Name()
+	// if anon, ok := checkCache.Get(cacheKey); ok {
+	// 	return anon.(Results), nil
+	// }
 
 	methods := t.Methods()
 	var installer Installer
@@ -309,7 +309,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	results, err := installer.Check(f, t, myV, s)
-	_ = checkCache.ForceSet(cacheKey, results)
+	// _ = checkCache.ForceSet(cacheKey, results)
 	return results, err
 }
 
@@ -370,7 +370,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	}
 	results, err := installer.Add(f, t, myV, s)
 	if err == nil {
-		_ = checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
+		// _ = checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
 	}
 	return results, err
 }
@@ -409,7 +409,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	results, err := installer.Remove(f, t, myV, s)
-	checkCache.Reset(f.DisplayName() + "@" + t.Name())
+	// checkCache.Reset(f.DisplayName() + "@" + t.Name())
 	return results, err
 }
 

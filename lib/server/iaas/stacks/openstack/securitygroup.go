@@ -174,7 +174,7 @@ func (s *Stack) createUDPRules(groupID string) error {
 	return err
 }
 
-// createICMPRules creates UDP rules to configure the default security group
+// createICMPRules creates ICMP rules inside the default security group
 func (s *Stack) createICMPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
@@ -258,6 +258,12 @@ func (s *Stack) InitDefaultSecurityGroup() error {
 	}
 
 	err = s.createUDPRules(group.ID)
+	if err != nil {
+		secgroups.Delete(s.NetworkClient, group.ID)
+		return err
+	}
+
+	err = s.createICMPRules(group.ID)
 	if err != nil {
 		secgroups.Delete(s.NetworkClient, group.ID)
 		return err
