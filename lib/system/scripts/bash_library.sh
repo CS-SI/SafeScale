@@ -173,10 +173,10 @@ sfRetry() {
 			while true; do
 				r=\$($*)
 				rc=\$?
-				[[ \$? -eq 0 ]] && echo \$r && break
+				[ \$rc -eq 0 ] && echo \$r && break
 				sleep $delay
 			done
-			return 0
+			return \$rc
 		}
 		export -f fn
 EOF
@@ -184,42 +184,42 @@ EOF
 	result=$(timeout $timeout bash -c fn)
 	rc=$?
 	unset fn
-	[[ $rc -eq 0 ]] && echo $result && return 0
+	[ $rc -eq 0 ] && echo $result && return 0
 	echo "sfRetry: timeout!"
 	return $rc
 }
 export -f sfRetry
 
-# sfNewRetry <timeout> <delay> command
-# retries command until success, with sleep of <delay> seconds
-sfNewRetry() {
-	local timeout=$1
-	local delay=$2
-	shift 2
-	local result
+# # sfNewRetry <timeout> <delay> command
+# # retries command until success, with sleep of <delay> seconds
+# sfNewRetry() {
+# 	local timeout=$1
+# 	local delay=$2
+# 	shift 2
+# 	local result
 
-	{ code=$(</dev/stdin); } <<-EOF
-		fn() {
-			local r
-			while true; do
-				r=\$($*)
-				rc=\$r
-				[[ \$r -eq 0 ]] && echo \$r && break
-				sleep $delay
-			done
-			return 0
-		}
-		export -f fn
-EOF
-	eval "$code"
-	result=$(timeout $timeout bash -c fn)
-	rc=$?
-	unset fn
-	[[ $rc -eq 0 ]] && echo $result && return 0
-	echo "sfRetry: timeout!"
-	return $rc
-}
-export -f sfNewRetry
+# 	{ code=$(</dev/stdin); } <<-EOF
+# 		fn() {
+# 			local r
+# 			while true; do
+# 				r=\$($*)
+# 				rc=\$r
+# 				[[ \$r -eq 0 ]] && echo \$r && break
+# 				sleep $delay
+# 			done
+# 			return 0
+# 		}
+# 		export -f fn
+# EOF
+# 	eval "$code"
+# 	result=$(timeout $timeout bash -c fn)
+# 	rc=$?
+# 	unset fn
+# 	[[ $rc -eq 0 ]] && echo $result && return 0
+# 	echo "sfRetry: timeout!"
+# 	return $rc
+# }
+# export -f sfNewRetry
 
 # sfFirewall sets a runtime firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
 # rule doesn't need sfFirewallReload to be applied, but isn't save as permanent (except if you add --permanent parameter,
