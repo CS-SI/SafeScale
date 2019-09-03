@@ -342,9 +342,9 @@ Is meaningful for some providers:
 ### <a name="kw_Region"></a> `Region`
 
 Contains the region to connect to. Values depend on provider.<br>
-Is mandatory in `tenants.compute` 
+Is mandatory in `tenants.compute`
 May be used in `tenants.objectstorage` and `tenants.metadata`.
-If the Region is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory) 
+If the Region is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory)
 
 ### <a name="kw_AvailabilityZone"></a> `AvailabilityZone`
 
@@ -425,13 +425,13 @@ The file retrieved from there has the following format:
 }
 ```
 
-The tenants.toml file contains the same fields as the service account json file AND the project number from the project settings page:
+For now (this will change in the future to be more consistent with the other drivers), the tenants.toml file contains the same fields as the service account json file AND the project number from the project settings page:
 
 ```yaml
 [[tenants]]
     client = "gcp"
     name = "my-google-account-project-x"
-    
+
     [tenants.identity]
         User = "******@****"
         Password = "**********"
