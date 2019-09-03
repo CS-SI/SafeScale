@@ -511,6 +511,15 @@ factsCleanup() {
 trap factsCleanup exit
 # --------
 
+# --------
+# Workaround for associative array not exported in bash
+declare -x SERIALIZED_FACTS=$(mktemp)
+factsCleanup() {
+	rm -f "$SERIALIZED_FACTS" &>/dev/null
+}
+trap factsCleanup exit
+# --------
+
 declare -A FACTS
 export LINUX_KIND=
 export VERSION_ID=
