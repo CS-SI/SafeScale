@@ -446,7 +446,7 @@ var hostAddFeatureCommand = cli.Command{
 	},
 }
 
-// hostCheckFeaturesCommand handles 'safescale host <host name or id> list-features'
+// hostListFeaturesCommand handles 'safescale host list-features'
 var hostListFeaturesCommand = cli.Command{
 	Name:      "list-features",
 	Aliases:   []string{"list-available-features"},
