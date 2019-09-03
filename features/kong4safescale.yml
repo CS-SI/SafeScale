@@ -66,29 +66,48 @@ feature:
                             # wait for database server
                             while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done
 
-                            # Create database if needed
-                            if ! $PSQL kong4safescale -c '\q' &>/dev/null; then
-                                $PSQL <<-SQLEOF
+                            case \$1 in
+                                dbinit)
+                                    # Create database if needed
+                                    if ! $PSQL kong4safescale -c '\q' &>/dev/null; then
+                                        $PSQL <<-SQLEOF
                             CREATE DATABASE kong4safescale;
                             CREATE USER kong4safescale;
                             #CREATE DATABASE kong4safescale-gui;
                             SQLEOF
-                            fi
+                                    fi
+                                    exit 0
+                                    ;;
 
-                            # init/reset kong4safescale password and db ownership
-                            $PSQL <<-SQLEOF
+                                proxy)
+                                    # Waits for database creation
+                                    echo "Waiting for database creation..."
+                                    while ! $PSQL kong4safescale -c '\q' &>/dev/null; do sleep 5; done
+                                    echo "Database is created, continue."
+
+                                    # init/reset kong4safescale password and db ownership
+                                    echo "Resetting password and ownership..."
+                                    $PSQL <<-SQLEOF
                             ALTER USER kong4safescale PASSWORD '$(cat /run/secrets/safescale.kong.db_password)';
                             ALTER DATABASE kong4safescale OWNER TO kong4safescale;
                             #ALTER DATABASE kong4safescale-gui OWNER TO kong4safescale;
                             SQLEOF
+                                    echo Done.
 
-                            # kong migrations
-                            /docker-entrypoint.sh kong migrations bootstrap >/dev/null
-                            /docker-entrypoint.sh kong migrations up >/dev/null
-                            /docker-entrypoint.sh kong migrations finish >/dev/null
+                                    # kong migrations
+                                    echo "Running Kong migrations..."
+                                    /docker-entrypoint.sh kong migrations bootstrap >/dev/null
+                                    /docker-entrypoint.sh kong migrations up >/dev/null
+                                    /docker-entrypoint.sh kong migrations finish >/dev/null
+                                    echo Done.
 
-                            # starts kong
-                            exec /docker-entrypoint.sh $*
+                                    # starts kong
+                                    exec /docker-entrypoint.sh \$*
+                                    ;;
+                            esac
+
+                            echo "Neither 'dbinit' nor 'proxy' parameter provided, stopping.""
+                            exit 0
                             EOF
 
                             # cat >${SF_ETCDIR}/kong4safescale/konga.userdb.data <<-EOF
@@ -159,8 +178,25 @@ feature:
                             cat >${SF_ETCDIR}/kong4safescale/stack.yml <<-EOF
                             version: '3.3'
                             services:
+                                dbinit:
+                                    image: kongdb4safescale:latest
+                                    command: dbinit
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    deploy:
+                                        mode: replicated
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        restart_policy:
+                                            condition: none
+                                    secrets:
+                                        - safescale.postgresxl.password
+                                        - safescale.kong.db_password
+
                                 proxy:
                                     image: kong4safescale:latest
+                                    command: proxy
                                     volumes:
                                         - ${SF_ETCDIR}/kong4safescale/includes:/etc/kong/includes:ro
                                     networks:
