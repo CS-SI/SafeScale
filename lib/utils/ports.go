@@ -22,7 +22,7 @@ func New() (port int, err error) {
 	}
 
 	// Defer the closing of the server so it closes
-	defer func(){
+	defer func() {
 		_ = server.Close()
 	}()
 
@@ -62,7 +62,7 @@ func Check(port int) (status bool, err error) {
 
 }
 
-func runAway(site string , port string) {
+func runAway(site string, port string) {
 	timeout := time.Duration(1 * time.Second)
 	_, err := net.DialTimeout("tcp", site+":"+port, timeout)
 	if err != nil {

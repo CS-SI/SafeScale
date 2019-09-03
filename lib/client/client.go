@@ -60,8 +60,8 @@ type Client *Session
 
 // DefaultTimeout tells to use the timeout by default depending on context
 var (
-	DefaultConnectionTimeout = common.GetTimeoutFromEnv("SAFESCALE_CONNECTION_TIMEOUT", 30 * time.Second)
-	DefaultExecutionTimeout  = common.GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", 5 * time.Minute)
+	DefaultConnectionTimeout = common.GetTimeoutFromEnv("SAFESCALE_CONNECTION_TIMEOUT", 30*time.Second)
+	DefaultExecutionTimeout  = common.GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", 5*time.Minute)
 )
 
 // New returns an instance of safescale Client

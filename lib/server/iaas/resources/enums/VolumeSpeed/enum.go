@@ -23,7 +23,6 @@ package VolumeSpeed
 type Enum int
 
 const (
-
 	//COLD speed volume
 	COLD Enum = iota
 	//HDD speed volume.

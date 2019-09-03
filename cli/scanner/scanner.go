@@ -570,7 +570,7 @@ func main() {
 	}
 
 	timeout := time.Duration(1 * time.Second)
-	_, err := net.DialTimeout("tcp", "localhost:" + strconv.Itoa(safescaledPort), timeout)
+	_, err := net.DialTimeout("tcp", "localhost:"+strconv.Itoa(safescaledPort), timeout)
 	if err != nil {
 		log.Fatalf("You must run safescaled first...")
 	}

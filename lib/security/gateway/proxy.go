@@ -255,7 +255,7 @@ func loadConfig() (cfg *proxyConfig, err error) {
 	viper.AddConfigPath("/etc/safescale/")  // path to look for the config file in
 	viper.AddConfigPath("$HOME/.safescale") // call multiple times to add many search paths
 	viper.AddConfigPath(".")                // optionally look for config in the working directory
-	err = viper.ReadInConfig()             // Find and read the config file
+	err = viper.ReadInConfig()              // Find and read the config file
 	if err != nil {                         // Handle errors reading the config file
 		return nil, fmt.Errorf("Fatal error reading config file: %s", err)
 	}

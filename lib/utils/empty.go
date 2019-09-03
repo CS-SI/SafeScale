@@ -57,4 +57,3 @@ func isEmpty(v reflect.Value) bool {
 func IsEmpty(v interface{}) bool {
 	return isEmpty(reflect.ValueOf(v))
 }
-

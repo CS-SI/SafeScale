@@ -663,14 +663,14 @@ func (w *worker) setReverseProxy() (err error) {
 
 	// FIXME Look how it's done on previous version
 	/*
-	// here begins the old style
-	_, err = w.identifyAvailableGateway()
-	if err != nil {
-		return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
-	}
+		// here begins the old style
+		_, err = w.identifyAvailableGateway()
+		if err != nil {
+			return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
+		}
 
-	// here ends the old style
-	 */
+		// here ends the old style
+	*/
 
 	svc := w.cluster.GetService(w.feature.task)
 	netprops := w.cluster.GetNetworkConfig(w.feature.task)

@@ -148,20 +148,20 @@ type Object interface {
 // FIXME GCP This is a problem
 // Config ...
 type Config struct {
-	Type         string
-	EnvAuth      bool
-	AuthVersion  int
-	AuthURL      string
-	EndpointType string
-	Endpoint     string
-	TenantDomain string
-	Tenant       string
-	Domain       string
-	User         string
-	Key          string
-	SecretKey    string
-	Region       string
+	Type             string
+	EnvAuth          bool
+	AuthVersion      int
+	AuthURL          string
+	EndpointType     string
+	Endpoint         string
+	TenantDomain     string
+	Tenant           string
+	Domain           string
+	User             string
+	Key              string
+	SecretKey        string
+	Region           string
 	AvailabilityZone string
-	ProjectId    string
-	Credentials  string
+	ProjectId        string
+	Credentials      string
 }
