@@ -29,7 +29,7 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		}
 		bc, err := f.TextFormatter.Format(entry)
 		ticket := string(bc)
-		replaced := strings.Replace(ticket, "[20", ""+strings.Repeat(" ", 8-len(entry.Level.String()))+"[" + f.pid + "][20", 1)
+		replaced := strings.Replace(ticket, "[20", ""+strings.Repeat(" ", 8-len(entry.Level.String()))+"["+f.pid+"][20", 1)
 
 		return []byte(replaced), err
 	}

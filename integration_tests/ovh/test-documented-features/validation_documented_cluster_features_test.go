@@ -21,4 +21,3 @@ func Test_Kubernetes(t *testing.T) {
 func Test_Spark(t *testing.T) {
 	integration_tests.Spark(t, Providers.OVH)
 }
-

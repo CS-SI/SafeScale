@@ -166,7 +166,7 @@ func TestGateway(t *testing.T) {
 
 	beauty := make(chan bool)
 	go gateway.Start(":4443", beauty)
-	failed := <- beauty
+	failed := <-beauty
 
 	if failed {
 		t.Skip()

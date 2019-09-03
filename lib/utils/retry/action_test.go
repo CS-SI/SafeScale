@@ -76,9 +76,9 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		timeout time.Duration
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name      string
+		args      args
+		wantErr   bool
 		wantTOErr bool
 	}{
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false, true},
@@ -106,9 +106,9 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 		timeout time.Duration
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name      string
+		args      args
+		wantErr   bool
 		wantTOErr bool
 	}{
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, true, false},

@@ -25,10 +25,10 @@ import (
 
 // Identity contains the bare minimum information about a cluster
 type Identity struct {
-	Name       string          `json:"name"`       // Name is the name of the cluster
-	Flavor     Flavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
-	Complexity Complexity.Enum `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
-	Keypair    *resources.KeyPair  `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
+	Name       string             `json:"name"`       // Name is the name of the cluster
+	Flavor     Flavor.Enum        `json:"flavor"`     // Flavor tells what kind of cluster it is
+	Complexity Complexity.Enum    `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
+	Keypair    *resources.KeyPair `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
 
 	// AdminPassword contains the password of cladm account. This password
 	// is used to connect via Guacamole, but can't be used with SSH

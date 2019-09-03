@@ -134,7 +134,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 
 	k, uperr = sshconfig.SudoCommand("which scp")
-	if uperr != nil && k != nil{
+	if uperr != nil && k != nil {
 		_, uptext, _, kerr := k.RunWithTimeout(utils.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
@@ -182,7 +182,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			}
 			return err
 		},
-		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout( utils.GetContextTimeout() )),
+		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(utils.GetContextTimeout())),
 		retry.Constant(utils.GetDefaultDelay()),
 		nil, nil, nil,
 	)

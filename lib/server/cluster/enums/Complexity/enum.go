@@ -25,7 +25,6 @@ import (
 type Enum int
 
 const (
-
 	// Small is the simplest mode of cluster
 	Small Enum = 1
 	// Normal allows the cluster to be resistant to 1 master failure

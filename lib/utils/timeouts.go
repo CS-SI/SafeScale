@@ -12,18 +12,17 @@ const (
 	HostTimeout = 5 * time.Minute
 
 	// Long timeout
-	LongHostOperationTimeout    = 10 * time.Minute
+	LongHostOperationTimeout = 10 * time.Minute
 
 	DefaultSSHConnectionTimeout = 2 * time.Minute
-	HostCleanupTimeout = 3 * time.Minute
+	HostCleanupTimeout          = 3 * time.Minute
 
 	DefaultConnectionTimeout = 30 * time.Second
 	DefaultExecutionTimeout  = 5 * time.Minute
 
-
-	SmallDelay = 1*time.Second
-	DefaultDelay = 5*time.Second
-	BigDelay = 30*time.Second
+	SmallDelay   = 1 * time.Second
+	DefaultDelay = 5 * time.Second
+	BigDelay     = 30 * time.Second
 )
 
 func GetTimeoutFromEnv(key string, duration time.Duration) time.Duration {

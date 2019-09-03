@@ -10,4 +10,3 @@ type LocalConfiguration struct {
 	// Connection identifier to the virtualisation device
 	URI string
 }
-

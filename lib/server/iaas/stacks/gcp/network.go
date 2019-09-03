@@ -43,7 +43,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	// disable subnetwork auto-creation
 	ne := compute.Network{
-		Name:                  s.GcpConfig.NetworkName,
+		Name: s.GcpConfig.NetworkName,
 		AutoCreateSubnetworks: false,
 		ForceSendFields:       []string{"AutoCreateSubnetworks"},
 	}
