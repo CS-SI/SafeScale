@@ -98,10 +98,10 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 		if err == nil {
 			for _, f := range files {
 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
-
 					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if err != nil {
-						return nil, err
+						log.Error(err)
+						continue
 					}
 					if _, ok := allEmbeddedMap[feature.displayName]; !ok {
 						allEmbeddedMap[feature.displayName] = feature
