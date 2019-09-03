@@ -19,6 +19,8 @@ export SF_VARDIR=${SF_BASEDIR}/var
 export SF_TMPDIR=${SF_VARDIR}/tmp
 export SF_LOGDIR=${SF_VARDIR}/log
 
+declare -x SF_SERIALIZED_FACTS=$(mktemp)
+
 sfFinishPreviousInstall() {
 	local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
 	if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
@@ -170,6 +172,7 @@ sfRetry() {
 	{ code=$(</dev/stdin); } <<-EOF
 		fn() {
 			local r
+			local rc
 			while true; do
 				r=\$($*)
 				rc=\$?
@@ -189,37 +192,6 @@ EOF
 	return $rc
 }
 export -f sfRetry
-
-# # sfNewRetry <timeout> <delay> command
-# # retries command until success, with sleep of <delay> seconds
-# sfNewRetry() {
-# 	local timeout=$1
-# 	local delay=$2
-# 	shift 2
-# 	local result
-
-# 	{ code=$(</dev/stdin); } <<-EOF
-# 		fn() {
-# 			local r
-# 			while true; do
-# 				r=\$($*)
-# 				rc=\$r
-# 				[[ \$r -eq 0 ]] && echo \$r && break
-# 				sleep $delay
-# 			done
-# 			return 0
-# 		}
-# 		export -f fn
-# EOF
-# 	eval "$code"
-# 	result=$(timeout $timeout bash -c fn)
-# 	rc=$?
-# 	unset fn
-# 	[[ $rc -eq 0 ]] && echo $result && return 0
-# 	echo "sfRetry: timeout!"
-# 	return $rc
-# }
-# export -f sfNewRetry
 
 # sfFirewall sets a runtime firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
 # rule doesn't need sfFirewallReload to be applied, but isn't save as permanent (except if you add --permanent parameter,
@@ -401,33 +373,40 @@ export -f sfReverseProxyReload
 sfService() {
 	[ $# -ne 2 ] && return 1
 
+	local use_systemd=$(sfGetFact "use_systemd")
+	local redhat_like=$(sfGetFact "redhat_like")
+
 	# Preventively run daemon-reload in case of changes
-	[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl daemon-reload
+	[ "$use_systemd" = "1" ] && systemctl daemon-reload
 
 	case $1 in
 		enable)
-			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl enable $2 && return $?
-			[ "$(sfGetFact 'redhat like')" = "1" ] && chkconfig $2 on && return $?
+			[ "$use_systemd" = "1" ] && systemctl enable $2 && return $?
+			[ "$redhat_like" = "1" ] && chkconfig $2 on && return $?
 			;;
 		disable)
-			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl disable $2 && return $?
-			[ "$(sfGetFact 'redhat like')" = "1" ] && chkconfig $2 off && return $?
+			[ "$use_systemd" = "1" ] && systemctl disable $2 && return $?
+			[ "$redhat_like" = "1" ] && chkconfig $2 off && return $?
 			;;
 		start)
-			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl start $2 && return $?
-			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 start && return $?
+			[ "$use_systemd" = "1" ] && systemctl start $2 && return $?
+			[ "$redhat_like" = "1" ] && service $2 start && return $?
 			;;
 		stop)
-			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl stop $2 && return $?
-			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 stop && return $?
+			[ "$use_systemd" = "1" ] && systemctl stop $2 && return $?
+			[ "$redhat_like" = "1" ] && service $2 stop && return $?
 			;;
 		restart)
-			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl restart $2 && return $?
-			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 restart && return $?
+			[ "$use_systemd" = "1" ] && systemctl restart $2 && return $?
+			[ "$redhat_like" = "1" ] && service $2 restart && return $?
 			;;
 		reload)
-			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl reload $2 && return $?
-			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 reload && return $?
+			[ "$use_systemd" = "1" ] && systemctl reload $2 && return $?
+			[ "$redhat_like" = "1" ] && service $2 reload && return $?
+			;;
+		status)
+			[ "$use_systemd" = "1" ] && systemctl status $2 && return $?
+			[ "$redhat_like" = "1" ] && service $2 status && return $?
 			;;
 		*)
 			echo "sfService(): unhandled command '$1'"
@@ -523,48 +502,57 @@ sfRandomString() {
 }
 export -f sfRandomString
 
+# --------
+# Workaround for associative array not exported in bash
+declare -x SERIALIZED_FACTS=$(mktemp)
+factsCleanup() {
+	rm -f "$SERIALIZED_FACTS" &>/dev/null
+}
+trap factsCleanup exit
+# --------
+
 declare -A FACTS
-LINUX_KIND=
-VERSION_ID=
+export LINUX_KIND=
+export VERSION_ID=
 sfDetectFacts() {
 	if [ -f /etc/os-release ]; then
-			. /etc/os-release
-			FACTS["linux kind"]=$ID
-			LINUX_KIND=${ID,,}
-			FACTS["linux version"]=$VERSION_ID
-			VERSION_ID=$VERSION_ID
-			[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux codename"]=${VERSION_CODENAME,,}
+		. /etc/os-release
+		FACTS["linux_kind"]=$ID
+		LINUX_KIND=${ID,,}
+		FACTS["linux_version"]=$VERSION_ID
+		VERSION_ID=$VERSION_ID
+		[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
 	else
-			if which lsb_release &>/dev/null; then
-					LINUX_KIND=$(lsb_release -is)
-					LINUX_KIND=${LINUX_KIND,,}
-					VERSION_ID=$(lsb_release -rs | cut -d. -f1)
-			else
-					[ -f /etc/redhat-release ] && {
-							LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
-							LINUX_KIND=${LINUX_KIND,,}
-							VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
-					}
-			fi
-			FACTS["linux kind"]=${LINUX_KIND,,}
-			FACTS["linux version"]=$VERSION_ID
+		if which lsb_release &>/dev/null; then
+			LINUX_KIND=$(lsb_release -is)
+			LINUX_KIND=${LINUX_KIND,,}
+			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+		else
+			[ -f /etc/redhat-release ] && {
+				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
+				LINUX_KIND=${LINUX_KIND,,}
+				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+			}
+		fi
+		FACTS["linux_kind"]=${LINUX_KIND,,}
+		FACTS["linux_version"]=$VERSION_ID
 	fi
 
 	# Some facts about system
-	case ${FACTS["linux kind"]} in
+	case ${FACTS["linux_kind"]} in
 		redhat|centos)
-			FACTS["redhat like"]=1
-			FACTS["debian like"]=0
+			FACTS["redhat_like"]=1
+			FACTS["debian_like"]=0
 			;;
 		debian|ubuntu)
-			FACTS["redhat like"]=0
-			FACTS["debian like"]=1
+			FACTS["redhat_like"]=0
+			FACTS["debian_like"]=1
 			;;
 	esac
 	if systemctl | grep '\-.mount' &>/dev/null; then
-		FACTS["use systemd"]=1
+		FACTS["use_systemd"]=1
 	else
-		FACTS["use systemd"]=0
+		FACTS["use_systemd"]=0
 	fi
 
 	# Some facts about hardware
@@ -578,21 +566,25 @@ sfDetectFacts() {
 	FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads/core"]} ))
 	val=$(( ${FACTS["threads"]} * 2 / 3 ))
 	[ $val -le 0 ] && val=1
-	FACTS["2/3 of threads"]=$val
+	FACTS["2/3_of_threads"]=$val
 
 	sfProbeGPU
 
+	declare -p FACTS >"${SERIALIZED_FACTS}"
 	return 0
 }
 
 sfGetFact() {
-	[ $# -ne 0 ] && [ ! -z "${FACTS[$1]}" ] && echo ${FACTS[$1]}
+	[ $# -eq 0 ] && return
+	source "$SERIALIZED_FACTS"
+	[ ${FACTS[$1]+isset} ] && echo -n ${FACTS[$1]}
 }
+export -f sfGetFact
 
 # Waits the completion of the execution of userdata
 waitForUserdata() {
 	while true; do
-		[ -f /opt/safescale/var/state/user_data.phase2.done ] && break
+		[ -f ${SF_VARDIR}/state/user_data.phase2.done ] && break
 		echo "Waiting userdata completion..."
 		sleep 5
 	done
