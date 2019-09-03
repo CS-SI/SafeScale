@@ -72,7 +72,9 @@ feature:
                             log_timezone = 'UTC'
                             autovacuum = on
                             track_counts = on
-                            password_encryption = scram-sha-256
+                            # kong (more specifically pgmoon) doesn't support scram-sha-256 authentication
+                            # password_encryption = scram-sha-256
+                            password_encryption = md5
 
                             # Locale
                             lc_messages = 'en_US.UTF-8'
@@ -99,7 +101,7 @@ feature:
                             listen_addresses = '*'
                             nodename = gtmslave
                             port = 6666
-                            active_host = tasks.postgresxl4safescale_gtm-master
+                            active_host = postgresxl4safescale_gtm-master
                             active_port = 6666
                             #keepalives_count = 3
                             #keepalives_interval = 10
@@ -112,7 +114,7 @@ feature:
                             listen_addresses = '*'
                             nodename = gtmproxy${INDEX}
                             port = 6666
-                            gtm_host = tasks.postgresxl4safescale_gtm-master
+                            gtm_host = postgresxl4safescale_gtm-master
                             gtm_port = 6666
                             gtm_connect_retry_interval = 30
                             comm_timeout = 10
@@ -120,14 +122,14 @@ feature:
 
                             cat >${SF_ETCDIR}/postgresxl4safescale/coordinator/coordinator.conf <<-EOF
                             pgxc_node_name=coord${INDEX}
-                            gtm_host = tasks.postgresxl4safescale_gtm-proxy
+                            gtm_host = postgresxl4safescale_gtm-proxy
                             gtm_port = 6666
                             EOF
 
                             cat >${SF_ETCDIR}/postgresxl4safescale/data/data.conf <<-EOF
                             pooler_port = 6666
                             pgxc_node_name=data${INDEX}
-                            gtm_host = tasks.postgresxl4safescale_gtm-proxy
+                            gtm_host = postgresxl4safescale_gtm-proxy
                             gtm_port = 6666
                             EOF
 
@@ -137,9 +139,9 @@ feature:
                             # TYPE  DATABASE        USER            ADDRESS             METHOD
                             local   all             all                                 trust
                             host    all             all             127.0.0.0/8         trust
-                            host    all             all             ${GWBRIDGE_SUBNET}  scram-sha-256
-                            host    all             all             ${OVERLAY_SUBNET}   scram-sha-256
-                            host    all             all             {{.CIDR}}           scram-sha-256
+                            host    all             all             ${GWBRIDGE_SUBNET}  md5 # scram-sha-256
+                            host    all             all             ${OVERLAY_SUBNET}   md5 # scram-sha-256
+                            host    all             all             {{.CIDR}}           md5 # scram-sha-256
                             HBAEOF
                             exit 0
 
@@ -216,7 +218,8 @@ feature:
                                         initgtm -Z gtm_proxy -D \${PGSQL_DATA}
                                         ;;
                                     coordinator|data)
-                                        initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=scram-sha-256 --username=postgres --pwfile=/run/secrets/safescale.postgresxl.password
+                                        # initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=scram-sha-256 --username=postgres --pwfile=/run/secrets/safescale.postgresxl.password
+                                        initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=md5 --username=postgres --pwfile=/run/secrets/safescale.postgresxl.password
                                         ;;
                                 esac
                             fi
@@ -224,8 +227,7 @@ feature:
                             # set postgres password
                             cat >\$HOME/.pgpass <<-EOF2
                             *:5432:*:postgres:\$(cat /run/secrets/safescale.postgresxl.password)
-                            *:55432:*:postgres:\$(cat /run/secrets/safescale.postgresxl.password)
-                            *:55433:*:postgres:\$(cat /run/secrets/safescale.postgresxl.password)
+                            *:5433:*:postgres:\$(cat /run/secrets/safescale.postgresxl.password)
                             EOF2
                             chmod 0600 \$HOME/.pgpass
                             chown postgres:postgres \$HOME/.pgpass
@@ -242,21 +244,16 @@ feature:
                                     # Define cluster topology
                                     cat <<-SQLEOF | psql
                             {{ range $i, $e := .Masters }}
-                            CREATE NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 55432);
-                            ALTER NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 55432);
-                            CREATE NODE data{{ $i }} WITH (TYPE = 'datanode', HOST = '{{ $e.PrivateIP }}',  PORT = 55433);
-                            ALTER NODE data{{ $i }} WITH (TYPE = 'datanode', HOST = '{{ $e.PrivateIP }}',  PORT = 55433);
+                            CREATE NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 5432);
+                            ALTER NODE coord{{ $i }} WITH (TYPE = 'coordinator', HOST = '{{ $e.PrivateIP }}', PORT = 5432);
+                            CREATE NODE data{{ $i }} WITH (TYPE = 'datanode', HOST = '{{ $e.PrivateIP }}',  PORT = 5433);
+                            ALTER NODE data{{ $i }} WITH (TYPE = 'datanode', HOST = '{{ $e.PrivateIP }}',  PORT = 5433);
                             {{ end }}
-                            SELECT pgxc_pool_reload();
-                            SQLEOF
-                                    if [ "\$KIND" = "coordinator" ]; then
-                                        # define the prefered data server for coordinator (both services on same host)
-                                        cat <<-SQLEOF | psql
                             ALTER NODE data\$INDEX WITH (PRIMARY, PREFERRED);
                             SELECT pgxc_pool_reload();
                             SQLEOF
-                                    fi
 
+                                    # define the prefered data server for coordinator (both services on same host)
                                     psql -c "SELECT * FROM pgxc_node;"
 
                                     kill -s SIGINT \$pid
@@ -376,7 +373,7 @@ feature:
                         targets:
                             hosts: no
                             gateways: no
-                            masters: any
+                            masters: all
                             nodes: no
                         run: |
                             cat >${SF_ETCDIR}/postgresxl4safescale/stack.yml <<-EOF
@@ -464,7 +461,7 @@ feature:
                                     networks:
                                         - postgresxl4safescale_net
                                     ports:
-                                        - published: 56666
+                                        - published: 6666
                                           target: 6666
                                           mode: host
                                     deploy:
@@ -502,7 +499,7 @@ feature:
                                     networks:
                                         - postgresxl4safescale_net
                                     ports:
-                                        - published: 55432
+                                        - published: 5432
                                           target: 5432
                                           mode: host
                                     deploy:
@@ -540,7 +537,7 @@ feature:
                                     networks:
                                         - postgresxl4safescale_net
                                     ports:
-                                        - published: 55433
+                                        - published: 5433
                                           target: 5432
                                           mode: host
                                     deploy:
