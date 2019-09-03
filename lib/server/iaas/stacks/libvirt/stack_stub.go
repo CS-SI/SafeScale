@@ -30,8 +30,7 @@ import (
 
 var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
 
-// Client is the implementation of the local driver regarding to the api.ClientAPI
-
+// Stack is the implementation of the local driver regarding to the api.ClientAPI
 type Stack struct {
 }
 
