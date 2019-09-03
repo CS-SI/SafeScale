@@ -223,55 +223,6 @@ func (s *Stack) createICMPRules(groupID string) error {
 	return err
 }
 
-// createICMPRules creates ICMP rules inside the default security group
-func (s *Stack) createICMPRules(groupID string) error {
-	// Inbound == ingress == coming from Outside
-	ruleOpts := secrules.CreateOpts{
-		Direction:      secrules.DirIngress,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err := secrules.Create(s.NetworkClient, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirIngress,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "::/0",
-	}
-	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-
-	// Outbound = egress == going to Outside
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirEgress,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirEgress,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "::/0",
-	}
-	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-	return err
-}
-
 // InitDefaultSecurityGroup create an open Security Group
 // The default security group opens all TCP, UDP, ICMP ports
 // Security is managed individually on each host using a linux firewall
@@ -318,17 +269,6 @@ func (s *Stack) InitDefaultSecurityGroup() error {
 		return err
 	}
 
-	err = s.createICMPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(s.NetworkClient, group.ID)
-		return err
-	}
-
-	err = s.createICMPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(s.NetworkClient, group.ID)
-		return err
-	}
 	s.SecurityGroup = group
 	return nil
 }
