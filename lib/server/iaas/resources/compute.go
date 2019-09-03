@@ -147,15 +147,20 @@ func NewHost() *Host {
 	}
 }
 
-// OK ...
-func (h *Host) OK() bool {
+// IsConsistent tells if host struct is consistent
+func (h *Host) IsConsistent() bool {
 	result := true
 	result = result && h.ID != ""
 	result = result && h.Name != ""
-	result = result && h.PrivateKey != ""
-	result = result && h.Password != ""
+	// result = result && h.PrivateKey != ""
+	// result = result && h.Password != ""
 	result = result && h.Properties != nil
 	return result
+}
+
+// OK ...
+func (h *Host) OK() bool {
+	return h.IsConsistent()
 }
 
 // GetAccessIP returns the IP to reach the host
