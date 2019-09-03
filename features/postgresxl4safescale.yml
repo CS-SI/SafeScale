@@ -299,7 +299,7 @@ feature:
                             esac
                             EOF
 
-                            PARALLEL=$(sfGetFact "2/3 of threads")
+                            PARALLEL=$(sfGetFact "2/3_of_threads")
 
                             cat >${SF_ETCDIR}/postgresxl4safescale/build/Dockerfile <<-EOF
                             FROM debian:stable-slim AS builder
