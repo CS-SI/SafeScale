@@ -258,6 +258,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	log.Debugf(">>> huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
 	defer log.Debugf("<<< huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
 
+	if s == nil {
+		return nil, nil, utils.InvalidInstanceError()
+	}
+
 	userData := userdata.NewContent()
 
 	//msgFail := "Failed to create Host resource: %s"
@@ -549,23 +553,27 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 
 // InspectHost updates the data inside host with the data from provider
 func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
-	var (
-		host     *resources.Host
-		server   *servers.Server
-		err      error
-		notFound bool
-	)
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
 
+	var host *resources.Host
 	switch hostParam.(type) {
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
 	case string:
 		host = resources.NewHost()
 		host.ID = hostParam.(string)
-	default:
-		panic("hostParam must be a string or a *resources.Host!")
+	}
+	if host == nil {
+		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
+	var (
+		server   *servers.Server
+		err      error
+		notFound bool
+	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(s.Stack.ComputeClient, host.ID).Extract()
@@ -777,6 +785,10 @@ func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[IPVersion.
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	pager := servers.List(s.Stack.ComputeClient, servers.ListOpts{})
 	var hosts []*resources.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -804,6 +816,10 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	_, err := s.InspectHost(id)
 	if err != nil {
 		return err
@@ -1067,6 +1083,10 @@ func toHostState(status string) HostState.Enum {
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
 func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	var (
 		host        *resources.Host
 		hostInError bool
