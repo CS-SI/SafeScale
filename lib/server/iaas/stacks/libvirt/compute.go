@@ -27,7 +27,6 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -35,6 +34,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -106,6 +107,10 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 
 // ListImages lists available OS images
 func (s *Stack) ListImages() ([]resources.Image, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -141,6 +146,13 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be empty string")
+	}
+
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -184,6 +196,10 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())
@@ -224,6 +240,10 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())
@@ -266,6 +286,10 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
 	pub, _ := ssh.NewPublicKey(&publicKey)
@@ -673,10 +697,6 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*resources.Host, *libvirt.D
 }
 
 func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) error {
-	if host == nil || newHost == nil {
-		return fmt.Errorf("host and newHost have to been set")
-	}
-
 	host.ID = newHost.ID
 	if host.Name == "" {
 		host.Name = newHost.Name
@@ -748,6 +768,10 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
+	if s == nil {
+		return nil, nil, utils.InvalidInstanceError()
+	}
+
 	resourceName := request.ResourceName
 	hostName := request.HostName
 	networks := request.Networks
@@ -1008,6 +1032,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 
 // GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
 func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	var host *resources.Host
 
 	switch hostParam.(type) {
@@ -1038,11 +1066,19 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 
 // GetHostByName returns the host identified by ref (name or id)
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	return s.InspectHost(name)
 }
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	_, domain, err := s.getHostAndDomainFromRef(id)
 	if err != nil {
 		return err
@@ -1098,6 +1134,10 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	var hosts []*resources.Host
 
 	domains, err := s.LibvirtService.ListAllDomains(16383)
@@ -1118,6 +1158,10 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	_, domain, err := s.getHostAndDomainFromRef(id)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("getHostAndDomainFromRef failed : %s", err.Error()))
@@ -1133,6 +1177,10 @@ func (s *Stack) StopHost(id string) error {
 
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	_, domain, err := s.getHostAndDomainFromRef(id)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("getHostAndDomainFromRef failed : %s", err.Error()))
@@ -1148,6 +1196,10 @@ func (s *Stack) StartHost(id string) error {
 
 // RebootHost reboot the host identified by id
 func (s *Stack) RebootHost(id string) error {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	_, domain, err := s.getHostAndDomainFromRef(id)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("getHostAndDomainFromRef failed : %s", err.Error()))
@@ -1163,6 +1215,10 @@ func (s *Stack) RebootHost(id string) error {
 
 // GetHostState returns the host identified by id
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
 		return HostState.ERROR, err
@@ -1174,9 +1230,16 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
 	return map[string]bool{"local": true}, nil
 }
 
 func (s *Stack) ListRegions() ([]string, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	return []string{"local"}, nil
 }

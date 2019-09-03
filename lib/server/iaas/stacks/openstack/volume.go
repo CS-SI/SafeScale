@@ -91,7 +91,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	defer log.Debugf("<<< stacks.openstack::CreateVolume(%s)", request.Name)
 
 	if s == nil {
-		panic("Calling openstack.Stack::CreateVolume() from nil pointer!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	volume, err := s.GetVolume(request.Name)
@@ -119,8 +119,12 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 			Size:             request.Size,
 			VolumeType:       s.getVolumeType(request.Speed),
 		}).Extract()
+		if err != nil {
+			break
+		}
 		if vol == nil {
-			panic("Unexpected nil volume")
+			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
+			break
 		}
 		v = resources.Volume{
 			ID:    vol.ID,
@@ -137,8 +141,12 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 			Size:             request.Size,
 			VolumeType:       s.getVolumeType(request.Speed),
 		}).Extract()
+		if err != nil {
+			break
+		}
 		if vol == nil {
-			panic("Unexpected nil volume")
+			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
+			break
 		}
 		v = resources.Volume{
 			ID:    vol.ID,
@@ -148,7 +156,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 			State: toVolumeState(vol.Status),
 		}
 	default:
-		return nil, fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
+		err = fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if err != nil {
 		log.Debugf("Error creating volume: volume creation invocation: %+v", err)
@@ -164,7 +172,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	defer log.Debugf("<<< stacks.openstack::GetVolume(%s)", id)
 
 	if s == nil {
-		panic("Calling stacks.openstack::GetVolume() from nil pointer!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	r := volumesv2.Get(s.VolumeClient, id)
@@ -193,7 +201,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	defer log.Debug("<<< stacks.openstack::ListVolumes()")
 
 	if s == nil {
-		panic("Calling stacks.openstack::ListVolumes() from nil pointer!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	var vs []resources.Volume
@@ -231,7 +239,7 @@ func (s *Stack) DeleteVolume(id string) error {
 	defer log.Debugf("<<< stacks.openstack::DeleteVolume(%s)", id)
 
 	if s == nil {
-		panic("Calling openstack.Stack::DeleteVolume() from nil pointer!")
+		return utils.InvalidInstanceError()
 	}
 
 	var (
@@ -274,7 +282,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	defer log.Debugf("<<< stacks.openstack::CreateVolumeAttachment(%s)", request.Name)
 
 	if s == nil {
-		panic("Calling stacks.openstack::CreateVolumeAttachment() from nil pointer!")
+		return "", utils.InvalidInstanceError()
 	}
 
 	// Creates the attachment
@@ -302,7 +310,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 	defer log.Debugf("<<< stacks.openstack::GetVolumeAttachment(%s)", id)
 
 	if s == nil {
-		panic("Calling stacks.openstack::GetVolumeAttachment() from nil pointer!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
@@ -324,7 +332,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	defer log.Debugf("<<< stacks.openstack::ListVolumeAttachments(%s)", serverID)
 
 	if s == nil {
-		panic("Calling stacks.openstack::ListVolumeAttachments() from nil pointer!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	var vs []resources.VolumeAttachment
@@ -358,7 +366,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	defer log.Debugf("<<< stacks.openstack::DeleteVolumeAttachment(%s)", serverID)
 
 	if s == nil {
-		panic("Calling stacks.openstack::DeleteVolumeAttachment() from nil pointer!")
+		return utils.InvalidInstanceError()
 	}
 
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
