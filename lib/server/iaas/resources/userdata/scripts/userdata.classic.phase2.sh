@@ -661,8 +661,6 @@ install_drivers_nvidia() {
 }
 
 early_packages_update() {
-    ensure_network_connectivity
-
     # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
     cat >/etc/gai.conf <<-EOF
 precedence ::ffff:0:0/96 100
@@ -693,7 +691,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils and netplan
-            if dpkg --compare-versions $(sfGetFact "linux version") ge 17.10; then
+            if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
                 sfApt install -y systemd pciutils netplan.io || fail 211
             else
                 sfApt install -y systemd pciutils || fail 211
@@ -741,7 +739,7 @@ add_common_repos() {
         ubuntu)
             sfFinishPreviousInstall
             add-apt-repository universe -y || return 1
-            codename=$(sfGetFact "linux codename")
+            codename=$(sfGetFact "linux_codename")
             echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
             ;;
         redhat|centos)
@@ -787,6 +785,7 @@ EOF
 
 configure_locale
 configure_dns
+ensure_network_connectivity
 early_packages_update
 add_common_repos
 
@@ -800,7 +799,7 @@ update_kernel_settings || fail 216
 
 echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 # For compatibility with previous user_data implementation (until v19.03.x)...
-ln -s /opt/safescale/var/state/user_data.phase2.done /var/tmp/user_data.done
+ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
 
 # !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
 #                      but after the template has been realized (cf. libvirt Stack)
