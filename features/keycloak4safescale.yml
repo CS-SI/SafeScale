@@ -1,0 +1,367 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: all
+    requirements:
+        features:
+            - postgresxl4safescale
+
+    parameters:
+        - KeycloakAdminPassword
+
+    install:
+        bash:
+            check:
+                pace: curl
+                steps:
+                    curl:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            curl -Ssl -I -k https://{{ .HostIP }}:8443/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null
+
+            add:
+                pace: config,build,secret,stack,database,start
+                steps:
+                    config:
+                        timeout: 10
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/keycloak4safescale/build
+
+                            cat >${SF_ETCDIR}/keycloak4safescale/build/standalone-ha.xml.patch <<-'EOF'
+                            --- standalone-ha.xml	2019-07-10 15:45:31.706239257 +0200
+                            +++ standalone-ha.xml.new	2019-07-10 15:46:06.850275164 +0200
+                            @@ -52,6 +52,13 @@
+                                                <properties path="application-roles.properties" relative-to="jboss.server.config.dir"/>
+                                            </authorization>
+                                        </security-realm>
+                            +            <security-realm name="KeycloakRealm">
+                            +                <server-identities>
+                            +                    <ssl>
+                            +                        <keystore path="safescale.jks" relative-to="jboss.server.config.dir" keystore-password="safescale" />
+                            +                    </ssl>
+                            +                </server-identities>
+                            +            </security-realm>
+                                    </security-realms>
+                                    <audit-log>
+                                        <formatters>
+                            @@ -126,18 +133,29 @@
+                                                    <password>sa</password>
+                                                </security>
+                                            </datasource>
+                            -                <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true">
+                            -                    <connection-url>jdbc:h2:${jboss.server.data.dir}/keycloak;AUTO_SERVER=TRUE</connection-url>
+                            -                    <driver>h2</driver>
+                            +                <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true" use-ccm="true">
+                            +                    <connection-url>jdbc:postgresql://${env.DB_ADDR:postgres}:${env.DB_PORT:5432}/${env.DB_DATABASE:keycloak}${env.JDBC_PARAMS:}</connection-url>
+                            +                    <driver>postgresql</driver>
+                            +                    <pool>
+                            +                        <flush-strategy>IdleConnections</flush-strategy>
+                            +                    </pool>
+                                                <security>
+                            -                        <user-name>sa</user-name>
+                            -                        <password>sa</password>
+                            +                        <user-name>${env.DB_USER:keycloak}</user-name>
+                            +                        <password>${env.DB_PASSWORD:password}</password>
+                                                </security>
+                            +                    <validation>
+                            +                        <check-valid-connection-sql>SELECT 1</check-valid-connection-sql>
+                            +                        <background-validation>true</background-validation>
+                            +                        <background-validation-millis>60000</background-validation-millis>
+                            +                    </validation>
+                                            </datasource>
+                                            <drivers>
+                                                <driver name="h2" module="com.h2database.h2">
+                                                    <xa-datasource-class>org.h2.jdbcx.JdbcDataSource</xa-datasource-class>
+                                                </driver>
+                            +                    <driver name="postgresql" module="org.postgresql.jdbc">
+                            +                        <xa-datasource-class>org.postgresql.xa.PGXADataSource</xa-datasource-class>
+                            +                    </driver>
+                                            </drivers>
+                                        </datasources>
+                                    </subsystem>
+                            @@ -590,11 +608,11 @@
+                                        <buffer-cache name="default"/>
+                                        <server name="default-server">
+                                            <ajp-listener name="ajp" socket-binding="ajp"/>
+                            -                <http-listener name="default" socket-binding="http" redirect-socket="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" enable-http2="true"/>
+                            -                <https-listener name="https" socket-binding="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" security-realm="ApplicationRealm" enable-http2="true"/>
+                            +                <http-listener name="default" socket-binding="http" redirect-socket="proxy-https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" enable-http2="true"/>
+                            +                <https-listener name="https" socket-binding="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" security-realm="KeycloakRealm" enable-http2="true"/>
+                                            <host name="default-host" alias="localhost">
+                                                <location name="/" handler="welcome-content"/>
+                            -                    <http-invoker security-realm="ApplicationRealm"/>
+                            +                    <http-invoker security-realm="KeycloakRealm"/>
+                                            </host>
+                                        </server>
+                                        <servlet-container name="default">
+                            @@ -629,8 +647,9 @@
+                                    <socket-binding name="modcluster" multicast-address="${jboss.modcluster.multicast.address:224.0.1.105}" multicast-port="23364"/>
+                                    <socket-binding name="txn-recovery-environment" port="4712"/>
+                                    <socket-binding name="txn-status-manager" port="4713"/>
+                            +        <socket-binding name="proxy-https" port="443"/>
+                                    <outbound-socket-binding name="mail-smtp">
+                                        <remote-destination host="localhost" port="25"/>
+                                    </outbound-socket-binding>
+                                </socket-binding-group>
+                            -</server>
+                            \ Pas de fin de ligne à la fin du fichier
+                            +</server>
+                            EOF
+
+                    build:
+                        timeout: 10
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/keycloak4safescale/build/my-docker-entrypoint.sh <<-'EOF'
+                            #!/bin/bash
+
+                            export ADMIN_PG_PASSWORD="$(cat /run/secrets/safescale.postgresxl.password)"
+                            export DB_PASSWORD="$(cat /run/secrets/safescale.keycloak.db_password)"
+                            export DB_VENDOR=POSTGRES
+                            export DB_ADDR=postgresxl4safescale_coordinator
+                            export DB_DATABASE=keycloak4safescale
+                            export DB_USER=keycloak4safescale
+                            export KEYCLOAK_USER=admin
+                            export KEYCLOAK_PASSWORD="$(cat /run/secrets/safescale.keycloak.admin_password)"
+
+                            cat >/root/.pgpass <<-EOF2
+                            *:5432:*:postgres:$ADMIN_PG_PASSWORD
+                            *:5432:keycloak4safescale:keycloak4safescale:$DB_PASSWORD
+                            EOF2
+                            chmod 0600 /root/.pgpass
+
+                            PSQL="psql -h $DB_ADDR -U postgres -c"
+
+                            # wait for database server
+                            echo "Waiting for database server..."
+                            timeout 60 bash -c "while ! $PSQL 'select 1' >/dev/null; do sleep 5; done"
+                            if [ $? -ne 0 ] && echo "Database server not ready for 60s. Aborting." && exit 1
+                            echo "Database server ready."
+
+                            # # Create database if needed
+                            # if ! $PSQL $DB_DATABASE -c '\q' &>/dev/null; then
+                            #     echo "Creating database keycloak4safescale..."
+                            #     cat  <<-SQLEOF | $PSQL
+                            # CREATE DATABASE $DB_DATABASE;
+                            # CREATE USER $DB_USER;
+                            # SQLEOF
+                            #     echo Done
+                            # fi
+
+                            # Update ownership and DB_USER password
+                            echo "Reset $DB_USER password..."
+                            $PSQL "ALTER USER $DB_USER PASSWORD '${DB_PASSWORD}';"
+                            $PSQL "ALTER DATABASE $DB_DATABASE OWNER TO $DB_USER;"
+                            echo Done
+
+                            exec /opt/jboss/tools/docker-entrypoint.sh $@
+                            EOF
+
+                            cat >${SF_ETCDIR}/keycloak4safescale/build/Dockerfile <<-'EOF'
+                            FROM jboss/keycloak:4.8.3.Final
+
+                            WORKDIR /opt/jboss
+                            USER root
+
+                            # need psql in my-docker-entrypoint.sh and patch
+                            RUN rpm -Uvh https://yum.postgresql.org/10/redhat/rhel-7-x86_64/pgdg-centos10-10-2.noarch.rpm \
+                             && yum install -qy postgresql10 patch
+
+                            # Generates SSL certificates
+                            RUN openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN={{ .HostIP }}" \
+                             && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
+                             && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale \
+                             && cp ./safescale.jks keycloak/standalone/configuration/ \
+                             && chown jboss:jboss keycloak/standalone/configuration/safescale.jks
+
+                            # Updates configuration
+                            COPY standalone-ha.xml.patch keycloak/standalone/configuration/
+                            RUN cd keycloak/standalone/configuration/ \
+                             && patch -l <./standalone-ha.xml.patch \
+                             && chown jboss:jboss standalone-ha.xml
+
+                            COPY my-docker-entrypoint.sh /
+                            RUN chmod 0550 /my-docker-entrypoint.sh
+                            ENTRYPOINT [ "/my-docker-entrypoint.sh" ]
+                            CMD ["-b", "0.0.0.0"]
+                            EOF
+
+                            docker build --network host -t keycloak4safescale:latest ${SF_ETCDIR}/keycloak4safescale/build || exit 192
+                            exit 0
+
+                    secret:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker secret rm safescale.keycloak.db_password safescale.keycloak.admin_password &>/dev/null || true
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.db_password - || exit 193
+                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.admin_password - || exit 194
+                            exit 0
+
+                    database:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE DATABASE keycloak4safescale;" || exit 195
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE USER keycloak4safescale;" || exit 196
+                            exit 0
+
+                    stack:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/keycloak4safescale/stack.yml <<-EOF
+                            version: '3.3'
+                            services:
+                                server:
+                                    image: keycloak4safescale:latest
+                                    environment:
+                                        - PROXY_ADDRESS_FORWARDING=true
+                                        # - KEYCLOAK_LOGLEVEL=DEBUG
+                                        # - ROOT_LOGLEVEL=DEBUG
+                                    networks:
+                                        - postgresxl4safescale_net
+                                    ports:
+                                        - published: 8443
+                                          target: 8443
+                                          mode: host
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
+                                    secrets:
+                                        - safescale.postgresxl.password
+                                        - safescale.keycloak.db_password
+                                        - safescale.keycloak.admin_password
+
+                            secrets:
+                                safescale.postgresxl.password:
+                                    external: true
+                                safescale.keycloak.db_password:
+                                    external: true
+                                safescale.keycloak.admin_password:
+                                    external: true
+
+                            networks:
+                                postgresxl4safescale_net:
+                                    external: true
+                            EOF
+
+                    start:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker stack deploy -c ${SF_ETCDIR}/keycloak4safescale/stack.yml keycloak4safescale || exit 197
+                            sfRetry 5m 5 "sfDoesDockerRunService keycloak4safescale:latest keycloak4safescale_server" || exit 198
+                            exit 0
+
+            remove:
+                pace: stack,cleanup
+                steps:
+                    stack:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker stack rm keycloak4safescale || exit 199
+                            docker secret rm safescale.keycloak.db_password safescale.keycloak.admin_password &>/dev/null
+                            # VPL: add database keycloak4safescale deletion
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP DATABASE keycloak4safescale;"
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP USER keycloak4safescale;"
+                            exit 0
+
+                    cleanup:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            sfRemoveDockerImage keycloak4safescale:latest
+                            rm -drf ${SF_ETCDIR}/keycloak4safescale ${SF_VARDIR}/keycloak4safescale
+
+    proxy:
+        rules:
+            - name: keycloak4safescale_backend
+              type: upstream
+              targets:
+                  masters: all
+              content: |
+                  {
+                      "target": "{{.HostIP}}:8443",
+                      "weight": 100
+                  }
+
+            - name: keycloak4safescale_svc
+              type: service
+              targets:
+                  masters: any
+              content: |
+                  {
+                      "protocol": "https",
+                      "host": "keycloak4safescale_backend"
+                  }
+
+            - name: keycloak4safescale_route
+              type: route
+              targets:
+                  masters: any
+              content: |
+                  {
+                        "paths": [ "/auth/" ],
+                        "strip_path": false,
+                        "protocols":["https"],
+                        "service": { "id": "{{.keycloak4safescale_svc}}" }
+                  }
+
+...
