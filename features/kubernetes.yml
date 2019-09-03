@@ -168,7 +168,7 @@ feature:
                         run: |
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
-                            case $(sfGetFact "linux kind") in
+                            case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
                                     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
