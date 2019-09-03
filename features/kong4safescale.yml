@@ -52,29 +52,35 @@ feature:
                             mkdir -p ${SF_ETCDIR}/kong4safescale/{build,includes}
 
                             cat >${SF_ETCDIR}/kong4safescale/build/my-docker-entrypoint.sh <<-'EOF'
-                            #!/bin/sh
+                            #!/bin/bash
 
-                            # creates /root/.pgpass
-                            cat >/root/.pgpass <<-EOF2
-                            *:5432:*:postgres:$(cat /run/secrets/safescale.postgresxl.password)
-                            *:5432:kong4safescale:kong4safescale:$(cat /run/secrets/safescale.kong.db_password)
+                            export KONG_PG_PASSWORD="$(cat /run/secrets/safescale.kong.db_password)"
+                            export ADMIN_PG_PASSWORD="$(cat /run/secrets/safescale.postgresxl.password)"
+
+                            # creates $HOME/.pgpass
+                            cat >$HOME/.pgpass <<-EOF2
+                            *:5432:*:postgres:${ADMIN_PG_PASSWORD}
+                            *:5432:kong4safescale:kong4safescale:${KONG_PG_PASSWORD}
                             EOF2
-                            chmod 0600 /root/.pgpass && chown root:root /root/.pgpass
+                            chmod 0600 $HOME/.pgpass && chown $(id -un):$(id -gn) /root/.pgpass
 
-                            PSQL="psql -h tasks.postgresxl4safescale_coordinator -U postgres"
+                            PSQL="psql -h postgresxl4safescale_coordinator -U postgres"
 
                             # wait for database server
-                            while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done
+                            echo "Waiting for database server..."
+                            timeout 60 sh -c "while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done"
+                            [ $? -ne 0 ] && echo "Database failed to respond in 60s, aborting." && exit 1
+                            echo "Database server ready."
 
                             case \$1 in
                                 dbinit)
                                     # Create database if needed
                                     if ! $PSQL kong4safescale -c '\q' &>/dev/null; then
-                                        $PSQL <<-SQLEOF
-                            CREATE DATABASE kong4safescale;
-                            CREATE USER kong4safescale;
-                            #CREATE DATABASE kong4safescale-gui;
-                            SQLEOF
+                                        echo "Creating database kong4safescale..."
+                                        $PSQL -c "CREATE DATABASE kong4safescale;"
+                                        $PSQL -c "CREATE USER kong4safescale;"
+                                        # $PSQL "CREATE DATABASE kong4safescale-gui;"
+                                        echo Done
                                     fi
                                     exit 0
                                     ;;
@@ -87,12 +93,10 @@ feature:
 
                                     # init/reset kong4safescale password and db ownership
                                     echo "Resetting password and ownership..."
-                                    $PSQL <<-SQLEOF
-                            ALTER USER kong4safescale PASSWORD '$(cat /run/secrets/safescale.kong.db_password)';
-                            ALTER DATABASE kong4safescale OWNER TO kong4safescale;
-                            #ALTER DATABASE kong4safescale-gui OWNER TO kong4safescale;
-                            SQLEOF
-                                    echo Done.
+                                    $PSQL -c "ALTER USER kong4safescale PASSWORD '$(cat /run/secrets/safescale.kong.db_password)';"
+                                    $PSQL -c "ALTER DATABASE kong4safescale OWNER TO kong4safescale;"
+                                    # $PSQL -c "ALTER DATABASE kong4safescale-gui OWNER TO kong_4_safescale;"
+                                    echo Done
 
                                     # kong migrations
                                     echo "Running Kong migrations..."
@@ -124,7 +128,7 @@ feature:
                             #     }
                             # ]
                             # EOF
-                            # chmod go-rwx ${SF_ETCDIR}/kong4gateway/konga.userdb.data
+                            # chmod go-rwx ${SF_ETCDIR}/kong4safescale/konga.userdb.data
 
                             cat >${SF_ETCDIR}/kong4safescale/build/kong.conf <<-EOF
                             trusted_ips=0.0.0.0/0,::/0
@@ -136,9 +140,9 @@ feature:
                             EOF
 
                             cat >${SF_ETCDIR}/kong4safescale/build/Dockerfile <<-EOF
-                            FROM kong:1.2
+                            FROM kong:1.3
 
-                            RUN apk update && apk add git unzip postgresql-client
+                            RUN apk update && apk add git unzip postgresql-client bash
                             RUN luarocks install kong-oidc \
                              && luarocks install kong-prometheus-plugin
 
@@ -150,9 +154,10 @@ feature:
                             RUN chmod a+rx /my-docker-entrypoint.sh \
                              && chmod a+r /etc/kong/kong.conf
 
-                            ENV KONG_PG_HOST=tasks.postgresxl4safescale_coordinator
+                            ENV KONG_DATABASE=postgres
+                            ENV KONG_PG_HOST=postgresxl4safescale_coordinator
                             ENV KONG_PG_USER=kong4safescale
-                            ENV KONG_DATABASE=kong4safescale
+                            ENV KONG_PG_DATABASE=kong4safescale
                             ENV KONG_PROXY_ACCESS_LOG=/dev/stdout
                             ENV KONG_ADMIN_ACCESS_LOG=/dev/stdout
                             ENV KONG_PROXY_ERROR_LOG=/dev/stderr
@@ -165,7 +170,7 @@ feature:
 
                             CMD ["kong", "docker-start"]
                             EOF
-                            docker build -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || exit 192
+                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || exit 192
                             exit 0
 
                     stack:
@@ -226,10 +231,10 @@ feature:
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
-                                    healthcheck:
-                                        test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
-                                        interval: 5s
-                                        retries: 10
+                                    # healthcheck:
+                                    #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
+                                    #     interval: 5s
+                                    #     retries: 10
                                     secrets:
                                         - safescale.postgresxl.password
                                         - safescale.kong.db_password
