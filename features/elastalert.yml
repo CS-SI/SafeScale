@@ -1,0 +1,235 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+
+    requirements:
+        features:
+            - docker
+            - docker-compose
+            - elasticsearch
+            - kibana
+
+    parameters:
+        - Version=2.0.1
+        - ElasticsearchHost={{ .HostIP }}
+        - ElasticsearchPort=9200
+        - KibanaURL=http://{{ .HostIP }}:5601/
+        - Verbose=false
+        - Debug=false
+        - PurgeOnRemoval=false
+
+    install:
+        bash:
+            check:
+                pace: running
+                steps:
+                    running:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} || exit 192
+                            exit 0
+
+            add:
+                # pace: config,kibanaplugin,start,running,ready
+                pace: config,start,running,ready
+                steps:
+                    config:
+                        targets:
+                            hosts: yes
+                            masters: any
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/elastalert/rules ${SF_ETCDIR}/elastalert/templates ${SF_VARDIR}/elastalert ${SF_LOGDIR}/elastalert
+                            chown safescale:safescale ${SF_ETCDIR}/elastalert
+                            chmod u+rwx,g+rx-w,o-rwx ${SF_ETCDIR}/elastalert ${SF_VARDIR}/elastalert ${SF_LOGDIR}/elastalert
+
+                            cat >${SF_ETCDIR}/elastalert/config.yml <<-EOF
+                            es_host: {{ .ElasticsearchHost }}
+                            es_port: {{ .ElasticsearchPort }}
+
+                            writeback_index: elastalert_status
+
+                            rules_folder: rules
+
+                            run_every:
+                                seconds: 5
+
+                            buffer_time:
+                                minutes: 1
+                            EOF
+
+                            cat >${SF_ETCDIR}/elastalert/config-test.yml <<-EOF
+                            EOF
+
+                            cat >${SF_ETCDIR}/elastalert/server.json <<-EOF
+                            {
+                                "appName": "elastalert-server",
+                                "port": 3030,
+                                "wsport": 3333,
+                                "elastalertPath": "/opt/elastalert",
+                            {{- if eq .Debug "true" }}
+                                "es_debug": true,
+                                "debug": true,
+                            {{ else }}
+                                "es_debug": false,
+                                "debug": false,
+                            {{ end -}}
+                            {{- if eq .Verbose "true" }}
+                                "verbose": true,
+                            {{ else }}
+                                "verbose": false,
+                            {{ end -}}
+                                "rulesPath": {
+                                    "relative": true,
+                                    "path": "/rules"
+                                },
+                                "templatesPath": {
+                                    "relative": true,
+                                    "path": "/templates"
+                                },
+                                "dataPath": {
+                                    "relative": true,
+                                    "path": "/serverdata"
+                                },
+                                "es_host": "{{ .ElasticsearchHost }}",
+                                "es_port": {{ .ElasticsearchPort }},
+                                "writeback_index": "elastalert_status"
+                            }
+                            EOF
+
+                            {{ if .ClusterFlavor }}
+                            HOSTNAME_PREFIX=elastalert4safescale
+                            {{ else }}
+                            HOSTNAME_PREFIX=elastalert
+                            {{ end }}
+
+                            cat >${SF_ETCDIR}/elastalert/docker-compose.yml <<-EOF
+                            version: '3.7'
+
+                            services:
+                                server:
+                                    image: bitsensor/elastalert:{{ .Version }}
+                                    volumes:
+                                        - ${SF_ETCDIR}/elastalert/config.yml:/opt/elastalert/config.yaml:ro
+                                        - ${SF_ETCDIR}/elastalert/config-test.yml:/opt/elastalert/config-test.yaml:ro
+                                        - ${SF_ETCDIR}/elastalert/server.json:/opt/elastalert-server/config/config.json:ro
+                                        - ${SF_ETCDIR}/elastalert/rules:/opt/elastalert/rules
+                                        - ${SF_ETCDIR}/elastalert/templates:/opt/elastalert/templates
+                                        - ${SF_VARDIR}/elastalert:/opt/elastalert/serverdata
+                                    ports:
+                                        - "3030:3030"
+                                        - "3333:3333"
+                                    network_mode: "host"
+                                    restart: always
+                            EOF
+                            chown -R safescale:safescale ${SF_ETCDIR}/elastalert
+                            chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/elastalert
+
+                    kibanaplugin:
+                        targets:
+                            hosts: yes
+                            masters: any
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_TMPDIR}/elastalert-kibana-plugin && cd ${SF_TMPDIR}/elastalert-kibana-plugin
+                            wget -O pkg.zip https://github.com/bitsensor/elastalert-kibana-plugin/releases/download/1.0.4/elastalert-kibana-plugin-1.0.4-7.1.1.zip || exit 193
+                            unzip pkg.zip || exit 194
+                            {{- if .ClusterFlavor }}
+                            ./bin/kibana-plugin https://{{ .GatewayIP }}/monitoring/kibana/ || exit 195
+                            {{ else }}
+                            ./bin/kibana-plugin {{ .KibanaURL }} || exit 196
+                            {{ end -}}
+                            cd ${SF_TMPDIR}
+                            rm -rf elastalert-kibana-plugin
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: yes
+                            masters: any
+                            nodes: no
+                        run: |
+                            {{- if .ClusterFlavor }}
+                            OPTIONS="-p elastalert4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end -}}
+                            docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d || exit 198
+                            exit 0
+
+                    running:
+                        targets:
+                            hosts: yes
+                            masters: any
+                            nodes: no
+                        run: |
+                            {{- if .ClusterFlavor }}
+                            PREFIX="elastalert4safescale"
+                            {{ else }}
+                            PREFIX="elastalert"
+                            {{ end -}}
+                            sfRetry 5m 5 "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || exit 200
+                            exit 0
+
+                    ready:
+                        targets:
+                            hosts: yes
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfRetry 5m 5 "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || exit 201
+                            exit 0
+
+            remove:
+                pace: stop,remove
+                steps:
+                    stop:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            if [ -f ${SF_ETCDIR}/elastalert/docker-compose.yml ]; then
+                                {{- if .ClusterFlavor }}
+                                OPTIONS="-p elastalert4safescale"
+                                {{ else }}
+                                OPTIONS=
+                                {{ end -}}
+                                docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force || exit 203
+                            fi
+                            exit 0
+
+                    remove:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            docker image rm -f bitsensor/elastalert:{{ .Version }}
+                            purge={{ .PurgeOnRemoval }}
+                            purge=${purge,,}
+                            [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elastalert ${SF_VARDIR}/elastalert ${SF_LOGDIR}/elastalert
+                            exit 0
+
+...
