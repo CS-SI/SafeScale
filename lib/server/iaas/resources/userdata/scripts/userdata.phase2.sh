@@ -108,9 +108,9 @@ o_PR_IF=
 # Don't update default route
 configure_dhclient() {
     # kill any dhclient process already running
-    pkill dhclient
+    pkill dhclient || true
 
-    [ -f /etc/dhcp/dhclient.conf ] && sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf
+    [ -f /etc/dhcp/dhclient.conf ] && (sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf || true)
 
     if [ -d /etc/dhcp/ ]; then
         HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
@@ -150,20 +150,20 @@ identify_nics() {
     NICS=${NICS/[[:cntrl:]]/ }
 
     for IF in $NICS; do
-        IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
+        IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
         [ ! -z $IP ] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
     done
-    PR_IFs=$(echo $PR_IFs | xargs)
-    PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
-    PU_IP=$(ip a | grep $PU_IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
+    PR_IFs=$(echo $PR_IFs | xargs) || true
+    PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null) || true
+    PU_IP=$(ip a | grep $PU_IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
     if [ ! -z $PU_IP ]; then
         if is_ip_private $PU_IP; then
             PU_IF=
 
-            NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404)
+            NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404) || true
             if [ -z $NO404 ]; then
                 # Works with FlexibleEngine and potentially with AWS (not tested yet)
-                PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
+                PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null) || true
                 [ -z $PU_IP ] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
             fi
         fi
@@ -662,6 +662,8 @@ install_drivers_nvidia() {
 }
 
 early_packages_update() {
+    ensure_network_connectivity
+
     # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
     cat >/etc/gai.conf <<-EOF
 precedence ::ffff:0:0/96 100
