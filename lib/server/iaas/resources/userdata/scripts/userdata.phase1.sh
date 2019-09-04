@@ -135,8 +135,13 @@ disable_cloudinit_network_autoconf() {
 disable_services() {
 	case $LINUX_KIND in
 		debian|ubuntu)
-			sfService stop apt-daily.service &>/dev/null
-			systemctl kill --kill-who=all apt-daily.service &>/dev/null
+		  if [[ -n $(which systemctl) ]]; then
+		    systemctl stop apt-daily.service &>/dev/null
+			  systemctl kill --kill-who=all apt-daily.service &>/dev/null
+		  fi
+		  if [[ -n $(which system) ]]; then
+        which system && service stop apt-daily.service &>/dev/null
+		  fi
 			;;
 	esac
 }
