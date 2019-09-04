@@ -71,9 +71,9 @@ feature:
                                     sfRetry 5m 3 "sfApt install -qqy docker-ce" || exit 194
                                     ;;
                                 centos|rhel)
-                                    yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
-                                    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 193
-                                    yum install -y docker-ce || exit 194
+                                    sfRetry 5m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
+                                    sfRetry 5m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 193
+                                    sfRetry 5m 3 yum install -y docker-ce || exit 194
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
