@@ -101,9 +101,9 @@ type Stack struct {
 	authOpts stacks.AuthenticationOptions
 	cfgOpts  stacks.ConfigurationOptions
 
-	// DefaultSecurityGroupName is the name of the default security groupa
+	// DefaultSecurityGroupName is the name of the default security groups
 	DefaultSecurityGroupName string
-	// DefaultSecurityGroupDescription contains a description for the default security groupa
+	// DefaultSecurityGroupDescription contains a description for the default security groups
 	DefaultSecurityGroupDescription string
 	// SecurityGroup is an instance of the default security group
 	SecurityGroup     *secgroups.SecGroup
