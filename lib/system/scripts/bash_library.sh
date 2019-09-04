@@ -20,17 +20,20 @@ export SF_TMPDIR=${SF_VARDIR}/tmp
 export SF_LOGDIR=${SF_VARDIR}/log
 
 declare -x SF_SERIALIZED_FACTS=$(mktemp)
+declare -A FACTS
+export LINUX_KIND=
+export VERSION_ID=
 
 sfFinishPreviousInstall() {
-	local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
-	if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
+  local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+  if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
 }
 export -f sfFinishPreviousInstall
 
 # sfWaitForApt waits an already running apt-like command to finish
 sfWaitForApt() {
-	sfFinishPreviousInstall || true
-	sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+  sfFinishPreviousInstall || true
+  sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
 export -f sfWaitForApt
 
@@ -184,7 +187,7 @@ sfRetry() {
 		export -f fn
 EOF
 	eval "$code"
-	result=$(timeout $timeout bash -c fn)
+  result=$(timeout $timeout bash -c -x fn)
 	rc=$?
 	unset fn
 	[ $rc -eq 0 ] && echo $result && return 0
@@ -267,7 +270,7 @@ sfDownload() {
 		export -f $fn
 EOF
 	eval "$code"
-	sfAsyncStart $name $timeout bash -c $fn
+  sfAsyncStart $name $timeout bash -c -x $fn
 	sfAsyncWait $name
 	rc=$?
 	unset $fn
@@ -511,9 +514,6 @@ factsCleanup() {
 trap factsCleanup exit
 # --------
 
-declare -A FACTS
-export LINUX_KIND=
-export VERSION_ID=
 sfDetectFacts() {
 	if [ -f /etc/os-release ]; then
 		. /etc/os-release
