@@ -86,6 +86,10 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 				return false, err
 			}
 			primaryGateway = mh.Get()
+			if primaryGateway == nil {
+				return false, fmt.Errorf("error recovering primary gateway")
+			}
+
 			target := NewNodeTarget(srvutils.ToPBHost(primaryGateway))
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
@@ -101,6 +105,10 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 					return false, err
 				}
 				secondaryGateway = mh.Get()
+				if secondaryGateway == nil {
+					return false, fmt.Errorf("error recovering secondary gateway")
+				}
+
 				target := NewNodeTarget(srvutils.ToPBHost(secondaryGateway))
 				results, err := rp.Check(target, Variables{}, Settings{})
 				if err != nil {
@@ -119,6 +127,10 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 	}
 	if !present {
 		return nil, fmt.Errorf("'kong4gateway' feature isn't installed on gateway")
+	}
+
+	if primaryGateway == nil {
+		return nil, fmt.Errorf("error recovering primary gateway")
 	}
 
 	ctrl := KongController{
@@ -186,8 +198,9 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 
 		response, _, propagated, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
-			log.Debugf("")
 			return nil, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+		} else {
+			log.Debugf("successfully applied proxy rule: %v", rule)
 		}
 		return propagated, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
@@ -211,8 +224,9 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		content = string(jsoned)
 		response, _, propagated, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
-			log.Debugf("")
 			return nil, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+		} else {
+			log.Debugf("successfully applied proxy rule: %v", rule)
 		}
 		return propagated, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
@@ -242,6 +256,8 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		_, _, _, err = k.post(ruleName, url, content, values, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+		} else {
+			log.Debugf("successfully applied proxy rule: %v", rule)
 		}
 		return propagated, nil
 
