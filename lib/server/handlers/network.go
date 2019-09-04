@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -474,6 +475,14 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 		}
 		if client.IsProvisioningError(err) {
 			log.Errorf("%+v", err)
+
+			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+				_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", gw.Name)), 0777)
+				dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", gw.Name, "phase2"))
+				_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
+				_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
+			}
+
 			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
 		}
 		return nil, infraErrf(err, "failed to wait gateway '%s' to become ready", gw.Name)
@@ -515,6 +524,13 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 		return nil, err
 	}
 	if returnCode != 0 {
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", gw.Name)), 0777)
+			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", gw.Name, "phase2"))
+			_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
+			_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
+		}
+
 		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: %s", gw.Name, stderr)
 	}
 	log.Infof("Gateway '%s' successfully configured.", gw.Name)
