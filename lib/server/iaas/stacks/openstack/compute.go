@@ -111,6 +111,11 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 			azList[zone.ZoneName] = zone.ZoneState.Available
 		}
 	}
+
+	if len(azList) == 0 {
+		log.Warnf("no Availability Zones detected !")
+	}
+
 	return azList, nil
 }
 
@@ -494,7 +499,6 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 func (s *Stack) interpretAddresses(
 	addresses map[string]interface{},
 ) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
-
 	var (
 		networks    = []string{}
 		addrs       = map[IPVersion.Enum]map[string]string{}
@@ -534,6 +538,10 @@ func (s *Stack) interpretAddresses(
 
 // complementHost complements Host data with content of server parameter
 func (s *Stack) complementHost(host *resources.Host, server *servers.Server) error {
+	if s == nil {
+		return utils.InvalidInstanceError()
+	}
+
 	networks, addresses, ipv4, ipv6 := s.interpretAddresses(server.Addresses)
 
 	// Updates intrinsic data of host if needed
@@ -856,7 +864,21 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
+			} else {
+				creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
+				if zoneErr != nil {
+					log.Tracef("Host successfully created: {%s} with some warnings {%s}", spew.Sdump(server), zoneErr)
+				} else {
+					log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
+					if creationZone != srvOpts.AvailabilityZone {
+						if srvOpts.AvailabilityZone != "" {
+							// FIXME REVIEW Decide what to do in this case, just log or return error ?
+							log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
+						}
+					}
+				}
 			}
+
 			if server == nil {
 				return fmt.Errorf("failed to create server")
 			}
@@ -940,6 +962,29 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 
 	log.Infoln(msgSuccess)
 	return host, userData, nil
+}
+
+func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, error) {
+	type ServerWithAZ struct {
+		servers.Server
+		az.ServerAvailabilityZoneExt
+	}
+	var allServers []ServerWithAZ
+	allPages, err := servers.List(s.ComputeClient, nil).AllPages()
+	if err != nil {
+		return "", fmt.Errorf("unable to retrieve servers: %s", err)
+	}
+	err = servers.ExtractServersInto(allPages, &allServers)
+	if err != nil {
+		return "", fmt.Errorf("unable to extract servers: %s", err)
+	}
+	for _, server := range allServers {
+		if server.ID == serverID {
+			return server.AvailabilityZone, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable to find availability zone information for server [%s]", serverID)
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
@@ -1067,6 +1112,10 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
 func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	pager := floatingips.List(s.ComputeClient)
 	var fips []floatingips.FloatingIP
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
