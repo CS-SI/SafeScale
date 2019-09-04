@@ -282,9 +282,9 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		return nil, utils.InvalidInstanceError()
 	}
 
-	templates, err := svc.ListTemplates(false)
+	allTpls, err := svc.ListTemplates(false)
 	var selectedTpls []*resources.HostTemplate
-	scannerTemplates := map[string]bool{}
+	scannerTpls := map[string]bool{}
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +368,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				}
 
 				for _, image := range images {
-					scannerTemplates[image.TemplateID] = true
+					scannerTpls[image.TemplateID] = true
 				}
 			}
 		}
@@ -405,32 +405,33 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		log.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
 	}
 
-	for _, template := range templates {
-		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+	for _, t := range allTpls {
+		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
 		msg = msg + " %s"
-		if sizing.MinCores > 0 && template.Cores < sizing.MinCores {
+		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
 			log.Debugf(msg, "not enough cores")
 			continue
 		}
-		if sizing.MaxCores > 0 && template.Cores > sizing.MaxCores {
+		if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
 			log.Debugf(msg, "too many cores")
 			continue
 		}
-		if sizing.MinRAMSize > 0.0 && template.RAMSize < sizing.MinRAMSize {
+		if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
 			log.Debugf(msg, "not enough RAM")
 			continue
 		}
-		if sizing.MaxRAMSize > 0.0 && template.RAMSize > sizing.MaxRAMSize {
+		if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
 			log.Debugf(msg, "too many RAM")
 			continue
 		}
-		if template.DiskSize > 0 && sizing.MinDiskSize > 0 && template.DiskSize < sizing.MinDiskSize {
+		if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
 			log.Debugf(msg, "not enough disk")
 			continue
 		}
 
-		if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo {
-			selectedTpls = append(selectedTpls, &template)
+		if _, ok := scannerTpls[t.ID]; ok || !askedForSpecificScannerInfo {
+			newT := t
+			selectedTpls = append(selectedTpls, &newT)
 		}
 	}
 
