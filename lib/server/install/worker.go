@@ -661,17 +661,6 @@ func (w *worker) setReverseProxy() (err error) {
 		return utils.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
 	}
 
-	// FIXME Look how it's done on previous version
-	/*
-		// here begins the old style
-		_, err = w.identifyAvailableGateway()
-		if err != nil {
-			return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
-		}
-
-		// here ends the old style
-	*/
-
 	svc := w.cluster.GetService(w.feature.task)
 	netprops := w.cluster.GetNetworkConfig(w.feature.task)
 	mn, err := metadata.LoadNetwork(svc, netprops.NetworkID)
@@ -713,6 +702,8 @@ func (w *worker) setReverseProxy() (err error) {
 		hosts, err := w.identifyHosts(targets)
 		if err != nil {
 			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
+		} else {
+			log.Debugf("successfully applied proxy rule: %v", rule)
 		}
 		for _, h := range hosts {
 			cloneV := w.variables.Clone()
@@ -725,6 +716,7 @@ func (w *worker) setReverseProxy() (err error) {
 				log.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
 				// return fmt.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
 			} else {
+				log.Debugf("successfully applied proxy rule: %v", rule)
 				// Propagated contain k/v that have to be added to w.variables
 				for k, v := range propagated {
 					w.variables[k] = v
