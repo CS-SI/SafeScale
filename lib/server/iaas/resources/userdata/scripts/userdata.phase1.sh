@@ -121,7 +121,9 @@ EOF
 }
 
 put_hostname_in_hosts() {
-	HON=$(hostname)
+	echo "{{ .HostName }}" >/etc/hostname
+	hostname {{ .HostName }}
+	HON=$(hostname -s)
 	ping -n -c1 -w5 $HON 2>/dev/null || echo "127.0.1.1 $HON" >>/etc/hosts
 }
 
