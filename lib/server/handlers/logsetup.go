@@ -29,7 +29,7 @@ import (
 )
 
 func init() {
-	log.SetFormatter(&utils.MyFormatter{TextFormatter: log.TextFormatter{ForceColors: true, TimestampFormat: "2006-01-02 15:04:05", FullTimestamp: true, DisableLevelTruncation: true}})
+	log.SetFormatter(utils.GetDefaultFormatter())
 	log.SetLevel(log.DebugLevel)
 
 	// Log as JSON instead of the default ASCII formatter.
