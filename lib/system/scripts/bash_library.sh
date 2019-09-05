@@ -367,7 +367,11 @@ sfProbeGPU() {
 }
 
 sfReverseProxyReload() {
-	id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
+	id=$(docker ps --filter "name=reverseproxy_server_1" {{ "--format '{{.ID}}'" }})
+	# legacy...
+	[ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
+	[ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }})
+
 	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null
 }
 export -f sfReverseProxyReload
@@ -490,6 +494,19 @@ sfRemoveDockerImage() {
 	return 0
 }
 export -f sfRemoveDockerImage
+
+sfIsPodRunning() {
+    local pod=${1%@*}
+    local domain=${1#*@}
+    [ -z ${domain+x} ] && domain=default
+    set +x +o pipefail
+    su cladm -c "kubectl get -n $domain pod $pod 2>/dev/null | grep Running"
+    retcode=$?
+printf "%q\n" $retcode
+    set -x -o pipefail
+    return $retcode
+}
+export -f sfIsPodRunning
 
 # Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
