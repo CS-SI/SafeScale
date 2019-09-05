@@ -674,7 +674,7 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*resources.Host, *libvirt.D
 
 func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) error {
 	if host == nil || newHost == nil {
-		return fmt.Errorf("host and newHost have to been set")
+		return fmt.Errorf("both host and newHost have to be set")
 	}
 
 	host.ID = newHost.ID

@@ -444,6 +444,19 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 				}
 				return fmt.Errorf("query to create host '%s' failed: %s%s",
 					request.ResourceName, openstack.ProviderErrorToString(err), codeStr)
+			} else {
+				creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
+				if zoneErr != nil {
+					log.Tracef("Host successfully created: {%s}, with some warnings {%s}", spew.Sdump(server), zoneErr)
+				} else {
+					log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
+					if creationZone != srvOpts.AvailabilityZone {
+						if srvOpts.AvailabilityZone != "" {
+							// FIXME REVIEW Decide what to do in this case, just log or return error ?
+							log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
+						}
+					}
+				}
 			}
 			host.ID = server.ID
 
