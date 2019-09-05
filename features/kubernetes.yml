@@ -369,9 +369,9 @@ feature:
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || exit 216
 
                             # waits availability of key pods
-                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-apiserver-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 217
-                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-controller-manager-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 218
-                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-scheduler-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 219
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || exit 217
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 218
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || exit 219
 
                             # Configure firewall
                             case {{.CNI}} in
