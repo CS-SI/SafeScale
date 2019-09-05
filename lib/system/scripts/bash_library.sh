@@ -499,14 +499,14 @@ sfIsPodRunning() {
     local pod=${1%@*}
     local domain=${1#*@}
     [ -z ${domain+x} ] && domain=default
-    set +x +o pipefail
-    su cladm -c "kubectl get -n $domain pod $pod 2>/dev/null | grep Running"
+    set +o pipefail
+    ( sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null)
     retcode=$?
-printf "%q\n" $retcode
-    set -x -o pipefail
-    return $retcode
+    set -o pipefail
+    [ $retcode = 0 ] && return 0 || return 1
 }
 export -f sfIsPodRunning
+
 
 # Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
