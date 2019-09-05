@@ -121,7 +121,9 @@ EOF
 }
 
 put_hostname_in_hosts() {
-	HON=$(hostname)
+	echo "{{ .HostName }}" >/etc/hostname
+	hostname {{ .HostName }}
+	HON=$(hostname -s)
 	ping -n -c1 -w5 $HON 2>/dev/null || echo "127.0.1.1 $HON" >>/etc/hosts
 }
 
@@ -135,7 +137,7 @@ disable_cloudinit_network_autoconf() {
 disable_services() {
 	case $LINUX_KIND in
 		debian|ubuntu)
-			sfService stop apt-daily.service &>/dev/null
+			systemctl stop apt-daily.service &>/dev/null
 			systemctl kill --kill-who=all apt-daily.service &>/dev/null
 			;;
 	esac
