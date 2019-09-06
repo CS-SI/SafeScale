@@ -187,7 +187,7 @@ sfRetry() {
 		export -f fn
 EOF
 	eval "$code"
-  result=$(timeout $timeout bash -c -x fn)
+  	result=$(timeout $timeout bash -c -x fn)
 	rc=$?
 	unset fn
 	[ $rc -eq 0 ] && echo $result && return 0
@@ -517,6 +517,12 @@ sfIsPodRunning() {
     [ $retcode = 0 ] && return 0 || return 1
 }
 export -f sfIsPodRunning
+
+# Returns the tag name corresponding to latest release
+sfGithubLastRelease() {
+	curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases/latest" | jq -r .tag_name
+}
+export -f sfGithubLastRelease
 
 # echoes a random string
 # $1 is the size of the result (optional)
