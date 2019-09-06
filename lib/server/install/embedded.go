@@ -420,9 +420,9 @@ func postgres4gatewayFeature() *Feature {
 	}
 }
 
-// edgeproxy4safescaleFeature ...
-func edgeproxy4safescaleFeature() *Feature {
-	name := "edgeproxy4safescale"
+// kong4gatewayFeature ...
+func kong4gatewayFeature() *Feature {
+	name := "kong4gateway"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

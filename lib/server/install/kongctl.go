@@ -69,9 +69,9 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 	}
 
 	// Check if reverseproxy feature is installed on host
-	rp, err := NewEmbeddedFeature(concurrency.VoidTask(), "edgeproxy4safescale")
+	rp, err := NewEmbeddedFeature(concurrency.VoidTask(), "kong4gateway")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find a feature called 'edgeproxy4safescale'")
+		return nil, fmt.Errorf("failed to find a feature called 'kong4gateway'")
 	}
 	var (
 		primaryGateway, secondaryGateway *resources.Host
@@ -93,10 +93,10 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 			target := NewNodeTarget(srvutils.ToPBHost(primaryGateway))
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
-				return false, fmt.Errorf("failed to check if feature 'edgeproxy4safescale' is installed on gateway '%s': %s", err.Error(), primaryGateway.Name)
+				return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), primaryGateway.Name)
 			}
 			if !results.Successful() {
-				return false, fmt.Errorf("feature 'edgeproxy4safescale' isn't installed on gateway '%s'", primaryGateway.Name)
+				return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", primaryGateway.Name)
 			}
 
 			if network.SecondaryGatewayID != "" {
@@ -112,10 +112,10 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 				target := NewNodeTarget(srvutils.ToPBHost(secondaryGateway))
 				results, err := rp.Check(target, Variables{}, Settings{})
 				if err != nil {
-					return false, fmt.Errorf("failed to check if feature 'edgeproxy4safescale' is installed on gateway '%s': %s", err.Error(), secondaryGateway.Name)
+					return false, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway '%s': %s", err.Error(), secondaryGateway.Name)
 				}
 				if !results.Successful() {
-					return false, fmt.Errorf("feature 'edgeproxy4safescale' isn't installed on gateway '%s'", secondaryGateway.Name)
+					return false, fmt.Errorf("feature 'kong4gateway' isn't installed on gateway '%s'", secondaryGateway.Name)
 				}
 			}
 			return true, nil
@@ -126,7 +126,7 @@ func NewKongController(svc iaas.Service, network *resources.Network) (*KongContr
 		present = true
 	}
 	if !present {
-		return nil, fmt.Errorf("'edgeproxy4safescale' feature isn't installed on gateway")
+		return nil, fmt.Errorf("'kong4gateway' feature isn't installed on gateway")
 	}
 
 	if primaryGateway == nil {

@@ -254,7 +254,6 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            ln -s ${SF_ETCDIR}/edgeproxy4safescale ${SF_ETCDIR}/kong4gateway || true
                             [ ! -d ${SF_ETCDIR}/kong4gateway ] && exit 197
 
                             cat >${SF_ETCDIR}/kong4gateway/includes/kubernetes.conf <<-'EOF'
@@ -323,9 +322,9 @@ feature:
                             sfDropzoneClean
 
                             # waits availability of key pods
-                            sfRetry 5m 10 bash -c "[ $(sfKubectl get -n kube-system pod kube-apiserver-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 206
-                            sfRetry 5m 10 bash -c "[ $(sfKubectl get -n kube-system pod kube-controller-manager-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 207
-                            sfRetry 5m 10 bash -c "[ $(sfKubectl get -n kube-system pod kube-scheduler-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 208
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || exit 206
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || exit 207
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || exit 208
 
                             touch /etc/kubernetes/.joined
                             echo "init done"
@@ -415,7 +414,7 @@ feature:
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
                             [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master-
                             # adds Kubernetes Dashboard
-                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml || exit 222
+                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || exit 222
 
                             # cat <<EOF | kubectl apply -f -
                             # apiVersion: v1
