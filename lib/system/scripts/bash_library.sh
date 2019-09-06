@@ -366,15 +366,26 @@ sfProbeGPU() {
 	fi
 }
 
-sfReverseProxyReload() {
-	id=$(docker ps --filter "name=reverseproxy_server_1" {{ "--format '{{.ID}}'" }})
+sfEdgeProxyReload() {
+	id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }})
 	# legacy...
 	[ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
 	[ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }})
 
 	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null
 }
-export -f sfReverseProxyReload
+export -f sfEdgeProxyReload
+
+sfReverseProxyReload() {
+	sfEdgeProxyReload()
+}
+export sfReverseProxyReload
+
+sfIngressReload() {
+	id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }})
+	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null
+}
+export -f sfIngressReload
 
 # sfService abstracts the command to use to manipulate services
 sfService() {
