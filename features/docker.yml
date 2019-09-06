@@ -136,8 +136,9 @@ feature:
                             sfService start dbus
                             # then firewalld  itself
                             sfService restart firewalld
-                            sfFirewallAdd --zone=trusted --add-interface=docker0
+                            sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
                             sfFirewallAdd --zone=trusted --add-service docker-swarm
+                            sfFirewallAdd --zone=trusted --add-masquerade
                             sfFirewallReload
 
                     ready:
