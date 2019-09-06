@@ -254,6 +254,7 @@ feature:
                         targets:
                             gateways: all
                         run: |
+                            ln -s ${SF_ETCDIR}/edgeproxy4safescale ${SF_ETCDIR}/kong4gateway || true
                             [ ! -d ${SF_ETCDIR}/kong4gateway ] && exit 197
 
                             cat >${SF_ETCDIR}/kong4gateway/includes/kubernetes.conf <<-'EOF'
