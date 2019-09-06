@@ -187,7 +187,7 @@ sfRetry() {
 		export -f fn
 EOF
 	eval "$code"
-  result=$(timeout $timeout bash -c -x fn)
+  	result=$(timeout $timeout bash -c -x fn)
 	rc=$?
 	unset fn
 	[ $rc -eq 0 ] && echo $result && return 0
@@ -505,8 +505,12 @@ sfIsPodRunning() {
 }
 export -f sfIsPodRunning
 
+# Returns the tag name corresponding to latest release
+sfGithubLastRelease() {
+	curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases/latest" | jq -r .tag_name
+}
+export -f sfGithubLastRelease
 
-# Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
 # $1 is the size of the result (optional)
 # $2 is the characters to choose from (optional); use preferably [:xxx:] notation (like [:alnum:] for all letters and digits)

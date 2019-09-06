@@ -414,7 +414,7 @@ feature:
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
                             [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master-
                             # adds Kubernetes Dashboard
-                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml || exit 222
+                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || exit 222
 
                             # cat <<EOF | kubectl apply -f -
                             # apiVersion: v1
