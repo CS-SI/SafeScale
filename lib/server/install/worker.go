@@ -702,9 +702,9 @@ func (w *worker) setReverseProxy() (err error) {
 		hosts, err := w.identifyHosts(targets)
 		if err != nil {
 			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
-		} else {
-			log.Debugf("successfully applied proxy rule: %v", rule)
 		}
+		log.Debugf("successfully applied proxy rule: %v", rule)
+
 		for _, h := range hosts {
 			cloneV := w.variables.Clone()
 			cloneV["HostIP"] = h.PrivateIp

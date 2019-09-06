@@ -366,15 +366,26 @@ sfProbeGPU() {
 	fi
 }
 
-sfReverseProxyReload() {
-	id=$(docker ps --filter "name=reverseproxy_server_1" {{ "--format '{{.ID}}'" }})
+sfEdgeProxyReload() {
+	id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }})
 	# legacy...
 	[ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
 	[ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }})
 
 	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null
 }
+export -f sfEdgeProxyReload
+
+sfReverseProxyReload() {
+	sfEdgeProxyReload
+}
 export -f sfReverseProxyReload
+
+sfIngressReload() {
+	id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }})
+	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null
+}
+export -f sfIngressReload
 
 # sfService abstracts the command to use to manipulate services
 sfService() {
@@ -507,8 +518,6 @@ sfIsPodRunning() {
 }
 export -f sfIsPodRunning
 
-
-# Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
 # $1 is the size of the result (optional)
 # $2 is the characters to choose from (optional); use preferably [:xxx:] notation (like [:alnum:] for all letters and digits)
