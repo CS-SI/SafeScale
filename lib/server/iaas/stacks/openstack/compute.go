@@ -442,7 +442,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	}
 
 	if !host.OK() {
-		log.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		log.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
 	return host, nil
@@ -475,8 +475,17 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 				err = fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
 				return nil
 			}
-			if server.Status != "ERROR" && server.Status != "CREATING" {
-				// host.LastState = toHostState(server.Status)
+
+			if server == nil {
+				err = fmt.Errorf("error getting host, nil response from gophercloud")
+				log.Debug(err)
+				return err
+			}
+
+			lastState := toHostState(server.Status)
+			if lastState != HostState.ERROR && lastState != HostState.STARTING {
+				log.Infof("host status of '%s' is '%s'", id, server.Status)
+				err = nil
 				return nil
 			}
 			return fmt.Errorf("server not ready yet")
@@ -488,6 +497,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 		if _, ok := err.(retry.ErrTimeout); ok {
 			return nil, fmt.Errorf("failed to get host '%s' information after %v: %s", id, timeout, retryErr.Error())
 		}
+		return nil, retryErr
 	}
 	if err != nil {
 		return nil, err
@@ -495,6 +505,11 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 	if notFound {
 		return nil, resources.ResourceNotFoundError("host", id)
 	}
+
+	if server == nil {
+		return nil, resources.ResourceNotFoundError("host", id)
+	}
+
 	return server, nil
 }
 
@@ -558,6 +573,9 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	host.LastState = toHostState(server.Status)
+	if host.LastState == HostState.ERROR || host.LastState == HostState.STARTING {
+		log.Warn("[TRACE] Unexpected host's last state: %v", host.LastState)
+	}
 
 	// Updates Host Property propsv1.HostDescription
 	err := host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
@@ -878,7 +896,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 					log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
 					if creationZone != srvOpts.AvailabilityZone {
 						if srvOpts.AvailabilityZone != "" {
-							// FIXME REVIEW Decide what to do in this case, just log or return error ?
 							log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
 						}
 					}

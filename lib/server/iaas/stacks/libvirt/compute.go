@@ -1007,7 +1007,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
 	var host *resources.Host
 
 	switch hostParam.(type) {
@@ -1025,12 +1025,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 		return nil, err
 	}
 
-	if err := s.complementHost(host, newHost); err != nil {
+	if err = s.complementHost(host, newHost); err != nil {
 		return nil, fmt.Errorf("Failed to complement the host : %s", err.Error())
 	}
 
 	if !host.OK() {
-		logrus.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
 	return host, nil
