@@ -47,7 +47,7 @@ var networkList = cli.Command{
 			Usage: "List all Networks on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		networks, err := client.New().Network.List(c.Bool("all"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
 		}
@@ -70,7 +70,7 @@ var networkDelete = cli.Command{
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		err := client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
+		err := client.New().Network.Delete(networkList, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
 		}
@@ -89,7 +89,7 @@ var networkInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		network, err := client.New().Network.Inspect(c.Args().First(), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
 		}
@@ -178,7 +178,7 @@ var networkCreate = cli.Command{
 				Sizing:  def.Sizing,
 			},
 		}
-		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
+		network, err := client.New().Network.Create(netdef, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 		}

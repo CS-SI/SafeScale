@@ -147,7 +147,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		w.availableMaster, err = client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+		w.availableMaster, err = client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +165,7 @@ func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		host, err := client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+		host, err := client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -241,7 +241,7 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 		w.allMasters = []*pb.Host{}
 		safescale := client.New().Host
 		for _, i := range w.cluster.ListMasterIDs(w.feature.task) {
-			host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
+			host, err := safescale.Inspect(i, utils.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
@@ -283,7 +283,7 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 		hostClt := client.New().Host
 		allHosts := []*pb.Host{}
 		for _, i := range w.cluster.ListNodeIDs(w.feature.task) {
-			host, err := hostClt.Inspect(i, client.DefaultExecutionTimeout)
+			host, err := hostClt.Inspect(i, utils.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
@@ -304,7 +304,7 @@ func (w *worker) identifyAvailableGateway() (*pb.Host, error) {
 	if w.availableGateway == nil {
 		var err error
 		netCfg := w.cluster.GetNetworkConfig(w.feature.task)
-		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
+		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -349,13 +349,13 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	)
 
 	netCfg := w.cluster.GetNetworkConfig(w.feature.task)
-	gw, err := client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
+	gw, err := client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
 	results = append(w.allGateways, gw)
 	if netCfg.SecondaryGatewayID != "" {
-		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, client.DefaultExecutionTimeout)
+		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}

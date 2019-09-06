@@ -18,10 +18,9 @@ package install
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
 
@@ -313,6 +312,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	return results, err
 }
 
+
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
 func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
@@ -334,7 +334,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	log.Infof("Adding feature '%s' on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
+	defer timer(fmt.Sprintf("Adding feature '%s' on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name()))()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -391,7 +391,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 
-	log.Infof("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
+	defer timer(fmt.Sprintf("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name()))()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)

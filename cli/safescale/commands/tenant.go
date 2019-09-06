@@ -43,7 +43,7 @@ var tenantList = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
-		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
+		tenants, err := client.New().Tenant.List(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
 		}
@@ -55,7 +55,7 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
-		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
+		tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
 		}
@@ -72,7 +72,7 @@ var tenantSet = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
+		err := client.New().Tenant.Set(c.Args().First(), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
 		}
@@ -85,7 +85,7 @@ var tenantStorageList = cli.Command{
 	Aliases: []string{"storage-ls"},
 	Usage:   "List available storage tenants",
 	Action: func(c *cli.Context) error {
-		tenants, err := client.New().Tenant.StorageList(client.DefaultExecutionTimeout)
+		tenants, err := client.New().Tenant.StorageList(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
 		}
@@ -97,7 +97,7 @@ var tenantStorageGet = cli.Command{
 	Name:  "storage-get",
 	Usage: "Get current storage tenants",
 	Action: func(c *cli.Context) error {
-		tenants, err := client.New().Tenant.StorageGet(client.DefaultExecutionTimeout)
+		tenants, err := client.New().Tenant.StorageGet(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
 		}
@@ -116,7 +116,7 @@ var tenantStorageSet = cli.Command{
 		}
 		tenantNames := []string{c.Args().First()}
 		tenantNames = append(tenantNames, c.Args().Tail()...)
-		err := client.New().Tenant.StorageSet(tenantNames, client.DefaultExecutionTimeout)
+		err := client.New().Tenant.StorageSet(tenantNames, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
 		}

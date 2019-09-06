@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"time"
 
@@ -325,7 +326,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	command = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
 
 	// Executes the script on the remote host
-	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, client.DefaultConnectionTimeout, is.WallTime)
+	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, utils.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{success: false, err: err}, nil
 	}

@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/sirupsen/logrus"
@@ -187,7 +188,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(f.Name(), to, utils.GetDefaultDelay(), client.DefaultExecutionTimeout) // FIXME File operations
+			retcode, _, _, err := sshClt.Copy(f.Name(), to, utils.GetDefaultDelay(), utils.GetExecutionTimeout()) // FIXME File operations
 			if err != nil {
 				return err
 			}
@@ -195,7 +196,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), utils.GetBigDelay(), client.DefaultExecutionTimeout)
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), utils.GetBigDelay(), utils.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -244,7 +245,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = sshClt.Run(host.Name, cmd, utils.GetDefaultDelay(), client.DefaultExecutionTimeout)
+			retcode, _, _, err = sshClt.Run(host.Name, cmd, utils.GetDefaultDelay(), utils.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -384,9 +385,15 @@ func gatewayFromHost(host *pb.Host) *pb.Host {
 	if gwID == "" {
 		return host
 	}
-	gw, err := client.New().Host.Inspect(gwID, client.DefaultExecutionTimeout)
+	gw, err := client.New().Host.Inspect(gwID, utils.GetExecutionTimeout())
 	if err != nil {
 		return nil
 	}
 	return gw
+}
+
+func timer(in string) func() {
+	logrus.Info(in)
+	start := time.Now()
+	return func() { logrus.Info(in, "... finished in (ms):", time.Since(start).Nanoseconds() * 1000000) }
 }

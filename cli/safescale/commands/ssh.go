@@ -69,7 +69,7 @@ var sshRun = cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
+		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), utils.GetConnectionTimeout(), timeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
 		}
@@ -110,7 +110,7 @@ var sshCopy = cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		retcode, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
+		retcode, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), utils.GetConnectionTimeout(), timeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
 		}

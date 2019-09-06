@@ -67,7 +67,7 @@ var hostStart = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 		hostRef := c.Args().First()
-		err := client.New().Host.Start(hostRef, client.DefaultExecutionTimeout)
+		err := client.New().Host.Start(hostRef, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error())))
 		}
@@ -85,7 +85,7 @@ var hostStop = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 		hostRef := c.Args().First()
-		err := client.New().Host.Stop(hostRef, client.DefaultExecutionTimeout)
+		err := client.New().Host.Stop(hostRef, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error())))
 		}
@@ -104,7 +104,7 @@ var hostReboot = cli.Command{
 		}
 
 		hostRef := c.Args().First()
-		err := client.New().Host.Reboot(hostRef, client.DefaultExecutionTimeout)
+		err := client.New().Host.Reboot(hostRef, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error())))
 		}
@@ -122,7 +122,7 @@ var hostList = cli.Command{
 			Usage: "List all hosts on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		hosts, err := client.New().Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		hosts, err := client.New().Host.List(c.Bool("all"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
 		}
@@ -151,7 +151,7 @@ var hostInspect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
-		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Inspect(c.Args().First(), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error())))
 		}
@@ -168,7 +168,7 @@ var hostStatus = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
-		resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Status(c.Args().First(), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error())))
 		}
@@ -267,7 +267,7 @@ var hostCreate = cli.Command{
 		if err != nil {
 			return err
 		}
-		resp, err := client.New().Host.Create(*def, client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Create(*def, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 		}
@@ -326,7 +326,7 @@ var hostResize = cli.Command{
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
-		resp, err := client.New().Host.Resize(def, client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Resize(def, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 		}
@@ -348,7 +348,7 @@ var hostDelete = cli.Command{
 		hostList = append(hostList, c.Args().First())
 		hostList = append(hostList, c.Args().Tail()...)
 
-		err := client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
+		err := client.New().Host.Delete(hostList, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error())))
 		}
@@ -423,7 +423,7 @@ var hostAddFeatureCommand = cli.Command{
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		// Wait for SSH service on remote host first
-		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
+		err = client.New().Ssh.WaitReady(hostInstance.Id, utils.GetConnectionTimeout())
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -513,7 +513,7 @@ var hostCheckFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
+		err = client.New().Ssh.WaitReady(hostInstance.Id, utils.GetConnectionTimeout())
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -580,7 +580,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
+		err = client.New().Ssh.WaitReady(hostInstance.Id, utils.GetConnectionTimeout())
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))

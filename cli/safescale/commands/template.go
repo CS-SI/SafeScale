@@ -43,7 +43,7 @@ var templateList = cli.Command{
 			Usage: "List all available templates in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		templates, err := client.New().Template.List(c.Bool("all"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error())))
 		}

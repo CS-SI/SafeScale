@@ -8,6 +8,7 @@ import (
 const (
 	// DefaultContextTimeout default timeout for grpc command invocation
 	DefaultContextTimeout = 1 * time.Minute
+
 	// HostTimeout timeout for grpc command relative to host creation
 	HostTimeout = 5 * time.Minute
 
@@ -19,7 +20,6 @@ const (
 
 	DefaultConnectionTimeout = 30 * time.Second
 	DefaultExecutionTimeout  = 5 * time.Minute
-
 
 	SmallDelay = 1*time.Second
 	DefaultDelay = 5*time.Second
@@ -68,6 +68,14 @@ func GetHostCleanupTimeout() time.Duration {
 
 func GetConnectSSHTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_SSH_CONNECT_TIMEOUT", DefaultSSHConnectionTimeout)
+}
+
+func GetConnectionTimeout() time.Duration {
+	return GetTimeoutFromEnv("SAFESCALE_CONNECT_TIMEOUT", DefaultConnectionTimeout)
+}
+
+func GetExecutionTimeout() time.Duration {
+	return GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", DefaultExecutionTimeout)
 }
 
 // GetHostTimeout ...

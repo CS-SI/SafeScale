@@ -142,7 +142,7 @@ func (b *foreman) ExecuteScript(
 	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
 	cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
 
-	return client.New().Ssh.Run(hostID, cmd, client.DefaultConnectionTimeout, 2*utils.GetLongOperationTimeout())
+	return client.New().Ssh.Run(hostID, cmd, utils.GetConnectionTimeout(), 2*utils.GetLongOperationTimeout())
 }
 
 // construct ...
@@ -257,7 +257,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 	clientInstance := client.New()
 	clientNetwork := clientInstance.Network
-	network, err := clientNetwork.Create(def, client.DefaultExecutionTimeout)
+	network, err := clientNetwork.Create(def, utils.GetExecutionTimeout())
 	if err != nil {
 		msg := fmt.Sprintf("failed to create network '%s': %s", networkName, err.Error())
 		log.Errorf("[cluster %s] %s", req.Name, msg)
@@ -268,7 +268,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := clientNetwork.Delete([]string{network.Id}, client.DefaultExecutionTimeout)
+			derr := clientNetwork.Delete([]string{network.Id}, utils.GetExecutionTimeout())
 			if derr != nil {
 				log.Errorf("after failure, failed to delete network '%s'", networkName)
 			}
@@ -282,7 +282,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		primaryGateway, secondaryGateway *resources.Host
 	)
 
-	tenant, err := clientInstance.Tenant.Get(client.DefaultExecutionTimeout)
+	tenant, err := clientInstance.Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		return err
 	}
 	primaryGateway = primaryGatewayMetadata.Get()
-	err = clientInstance.Ssh.WaitReady(primaryGateway.ID, client.DefaultExecutionTimeout)
+	err = clientInstance.Ssh.WaitReady(primaryGateway.ID, utils.GetExecutionTimeout())
 	if err != nil {
 		return client.DecorateError(err, "wait for remote ssh service to be ready", false)
 	}
@@ -329,7 +329,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 			return err
 		}
 		secondaryGateway = secondaryGatewayMetadata.Get()
-		err = clientInstance.Ssh.WaitReady(primaryGateway.ID, client.DefaultExecutionTimeout)
+		err = clientInstance.Ssh.WaitReady(primaryGateway.ID, utils.GetExecutionTimeout())
 		if err != nil {
 			return client.DecorateError(err, "wait for remote ssh service to be ready", false)
 		}
@@ -449,7 +449,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := client.New().Host.Delete(b.cluster.ListMasterIDs(task), client.DefaultExecutionTimeout)
+			derr := client.New().Host.Delete(b.cluster.ListMasterIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
 				log.Errorf("[cluster %s] after failure, failed to delete masters", req.Name)
 			}
@@ -481,7 +481,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			clientHost := clientInstance.Host
-			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), client.DefaultExecutionTimeout)
+			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
 				log.Debugf("failed to remove private nodes on failure")
 			}
@@ -601,7 +601,7 @@ func (b *foreman) configureNode(task concurrency.Task, index int, pbHost *pb.Hos
 
 // unconfigureNode executes what has to be done to remove node from cluster
 func (b *foreman) unconfigureNode(task concurrency.Task, hostID string, selectedMasterID string) error {
-	pbHost, err := client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+	pbHost, err := client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 	if err != nil {
 		return err
 	}
@@ -681,7 +681,7 @@ func uploadTemplateToFile(
 	if box == nil {
 		panic("box is nil!")
 	}
-	host, err := client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+	host, err := client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 	if err != nil {
 		return "", fmt.Errorf("failed to get host information: %s", err)
 	}
@@ -724,7 +724,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 	clientHost := client.New().Host
 	length := len(hosts)
 	for i := 0; i < length; i++ {
-		host, err = clientHost.Inspect(hosts[i], client.DefaultExecutionTimeout)
+		host, err = clientHost.Inspect(hosts[i], utils.GetExecutionTimeout())
 		if err != nil {
 			break
 		}
@@ -766,7 +766,7 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
-		pbHost, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		pbHost, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			return err
 		}
@@ -794,7 +794,7 @@ func (b *foreman) leaveMastersFromList(task concurrency.Task, public bool, hosts
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
-		pbHost, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		pbHost, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			return err
 		}
@@ -819,7 +819,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
-		pbHost, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		pbHost, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			// If host seems deleted, consider leaving as a success
 			if _, ok := err.(resources.ErrResourceNotFound); ok {
@@ -969,7 +969,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 // configureDockerSwarm
 //func (b *foreman) configureDockerSwarm(task concurrency.Task, gw *pb.Host, hostLabel string) error {
 //	cmd := fmt.Sprintf("docker swarm init --advertise-addr %s", gw.GetPrivateIp())
-//	retcode, _, _, err := client.New().Ssh.Run(gw.Id, cmd, client.DefaultConnectionTimeout, 2*utils.GetLongOperationTimeout())
+//	retcode, _, _, err := client.New().Ssh.Run(gw.Id, cmd, utils.GetConnectionTimeout(), 2*utils.GetLongOperationTimeout())
 //	if err != nil {
 //		return err
 //	}
@@ -1013,6 +1013,8 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	defer log.Debugf(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
 
 	clusterName := b.cluster.GetIdentity(t).Name
+
+	defer timer(fmt.Sprintf("[cluster %s] 'taskCreateMasters' called", clusterName))()
 
 	if count <= 0 {
 		log.Debugf("[cluster %s] no masters to create.", clusterName)
@@ -1157,7 +1159,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	clientHost := client.New().Host
 	var subtasks []concurrency.Task
 	for i, hostID := range b.cluster.ListMasterIDs(t) {
-		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		host, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			err = fmt.Errorf("failed to get metadata of host: %s", err.Error())
 			continue
@@ -1226,6 +1228,9 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	defer log.Debugf("<<< lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
 
 	clusterName := b.cluster.GetIdentity(t).Name
+
+	defer timer(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName))()
+
 	if count <= 0 {
 		log.Debugf("[cluster %s] no nodes to create.", clusterName)
 		return nil, nil
@@ -1369,6 +1374,9 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 	defer log.Debugf("<<< safescale.cluster.controller.Foreman::taskConfigureNodes()")
 
 	clusterName := b.cluster.GetIdentity(t).Name
+
+	defer timer(fmt.Sprintf("[cluster %s] 'taskConfigureNodes' called", clusterName))()
+
 	list := b.cluster.ListNodeIDs(t)
 	if len(list) <= 0 {
 		log.Debugf("[cluster %s] no nodes to configure.", clusterName)
@@ -1388,7 +1396,7 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 	var subtasks []concurrency.Task
 	clientHost := client.New().Host
 	for i, hostID = range list {
-		pbHost, err = clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		pbHost, err = clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			break
 		}
@@ -1452,6 +1460,8 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
 
+	defer timer(fmt.Sprintf("[cluster %s] installing 'reverseproxy' called", clusterName))()
+
 	disabled := false
 	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
@@ -1487,10 +1497,17 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 	return nil
 }
 
+func timer(in string) func() {
+	log.Info(in)
+	start := time.Now()
+	return func() { log.Info(in, "... finished in (ms):", time.Since(start).Nanoseconds() * 1000000) }
+}
+
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
 func (b *foreman) installRemoteDesktop(task concurrency.Task) error {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
+	defer timer(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName))()
 
 	disabled := false
 	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
@@ -1513,7 +1530,7 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) error {
 		// Adds remotedesktop feature on master
 		feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
 		if err != nil {
-			log.Errorf("[cluster %s] failed to instanciate feature 'remotedesktop': %s\n", clusterName, err.Error())
+			log.Errorf("[cluster %s] failed to instantiate feature 'remotedesktop': %s\n", clusterName, err.Error())
 			return err
 		}
 		results, err := feat.Add(target, install.Variables{

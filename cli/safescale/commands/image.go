@@ -43,7 +43,7 @@ var imageList = cli.Command{
 			Usage: "List all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		images, err := client.New().Image.List(c.Bool("all"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error())))
 		}

@@ -36,7 +36,7 @@ import (
 
 // Load ...
 func Load(task concurrency.Task, name string) (api.Cluster, error) {
-	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
+	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
 
 	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
+	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func Delete(task concurrency.Task, name string) error {
 
 // List lists the clusters already created
 func List() ([]api.Cluster, error) {
-	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
+	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}

@@ -63,7 +63,7 @@ var dataPush = cli.Command{
 		} else {
 			fileName = strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
 		}
-		err := client.New().Data.Push(localFilePath, fileName, client.DefaultExecutionTimeout)
+		err := client.New().Data.Push(localFilePath, fileName, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
 		}
@@ -95,7 +95,7 @@ var dataGet = cli.Command{
 			localFilePath = utils.AbsPathify(fileName)
 		}
 
-		err := client.New().Data.Get(localFilePath, fileName, client.DefaultExecutionTimeout)
+		err := client.New().Data.Get(localFilePath, fileName, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
 		}
@@ -114,7 +114,7 @@ var dataDelete = cli.Command{
 		}
 
 		fileName := c.Args().First()
-		err := client.New().Data.Delete(fileName, client.DefaultExecutionTimeout)
+		err := client.New().Data.Delete(fileName, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
 		}
@@ -127,7 +127,7 @@ var dataList = cli.Command{
 	Usage:     "list all files in the storage",
 	ArgsUsage: "<local_file_path>",
 	Action: func(c *cli.Context) error {
-		filesList, err := client.New().Data.List(client.DefaultExecutionTimeout)
+		filesList, err := client.New().Data.List(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
 		}

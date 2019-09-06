@@ -397,7 +397,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (*pb.Host, er
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
 	}
-	return client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+	return client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 }
 
 // SearchNode tells if an host ID corresponds to a node of the Cluster
@@ -615,7 +615,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		hosts  []string
 		errors []string
 	)
-	timeout := client.DefaultExecutionTimeout + time.Duration(count)*time.Minute
+	timeout := utils.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
@@ -644,7 +644,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	defer func() {
 		if err != nil {
 			if len(hosts) > 0 {
-				derr := hostClt.Delete(hosts, client.DefaultExecutionTimeout)
+				derr := hostClt.Delete(hosts, utils.GetExecutionTimeout())
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}
@@ -1040,7 +1040,7 @@ func (c *Controller) Delete(task concurrency.Task) error {
 	clientNetwork := client.New().Network
 	err = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
-			return clientNetwork.Delete([]string{networkID}, client.DefaultExecutionTimeout)
+			return clientNetwork.Delete([]string{networkID}, utils.GetExecutionTimeout())
 		},
 		utils.GetHostTimeout(),
 	)

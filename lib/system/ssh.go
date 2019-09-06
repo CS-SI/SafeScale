@@ -728,7 +728,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	if err != nil {
 		return 0, "", "", fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
-	log.Debugf("SSH Identity file: %s", identityfile.Name())
+	// log.Debugf("SSH Identity file: %s", identityfile.Name())
 
 	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}'{{.LocalPath}}' {{.User}}@{{.Host}}:'{{.RemotePath}}'{{else}}{{.User}}@{{.Host}}:'{{.RemotePath}}' '{{.LocalPath}}'{{end}}")
 	if err != nil {

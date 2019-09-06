@@ -18,13 +18,11 @@ package client
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	logr "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/pkg/errors"
-	logr "github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -60,8 +58,8 @@ type Client *Session
 
 // DefaultTimeout tells to use the timeout by default depending on context
 var (
-	DefaultConnectionTimeout = common.GetTimeoutFromEnv("SAFESCALE_CONNECTION_TIMEOUT", 30 * time.Second)
-	DefaultExecutionTimeout  = common.GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", 5 * time.Minute)
+	DefaultConnectionTimeout = common.GetConnectSSHTimeout()
+	DefaultExecutionTimeout  = common.GetExecutionTimeout()
 )
 
 // New returns an instance of safescale Client
