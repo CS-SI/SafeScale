@@ -1461,12 +1461,12 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("[cluster %s] failed to install  embedded feature 'edgeproxy4safescale': %v", clusterName, err)
+		log.Errorf("[cluster %s] failed to install  embedded feature 'edgeproxy4network': %v", clusterName, err)
 		return err
 	}
 	if !disabled {
-		log.Debugf("[cluster %s] adding feature 'edgeproxy4safescale'", clusterName)
-		feat, err := install.NewEmbeddedFeature(task, "edgeproxy4safescale")
+		log.Debugf("[cluster %s] adding feature 'edgeproxy4network'", clusterName)
+		feat, err := install.NewEmbeddedFeature(task, "edgeproxy4network")
 		if err != nil {
 			log.Errorf("[cluster %s] failed to instanciate embedded feature '%s': %s\n", clusterName, feat.DisplayName(), err.Error())
 			return err
