@@ -37,7 +37,7 @@ func init() {
 		ohpcSlurmNodeFeature(),
 		remoteDesktopFeature(),
 		postgres4gatewayFeature(),
-		edgeproxy4safescaleFeature(),
+		edgeproxy4networkFeature(),
 		keycloak4gatewayFeature(),
 		kubernetesFeature(),
 		proxycacheServerFeature(),
