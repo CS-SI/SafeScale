@@ -377,9 +377,9 @@ sfEdgeProxyReload() {
 export -f sfEdgeProxyReload
 
 sfReverseProxyReload() {
-	sfEdgeProxyReload()
+	sfEdgeProxyReload
 }
-export sfReverseProxyReload
+export -f sfReverseProxyReload
 
 sfIngressReload() {
 	id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }})
@@ -518,8 +518,6 @@ sfIsPodRunning() {
 }
 export -f sfIsPodRunning
 
-
-# Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
 # $1 is the size of the result (optional)
 # $2 is the characters to choose from (optional); use preferably [:xxx:] notation (like [:alnum:] for all letters and digits)
