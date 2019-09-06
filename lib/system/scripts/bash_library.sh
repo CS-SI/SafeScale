@@ -367,9 +367,7 @@ sfProbeGPU() {
 }
 
 sfReverseProxyReload() {
-	id=$(docker ps --filter "name=reverseproxy_server_1" {{ "--format '{{.ID}}'" }})
-	# legacy...
-	[ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
+	id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
 	[ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }})
 
 	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null

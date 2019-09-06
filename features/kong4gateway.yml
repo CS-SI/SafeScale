@@ -49,12 +49,12 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            mkdir -p ${SF_ETCDIR}/edgeproxy4safescale/includes
+                            mkdir -p ${SF_ETCDIR}/kong4gateway/includes
 
                             KONG_PG_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
                             ADMIN_PG_PASSWORD="$(cat ${SF_ETCDIR}/postgres4gateway/password)"
 
-                            cat >${SF_ETCDIR}/edgeproxy4safescale/my-docker-entrypoint.sh <<-'EOF'
+                            cat >${SF_ETCDIR}/kong4gateway/my-docker-entrypoint.sh <<-'EOF'
                             #!/bin/sh
 
                             case $KONG_DATABASE in
@@ -66,7 +66,7 @@ feature:
                                           # creates /root/.pgpass
                                           cat >/root/.pgpass <<-EOF2
                             *:5432:*:postgres:$ADMIN_PG_PASSWORD
-                            *:5432:edgeproxy4safescale:edgeproxy4safescale:$KONG_PG_PASSWORD
+                            *:5432:kong4gateway:kong4gateway:$KONG_PG_PASSWORD
                             EOF2
                                           chmod 0600 /root/.pgpass && chown root:root /root/.pgpass
 
@@ -102,7 +102,7 @@ feature:
                             exec /docker-entrypoint.sh $*
                             EOF
 
-                            cat >${SF_ETCDIR}/edgeproxy4safescale/Dockerfile <<-EOF
+                            cat >${SF_ETCDIR}/kong4gateway/Dockerfile <<-EOF
                             FROM kong:1.2
                             RUN apk update && apk add git unzip postgresql-client
                             RUN luarocks install kong-oidc \
@@ -114,9 +114,9 @@ feature:
                             ENTRYPOINT ["/my-docker-entrypoint.sh"]
                             CMD ["kong", "docker-start"]
                             EOF
-                            docker build -t edgeproxy4safescale:latest ${SF_ETCDIR}/edgeproxy4safescale
+                            docker build -t kong4gateway:latest ${SF_ETCDIR}/kong4gateway
 
-                            # cat >${SF_ETCDIR}/edgeproxy4safescale/konga.userdb.data <<-EOF
+                            # cat >${SF_ETCDIR}/kong4gateway/konga.userdb.data <<-EOF
                             # module.exports = [
                             #     {
                             #         "username": "safescale",
@@ -130,18 +130,18 @@ feature:
                             #     }
                             # ]
                             # EOF
-                            # chmod go-rwx ${SF_ETCDIR}/edgeproxy4safescale/konga.userdb.data
+                            # chmod go-rwx ${SF_ETCDIR}/kong4gateway/konga.userdb.data
 
-                            cat >${SF_ETCDIR}/edgeproxy4safescale/docker-compose.yml <<-EOF
+                            cat >${SF_ETCDIR}/kong4gateway/docker-compose.yml <<-EOF
                             version: '2.1'
                             services:
                                 proxy:
-                                    image: edgeproxy4safescale:latest
+                                    image: kong4gateway:latest
                                     environment:
                                         - KONG_DATABASE=postgres
                                         - KONG_PG_HOST={{ .HostIP }}
-                                        - KONG_PG_DATABASE=edgeproxy4safescale
-                                        - KONG_PG_USER=edgeproxy4safescale
+                                        - KONG_PG_DATABASE=kong4gateway
+                                        - KONG_PG_USER=kong4gateway
                                         - KONG_PG_PASSWORD=${KONG_PG_PASSWORD}
                                         - ADMIN_PG_PASSWORD=${ADMIN_PG_PASSWORD}
                                         - KONG_PROXY_ACCESS_LOG=/dev/stdout
@@ -152,8 +152,8 @@ feature:
                                         - KONG_PROXY_LISTEN=0.0.0.0:443 ssl
                                         - KONG_PLUGINS=oidc,prometheus,ip-restriction
                                     volumes:
-                                        - ${SF_ETCDIR}/edgeproxy4safescale/kong.conf:/etc/kong/kong.conf:ro
-                                        - ${SF_ETCDIR}/edgeproxy4safescale/includes:/etc/kong/includes:ro
+                                        - ${SF_ETCDIR}/kong4gateway/kong.conf:/etc/kong/kong.conf:ro
+                                        - ${SF_ETCDIR}/kong4gateway/includes:/etc/kong/includes:ro
                                     # networks:
                                     #     - safescale-gw
                                     network_mode: "bridge"
@@ -184,12 +184,12 @@ feature:
                                 # gui:
                                 #     image: pantsel/konga
                                 #     volumes:
-                                #         - ${SF_ETCDIR}/edgeproxy4safescale/konga.userdb.data:/usr/local/etc/userdb.data:ro
+                                #         - ${SF_ETCDIR}/kong4gateway/konga.userdb.data:/usr/local/etc/userdb.data:ro
                                 #     environment:
                                 #         - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
                                 #         - DB_ADAPTER=postgres
-                                #         - DB_DATABASE=edgeproxy4safescale-gui
-                                #         - DB_USER=edgeproxy4safescale
+                                #         - DB_DATABASE=kong4gateway-gui
+                                #         - DB_USER=kong4gateway
                                 #         - DB_PASSWORD="${DB_PASSWORD}"
                                 #         - NODE_ENV=production
                                 #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
@@ -211,9 +211,9 @@ feature:
                                 #             max_attempts: 3
                                 #             window: 120s
 
-                            chmod go-rwx ${SF_ETCDIR}/edgeproxy4safescale/docker-compose.yml
+                            chmod go-rwx ${SF_ETCDIR}/kong4gateway/docker-compose.yml
 
-                            cat >${SF_ETCDIR}/edgeproxy4safescale/kong.conf <<-EOF
+                            cat >${SF_ETCDIR}/kong4gateway/kong.conf <<-EOF
                             trusted_ips=0.0.0.0/0,::/0
                             real_ip_header=X-Forwarded-For
                             real_ip_recursive=on
@@ -266,8 +266,8 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/edgeproxy4safescale/docker-compose.yml -p edgeproxy4safescale up -d || exit 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4safescale:latest edgeproxy4safescale_proxy_1" || exit 194
+                            docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway up -d || exit 193
+                            sfRetry 5m 5 "sfDoesDockerRunContainer kong4gateway:latest kong4gateway_proxy_1" || exit 194
                             exit 0
 
             remove:
@@ -280,11 +280,11 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            if [ -f ${SF_ETCDIR}/edgeproxy4safescale/docker-compose.yml ]; then
-                                docker-compose -f ${SF_ETCDIR}/edgeproxy4safescale/docker-compose.yml -p edgeproxy4safescale rm --stop --force || exit 195
+                            if [ -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml ]; then
+                                docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force || exit 195
                                 # docker secret rm safescale.edgeproxy.db_password &>/dev/null
-                                docker image rm -f edgeproxy4safescale:latest
-                                rm -rf ${SF_ETCDIR}/edgeproxy4safescale
+                                docker image rm -f kong4gateway:latest
+                                rm -rf ${SF_ETCDIR}/kong4gateway
 
                             else
                                 if [ -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml ]; then
