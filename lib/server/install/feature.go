@@ -334,7 +334,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	defer timer(fmt.Sprintf("Adding feature '%s' on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name()))()
+	defer timer(fmt.Sprintf("Adding feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()))()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -391,7 +391,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 
-	defer timer(fmt.Sprintf("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name()))()
+	defer timer(fmt.Sprintf("Removing feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()))()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
