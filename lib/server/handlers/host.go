@@ -550,6 +550,14 @@ func (handler *HostHandler) Create(
 	if retcode != 0 {
 		// Setting err will trigger defers
 		err = fmt.Errorf("failed to finalize host installation: %s", stderr)
+
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
+			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
+			_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
+			_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
+		}
+
 		return nil, err
 	}
 

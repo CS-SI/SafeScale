@@ -395,5 +395,20 @@ func gatewayFromHost(host *pb.Host) *pb.Host {
 func timer(in string) func() {
 	logrus.Info(in)
 	start := time.Now()
-	return func() { logrus.Info(in, "... finished in (ms):", time.Since(start).Nanoseconds() * 1000000) }
+	return func() { logrus.Info(in, "... finished in: ", fmtDuration(time.Since(start))) }
+}
+
+func fmtDuration(dur time.Duration) string {
+	ms := (dur.Nanoseconds() % 1000000000) / 1000
+	if ms == 0 {
+		if dur.Nanoseconds() / 1000000000 == 0 {
+			ms = 1
+			return fmt.Sprintf("%d ms", ms)
+		}
+	}
+
+	sec := int64(dur.Truncate(time.Second).Seconds()) % 60
+	min := int64(dur.Truncate(time.Minute).Minutes())
+
+	return fmt.Sprintf("%d minutes, %d seconds, %d ms", min, sec, ms)
 }
