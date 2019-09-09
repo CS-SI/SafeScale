@@ -272,6 +272,7 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		return nil, err
 	}
 
+	/*
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		if cmdString != "" {
 			log.Debugf("[TRACE] %s", cmdString)
@@ -284,6 +285,7 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
 		}
 	}
+	 */
 
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
@@ -451,7 +453,7 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
-	log.Debugf("Running command [%s] with timeout of %s", sc.Display(), timeout)
+	defer utils.TimerWithLevel(fmt.Sprintf("Running command [%s] with timeout of %s", sc.Display(), timeout), log.DebugLevel)()
 
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
@@ -481,19 +483,19 @@ func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string
 
 		msgOut, closeErr = ioutil.ReadAll(stdOut)
 		if closeErr != nil {
-			log.Debugf("Error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
+			log.Debugf("error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
 			clean = false
 		}
 
 		msgErr, closeErr = ioutil.ReadAll(stderr)
 		if closeErr != nil {
-			log.Debugf("Error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
+			log.Debugf("error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
 			clean = false
 		}
 
 		err = sc.Wait()
 		if err != nil {
-			log.Debugf("Error waiting for command [%s]: %v", sc.Display(), err)
+			log.Debugf("error waiting for command [%s]: %v", sc.Display(), err)
 			clean = false
 		}
 
@@ -510,10 +512,10 @@ func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 		}
 		if !issues {
-			log.Warnf("There have been issues running this command [%s], please check daemon logs", sc.Display())
+			log.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display())
 		}
 	case <-time.After(timeout):
-		errMsg := fmt.Sprintf("Timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
+		errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
 		log.Warnf(errMsg)
 		return 0, "", "", fmt.Errorf(errMsg)
 	}
@@ -594,6 +596,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		sshConfig.Host,
 	)
 
+	/*
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		if cmdString != "" {
 			log.Debugf("[TRACE] %s", cmdString)
@@ -606,6 +609,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
 		}
 	}
+	 */
 
 	sudoOpt := ""
 	if withSudo {
@@ -667,6 +671,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 		retcode        int
 		stdout, stderr string
 	)
+	begins := time.Now()
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
@@ -692,8 +697,13 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 		},
 		timeout,
 	)
+	ends := time.Since(begins)
+	duration := utils.FmtDuration(ends)
 	if err == nil {
+		log.Infof("host [%s] creation successful in %s: host stdout is [%s]", ssh.Host, duration, stdout)
 		return stdout, nil
+	} else {
+		log.Errorf("failure creating host resource [%s] in %s: %v", ssh.Host, duration, err)
 	}
 
 	originalErr := err

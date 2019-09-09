@@ -69,8 +69,8 @@ type Subnet struct {
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	log.Debugf(">>> stacks.openstack::CreateNetwork(%s)", req.Name)
-	defer log.Debugf("<<< stacks.openstack::CreateNetwork(%s)", req.Name)
+	log.Tracef(">>> stacks.openstack::CreateNetwork(%s)", req.Name)
+	defer log.Tracef("<<< stacks.openstack::CreateNetwork(%s)", req.Name)
 
 	if s == nil {
 		panic("Calling stacks.openstack::CreateNetwork from nil pointer!")
@@ -132,8 +132,8 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 // GetNetworkByName ...
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
-	log.Debugf(">>> stacks.openstack::GetNetworkByName(%s)", name)
-	defer log.Debugf("<<< stacks.openstack::GetNetworkByName(%s)", name)
+	log.Tracef(">>> stacks.openstack::GetNetworkByName(%s)", name)
+	defer log.Tracef("<<< stacks.openstack::GetNetworkByName(%s)", name)
 
 	if s == nil {
 		panic("Calling stacks.openstack::GetNetworkByName from nil pointer!")
@@ -164,8 +164,8 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 // GetNetwork returns the network identified by id
 func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
-	log.Debugf(">>> stacks.openstack::GetNetwork(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetNetwork(%s)", id)
+	log.Tracef(">>> stacks.openstack::GetNetwork(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::GetNetwork(%s)", id)
 
 	if s == nil {
 		panic("Calling stacks.openstack::GetNetwork from nil pointer!")
@@ -210,8 +210,8 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	log.Debug(">>> stacks.openstack::ListNetworks()")
-	defer log.Debug("<<< stacks.openstack::ListNetworks()")
+	log.Trace(">>> stacks.openstack::ListNetworks()")
+	defer log.Trace("<<< stacks.openstack::ListNetworks()")
 
 	if s == nil {
 		panic("Calling stacks.openstack::ListNetworks from nil pointer!")
@@ -263,8 +263,8 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(id string) error {
-	log.Debugf(">>> stacks.openstack::DeleteNetwork(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::DeleteNetwork(%s)", id)
+	log.Tracef(">>> stacks.openstack::DeleteNetwork(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::DeleteNetwork(%s)", id)
 
 	if s == nil {
 		panic("Calling stacks.openstack::DeleteNetwork from nil pointer!")
@@ -314,8 +314,8 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
-	log.Debugf(">>> stacks.openstack::CreateGateway(%s)", req.Name)
-	defer log.Debugf("<<< stacks.openstack::CreateGateway(%s)", req.Name)
+	log.Tracef(">>> stacks.openstack::CreateGateway(%s)", req.Name)
+	defer log.Tracef("<<< stacks.openstack::CreateGateway(%s)", req.Name)
 
 	if s == nil {
 		panic("Calling stacks.openstack::CreateGateway from nil pointer!")
@@ -375,8 +375,8 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 
 // DeleteGateway delete the public gateway of a private network
 func (s *Stack) DeleteGateway(id string) error {
-	log.Debugf(">>> stacks.openstack::DeleteGateway(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::DeleteGateway(%s)", id)
+	log.Tracef(">>> stacks.openstack::DeleteGateway(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::DeleteGateway(%s)", id)
 
 	if s == nil {
 		panic("Calling stacks.openstack::DeleteGateway from nil pointer!")

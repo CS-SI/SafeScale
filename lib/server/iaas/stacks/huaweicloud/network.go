@@ -184,8 +184,8 @@ func (s *Stack) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	log.Debugf(">>> huaweicloud.Stack::CreateNetwork(%s)", req.Name)
-	defer log.Debugf("<<< huaweicloud.Stack::CreateNetwork(%s)", req.Name)
+	log.Tracef(">>> huaweicloud.Stack::CreateNetwork(%s)", req.Name)
+	defer log.Tracef("<<< huaweicloud.Stack::CreateNetwork(%s)", req.Name)
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
@@ -625,8 +625,8 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		gwname = "gw-" + req.Network.Name
 	}
 
-	log.Debugf(">>> huaweicloud.Stack::CreateGateway(%s)", gwname)
-	defer log.Debugf("<<< huaweicloud.Stack::CreateGateway(%s)", gwname)
+	log.Tracef(">>> huaweicloud.Stack::CreateGateway(%s)", gwname)
+	defer log.Tracef("<<< huaweicloud.Stack::CreateGateway(%s)", gwname)
 
 	userData := userdata.NewContent()
 	hostReq := resources.HostRequest{

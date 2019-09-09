@@ -118,8 +118,8 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 
 //Push ...
 func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) error {
-	log.Debugf(">>> lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
+	log.Tracef(">>> lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
+	defer log.Tracef("<<< lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
 	//localFile inspection
 	file, err := os.Open(fileLocalPath)
 	if err != nil {
@@ -276,8 +276,8 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 
 //Get ...
 func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) error {
-	log.Debugf(">>> lib.server.handlers.DataHandler::Get(%s)", fileName)
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::Get(%s)", fileName)
+	log.Tracef(">>> lib.server.handlers.DataHandler::Get(%s)", fileName)
+	defer log.Tracef("<<< lib.server.handlers.DataHandler::Get(%s)", fileName)
 
 	// Check if the local file is available
 	if _, err := os.Stat(fileLocalPath); err == nil {
@@ -434,8 +434,8 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 
 // Delete ...
 func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
-	log.Debugf(">>> lib.server.handlers.DataHandler::Delete(%s)", fileName)
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::Delete(%s)", fileName)
+	log.Tracef(">>> lib.server.handlers.DataHandler::Delete(%s)", fileName)
+	defer log.Tracef("<<< lib.server.handlers.DataHandler::Delete(%s)", fileName)
 
 	bucketMap, _, buckets := handler.getBuckets()
 	metadataFileName, keyFileName := getFileNames(fileName)
@@ -481,8 +481,8 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 
 // List returns []fileName []UploadDate []fileSize [][]buckets, error
 func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int64, [][]string, error) {
-	log.Debugf(">>> lib.server.handlers.DataHandler::List()")
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::List()")
+	log.Tracef(">>> lib.server.handlers.DataHandler::List()")
+	defer log.Tracef("<<< lib.server.handlers.DataHandler::List()")
 
 	bucketMap, _, buckets := handler.getBuckets()
 

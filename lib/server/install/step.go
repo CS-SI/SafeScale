@@ -228,7 +228,7 @@ type step struct {
 
 // Run executes the step on all the concerned hosts
 func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
-	log.Debugf("running step '%s' on %d hosts...", is.Name, len(hosts))
+	defer utils.TimerWithLevel(fmt.Sprintf("running step '%s' on %d hosts...", is.Name, len(hosts)), log.DebugLevel)
 
 	var err error
 	results := stepResults{}
@@ -312,8 +312,6 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 			return stepResult{success: false, err: err}, nil
 		}
 	}
-
-	// FIXME Not so fast, validate first, save this elsewhere
 
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)

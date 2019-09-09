@@ -49,7 +49,7 @@ type ShareListener struct{}
 // Create calls share service creation
 func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb.ShareDefinition, error) {
 	log.Infof(">>> Listeners: share create '%v'", in)
-	defer log.Debugf("<<< Listeners: share create '%v'", in)
+	defer log.Tracef("<<< Listeners: share create '%v'", in)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -77,7 +77,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb
 func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	shareName := in.GetName()
 	log.Infof(">>> Listeners: share delete '%s'", shareName)
-	defer log.Debugf("<<< Listeners: share delete '%s'", shareName)
+	defer log.Tracef("<<< Listeners: share delete '%s'", shareName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -112,7 +112,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 // List return the list of all available shares
 func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ShareList, error) {
 	log.Infof(">>> Listeners: share list '%v'", in)
-	defer log.Debugf("<<< Listeners: share list '%v'", in)
+	defer log.Tracef("<<< Listeners: share list '%v'", in)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -146,7 +146,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*p
 // Mount mounts share on a local directory of the given host
 func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) (*pb.ShareMountDefinition, error) {
 	log.Infof(">>> Listeners: share mount '%v'", in)
-	defer log.Debugf("<<< Listeners: share mount '%v'", in)
+	defer log.Tracef("<<< Listeners: share mount '%v'", in)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -174,7 +174,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 // Unmount unmounts share from the given host
 func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (*google_protobuf.Empty, error) {
 	log.Infof(">>> Listeners: share unmount '%v'", in)
-	defer log.Debugf("<<< Listeners: share unmount '%v'", in)
+	defer log.Tracef("<<< Listeners: share unmount '%v'", in)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -203,7 +203,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.ShareMountList, error) {
 	shareName := in.GetName()
 	log.Infof(">>> Listeners: share inspect '%s'", shareName)
-	defer log.Debugf("<<< Listeners: share inspect '%s'", shareName)
+	defer log.Tracef("<<< Listeners: share inspect '%s'", shareName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

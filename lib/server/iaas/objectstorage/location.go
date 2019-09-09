@@ -65,9 +65,6 @@ func (l *location) getStowLocation() stow.Location {
 
 // Connect connects to an Object Storage Location
 func (l *location) connect() error {
-	log.Debugln("objectstorage.Location.Connect() called")
-	defer log.Debugln("objectstorage.Location.Connect() done")
-
 	// FIXME GCP Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
 	var config stow.ConfigMap
 

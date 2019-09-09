@@ -57,8 +57,8 @@ import (
 
 // ListRegions ...
 func (s *Stack) ListRegions() ([]string, error) {
-	log.Debug(">>> openstack.Client.ListRegions()")
-	defer log.Debug("<<< openstack.Client.ListRegions()")
+	log.Trace(">>> openstack.Client.ListRegions()")
+	defer log.Trace("<<< openstack.Client.ListRegions()")
 
 	var results []string
 
@@ -89,8 +89,8 @@ func (s *Stack) ListRegions() ([]string, error) {
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
-	log.Debug(">>> openstack.Client.ListAvailabilityZones()")
-	defer log.Debug("<<< openstack.Client.ListAvailabilityZones()")
+	log.Trace(">>> openstack.Client.ListAvailabilityZones()")
+	defer log.Trace("<<< openstack.Client.ListAvailabilityZones()")
 
 	if s == nil {
 		panic("Calling method ListAvailabilityZones from nil!")
@@ -122,8 +122,8 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 
 // ListImages lists available OS images
 func (s *Stack) ListImages() ([]resources.Image, error) {
-	log.Debug(">>> stacks.openstack::ListImages()")
-	defer log.Debug("<<< stacks.openstack::ListImages()")
+	log.Trace(">>> stacks.openstack::ListImages()")
+	defer log.Trace("<<< stacks.openstack::ListImages()")
 
 	if s == nil {
 		panic("Calling stacks.openstack::ListImage from nil pointer!")
@@ -162,8 +162,8 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
-	log.Debugf(">>> stacks.openstack::GetImage(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetImage(%s)", id)
+	log.Tracef(">>> stacks.openstack::GetImage(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::GetImage(%s)", id)
 
 	if s == nil {
 		panic("Calling method GetImage from nil!")
@@ -179,8 +179,8 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 
 // GetTemplate returns the Template referenced by id
 func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
-	log.Debugf(">>> stacks.openstack::GetTemplate(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetTemplate(%s)", id)
+	log.Tracef(">>> stacks.openstack::GetTemplate(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::GetTemplate(%s)", id)
 
 	if s == nil {
 		panic("Calling method GetTemplate from nil!")
@@ -212,8 +212,8 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
-	log.Debugf(">>> stacks.openstack::ListTemplates()")
-	defer log.Debugf("<<< stacks.openstack::ListTemplates()")
+	log.Tracef(">>> stacks.openstack::ListTemplates()")
+	defer log.Tracef("<<< stacks.openstack::ListTemplates()")
 
 	if s == nil {
 		panic("Calling method ListTemplates from nil!")
@@ -258,8 +258,8 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	log.Debugf(">>> stacks.openstack::CreateKeyPair(%s)", name)
-	defer log.Debugf("<<< stacks.openstack::CreateKeyPair(%s)", name)
+	log.Tracef(">>> stacks.openstack::CreateKeyPair(%s)", name)
+	defer log.Tracef("<<< stacks.openstack::CreateKeyPair(%s)", name)
 
 	if s == nil {
 		panic("Calling method CreateKeyPair from nil!")
@@ -289,8 +289,8 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	log.Debugf(">>> stacks.openstack::GetKeyPair(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetKeyPair(%s)", id)
+	log.Tracef(">>> stacks.openstack::GetKeyPair(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::GetKeyPair(%s)", id)
 
 	if s == nil {
 		panic("Calling method GetKeyPair from nil!")
@@ -312,8 +312,8 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	log.Debug(">>> stacks.openstack::ListKeyPairs()")
-	defer log.Debug("<<< stacks.openstack::ListKeyPairs()")
+	log.Trace(">>> stacks.openstack::ListKeyPairs()")
+	defer log.Trace("<<< stacks.openstack::ListKeyPairs()")
 
 	if s == nil {
 		panic("Calling method ListKeyPairs from nil!")
@@ -352,8 +352,8 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	log.Debugf(">>> stacks.openstack::DeleteKeyPair(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::DeleteKeyPair(%s)", id)
+	log.Tracef(">>> stacks.openstack::DeleteKeyPair(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::DeleteKeyPair(%s)", id)
 
 	if s == nil {
 		panic("Calling method DeleteKeyPair from nil!")
@@ -429,8 +429,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	if hostRef == "" {
 		hostRef = host.ID
 	}
-	log.Debugf(">>> stacks.openstack::InspectHost(%s)", hostRef)
-	defer log.Debugf("<<< stacks.openstack::InspectHost(%s)", hostRef)
+	log.Tracef(">>> stacks.openstack::InspectHost(%s)", hostRef)
+	defer log.Tracef("<<< stacks.openstack::InspectHost(%s)", hostRef)
 
 	server, err := s.queryServer(host.ID)
 	if err != nil {
@@ -484,7 +484,9 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 
 			lastState := toHostState(server.Status)
 			if lastState != HostState.ERROR && lastState != HostState.STARTING {
-				log.Infof("host status of '%s' is '%s'", id, server.Status)
+				if lastState != HostState.STARTED {
+					log.Warnf("unexpected: host status of '%s' is '%s'", id, server.Status)
+				}
 				err = nil
 				return nil
 			}
@@ -694,8 +696,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 // GetHostByName returns the host using the name passed as parameter
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
-	log.Debugf(">>> stacks.openstack::GetHostByName(%s)", name)
-	defer log.Debugf("<<< stacks.openstack::GetHostByName(%s)", name)
+	log.Tracef(">>> stacks.openstack::GetHostByName(%s)", name)
+	defer log.Tracef("<<< stacks.openstack::GetHostByName(%s)", name)
 
 	if s == nil {
 		panic("Calling method GetHostByName from nil!")
@@ -730,8 +732,8 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
-	log.Debugf(">>> stacks.openstack::CreateHost(%s)", request.ResourceName)
-	defer log.Debugf("<<< stacks.openstack::CreateHost(%s)", request.ResourceName)
+	log.Tracef(">>> stacks.openstack::CreateHost(%s)", request.ResourceName)
+	defer log.Tracef("<<< stacks.openstack::CreateHost(%s)", request.ResourceName)
 
 	if s == nil {
 		panic("Calling s.CreateHost with s==nil!")
@@ -1049,8 +1051,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	default:
 		panic("hostParam must be a string or a *resources.Host!")
 	}
-	log.Debugf(">>> stacks.openstack::WaitHostReady(%s)", host.ID)
-	defer log.Debugf("<<< stacks.openstack::WaitHostReady(%s)", host.ID)
+	log.Tracef(">>> stacks.openstack::WaitHostReady(%s)", host.ID)
+	defer log.Tracef("<<< stacks.openstack::WaitHostReady(%s)", host.ID)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -1079,8 +1081,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *resources.Host; any other type will panic
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
-	log.Debug(">>> stacks.openstack::GetHostState()")
-	defer log.Debug("<<< stacks.openstack::GetHostState()")
+	log.Trace(">>> stacks.openstack::GetHostState()")
+	defer log.Trace("<<< stacks.openstack::GetHostState()")
 
 	if s == nil {
 		panic("Calling s.GetHostState with s==nil!")
@@ -1095,8 +1097,8 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 // ListHosts lists all hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	log.Debug(">>> stacks.openstack::ListHosts()")
-	defer log.Debug("<<< stacks.openstack::ListHosts()")
+	log.Trace(">>> stacks.openstack::ListHosts()")
+	defer log.Trace("<<< stacks.openstack::ListHosts()")
 
 	if s == nil {
 		panic("Calling s.ListHosts with s==nil!")
@@ -1166,8 +1168,8 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	log.Debugf(">>> stacks.openstack::DeleteHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::DeleteHost(%s)", id)
+	log.Tracef(">>> stacks.openstack::DeleteHost(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::DeleteHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.DeleteHost with s==nil!")
@@ -1257,8 +1259,8 @@ func (s *Stack) DeleteHost(id string) error {
 
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
-	log.Debugf(">>> stacks.openstack::StopHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::StopHost(%s)", id)
+	log.Tracef(">>> stacks.openstack::StopHost(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::StopHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.StopHost with s==nil!")
@@ -1274,8 +1276,8 @@ func (s *Stack) StopHost(id string) error {
 
 // RebootHost reboots inconditionnaly the host identified by id
 func (s *Stack) RebootHost(id string) error {
-	log.Debugf(">>> stacks.openstack::Reboot(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::Reboot(%s)", id)
+	log.Tracef(">>> stacks.openstack::Reboot(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::Reboot(%s)", id)
 
 	if s == nil {
 		panic("Calling s.RebootHost with s==nil!")
@@ -1296,8 +1298,8 @@ func (s *Stack) RebootHost(id string) error {
 
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
-	log.Debugf(">>> stacks.openstack::StartHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::StartHost(%s)", id)
+	log.Tracef(">>> stacks.openstack::StartHost(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::StartHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.StartHost with s==nil!")
@@ -1314,8 +1316,8 @@ func (s *Stack) StartHost(id string) error {
 
 // ResizeHost ...
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	log.Debugf(">>> stacks.openstack::ResizeHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::ResizeHost(%s)", id)
+	log.Tracef(">>> stacks.openstack::ResizeHost(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::ResizeHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.ResizeHost with s==nil!")

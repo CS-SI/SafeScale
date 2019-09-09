@@ -632,8 +632,8 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 
 // configureCluster ...
 func (b *foreman) configureCluster(task concurrency.Task) error {
-	log.Debugf(">>> safescale.cluster.controller.foreman::configureCluster()")
-	defer log.Debugf("<<< safescale.cluster.controller.foreman::configureCluster()")
+	log.Tracef(">>> safescale.cluster.controller.foreman::configureCluster()")
+	defer log.Tracef("<<< safescale.cluster.controller.foreman::configureCluster()")
 
 	var err error
 
@@ -923,8 +923,8 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 // This function is intended to be call as a goroutine
 func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	pbGateway := params.(*pb.Host)
-	// log.Debugf(">>> lib.server.cluster.control.foreman::taskInstallGateway(%s)", pbGateway.Name)
-	// defer log.Debugf("<<< lib.server.cluster.control.foreman::taskInstallGateway(%s)", pbGateway.Name)
+	// log.Tracef(">>> lib.server.cluster.control.foreman::taskInstallGateway(%s)", pbGateway.Name)
+	// defer log.Tracef("<<< lib.server.cluster.control.foreman::taskInstallGateway(%s)", pbGateway.Name)
 
 	hostLabel := "gateway"
 	log.Debugf("[%s] starting installation...", hostLabel)
@@ -985,8 +985,8 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	// Convert parameters
 	gw := params.(*pb.Host)
 
-	log.Debugf(">>> lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
-	defer log.Debugf("<<< lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
+	log.Tracef(">>> lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
+	defer log.Tracef("<<< lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
 
 	log.Debugf("[%s] starting configuration...", gw.Name)
 
@@ -1009,12 +1009,12 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	count := p["count"].(int)
 	def := p["masterDef"].(*pb.HostDefinition)
 
-	log.Debugf(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
-	defer log.Debugf(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
+	log.Tracef(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
+	defer log.Tracef(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer timer(fmt.Sprintf("[cluster %s] 'taskCreateMasters' called", clusterName))()
+	defer utils.Timer(fmt.Sprintf("[cluster %s] 'taskCreateMasters' called", clusterName))()
 
 	if count <= 0 {
 		log.Debugf("[cluster %s] no masters to create.", clusterName)
@@ -1059,8 +1059,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	def := p["masterDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 
-	log.Debugf(">>>{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index)
-	defer log.Debugf("<<<{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index)
+	log.Tracef(">>>{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index)
+	defer log.Tracef("<<<{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index)
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1146,8 +1146,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-	log.Debugf(">>> lib.server.cluster.control.Foreman::taskConfigureMasters()")
-	defer log.Debugf("<<< lib.server.cluster.control.Foreman::taskConfigureMasters()")
+	log.Tracef(">>> lib.server.cluster.control.Foreman::taskConfigureMasters()")
+	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskConfigureMasters()")
 
 	list := b.cluster.ListMasterIDs(t)
 	if len(list) <= 0 {
@@ -1194,8 +1194,8 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	log.Debugf(">>> lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
-	defer log.Debugf("<<< lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
+	log.Tracef(">>> lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
+	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
 
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...\n", hostLabel)
@@ -1224,12 +1224,12 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	public := p["public"].(bool)
 	def := p["nodeDef"].(*pb.HostDefinition)
 
-	log.Debugf(">>> lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
-	defer log.Debugf("<<< lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
+	log.Tracef(">>> lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
+	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer timer(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName))()
+	defer utils.Timer(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName))()
 
 	if count <= 0 {
 		log.Debugf("[cluster %s] no nodes to create.", clusterName)
@@ -1273,8 +1273,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	def := p["nodeDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 
-	log.Debugf(">>> lib.server.cluster.control.Foreman::taskCreateNode(%d)", index)
-	defer log.Debugf("<<< lib.server.cluster.control.Foreman::taskCreateNode(%d)", index)
+	log.Tracef(">>> lib.server.cluster.control.Foreman::taskCreateNode(%d)", index)
+	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskCreateNode(%d)", index)
 
 	hostLabel := fmt.Sprintf("node #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1370,12 +1370,12 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-	log.Debugf(">>> safescale.cluster.controller.Foreman::taskConfigureNodes()")
-	defer log.Debugf("<<< safescale.cluster.controller.Foreman::taskConfigureNodes()")
+	log.Tracef(">>> safescale.cluster.controller.Foreman::taskConfigureNodes()")
+	defer log.Tracef("<<< safescale.cluster.controller.Foreman::taskConfigureNodes()")
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer timer(fmt.Sprintf("[cluster %s] 'taskConfigureNodes' called", clusterName))()
+	defer utils.Timer(fmt.Sprintf("[cluster %s] 'taskConfigureNodes' called", clusterName))()
 
 	list := b.cluster.ListNodeIDs(t)
 	if len(list) <= 0 {
@@ -1433,8 +1433,8 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	log.Debugf(">>> safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s)", index, pbHost.Name)
-	defer log.Debugf("<<< safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s)", index, pbHost.Name)
+	log.Tracef(">>> safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s)", index, pbHost.Name)
+	defer log.Tracef("<<< safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s)", index, pbHost.Name)
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...", hostLabel)
@@ -1460,7 +1460,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
 
-	defer timer(fmt.Sprintf("[cluster %s] installing 'reverseproxy' called", clusterName))()
+	defer utils.Timer(fmt.Sprintf("[cluster %s] installing 'reverseproxy' called", clusterName))()
 
 	disabled := false
 	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
@@ -1497,35 +1497,11 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 	return nil
 }
 
-
-func timer(in string) func() {
-	log.Info(in)
-	start := time.Now()
-	return func() { log.Info(in, "... finished in: ", fmtDuration(time.Since(start))) }
-}
-
-
-func fmtDuration(dur time.Duration) string {
-	ms := (dur.Nanoseconds() % 1000000000) / 1000
-	if ms == 0 {
-		if dur.Nanoseconds() / 1000000000 == 0 {
-			ms = 1
-			return fmt.Sprintf("%d ms", ms)
-		}
-	}
-
-	sec := int64(dur.Truncate(time.Second).Seconds()) % 60
-	min := int64(dur.Truncate(time.Minute).Minutes())
-
-	return fmt.Sprintf("%d minutes, %d seconds, %d ms", min, sec, ms)
-}
-
-
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
 func (b *foreman) installRemoteDesktop(task concurrency.Task) error {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
-	defer timer(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName))()
+	defer utils.Timer(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName))()
 
 	disabled := false
 	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {

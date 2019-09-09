@@ -59,8 +59,8 @@ func NewTaskedLock() TaskedLock {
 func (tm *taskedLock) RLock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Debugf(">>>{task %s} utils.concurrency.TaskedLock::RLock()", tid)
-		defer log.Debugf("<<<{task %s} utils.concurrency.TaskedLock::RLock()", tid)
+		log.Tracef(">>>{task %s} utils.concurrency.TaskedLock::RLock()", tid)
+		defer log.Tracef("<<<{task %s} utils.concurrency.TaskedLock::RLock()", tid)
 	}
 
 	tm.lock.Lock()
@@ -90,8 +90,8 @@ func (tm *taskedLock) RLock(task Task) {
 func (tm *taskedLock) RUnlock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Debugf(">>>{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
-		defer log.Debugf("<<<{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
+		log.Tracef(">>>{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
+		defer log.Tracef("<<<{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
 	}
 
 	tm.lock.Lock()
@@ -121,8 +121,8 @@ func (tm *taskedLock) RUnlock(task Task) {
 func (tm *taskedLock) Lock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Debugf(">>>{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
-		defer log.Debugf("<<<{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
+		log.Tracef(">>>{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
+		defer log.Tracef("<<<{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
 	}
 
 	tm.lock.Lock()
@@ -147,8 +147,8 @@ func (tm *taskedLock) Lock(task Task) {
 func (tm *taskedLock) Unlock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Debugf(">>>{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
-		defer log.Debugf("<<<{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
+		log.Tracef(">>>{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
+		defer log.Tracef("<<<{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
 	}
 
 	tm.lock.Lock()

@@ -255,8 +255,8 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 // CreateHost creates a new host
 // On success returns an instance of resources.Host, and a string containing the script to execute to finalize host installation
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
-	log.Debugf(">>> huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
-	defer log.Debugf("<<< huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
+	log.Tracef(">>> huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
+	defer log.Tracef("<<< huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
 
 	userData := userdata.NewContent()
 

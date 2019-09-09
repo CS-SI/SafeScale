@@ -74,8 +74,8 @@ func NewHostHandler(svc iaas.Service) HostAPI {
 
 // Start starts a host
 func (handler *HostHandler) Start(ctx context.Context, ref string) error {
-	log.Debugf(">>> lib.server.handlers.HostHandler::Start(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::Start(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::Start(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::Start(%s)", ref)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -95,8 +95,8 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) error {
 
 // Stop stops a host
 func (handler *HostHandler) Stop(ctx context.Context, ref string) error {
-	log.Debugf(">>> lib.server.handlers.HostHandler::Stop(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::Stop(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::Stop(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::Stop(%s)", ref)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -116,8 +116,8 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) error {
 
 // Reboot reboots a host
 func (handler *HostHandler) Reboot(ctx context.Context, ref string) error {
-	log.Debugf(">>> lib.server.handlers.HostHandler::Reboot(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::Reboot(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::Reboot(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::Reboot(%s)", ref)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -145,8 +145,8 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) error {
 
 // Resize ...
 func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*resources.Host, error) {
-	log.Debugf(">>> lib.server.handlers.HostHandler::Resize(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::Resize(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::Resize(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::Resize(%s)", ref)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -213,8 +213,8 @@ func (handler *HostHandler) Create(
 	name string, net string, los string, public bool, sizingParam interface{}, force bool,
 ) (*resources.Host, error) {
 
-	log.Debugf(">>> lib.server.handlers.HostHandler::Create(%s)", name)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::Create(%s)", name)
+	log.Tracef(">>> lib.server.handlers.HostHandler::Create(%s)", name)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::Create(%s)", name)
 
 	if handler == nil {
 		return nil, utils.InvalidInstanceError()
@@ -494,14 +494,12 @@ func (handler *HostHandler) Create(
 		return nil, infraErr(err)
 	}
 
-	sshDefaultTimeout := utils.GetHostTimeout() // FIXME SSH_TIMEOUT
-
-	_, err = sshCfg.WaitServerReady("phase1", sshDefaultTimeout)
+	_, err = sshCfg.WaitServerReady("phase1", utils.GetHostCreationTimeout()) // FIXME Force Initial SSH_TIMEOUT on phase1, see the code error
 	if err != nil {
 		derr := err
 		err = nil
 		if client.IsTimeoutError(derr) {
-			return nil, infraErrf(derr, "Timeout waiting host '%s' to become ready", host.Name)
+			return nil, infraErrf(derr, "timeout waiting host '%s' to become ready", host.Name)
 		}
 
 		if client.IsProvisioningError(derr) {
@@ -543,13 +541,16 @@ func (handler *HostHandler) Create(
 	}
 	command := fmt.Sprintf("sudo bash %s; exit $?", filepath)
 	// Executes the script on the remote host
-	retcode, _, stderr, err := sshHandler.Run(ctx, host.Name, command)
+	retcode, stdout, stderr, err := sshHandler.Run(ctx, host.Name, command)
 	if err != nil {
 		return nil, err
 	}
 	if retcode != 0 {
 		// Setting err will trigger defers
-		err = fmt.Errorf("failed to finalize host installation: %s", stderr)
+		err = fmt.Errorf("failed to finalize host installation: stdout[%s], stderr[%s]", stdout, stderr)
+		if client.IsProvisioningError(err) {
+			log.Error(err)
+		}
 
 		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
@@ -568,8 +569,8 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	// FIXME configurable timeout here
-	_, err = sshCfg.WaitServerReady("ready", sshDefaultTimeout)
+	// Wait like 2 min for the machine to reboot
+	_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout creating host '%s'", host.Name)
@@ -577,7 +578,7 @@ func (handler *HostHandler) Create(
 
 		if client.IsProvisioningError(err) {
 			log.Errorf("%+v", err)
-			return nil, fmt.Errorf("Error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
+			return nil, fmt.Errorf("error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
 		return nil, infraErr(err)
@@ -586,8 +587,8 @@ func (handler *HostHandler) Create(
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Host creation cancelled by safescale")
-		err = fmt.Errorf("Host creation cancelled by safescale")
+		err = fmt.Errorf("host creation cancelled by safescale")
+		log.Warn(err)
 		return nil, err
 	default:
 	}
@@ -622,8 +623,8 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (*resources.Network, err
 
 // List returns the host list
 func (handler *HostHandler) List(ctx context.Context, all bool) ([]*resources.Host, error) {
-	log.Debugf("<<< lib.server.handlers.HostHandler::List(%v)", all)
-	defer log.Debugf(">>> lib.server.handlers.HostHandler::List(%v)", all)
+	log.Tracef("<<< lib.server.handlers.HostHandler::List(%v)", all)
+	defer log.Tracef(">>> lib.server.handlers.HostHandler::List(%v)", all)
 
 	if all {
 		return handler.service.ListHosts()
@@ -644,8 +645,8 @@ func (handler *HostHandler) List(ctx context.Context, all bool) ([]*resources.Ho
 // ForceInspect ...
 // If not found, return (nil, err)
 func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (*resources.Host, error) {
-	log.Debugf(">>> lib.server.handlers.HostHandler::ForceInspect(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::ForceInspect(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::ForceInspect(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::ForceInspect(%s)", ref)
 
 	host, err := handler.Inspect(ctx, ref)
 	if err != nil {
@@ -658,8 +659,8 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (*reso
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
 func (handler *HostHandler) Inspect(ctx context.Context, ref string) (*resources.Host, error) {
-	log.Debugf(">>> lib.server.handlers.HostHandler::Inspect(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::Inspect(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::Inspect(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::Inspect(%s)", ref)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -679,8 +680,8 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (*resources
 
 // Delete deletes host referenced by ref
 func (handler *HostHandler) Delete(ctx context.Context, ref string) error {
-	log.Debugf(">>> lib.server.handlers.HostHandler::Delete(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::Delete(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::Delete(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::Delete(%s)", ref)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -866,8 +867,8 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) error {
 
 // SSH returns ssh parameters to access the host referenced by ref
 func (handler *HostHandler) SSH(ctx context.Context, ref string) (*system.SSHConfig, error) {
-	log.Debugf(">>> lib.server.handlers.HostHandler::SSH(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.HostHandler::SSH(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.HostHandler::SSH(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.HostHandler::SSH(%s)", ref)
 
 	// host, err := svc.Inspect(ref)
 	// if err != nil {

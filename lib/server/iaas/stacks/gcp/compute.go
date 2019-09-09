@@ -446,8 +446,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	default:
 		panic("hostParam must be a string or a *resources.Host!")
 	}
-	logrus.Debugf(">>> stacks.gcp::WaitHostReady(%s)", host.ID)
-	defer logrus.Debugf("<<< stacks.gcp::WaitHostReady(%s)", host.ID)
+	logrus.Tracef(">>> stacks.gcp::WaitHostReady(%s)", host.ID)
+	defer logrus.Tracef("<<< stacks.gcp::WaitHostReady(%s)", host.ID)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

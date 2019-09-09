@@ -39,8 +39,8 @@ type DataListener struct{}
 // List will returns all the files from one or several ObjectStorages
 func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.FileList, error) {
 	log.Infof("safescaled receiving 'data list'")
-	log.Debugf(">>> listeners.DataListener::List()")
-	defer log.Debugf("<<< listeners.DataListener::List()")
+	log.Tracef(">>> listeners.DataListener::List()")
+	defer log.Tracef("<<< listeners.DataListener::List()")
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -66,8 +66,8 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb
 // Push upload a file to one or several ObjectStorages
 func (s *DataListener) Push(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
 	log.Infof("safescaled receiving 'data push %s'", in.GetLocalPath())
-	log.Debugf(">>> listeners.DataListener::Push(%s)", in.GetLocalPath())
-	defer log.Debugf("<<< listeners.DataListener::Push(%s)", in.GetLocalPath())
+	log.Tracef(">>> listeners.DataListener::Push(%s)", in.GetLocalPath())
+	defer log.Tracef("<<< listeners.DataListener::Push(%s)", in.GetLocalPath())
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -93,8 +93,8 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (*google_protobuf.
 // Get fetch a file from one or several ObjectStorages
 func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
 	log.Infof("safescaled receiving 'data get %s'", in.GetName())
-	log.Debugf(">>> listeners.DataListener::Get(%s)", in.GetName())
-	defer log.Debugf("<<< listeners.DataListener::Get(%s)", in.GetName())
+	log.Tracef(">>> listeners.DataListener::Get(%s)", in.GetName())
+	defer log.Tracef("<<< listeners.DataListener::Get(%s)", in.GetName())
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -120,8 +120,8 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.E
 // Delete remove a file from one or several ObjectStorages
 func (s *DataListener) Delete(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
 	log.Infof("safescaled receiving 'data delete %s'", in.GetName())
-	log.Debugf(">>> listeners.DataListener::Delete(%s)", in.GetName())
-	defer log.Debugf("<<< listeners.DataListener::Delete(%s)", in.GetName())
+	log.Tracef(">>> listeners.DataListener::Delete(%s)", in.GetName())
+	defer log.Tracef("<<< listeners.DataListener::Delete(%s)", in.GetName())
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

@@ -87,8 +87,8 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
-	log.Debugf(">>> stacks.openstack::CreateVolume(%s)", request.Name)
-	defer log.Debugf("<<< stacks.openstack::CreateVolume(%s)", request.Name)
+	log.Tracef(">>> stacks.openstack::CreateVolume(%s)", request.Name)
+	defer log.Tracef("<<< stacks.openstack::CreateVolume(%s)", request.Name)
 
 	if s == nil {
 		panic("Calling openstack.Stack::CreateVolume() from nil pointer!")
@@ -160,8 +160,8 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
-	log.Debugf(">>> stacks.openstack::GetVolume(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetVolume(%s)", id)
+	log.Tracef(">>> stacks.openstack::GetVolume(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::GetVolume(%s)", id)
 
 	if s == nil {
 		panic("Calling stacks.openstack::GetVolume() from nil pointer!")
@@ -189,8 +189,8 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 
 // ListVolumes returns the list of all volumes known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	log.Debug(">>> stacks.openstack::ListVolumes()")
-	defer log.Debug("<<< stacks.openstack::ListVolumes()")
+	log.Trace(">>> stacks.openstack::ListVolumes()")
+	defer log.Trace("<<< stacks.openstack::ListVolumes()")
 
 	if s == nil {
 		panic("Calling stacks.openstack::ListVolumes() from nil pointer!")
@@ -227,8 +227,8 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) error {
-	log.Debugf(">>> stacks.openstack::DeleteVolume(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::DeleteVolume(%s)", id)
+	log.Tracef(">>> stacks.openstack::DeleteVolume(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::DeleteVolume(%s)", id)
 
 	if s == nil {
 		panic("Calling openstack.Stack::DeleteVolume() from nil pointer!")
@@ -270,8 +270,8 @@ func (s *Stack) DeleteVolume(id string) error {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
-	log.Debugf(">>> stacks.openstack::CreateVolumeAttachment(%s)", request.Name)
-	defer log.Debugf("<<< stacks.openstack::CreateVolumeAttachment(%s)", request.Name)
+	log.Tracef(">>> stacks.openstack::CreateVolumeAttachment(%s)", request.Name)
+	defer log.Tracef("<<< stacks.openstack::CreateVolumeAttachment(%s)", request.Name)
 
 	if s == nil {
 		panic("Calling stacks.openstack::CreateVolumeAttachment() from nil pointer!")
@@ -298,8 +298,8 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
-	log.Debugf(">>> stacks.openstack::GetVolumeAttachment(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetVolumeAttachment(%s)", id)
+	log.Tracef(">>> stacks.openstack::GetVolumeAttachment(%s)", id)
+	defer log.Tracef("<<< stacks.openstack::GetVolumeAttachment(%s)", id)
 
 	if s == nil {
 		panic("Calling stacks.openstack::GetVolumeAttachment() from nil pointer!")
@@ -320,8 +320,8 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-	log.Debugf(">>> stacks.openstack::ListVolumeAttachments(%s)", serverID)
-	defer log.Debugf("<<< stacks.openstack::ListVolumeAttachments(%s)", serverID)
+	log.Tracef(">>> stacks.openstack::ListVolumeAttachments(%s)", serverID)
+	defer log.Tracef("<<< stacks.openstack::ListVolumeAttachments(%s)", serverID)
 
 	if s == nil {
 		panic("Calling stacks.openstack::ListVolumeAttachments() from nil pointer!")
@@ -354,8 +354,8 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
-	log.Debugf(">>> stacks.openstack::DeleteVolumeAttachment(%s)", serverID)
-	defer log.Debugf("<<< stacks.openstack::DeleteVolumeAttachment(%s)", serverID)
+	log.Tracef(">>> stacks.openstack::DeleteVolumeAttachment(%s)", serverID)
+	defer log.Tracef("<<< stacks.openstack::DeleteVolumeAttachment(%s)", serverID)
 
 	if s == nil {
 		panic("Calling stacks.openstack::DeleteVolumeAttachment() from nil pointer!")

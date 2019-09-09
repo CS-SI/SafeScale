@@ -75,8 +75,8 @@ func (handler *NetworkHandler) Create(
 	failover bool,
 ) (*resources.Network, error) {
 
-	log.Debugf(">>> lib.server.handlers.NetworkHandler::Create()")
-	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::Create()")
+	log.Tracef(">>> lib.server.handlers.NetworkHandler::Create()")
+	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::Create()")
 
 	if gwname != "" && failover {
 		return nil, fmt.Errorf("can't name gateway when failover is requested")
@@ -467,8 +467,7 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	}
 
 	log.Debugf("Provisioning gateway '%s', phase 1", gw.Name)
-	sshDefaultTimeout := utils.GetHostTimeout()
-	_, err = ssh.WaitServerReady("phase1", sshDefaultTimeout)
+	_, err = ssh.WaitServerReady("phase1", utils.GetHostCreationTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout waiting gateway '%s' to become ready", gw.Name)
@@ -592,8 +591,8 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 
 // List returns the network list
 func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources.Network, error) {
-	log.Debugf(">>> lib.server.handlers.NetworkHandler::List(%v)", all)
-	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::List(%v)", all)
+	log.Tracef(">>> lib.server.handlers.NetworkHandler::List(%v)", all)
+	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::List(%v)", all)
 
 	if all {
 		return handler.service.ListNetworks()
@@ -617,8 +616,8 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources
 
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resources.Network, error) {
-	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
-	log.Debugf(">>> lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
@@ -629,8 +628,8 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resour
 
 // Delete deletes network referenced by ref
 func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
-	log.Debugf(">>> lib.server.handlers.NetworkHandler::Delete(%s)", ref)
-	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::Delete(%s)", ref)
+	log.Tracef(">>> lib.server.handlers.NetworkHandler::Delete(%s)", ref)
+	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::Delete(%s)", ref)
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {

@@ -105,7 +105,7 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			log.SetLevel(log.DebugLevel)
+			log.SetLevel(log.TraceLevel)
 			utils.Verbose = true
 		} else {
 			log.SetLevel(log.WarnLevel)

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/sirupsen/logrus"
 	"os"
 	"time"
 )
@@ -32,6 +33,7 @@ func GetTimeoutFromEnv(key string, duration time.Duration) time.Duration {
 	if defaultTimeoutCandidate := os.Getenv(key); defaultTimeoutCandidate != "" {
 		newTimeout, err := time.ParseDuration(defaultTimeoutCandidate)
 		if err != nil {
+			logrus.Warnf("Error parsing variable: [%s]", key)
 			return defaultTimeout
 		}
 		return newTimeout
@@ -60,6 +62,10 @@ func GetContextTimeout() time.Duration {
 // GetHostTimeout ...
 func GetHostTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_HOST_TIMEOUT", HostTimeout)
+}
+
+func GetHostCreationTimeout() time.Duration {
+	return GetTimeoutFromEnv("SAFESCALE_HOST_CREATION_TIMEOUT", HostTimeout)
 }
 
 func GetHostCleanupTimeout() time.Duration {
