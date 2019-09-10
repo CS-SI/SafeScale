@@ -12,6 +12,18 @@ func Timer(in string) func() {
 	return func() { logrus.Info(in, "... finished in: ", FmtDuration(time.Since(start))) }
 }
 
+func TimerErr(in string, err error) func() {
+	logrus.Info(in)
+	start := time.Now()
+	return func() {
+		if err == nil {
+			logrus.Info(in, "... finished in: ", FmtDuration(time.Since(start)))
+		} else {
+			logrus.Info(in, "... finished WITH ERROR in: ", FmtDuration(time.Since(start)))
+		}
+	}
+}
+
 func TimerWithLevel(in string, level logrus.Level) func() {
 	switch level {
 	case logrus.DebugLevel:
@@ -37,10 +49,65 @@ func TimerWithLevel(in string, level logrus.Level) func() {
 	}
 }
 
+func TimerErrWithLevel(in string, err error, level logrus.Level) func() {
+	switch level {
+	case logrus.DebugLevel:
+		logrus.Debug(in)
+		start := time.Now()
+		return func() {
+			if err == nil {
+				logrus.Debug(in, "... finished in: ", FmtDuration(time.Since(start)))
+			} else {
+				logrus.Debug(in, "... finished WITH ERROR in: ", FmtDuration(time.Since(start)))
+			}
+		}
+	case logrus.InfoLevel:
+		logrus.Info(in)
+		start := time.Now()
+		return func() {
+			if err == nil {
+				logrus.Info(in, "... finished in: ", FmtDuration(time.Since(start)))
+			} else {
+				logrus.Info(in, "... finished WITH ERROR in: ", FmtDuration(time.Since(start)))
+			}
+		}
+	case logrus.WarnLevel:
+		logrus.Warn(in)
+		start := time.Now()
+		return func() {
+			if err == nil {
+				logrus.Warn(in, "... finished in: ", FmtDuration(time.Since(start)))
+			} else {
+				logrus.Warn(in, "... finished WITH ERROR in: ", FmtDuration(time.Since(start)))
+			}
+		}
+	case logrus.ErrorLevel:
+		logrus.Error(in)
+		start := time.Now()
+		return func() {
+			if err == nil {
+				logrus.Error(in, "... finished in: ", FmtDuration(time.Since(start)))
+			} else {
+				logrus.Error(in, "... finished WITH ERROR in: ", FmtDuration(time.Since(start)))
+			}
+		}
+	default:
+		logrus.Debug(in)
+		start := time.Now()
+		return func() {
+			if err == nil {
+				logrus.Debug(in, "... finished in: ", FmtDuration(time.Since(start)))
+			} else {
+				logrus.Debug(in, "... finished WITH ERROR in: ", FmtDuration(time.Since(start)))
+			}
+		}
+	}
+}
+
 func FmtDuration(dur time.Duration) string {
 	ms := (dur.Nanoseconds() % 1000000000) / 1000000
 	if ms == 0 {
-		if dur.Nanoseconds() / 1000000000 == 0 {
+		if dur.Nanoseconds()/1000000000 == 0 {
 			ms = 1
 			return fmt.Sprintf("%d ms", ms)
 		}
