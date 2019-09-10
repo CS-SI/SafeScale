@@ -453,7 +453,9 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("Running command [%s] with timeout of %s", sc.Display(), timeout), log.DebugLevel)()
+	if strings.Contains(sc.Display(), "ENDSSH") {
+		defer utils.TimerWithLevel(fmt.Sprintf("Running command [%s] with timeout of %s", sc.Display(), timeout), log.DebugLevel)()
+	}
 
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
