@@ -250,7 +250,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResu
 			subtask.Reset()
 
 			if !results[h.Name].Successful() {
-				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)))
 			}
@@ -283,7 +283,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResu
 			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
-				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)))
 			}
