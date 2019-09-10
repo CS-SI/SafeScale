@@ -543,6 +543,8 @@ func (handler *HostHandler) Create(
 	// Executes the script on the remote host
 	retcode, stdout, stderr, err := sshHandler.Run(ctx, host.Name, command)
 	if err != nil {
+		retrieveForensicsData(sshHandler, host)
+
 		return nil, err
 	}
 	if retcode != 0 {
@@ -552,12 +554,7 @@ func (handler *HostHandler) Create(
 			log.Error(err)
 		}
 
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
-			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
-			_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
-			_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
-		}
+		retrieveForensicsData(sshHandler, host)
 
 		return nil, err
 	}
@@ -594,6 +591,18 @@ func (handler *HostHandler) Create(
 	}
 
 	return host, nil
+}
+
+func retrieveForensicsData(sshHandler *SSHHandler, host *resources.Host) {
+	if sshHandler == nil || host == nil {
+		return
+	}
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
+		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
+		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
+		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
+	}
 }
 
 // getOrCreateDefaultNetwork gets network resources.SingleHostNetworkName or create it if necessary
