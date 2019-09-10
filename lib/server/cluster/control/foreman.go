@@ -1217,13 +1217,13 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 		return nil, err
 	}
 
-	log.Debugf("[%s] configuration successful in [%s].", hostLabel, time.Since(started))
+	log.Debugf("[%s] configuration successful in [%s].", hostLabel, utils.FmtDuration(time.Since(started)))
 	return nil, nil
 }
 
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert params
 	p := params.(data.Map)
 	count := p["count"].(int)
@@ -1235,7 +1235,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer utils.Timer(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName))()
+	defer utils.TimerErr(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName), err)()
 
 	if count <= 0 {
 		log.Debugf("[cluster %s] no nodes to create.", clusterName)
@@ -1621,25 +1621,22 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	return nil
 }
 
-func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, hostLabel string) error {
+func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
 	// install docker-compose (and docker) feature
-	log.Debugf("[%s] adding feature 'docker-compose'...\n", hostLabel)
+	defer utils.TimerErr(fmt.Sprintf("[%s] adding feature 'docker-compose'...\n", hostLabel), err)()
+
 	feat, err := install.NewEmbeddedFeature(task, "docker-compose")
 	if err != nil {
-		log.Errorf("[%s] failed to prepare feature 'docker-compose': %s", hostLabel, err.Error())
-		return fmt.Errorf("failed to add feature 'docker-compose' on host '%s': %s", pbHost.Name, err.Error())
+		return fmt.Errorf("[%s] failed to add feature 'docker-compose' on host '%s': %s", hostLabel, pbHost.Name, err.Error())
 	}
 	results, err := feat.Add(install.NewHostTarget(pbHost), install.Variables{}, install.Settings{})
 	if err != nil {
-		log.Errorf("[%s] failed to add feature 'docker-compose': %s", hostLabel, err.Error())
-		return fmt.Errorf("failed to add feature 'docker-compose' on host '%s': %s", pbHost.Name, err.Error())
+		return fmt.Errorf("[%s] failed to add feature 'docker-compose' on host '%s': %s", hostLabel, pbHost.Name, err.Error())
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		log.Errorf("[%s] failed to add feature 'docker-compose': %s", hostLabel, msg)
-		return fmt.Errorf("failed to add feature 'docker-compose' on host '%s': %s", pbHost.Name, msg)
+		return fmt.Errorf("[%s] failed to add feature 'docker-compose' on host '%s': %s", hostLabel, pbHost.Name, msg)
 	}
-	log.Debugf("[%s] feature 'docker-compose' addition successful.", hostLabel)
 	return nil
 }
 
