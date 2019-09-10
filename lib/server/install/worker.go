@@ -58,6 +58,7 @@ type worker struct {
 	action    Action.Enum
 	variables Variables
 	settings  Settings
+	startTime time.Time
 
 	host    *pb.Host
 	node    bool
@@ -506,21 +507,22 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			v["options"] = ""
 		}
 
-		wallTime := 0
+		wallTime := utils.GetLongOperationTimeout()
 		anon, ok = stepMap[yamlTimeoutKeyword]
 		if ok {
 			if _, ok := anon.(int); ok {
-				wallTime = anon.(int)
+				wallTime = time.Duration(anon.(int)) * time.Minute
 			} else {
-				wallTime, err = strconv.Atoi(anon.(string))
+				wallTimeConv, err := strconv.Atoi(anon.(string))
 				if err != nil {
 					log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+				} else {
+					wallTime = time.Duration(wallTimeConv) * time.Minute
 				}
 			}
 		}
-		if wallTime == 0 {
-			wallTime = 5
-		}
+
+		utils.GetLongOperationTimeout()
 
 		templateCommand, err := normalizeScript(Variables{
 			"reserved_Name":    w.feature.DisplayName(),
@@ -550,7 +552,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			Action:             w.action,
 			Targets:            stepT,
 			Script:             templateCommand,
-			WallTime:           time.Duration(wallTime) * time.Minute,
+			WallTime:           wallTime,
 			OptionsFileContent: optionsFileContent,
 			YamlKey:            stepKey,
 			Serial:             serial,

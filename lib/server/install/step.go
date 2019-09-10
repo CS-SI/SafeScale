@@ -238,6 +238,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
@@ -249,16 +250,19 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
 			results[h.Name] = result.(stepResult)
 			subtask.Reset()
-			// if !results[h.Name].Successful() {
-			// 	log.Infof("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-			// } else {
-			// 	log.Infof("%s(%s):step(%s)@%s: success", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-			// }
+
+			if !results[h.Name].Successful() {
+				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+			} else {
+				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)))
+			}
 		}
 	} else {
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			is.Worker.startTime = time.Now()
+
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
 			cloneV["Hostname"] = h.Name
@@ -275,15 +279,15 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 		for k, s := range subtasks {
 			result, err := s.Wait()
 			if err != nil {
-				log.Debugf("%s(%s):step(%s)@%s: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)))
 				continue
 			}
 			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
-				log.Debugf("%s(%s):step(%s)@%s: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, results.ErrorMessages())
+				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 			} else {
-				log.Debugf("%s(%s):step(%s)@%s: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	}
