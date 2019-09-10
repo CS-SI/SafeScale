@@ -287,7 +287,11 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResu
 			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
-				log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				if is.Worker.action == Action.Check { // Checks can fail and it's ok
+					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				} else { // other steps are expected to succeed
+					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				}
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)))
 			}
@@ -299,7 +303,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResu
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
-func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Get parameters
 	p := params.(data.Map)
 	host := p["host"].(*pb.Host)
