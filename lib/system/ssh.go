@@ -772,7 +772,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}
 
 	sshCmdString := copyCommand.String()
-	log.Debugf("cmd: %s", sshCmdString)
+	// log.Debugf("cmd: %s", sshCmdString)
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
