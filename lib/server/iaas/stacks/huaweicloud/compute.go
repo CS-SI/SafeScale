@@ -456,7 +456,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 					log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
 					if creationZone != srvOpts.AvailabilityZone {
 						if srvOpts.AvailabilityZone != "" {
-							// FIXME REVIEW Decide what to do in this case, just log or return error ?
 							log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
 						}
 					}
@@ -604,11 +603,20 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 				default:
 					// Any other error stops the retry
 					err = fmt.Errorf("error getting host '%s': %s", host.ID, openstack.ProviderErrorToString(err))
+					log.Warn(err)
 					return nil
 				}
 			}
-			if server.Status != "ERROR" && server.Status != "CREATING" {
+			if server == nil {
+				err = fmt.Errorf("error getting host, nil response from gophercloud")
+				log.Debug(err)
+				return err
+			}
+
 				host.LastState = toHostState(server.Status)
+			if host.LastState != HostState.ERROR && host.LastState != HostState.STARTING {
+				log.Infof("host status of '%s' is '%s'", host.ID, server.Status)
+				err = nil
 				return nil
 			}
 			return fmt.Errorf("server not ready yet")
@@ -628,6 +636,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 			}
 			return nil, fmt.Errorf(msg)
 		}
+		return nil, retryErr
 	}
 	if err != nil {
 		return nil, err
@@ -635,10 +644,16 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	if notFound {
 		return nil, resources.ResourceNotFoundError("host", host.ID)
 	}
-	err = s.complementHost(host, server)
+	if server == nil {
+		return nil, resources.ResourceNotFoundError("host", host.ID)
+	}
+
+	if err = s.complementHost(host, server); err != nil {
+		return nil, err
+	}
 
 	if !host.OK() {
-		log.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		log.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
 	return host, err
