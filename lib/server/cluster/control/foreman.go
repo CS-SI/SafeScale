@@ -636,11 +636,12 @@ func (b *foreman) configureCluster(task concurrency.Task) error {
 	defer log.Tracef("<<< safescale.cluster.controller.foreman::configureCluster()")
 
 	var err error
+	started := time.Now()
 
 	log.Infof("[cluster %s] configuring cluster...", b.cluster.Name)
 	defer func() {
 		if err == nil {
-			log.Infof("[cluster %s] configuration successful.", b.cluster.Name)
+			log.Infof("[cluster %s] configuration successful in [%s]", b.cluster.Name, utils.FmtDuration(time.Since(started)))
 		}
 	}()
 
@@ -988,6 +989,8 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	log.Tracef(">>> lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
 	defer log.Tracef("<<< lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
 
+	started := time.Now()
+
 	log.Debugf("[%s] starting configuration...", gw.Name)
 
 	if b.makers.ConfigureGateway != nil {
@@ -997,7 +1000,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 		}
 	}
 
-	log.Debugf("[%s] configuration successful.", gw.Name)
+	log.Debugf("[%s] configuration successful in [%s].", gw.Name, utils.FmtDuration(time.Since(started)))
 	return nil, nil
 }
 
@@ -1155,6 +1158,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	}
 
 	log.Debugf("[cluster %s] Configuring masters...", b.cluster.Name)
+	started := time.Now()
 
 	clientHost := client.New().Host
 	var subtasks []concurrency.Task
@@ -1182,7 +1186,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 		return nil, fmt.Errorf(strings.Join(errors, "\n"))
 	}
 
-	log.Debugf("[cluster %s] Masters configuration successful.", b.cluster.Name)
+	log.Debugf("[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, utils.FmtDuration(time.Since(started)))
 	return nil, nil
 }
 
@@ -1196,6 +1200,8 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 
 	log.Tracef(">>> lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
 	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
+
+	started := time.Now()
 
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...\n", hostLabel)
@@ -1211,7 +1217,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 		return nil, err
 	}
 
-	log.Debugf("[%s] configuration successful.", hostLabel)
+	log.Debugf("[%s] configuration successful in [%s].", hostLabel, time.Since(started))
 	return nil, nil
 }
 
@@ -1370,12 +1376,9 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-	log.Tracef(">>> safescale.cluster.controller.Foreman::taskConfigureNodes()")
-	defer log.Tracef("<<< safescale.cluster.controller.Foreman::taskConfigureNodes()")
-
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer utils.Timer(fmt.Sprintf("[cluster %s] 'taskConfigureNodes' called", clusterName))()
+	defer utils.Timer(fmt.Sprintf("[cluster %s] nodes configuration called", clusterName))()
 
 	list := b.cluster.ListNodeIDs(t)
 	if len(list) <= 0 {
@@ -1427,20 +1430,19 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	log.Tracef(">>> safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s)", index, pbHost.Name)
-	defer log.Tracef("<<< safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s)", index, pbHost.Name)
+	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s) called...", index, pbHost.Name), err, log.TraceLevel)
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...", hostLabel)
 
 	// Docker and docker-compose installation is mandatory on all nodes
-	err := b.installDockerCompose(t, pbHost, hostLabel)
+	err = b.installDockerCompose(t, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
