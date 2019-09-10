@@ -1623,7 +1623,7 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
 	// install docker-compose (and docker) feature
-	defer utils.TimerErr(fmt.Sprintf("[%s] adding feature 'docker-compose'...\n", hostLabel), err)()
+	defer utils.TimerErr(fmt.Sprintf("[%s] adding feature 'docker-compose'...", hostLabel), err)()
 
 	feat, err := install.NewEmbeddedFeature(task, "docker-compose")
 	if err != nil {
