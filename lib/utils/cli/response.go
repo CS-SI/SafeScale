@@ -19,6 +19,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -96,10 +97,12 @@ func (r *response) Failure(err error) error {
 func (r *response) Display() {
 	out, err := json.Marshal(r.getDisplayResponse())
 	if err == nil {
-		if r.Status == CmdStatus.FAILURE {
-			log.Error(string(out))
-		} else {
-			log.Warn(string(out))
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			if r.Status == CmdStatus.FAILURE {
+				log.Error(string(out))
+			} else {
+				log.Warn(string(out))
+			}
 		}
 		fmt.Println(string(out))
 	} else {
