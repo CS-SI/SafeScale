@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	timing "github.com/CS-SI/SafeScale/lib/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
@@ -69,8 +70,7 @@ type StoredCPUInfo struct {
 
 // Start ...
 func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Infof("Listeners: host start '%s' called", in.Name)
-	defer log.Debugf("Listeners: host start '%s' done", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host start '%s' called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
@@ -96,8 +96,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 
 // Stop ...
 func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Infof("Listeners: host stop '%s' called", in.Name)
-	defer log.Debugf("Listeners: host stop '%s' done", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host stop '%s' called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -124,8 +123,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 
 // Reboot ...
 func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Infof("Listeners: host reboot '%s' called", in.Name)
-	defer log.Debugf("Listeners: host reboot '%s' done", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host reboot '%s' called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -152,8 +150,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 
 // List available hosts
 func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.HostList, error) {
-	log.Infoln("Listeners: host list called")
-	defer log.Debugln("Listeners: host list done")
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host list called"), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -184,8 +181,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 
 // Create a new host
 func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	log.Infof("Listeners: host create '%s' called", in.Name)
-	defer log.Debugf("Listeners: host create '%s' done", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host create '%s' called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -246,8 +242,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 // Resize an host
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	log.Infof("Listeners: host resize '%s' done", in.Name)
-	defer log.Debugf("Listeners: host resize '%s' done", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host resize '%s' done", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -279,8 +274,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 // Status of a host
 func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostStatus, error) {
-	log.Infof("Listeners: host status '%s' called", in.Name)
-	defer log.Debugf("Listeners: host status '%s' done", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host status '%s' called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -309,9 +303,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 
 // Inspect an host
 func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host, error) {
-	log.Infof("Receiving 'host inspect %s'", in.Name)
-	log.Tracef(">>> lib.server.listeners.HostListener::Inspect(%s)", in.Name)
-	defer log.Tracef("<<< lib.server.listeners.HostListener::Inspect(%s)", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.listeners.HostListener::Inspect(%s) called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -340,9 +332,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 
 // Delete an host
 func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Infof("Receiving 'host delete %s'", in.Name)
-	log.Tracef(">>> lib.server.listeners.HostListener::Delete(%s)", in.Name)
-	defer log.Tracef("<<< lib.server.Listeners.HostListener::Delete(%s)", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.listeners.HostListener::Delete(%s) called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -352,7 +342,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Can't delete host: neither name nor id given as reference")
+		return nil, fmt.Errorf("can't delete host: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
@@ -372,8 +362,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 
 // SSH returns ssh parameters to access an host
 func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
-	log.Tracef(">>> lib.server.listeners.HostListener::SSH(%s)", in.Name)
-	defer log.Tracef("<<< lib.server.listeners.HostListener::SSH(%s)", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.listeners.HostListener::SSH(%s) called", in.Name), log.InfoLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -383,12 +372,12 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Can't ssh to host: neither name nor id given as reference")
+		return nil, fmt.Errorf("can't ssh to host: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't delete host: no tenant set")
+		log.Info("can't delete host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't ssh host: no tenant set")
 	}
 
