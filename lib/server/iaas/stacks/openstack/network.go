@@ -69,8 +69,7 @@ type Subnet struct {
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	log.Tracef(">>> stacks.openstack::CreateNetwork(%s)", req.Name)
-	defer log.Tracef("<<< stacks.openstack::CreateNetwork(%s)", req.Name)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateNetwork(%s) called", req.Name), log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::CreateNetwork from nil pointer!")
@@ -92,9 +91,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	// Execute the operation and get back a networks.NetworkClient struct
 	network, err := networks.Create(s.NetworkClient, opts).Extract()
 	if err != nil {
-		msg := fmt.Sprintf("Error creating network '%s': %s", req.Name, ProviderErrorToString(err))
-		// log.Errorf(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, ProviderErrorToString(err))
 	}
 
 	// Starting from here, delete network if exit with error
@@ -109,7 +106,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	subnet, err := s.createSubnet(req.Name, network.ID, req.CIDR, req.IPVersion, req.DNSServers)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating network '%s': %s", req.Name, ProviderErrorToString(err))
+		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, ProviderErrorToString(err))
 	}
 
 	// Starting from here, delete subnet if exit with error
@@ -132,8 +129,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 // GetNetworkByName ...
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
-	log.Tracef(">>> stacks.openstack::GetNetworkByName(%s)", name)
-	defer log.Tracef("<<< stacks.openstack::GetNetworkByName(%s)", name)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetNetworkByName(%s) called", name), log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::GetNetworkByName from nil pointer!")
@@ -164,8 +160,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 // GetNetwork returns the network identified by id
 func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
-	log.Tracef(">>> stacks.openstack::GetNetwork(%s)", id)
-	defer log.Tracef("<<< stacks.openstack::GetNetwork(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetNetwork(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::GetNetwork from nil pointer!")
@@ -210,8 +205,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	log.Trace(">>> stacks.openstack::ListNetworks()")
-	defer log.Trace("<<< stacks.openstack::ListNetworks()")
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListNetworks() called"), log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::ListNetworks from nil pointer!")
@@ -263,8 +257,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(id string) error {
-	log.Tracef(">>> stacks.openstack::DeleteNetwork(%s)", id)
-	defer log.Tracef("<<< stacks.openstack::DeleteNetwork(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteNetwork(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::DeleteNetwork from nil pointer!")
@@ -373,8 +366,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 
 // DeleteGateway delete the public gateway of a private network
 func (s *Stack) DeleteGateway(id string) error {
-	log.Tracef(">>> stacks.openstack::DeleteGateway(%s)", id)
-	defer log.Tracef("<<< stacks.openstack::DeleteGateway(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteGateway(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::DeleteGateway from nil pointer!")
