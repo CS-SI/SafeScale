@@ -162,7 +162,7 @@ func (tunnel *SSHTunnel) Close() error {
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
 		log.Errorf("tunnel.cmd.Process.Kill() failed: %s\n", reflect.TypeOf(err).String())
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+		return fmt.Errorf("unable to close tunnel :%s", err.Error())
 	}
 	// Kills remaining processes if there are some
 	bytesCmd, err := exec.Command("pgrep", "-f", tunnel.cmdString).Output()
@@ -173,7 +173,7 @@ func (tunnel *SSHTunnel) Close() error {
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
 				log.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 		}
 	}
@@ -196,7 +196,7 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-// CreateTempFileFromString creates a tempory file containing 'content'
+// CreateTempFileFromString creates a temporary file containing 'content'
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, error) {
 	defaultTmpDir := "/tmp"
 	if runtime.GOOS == "windows" {
@@ -681,7 +681,6 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 				return err
 			}
 
-			// retcode, stdout, stderr, err := cmd.Run() // FIXME It CAN lock
 			retcode, stdout, stderr, err = cmd.RunWithTimeout(timeout)
 			if err != nil {
 				return err
@@ -714,7 +713,6 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 		return "", err
 	}
 
-	// retcode, stdout, stderr, logErr := logCmd.Run() // FIXME It CAN lock
 	retcode, stdout, stderr, logErr := logCmd.RunWithTimeout(timeout)
 	if logErr == nil {
 		if retcode == 0 {
