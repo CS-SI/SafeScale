@@ -701,10 +701,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 	ends := time.Since(begins)
 	duration := utils.FmtDuration(ends)
 	if err == nil {
-		log.Infof("host [%s] creation successful in %s: host stdout is [%s]", ssh.Host, duration, stdout)
+		log.Infof("host [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, duration, stdout)
 		return stdout, nil
 	} else {
-		log.Errorf("failure creating host resource [%s] in %s: %v", ssh.Host, duration, err)
+		log.Errorf("failure creating host resource [%s] in [%s]: %v", ssh.Host, duration, err)
 	}
 
 	originalErr := err
