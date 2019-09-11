@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -61,7 +62,7 @@ func (w LoggedProvider) trace(s string) (string, time.Time) {
 
 // prepare ...
 func (w LoggedProvider) prepare(s string, startTime time.Time) {
-	logrus.Tracef("<<< stacks.%s::%s() done in %d ms", w.Name, s, time.Since(startTime).Nanoseconds()/1000000)
+	logrus.Tracef("<<< stacks.%s::%s() done in [%s] ms", w.Name, s, utils.FmtDuration(time.Since(startTime)))
 }
 
 // NewLoggedProvider ...
