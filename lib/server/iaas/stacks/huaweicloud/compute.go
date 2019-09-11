@@ -603,16 +603,18 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 				return err
 			}
 
-				host.LastState = toHostState(server.Status)
+			host.LastState = toHostState(server.Status)
 			if host.LastState != HostState.ERROR && host.LastState != HostState.STARTING {
 				log.Infof("host status of '%s' is '%s'", host.ID, server.Status)
 				err = nil
 				return nil
 			}
+
+			// log.Trace("server not ready yet")
 			return fmt.Errorf("server not ready yet")
 		},
-		utils.GetHostTimeout(),
 		utils.GetMinDelay(),
+		utils.GetHostTimeout(),
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {

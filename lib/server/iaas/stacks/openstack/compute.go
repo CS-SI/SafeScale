@@ -492,8 +492,8 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		timeout,
 		utils.GetMinDelay(),
+		timeout,
 	)
 	if retryErr != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
