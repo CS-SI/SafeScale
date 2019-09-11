@@ -421,7 +421,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	if !host.OK() {
-		logrus.Warnf("Missing data in host: %v", host)
+		logrus.Warnf("Missing data in host: %s", spew.Sdump(host))
 	}
 
 	return host, userData, nil

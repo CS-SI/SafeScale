@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -325,7 +326,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	if !theNetwork.OK() {
-		logrus.Warnf("Missing data in network: %v", theNetwork)
+		logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
 	}
 
 	compuService := s.ComputeService
