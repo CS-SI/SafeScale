@@ -617,6 +617,8 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called...", req.Name), log.TraceLevel)()
+
 	if req.Network == nil {
 		panic("req.Network is nil!")
 	}
@@ -643,7 +645,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		case resources.ErrResourceInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+			return nil, userData, fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))
 		}
 	}
 	return host, userData, err
