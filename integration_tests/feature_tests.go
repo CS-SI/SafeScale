@@ -147,7 +147,7 @@ func RemoteDesktop(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 	host := HostInfo{}
-	json.Unmarshal([]byte(out), &host)
+	_ = json.Unmarshal([]byte(out), &host)
 
 	out, err = GetOutput("safescale host check-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.NotNil(t, err)
