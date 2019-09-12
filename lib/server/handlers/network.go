@@ -73,7 +73,7 @@ func (handler *NetworkHandler) Create(
 	name string, cidr string, ipVersion IPVersion.Enum,
 	sizing resources.SizingRequirements, theos string, gwname string,
 	failover bool,
-) (*resources.Network, error) {
+) (network *resources.Network, err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Create() called"), log.TraceLevel)()
 
 	if gwname != "" && failover {
@@ -81,7 +81,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// Verify that the network doesn't exist first
-	_, err := handler.service.GetNetworkByName(name)
+	_, err = handler.service.GetNetworkByName(name)
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound:
@@ -103,7 +103,7 @@ func (handler *NetworkHandler) Create(
 
 	// Create the network
 	log.Debugf("Creating network '%s' ...", name)
-	network, err := handler.service.CreateNetwork(resources.NetworkRequest{
+	network, err = handler.service.CreateNetwork(resources.NetworkRequest{
 		Name:      name,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
@@ -157,8 +157,6 @@ func (handler *NetworkHandler) Create(
 		}
 	}()
 
-	log.Debugf("Creating compute resource '%s' ...", gwname)
-
 	var template *resources.HostTemplate
 	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
@@ -180,12 +178,12 @@ func (handler *NetworkHandler) Create(
 		msg += ")"
 		log.Infof(msg)
 	} else {
-		err = logicErr(fmt.Errorf("Error creating network: no host template matching requirements for gateway"))
+		err = logicErr(fmt.Errorf("error creating network: no host template matching requirements for gateway"))
 		return nil, err
 	}
 	img, err := handler.service.SearchImage(theos)
 	if err != nil {
-		err := infraErrf(err, "Error creating network: Error searching image '%s'", theos)
+		err := infraErrf(err, "error creating network: Error searching image '%s'", theos)
 		return nil, err
 	}
 
@@ -275,12 +273,10 @@ func (handler *NetworkHandler) Create(
 		}
 	}
 	if primaryErr != nil {
-		err = primaryErr // Set to trigger defers
-		return nil, err
+		return nil, primaryErr
 	}
 	if secondaryErr != nil {
-		err = secondaryErr // set to trigger defers
-		return nil, err
+		return nil, secondaryErr
 	}
 
 	network.GatewayID = primaryGateway.ID
@@ -299,15 +295,11 @@ func (handler *NetworkHandler) Create(
 	}
 	_, primaryErr = primaryTask.Wait()
 	if primaryErr != nil {
-		// err = primaryErr // set to trigger defers
-		// return nil, err
 		return nil, primaryErr
 	}
 	if failover && secondaryTask != nil {
 		_, secondaryErr = secondaryTask.Wait()
 		if secondaryErr != nil {
-			// err = secondaryErr // set to trigger defers
-			// return nil, err
 			return nil, secondaryErr
 		}
 	}
@@ -346,14 +338,12 @@ func (handler *NetworkHandler) Create(
 	}
 	_, primaryErr = primaryTask.Wait()
 	if primaryErr != nil {
-		err = primaryErr // Set to trigger defers
-		return nil, err
+		return nil, primaryErr
 	}
 	if failover && secondaryTask != nil {
 		_, secondaryErr = secondaryTask.Wait()
 		if secondaryErr != nil {
-			err = secondaryErr // set to trigger defers
-			return nil, err
+			return nil, secondaryErr
 		}
 	}
 
@@ -368,7 +358,7 @@ func (handler *NetworkHandler) Create(
 	return network, nil
 }
 
-func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		inputs data.Map
 		ok     bool
@@ -440,7 +430,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	if err != nil {
 		return nil, infraErrf(err, "failed to create gateway '%s': failed to save metadata: %s", gw.Name, err.Error())
 	}
-	result := data.Map{
+	result = data.Map{
 		"host":     gw,
 		"userdata": userData,
 		"metadata": m,
@@ -450,7 +440,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 
 func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	task concurrency.Task, params concurrency.TaskParameters,
-) (concurrency.TaskResult, error) {
+) (result concurrency.TaskResult, err error) {
 
 	gw := params.(*resources.Host)
 
@@ -489,7 +479,7 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	return nil, nil
 }
 
-func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		gw       *resources.Host
 		userData *userdata.Content
@@ -588,17 +578,15 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 }
 
 // List returns the network list
-func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources.Network, error) {
+func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*resources.Network, err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::List(%v) called", all), log.TraceLevel)()
 
 	if all {
 		return handler.service.ListNetworks()
 	}
 
-	var netList []*resources.Network
-
 	mn := metadata.NewNetwork(handler.service)
-	err := mn.Browse(func(network *resources.Network) error {
+	err = mn.Browse(func(network *resources.Network) error {
 		netList = append(netList, network)
 		return nil
 	})
@@ -612,7 +600,7 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
-func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resources.Network, error) {
+func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *resources.Network, err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Inspect(%s) called", ref), log.TraceLevel)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
@@ -623,7 +611,7 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resour
 }
 
 // Delete deletes network referenced by ref
-func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
+func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Delete(%s) called", ref), log.TraceLevel)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)

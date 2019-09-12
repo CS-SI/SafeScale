@@ -183,7 +183,7 @@ func (s *Stack) DeleteVPC(id string) error {
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.Network, err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateNetwork(%s) called", req.Name), log.TraceLevel)()
 
 	subnet, err := s.findSubnetByName(req.Name)
@@ -226,7 +226,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		}
 	}()
 
-	network := resources.NewNetwork()
+	network = resources.NewNetwork()
 	network.ID = subnet.ID
 	network.Name = subnet.Name
 	network.CIDR = subnet.CIDR

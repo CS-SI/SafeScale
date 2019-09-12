@@ -254,10 +254,10 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 // CreateHost creates a new host
 // On success returns an instance of resources.Host, and a string containing the script to execute to finalize host installation
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateHost(%s) called", request.ResourceName), log.TraceLevel)()
 
-	userData := userdata.NewContent()
+	userData = userdata.NewContent()
 
 	//msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -323,7 +323,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	err := userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
+	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.Capitalize(msg))
@@ -390,7 +390,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 
 	// --- Initializes resources.Host ---
 
-	host := resources.NewHost()
+	host = resources.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 

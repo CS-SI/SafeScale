@@ -560,7 +560,7 @@ func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (str
 }
 
 // AddNodes adds <count> nodes
-func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) ([]string, error) {
+func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) (hosts []string, err error) {
 	log.Tracef("lib.server.cluster.control.Controller::AddNodes(%d) called", count)
 	defer log.Tracef("<<< lib.server.cluster.control.Controller::AddNodes(%d)", count)
 
@@ -588,7 +588,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 			return nil, err
 		}
 	}
-	err := properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
+	err = properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
 		defaultsV2 := v.(*clusterpropsv2.Defaults)
 		sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
 		nodeDef.Sizing = &sizing
@@ -611,7 +611,6 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	nodeDef.Network = c.GetNetworkConfig(task).NetworkID
 
 	var (
-		hosts  []string
 		errors []string
 	)
 	timeout := utils.GetExecutionTimeout() + time.Duration(count)*time.Minute
@@ -746,7 +745,7 @@ func (c *Controller) ForceGetState(task concurrency.Task) (ClusterState.Enum, er
 }
 
 // deleteMaster deletes the master specified by its ID
-func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
+func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err error) {
 	if hostID == "" {
 		panic("Invalid parameter 'hostID': can't be empty string!")
 	}
@@ -756,7 +755,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
 
 	// Removes master from cluster metadata
 	var master *clusterpropsv1.Node
-	err := c.UpdateMetadata(task, func() error {
+	err = c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			found, idx := contains(nodesV1.Masters, hostID)
@@ -884,7 +883,7 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 }
 
 // deleteNode deletes the node specified by its ID
-func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) error {
+func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) (err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::deleteNode(%s) called", node.Name), log.TraceLevel)()
 
 	if c == nil {
@@ -899,7 +898,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	}
 
 	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
-	err := c.UpdateMetadata(task, func() error {
+	err = c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			length := len(nodesV1.PrivateNodes)

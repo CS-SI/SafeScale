@@ -105,7 +105,7 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
+func (s *Stack) ListImages() (images []resources.Image, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -140,7 +140,7 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*resources.Image, error) {
+func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -183,7 +183,7 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
+func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())
@@ -223,7 +223,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 }
 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())
@@ -331,7 +331,7 @@ func downloadImage(path string, downloadInfo map[string]interface{}) error {
 }
 
 // getImagePathFromID retrieve the storage path of an image from this image ID
-func getImagePathFromID(s *Stack, id string) (string, error) {
+func getImagePathFromID(s *Stack, id string) (path string, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -380,7 +380,7 @@ func getImagePathFromID(s *Stack, id string) (string, error) {
 }
 
 // getDiskFromID retrieve the disk with root partition of an image from this image ID
-func getDiskFromID(s *Stack, id string) (string, error) {
+func getDiskFromID(s *Stack, id string) (disk string, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -747,7 +747,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	resourceName := request.ResourceName
 	hostName := request.HostName
 	networks := request.Networks
@@ -757,7 +757,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	keyPair := request.KeyPair
 	defaultGateway := request.DefaultGateway
 
-	userData := userdata.NewContent()
+	userData = userdata.NewContent()
 
 	//----Check Inputs----
 	if resourceName == "" {

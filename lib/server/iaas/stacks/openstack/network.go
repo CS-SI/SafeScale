@@ -68,7 +68,7 @@ type Subnet struct {
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.Network, err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateNetwork(%s) called", req.Name), log.TraceLevel)()
 
 	if s == nil {
@@ -76,7 +76,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	}
 
 	// Checks if CIDR is valid...
-	_, _, err := net.ParseCIDR(req.CIDR)
+	_, _, err = net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error())
 	}
@@ -119,7 +119,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		}
 	}()
 
-	newNet := resources.NewNetwork()
+	newNet = resources.NewNetwork()
 	newNet.ID = network.ID
 	newNet.Name = network.Name
 	newNet.CIDR = subnet.Mask
@@ -306,13 +306,13 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateGateway(%s) called...", req.Name), log.TraceLevel)()
 	if s == nil {
 		panic("Calling stacks.openstack::CreateGateway from nil pointer!")
 	}
 
-	userData := userdata.NewContent()
+	userData = userdata.NewContent()
 
 	// Ensure network exists
 	if req.Network == nil {
@@ -336,7 +336,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		PublicIP:     true,
 		Password:     password,
 	}
-	host, userData, err := s.CreateHost(hostReq)
+	host, userData, err = s.CreateHost(hostReq)
 	if err != nil {
 		log.Errorf("Error creating gateway: creating host: %+v", err)
 		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
@@ -408,7 +408,7 @@ func FromIntIPversion(v int) IPVersion.Enum {
 // - netID ID of the parent network
 // - name is the name of the sub network
 // - mask is a network mask defined in CIDR notation
-func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum, dnsServers []string) (*Subnet, error) {
+func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum, dnsServers []string) (subn *Subnet, err error) {
 	// You must associate a new subnet with an existing network - to do this you
 	// need its UUID. You must also provide a well-formed CIDR value.
 	dhcp := true

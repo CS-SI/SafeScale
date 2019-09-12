@@ -146,8 +146,7 @@ func (b *foreman) ExecuteScript(
 }
 
 // construct ...
-func (b *foreman) construct(task concurrency.Task, req Request) error {
-	var err error
+func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	log.Infof("Constructing cluster '%s'...", req.Name)
 	defer func() {
 		if err == nil {
@@ -629,10 +628,9 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 }
 
 // configureCluster ...
-func (b *foreman) configureCluster(task concurrency.Task) error {
+func (b *foreman) configureCluster(task concurrency.Task) (err error) {
 	defer utils.TimerWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), log.TraceLevel)()
 
-	var err error
 	started := time.Now()
 
 	log.Infof("[cluster %s] configuring cluster...", b.cluster.Name)

@@ -201,8 +201,8 @@ func (handler *VolumeHandler) Inspect(
 }
 
 // Create a volume
-func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error) {
-	volume, err := handler.service.CreateVolume(resources.VolumeRequest{
+func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (volume *resources.Volume, err error) {
+	volume, err = handler.service.CreateVolume(resources.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -246,7 +246,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 }
 
 // Attach a volume to an host
-func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) error {
+func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) {
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {

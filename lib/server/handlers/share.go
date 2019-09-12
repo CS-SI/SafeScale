@@ -76,7 +76,7 @@ func (handler *ShareHandler) Create(
 	ctx context.Context,
 	shareName, hostName, path string, securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
-) (*propsv1.HostShare, error) {
+) (share *propsv1.HostShare, err error) {
 
 	// Check if a share already exists with the same name
 	server, _, _, err := handler.Inspect(ctx, shareName)
@@ -156,8 +156,6 @@ func (handler *ShareHandler) Create(
 			}
 		}
 	}()
-
-	var share *propsv1.HostShare
 
 	// Updates Host Property propsv1.HostShares
 	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
@@ -339,7 +337,7 @@ func (handler *ShareHandler) List(ctx context.Context) (map[string]map[string]*p
 }
 
 // Mount a share on a local directory of an host
-func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string, withCache bool) (*propsv1.HostRemoteMount, error) {
+func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string, withCache bool) (mount *propsv1.HostRemoteMount, err error) {
 	// Retrieve info about the share
 	server, share, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
@@ -469,7 +467,6 @@ func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, pat
 		}
 	}()
 
-	var mount *propsv1.HostRemoteMount
 	err = target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 		targetMountsV1 := v.(*propsv1.HostMounts)
 		// Make sure the HostMounts is correctly init if there are no mount yet
