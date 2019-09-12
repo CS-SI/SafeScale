@@ -639,10 +639,11 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	hostClt := client.New().Host
 
 	// Starting from here, delete nodes if exiting with error
+	newHosts := hosts
 	defer func() {
 		if err != nil {
-			if len(hosts) > 0 {
-				derr := hostClt.Delete(hosts, utils.GetExecutionTimeout())
+			if len(newHosts) > 0 {
+				derr := hostClt.Delete(newHosts, utils.GetExecutionTimeout())
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}

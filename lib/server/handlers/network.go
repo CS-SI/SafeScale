@@ -109,16 +109,18 @@ func (handler *NetworkHandler) Create(
 		CIDR:      cidr,
 	})
 	if err != nil {
-		err = infraErr(err)
-		return nil, err
+		return nil, infraErr(err)
 	}
 
+	newNetwork := network
 	// Starting from here, delete network if exiting with error
 	defer func() {
 		if err != nil {
-			derr := handler.service.DeleteNetwork(network.ID)
-			if derr != nil {
-				log.Errorf("Failed to delete network: %+v", derr)
+			if newNetwork != nil {
+				derr := handler.service.DeleteNetwork(newNetwork.ID)
+				if derr != nil {
+					log.Errorf("Failed to delete network: %+v", derr)
+				}
 			}
 		}
 	}()
@@ -133,9 +135,11 @@ func (handler *NetworkHandler) Create(
 		// Starting from here, delete VIP if exists with error
 		defer func() {
 			if err != nil {
-				derr := handler.service.DeleteVIP(network.VIP)
-				if derr != nil {
-					log.Errorf("Failed to delete VIP: %+v", derr)
+				if newNetwork != nil {
+					derr := handler.service.DeleteVIP(newNetwork.VIP)
+					if derr != nil {
+						log.Errorf("Failed to delete VIP: %+v", derr)
+					}
 				}
 			}
 		}()
@@ -150,9 +154,11 @@ func (handler *NetworkHandler) Create(
 	// Starting from here, delete network metadata if exits with error
 	defer func() {
 		if err != nil {
-			derr := mn.Delete()
-			if derr != nil {
-				log.Errorf("Failed to delete network metadata: %+v", derr)
+			if mn != nil {
+				derr := mn.Delete()
+				if derr != nil {
+					log.Errorf("Failed to delete network metadata: %+v", derr)
+				}
 			}
 		}
 	}()
@@ -178,13 +184,11 @@ func (handler *NetworkHandler) Create(
 		msg += ")"
 		log.Infof(msg)
 	} else {
-		err = logicErr(fmt.Errorf("error creating network: no host template matching requirements for gateway"))
-		return nil, err
+		return nil, logicErr(fmt.Errorf("error creating network: no host template matching requirements for gateway"))
 	}
 	img, err := handler.service.SearchImage(theos)
 	if err != nil {
-		err := infraErrf(err, "error creating network: Error searching image '%s'", theos)
-		return nil, err
+		return nil, infraErrf(err, "error creating network: Error searching image '%s'", theos)
 	}
 
 	var primaryGatewayName, secondaryGatewayName string
@@ -250,7 +254,7 @@ func (handler *NetworkHandler) Create(
 				handler.deleteGateway(primaryGateway)
 				handler.deleteGatewayMetadata(primaryMetadata)
 				if failover {
-					handler.unbindHostFromVIP(network.VIP, primaryGateway)
+					handler.unbindHostFromVIP(newNetwork.VIP, primaryGateway)
 				}
 			}
 		}()
@@ -267,7 +271,7 @@ func (handler *NetworkHandler) Create(
 				if err != nil {
 					handler.deleteGateway(secondaryGateway)
 					handler.deleteGatewayMetadata(secondaryMetadata)
-					handler.unbindHostFromVIP(network.VIP, secondaryGateway)
+					handler.unbindHostFromVIP(newNetwork.VIP, secondaryGateway)
 				}
 			}()
 		}
@@ -350,8 +354,7 @@ func (handler *NetworkHandler) Create(
 	select {
 	case <-ctx.Done():
 		log.Warnf("Network creation cancelled by user")
-		err = fmt.Errorf("network creation cancelled by user")
-		return nil, err
+		return nil, fmt.Errorf("network creation cancelled by user")
 	default:
 	}
 

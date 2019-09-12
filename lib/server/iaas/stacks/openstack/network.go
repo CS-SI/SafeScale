@@ -343,11 +343,12 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	}
 
 	// delete the host when found problem starting from here
+	newHost := host
 	defer func() {
 		if err != nil {
-			derr := s.DeleteHost(host.ID)
+			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
-				log.Errorf("failed to delete host '%s': %v", host.Name, derr)
+				log.Errorf("failed to delete host '%s': %v", newHost.Name, derr)
 			}
 		}
 	}()

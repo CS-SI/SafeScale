@@ -210,11 +210,14 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	if err != nil {
 		return nil, infraErr(err)
 	}
+
+	// starting from here delete volume if function ends with failure
+	newVolume := volume
 	defer func() {
 		if err != nil {
-			derr := handler.service.DeleteVolume(volume.ID)
+			derr := handler.service.DeleteVolume(newVolume.ID)
 			if derr != nil {
-				log.Debugf("failed to delete volume '%s': %v", volume.Name, derr)
+				log.Debugf("failed to delete volume '%s': %v", newVolume.Name, derr)
 			}
 		}
 	}()
@@ -225,11 +228,12 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 		return nil, infraErrf(err, "error creating volume '%s' saving its metadata", name)
 	}
 
+	// starting from here delete volume if function ends with failure
 	defer func() {
 		if err != nil {
 			derr := md.Delete()
 			if derr != nil {
-				log.Warnf("Failed to delete metadata of volume '%s'", volume.Name)
+				log.Warnf("Failed to delete metadata of volume '%s'", newVolume.Name)
 			}
 		}
 	}()

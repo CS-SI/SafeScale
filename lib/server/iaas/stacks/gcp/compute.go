@@ -405,11 +405,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	logrus.Debugf("host resource created.")
 
+	newHost := host
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			logrus.Infof("Cleanup, deleting host '%s'", host.Name)
-			derr := s.DeleteHost(host.ID)
+			logrus.Infof("Cleanup, deleting host '%s'", newHost.Name)
+			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				logrus.Warnf("Error deleting host: %v", derr)
 			}

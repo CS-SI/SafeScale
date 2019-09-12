@@ -184,12 +184,13 @@ func (handler *ShareHandler) Create(
 	if err != nil {
 		return nil, logicErrf(err, "Error saving server metadata")
 	}
+	newShare := share
 	defer func() {
 		if err != nil {
 			err2 := server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
 				serverSharesV1 := v.(*propsv1.HostShares)
-				delete(serverSharesV1.ByID, share.ID)
-				delete(serverSharesV1.ByName, share.Name)
+				delete(serverSharesV1.ByID, newShare.ID)
+				delete(serverSharesV1.ByName, newShare.Name)
 				return nil
 			})
 			if err2 != nil {
@@ -205,11 +206,12 @@ func (handler *ShareHandler) Create(
 	if err != nil {
 		return nil, infraErr(err)
 	}
+	newShare := share
 	defer func() {
 		if err != nil {
 			derr := ms.Delete()
 			if derr != nil {
-				log.Warnf("Failed to delete metadata of share '%s'", share.Name)
+				log.Warnf("Failed to delete metadata of share '%s'", newShare.Name)
 			}
 		}
 	}()
@@ -516,13 +518,14 @@ func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, pat
 		}
 	}
 
+	newMount := mount
 	defer func() {
 		if err != nil {
 			err2 := target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 				targetMountsV1 := v.(*propsv1.HostMounts)
-				delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
-				delete(targetMountsV1.RemoteMountsByPath, mount.Path)
-				delete(targetMountsV1.RemoteMountsByExport, mount.Export)
+				delete(targetMountsV1.RemoteMountsByShareID, newMount.ShareID)
+				delete(targetMountsV1.RemoteMountsByPath, newMount.Path)
+				delete(targetMountsV1.RemoteMountsByExport, newMount.Export)
 				return nil
 			})
 			if err2 != nil {

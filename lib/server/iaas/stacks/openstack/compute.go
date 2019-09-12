@@ -915,10 +915,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	log.Debugf("host resource created.")
 
 	// Starting from here, delete host if exiting with error
+	newHost := host
 	defer func() {
 		if err != nil {
-			log.Infof("Cleanup, deleting host '%s'", host.Name)
-			derr := s.DeleteHost(host.ID)
+			log.Infof("Cleanup, deleting host '%s'", newHost.Name)
+			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				log.Warnf("Error deleting host: %v", derr)
 			}

@@ -217,6 +217,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
+	// starting from here delete network
 	defer func() {
 		if err != nil {
 			derr := s.deleteSubnet(subnet.ID)

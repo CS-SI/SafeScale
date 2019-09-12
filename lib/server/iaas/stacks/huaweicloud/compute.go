@@ -481,12 +481,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, err
 	}
 
+	newHost := host
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			derr := s.DeleteHost(host.ID)
+			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
-				log.Errorf("Failed to delete host '%s': %v", host.Name, derr)
+				log.Errorf("Failed to delete host '%s': %v", newHost.Name, derr)
 			}
 		}
 	}()
@@ -497,6 +498,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			spew.Dump(err)
 			return nil, userData, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
+		}
+		if fip == nil {
+			return nil, userData, fmt.Errorf("error attaching public IP for host: unknown error")
 		}
 
 		// Starting from here, delete Floating IP if exiting with error

@@ -933,6 +933,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}
 
+	// starting from here delete host if failure
 	defer func() {
 		if err != nil {
 			if err := s.DeleteHost(resourceName); err != nil {
