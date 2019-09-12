@@ -326,10 +326,10 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	// Prepare network
 
 	there := true
-	var net *resources.Network
+	var network *resources.Network
 
 	netName := "net-safescale" // FIXME Hardcoded string
-	if net, err = serviceProvider.GetNetwork(netName); net != nil && err == nil {
+	if network, err = serviceProvider.GetNetwork(netName); network != nil && err == nil {
 		there = true
 		log.Warnf("Network '%s' already there", netName)
 	} else {
@@ -337,7 +337,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	}
 
 	if !there {
-		net, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
+		network, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
 			IPVersion: IPVersion.IPv4,
 			Name:      netName,
@@ -345,18 +345,18 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 		if err != nil {
 			return errors.Wrapf(err, "Error waiting for server ready: %v", err)
 		}
-		if net == nil {
+		if network == nil {
 			return errors.Errorf("Failure creating network")
 		}
 
 		defer func() {
-			delerr := serviceProvider.DeleteNetwork(net.ID)
+			delerr := serviceProvider.DeleteNetwork(network.ID)
 			if delerr != nil {
-				log.Warnf("Error deleting network '%s'", net.ID)
+				log.Warnf("Error deleting network '%s'", network.ID)
 			}
 		}()
 
-		_, err = metadata.SaveNetwork(serviceProvider, net)
+		_, err = metadata.SaveNetwork(serviceProvider, network)
 		if err != nil {
 			return errors.Errorf("Failure saving network metadata")
 		}
@@ -374,7 +374,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 	hostAnalysis := func(template resources.HostTemplate) error {
 		defer wg.Done()
-		if net != nil {
+		if network != nil {
 
 			// Limit scanner tests for integration test purposes
 			testSubset := ""
@@ -400,7 +400,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			hostName := "scanhost-" + template.Name
 			hostHandler := handlers.NewHostHandler(serviceProvider)
 
-			host, err := hostHandler.Create(context.Background(), hostName, net.Name, "Ubuntu 18.04", true, template.Name, false)
+			host, err := hostHandler.Create(context.Background(), hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
@@ -570,7 +570,7 @@ func main() {
 	}
 
 	timeout := time.Duration(1 * time.Second)
-	_, err := net.DialTimeout("tcp", "localhost:" + strconv.Itoa(safescaledPort), timeout)
+	_, err := net.DialTimeout("tcp", "localhost:"+strconv.Itoa(safescaledPort), timeout)
 	if err != nil {
 		log.Fatalf("You must run safescaled first...")
 	}
