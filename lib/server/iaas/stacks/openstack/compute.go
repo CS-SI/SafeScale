@@ -1257,7 +1257,7 @@ func (s *Stack) StopHost(id string) error {
 	return nil
 }
 
-// RebootHost reboots inconditionnaly the host identified by id
+// RebootHost reboots unconditionally the host identified by id
 func (s *Stack) RebootHost(id string) error {
 	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::Reboot(%s) called", id), log.TraceLevel)()
 
@@ -1303,7 +1303,7 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 		panic("Calling s.ResizeHost with s==nil!")
 	}
 
-	// TODO RESIZE Stackement Resize Host HERE
+	// TODO RESIZE Resize Host HERE
 	log.Warn("Trying to resize a Host...")
 
 	// TODO RESIZE Call this
