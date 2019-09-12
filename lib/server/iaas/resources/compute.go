@@ -152,8 +152,8 @@ func (h *Host) OK() bool {
 	result := true
 	result = result && h.ID != ""
 	result = result && h.Name != ""
-	result = result && h.PrivateKey != ""
-	result = result && h.Password != ""
+	// result = result && h.PrivateKey != ""
+	// result = result && h.Password != ""
 	result = result && h.Properties != nil
 	return result
 }
