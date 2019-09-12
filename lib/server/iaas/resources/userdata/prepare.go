@@ -32,7 +32,7 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 )

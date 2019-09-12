@@ -18,6 +18,7 @@ package concurrency
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -59,8 +60,7 @@ func NewTaskedLock() TaskedLock {
 func (tm *taskedLock) RLock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Tracef(">>>{task %s} utils.concurrency.TaskedLock::RLock()", tid)
-		defer log.Tracef("<<<{task %s} utils.concurrency.TaskedLock::RLock()", tid)
+		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::RLock() called", tid), log.TraceLevel)()
 	}
 
 	tm.lock.Lock()
@@ -90,8 +90,7 @@ func (tm *taskedLock) RLock(task Task) {
 func (tm *taskedLock) RUnlock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Tracef(">>>{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
-		defer log.Tracef("<<<{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
+		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::RUnlock() called", tid), log.TraceLevel)()
 	}
 
 	tm.lock.Lock()
@@ -121,8 +120,7 @@ func (tm *taskedLock) RUnlock(task Task) {
 func (tm *taskedLock) Lock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Tracef(">>>{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
-		defer log.Tracef("<<<{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
+		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::Lock() called", tid), log.TraceLevel)()
 	}
 
 	tm.lock.Lock()
@@ -147,8 +145,7 @@ func (tm *taskedLock) Lock(task Task) {
 func (tm *taskedLock) Unlock(task Task) {
 	tid := task.GetID()
 	if Trace.Locks {
-		log.Tracef(">>>{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
-		defer log.Tracef("<<<{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
+		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::Unlock() called", tid), log.TraceLevel)()
 	}
 
 	tm.lock.Lock()

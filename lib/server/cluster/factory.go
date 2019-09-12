@@ -85,8 +85,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 
 // Create creates a cluster following the parameters of the request
 func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
-	log.Tracef(">>> lib.server.cluster.factory::Create()")
-	defer log.Tracef("<<< safescale.cluster.factory::Create()")
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.factory::Create() called"), log.TraceLevel)()
 
 	// Validates parameters
 	if req.Name == "" {

@@ -486,8 +486,7 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 		task = concurrency.RootTask()
 	}
 
-	log.Tracef(">>>{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.GetID())
-	defer log.Tracef("<<<{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.GetID())
+	defer utils.TimerWithLevel(fmt.Sprintf("{task %s} lib.server.cluster.control.Controller::UpdateMetadata() called", task.GetID()), log.TraceLevel)()
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -562,7 +561,7 @@ func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (str
 
 // AddNodes adds <count> nodes
 func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) ([]string, error) {
-	log.Tracef(">>> lib.server.cluster.control.Controller::AddNodes(%d)", count)
+	log.Tracef("lib.server.cluster.control.Controller::AddNodes(%d) called", count)
 	defer log.Tracef("<<< lib.server.cluster.control.Controller::AddNodes(%d)", count)
 
 	if task == nil {
@@ -886,8 +885,7 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 
 // deleteNode deletes the node specified by its ID
 func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) error {
-	log.Tracef(">>> lib.server.cluster.control.Controller::deleteNode(%s)", node.Name)
-	defer log.Tracef("<<< lib.server.cluster.control.Controller::deleteNode(%s)", node.Name)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::deleteNode(%s) called", node.Name), log.TraceLevel)()
 
 	if c == nil {
 		panic("Calling lib.server.cluster.control.Controller::deleteNode() from nil pointer!")

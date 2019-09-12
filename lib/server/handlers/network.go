@@ -74,9 +74,7 @@ func (handler *NetworkHandler) Create(
 	sizing resources.SizingRequirements, theos string, gwname string,
 	failover bool,
 ) (*resources.Network, error) {
-
-	log.Tracef(">>> lib.server.handlers.NetworkHandler::Create()")
-	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::Create()")
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Create() called"), log.TraceLevel)()
 
 	if gwname != "" && failover {
 		return nil, fmt.Errorf("can't name gateway when failover is requested")
@@ -478,8 +476,8 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 				_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", gw.Name)), 0777)
 				dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", gw.Name, "phase2"))
-				_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
-				_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
+				_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name+":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName+"sh")
+				_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name+":/opt/safescale/var/log/user_data.phase2.log", dumpName+"log")
 			}
 
 			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
@@ -526,8 +524,8 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", gw.Name)), 0777)
 			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", gw.Name, "phase2"))
-			_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
-			_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
+			_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name+":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName+"sh")
+			_, _, _, _ = sshHandler.Copy(task.GetContext(), gw.Name+":/opt/safescale/var/log/user_data.phase2.log", dumpName+"log")
 		}
 
 		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: %s", gw.Name, stderr)
@@ -591,8 +589,7 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 
 // List returns the network list
 func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources.Network, error) {
-	log.Tracef(">>> lib.server.handlers.NetworkHandler::List(%v)", all)
-	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::List(%v)", all)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::List(%v) called", all), log.TraceLevel)()
 
 	if all {
 		return handler.service.ListNetworks()
@@ -616,8 +613,7 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources
 
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resources.Network, error) {
-	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
-	log.Tracef(">>> lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Inspect(%s) called", ref), log.TraceLevel)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
@@ -628,8 +624,7 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resour
 
 // Delete deletes network referenced by ref
 func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
-	log.Tracef(">>> lib.server.handlers.NetworkHandler::Delete(%s)", ref)
-	defer log.Tracef("<<< lib.server.handlers.NetworkHandler::Delete(%s)", ref)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Delete(%s) called", ref), log.TraceLevel)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {

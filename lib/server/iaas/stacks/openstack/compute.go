@@ -419,8 +419,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	if hostRef == "" {
 		hostRef = host.ID
 	}
-	log.Tracef(">>> stacks.openstack::InspectHost(%s)", hostRef)
-	defer log.Tracef("<<< stacks.openstack::InspectHost(%s)", hostRef)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::InspectHost(%s) called", hostRef), log.TraceLevel)()
 
 	server, err := s.queryServer(host.ID)
 	if err != nil {

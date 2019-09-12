@@ -117,7 +117,7 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 					//DiskSize: int(matype.ImageSpaceGb),
 					DiskSize: 0,
 					ID:       strconv.FormatUint(matype.Id, 10),
-					Name:     string(matype.Name),
+					Name:     matype.Name,
 				}
 				templates = append(templates, ht)
 			}
@@ -446,8 +446,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	default:
 		panic("hostParam must be a string or a *resources.Host!")
 	}
-	logrus.Tracef(">>> stacks.gcp::WaitHostReady(%s)", host.ID)
-	defer logrus.Tracef("<<< stacks.gcp::WaitHostReady(%s)", host.ID)
+	defer common.TimerWithLevel(fmt.Sprintf("stacks.gcp::WaitHostReady(%s) called", host.ID), logrus.TraceLevel)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

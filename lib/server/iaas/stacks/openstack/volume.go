@@ -187,7 +187,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 
 // ListVolumes returns the list of all volumes known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListVolumes(%) called"), log.TraceLevel)()
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListVolumes() called"), log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::ListVolumes() from nil pointer!")

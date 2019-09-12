@@ -30,6 +30,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	timing "github.com/CS-SI/SafeScale/lib/utils"
+
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
@@ -48,9 +50,7 @@ type BucketListener struct{}
 
 // List available buckets
 func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.BucketList, error) {
-	log.Infof("safescaled receiving 'bucket list'")
-	log.Tracef(">>> listeners.BucketListener::List()")
-	defer log.Tracef("<<< listeners.BucketListener::List()")
+	defer timing.TimerWithLevel(fmt.Sprintf("listeners.BucketListener::List() called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -77,9 +77,7 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 // Create a new bucket
 func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
 	bucketName := in.GetName()
-	log.Infof("safescaled receiving 'bucket create %s'", bucketName)
-	log.Tracef(">>> listeners.BucketListener::Create(%s)", bucketName)
-	defer log.Tracef("<<< listeners.BucketListener::Create(%s)", bucketName)
+	defer timing.TimerWithLevel(fmt.Sprintf("listeners.BucketListener::Create(%s) called", bucketName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Create : "+bucketName); err != nil {
@@ -105,9 +103,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 // Delete a bucket
 func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
 	bucketName := in.GetName()
-	log.Infof("safescaled receiving 'bucket delete %s'", bucketName)
-	log.Tracef(">>> listeners.BucketListener::Delete(%s)", bucketName)
-	defer log.Tracef("<<< listeners.BucketListener::Delete(%s)", bucketName)
+	defer timing.TimerWithLevel(fmt.Sprintf("listeners.BucketListener::Delete(%s) called", bucketName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -134,13 +130,11 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_pro
 // Inspect a bucket
 func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.BucketMountingPoint, error) {
 	bucketName := in.GetName()
-	log.Infof("safescaled receiving 'bucket inspect %s'", bucketName)
-	log.Tracef(">>> listeners.BucketListener::Inspect(%s)", bucketName)
-	defer log.Tracef("<<< listeners.BucketListener::Inspect(%s)", bucketName)
+	defer timing.TimerWithLevel(fmt.Sprintf("listeners.BucketListener::Inspect(%s) called", bucketName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -165,9 +159,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.Bucket
 func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().GetName()
-	log.Infof("safescaled receiving 'bucket mount %s %s'", bucketName, hostName)
-	log.Tracef(">>> listeners.BucketListener::Mount(%s, %s)", bucketName, hostName)
-	defer log.Tracef("<<< listeners.BucketListener::Mount(%s, %s)", bucketName, hostName)
+	defer timing.TimerWithLevel(fmt.Sprintf("listeners.BucketListener::Mount(%s, %s) called", bucketName, hostName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Mount : "+bucketName+" on "+hostName); err != nil {
@@ -192,14 +184,12 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().GetName()
-	log.Infof("safescaled receiving 'bucket unmount %s %s'", bucketName, hostName)
-	log.Tracef(">>> listeners.BucketListener::Unmount(%s, %s)", bucketName, hostName)
-	defer log.Tracef("<<< listeners.BucketListener::Unmount(%s, %s)", bucketName, hostName)
+	defer timing.TimerWithLevel(fmt.Sprintf("listeners.BucketListener::Unmount(%s, %s) called", bucketName, hostName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Unount : "+bucketName+" off "+hostName); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
 
 	tenant := GetCurrentTenant()

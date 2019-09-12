@@ -26,9 +26,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	timing "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
@@ -69,9 +70,7 @@ type TenantListener struct{}
 
 // List registered tenants
 func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
-	log.Infoln("Listeners: receiving \"tenant list\"")
-	log.Traceln(">>> TenantListener::List()")
-	defer log.Traceln("<<< TenantListener::List()")
+	defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::List() called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -97,9 +96,7 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 
 // Get returns the name of the current tenant used
 func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
-	log.Infoln("Listeners: receiving \"tenant get\"")
-	log.Traceln(">>> TenantListener::Get()")
-	defer log.Traceln("<<< TenantListener::Get()")
+	defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::Get() called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -117,9 +114,7 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*p
 
 // Set the the tenant to use for each command
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
-	log.Infof("Listeners: receiving \"tenant set %s\"", in.Name)
-	log.Tracef(">>> TenantListener::Set(%s)", in.Name)
-	defer log.Tracef("<<< TenantListener::Set(%s)", in.Name)
+	defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::Set(%s) called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -177,9 +172,7 @@ func getCurrentStorageTenants() *StorageTenants {
 
 // StorageList lists registered storage tenants
 func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
-	log.Infoln("Listeners: receiving \"tenant storage-list\"")
-	log.Traceln(">>> TenantListener::StorageList()")
-	defer log.Traceln("<<< TenantListener::StorageList()")
+	defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::StorageList() called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant StorageList"); err == nil {
@@ -209,9 +202,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 
 // StorageGet returns the name of the current storage tenants used for data related commands
 func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantNameList, error) {
-	log.Infoln("Listeners: receiving \"tenant storage-get\"")
-	log.Traceln(">>> TenantListener::StorageGet()")
-	defer log.Traceln(">>> TenantListener::StorageGet()")
+	defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::StorageGet() called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant StorageGet"); err == nil {
@@ -229,10 +220,7 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 
 // StorageSet set the tenants to use for data related commands
 func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) (*google_protobuf.Empty, error) {
-
-	log.Infof("Listeners: receiving \"tenant storage-set %v\"", in.Names)
-	log.Tracef(">>> TenantListener::StorageSet(%v)", in.Names)
-	defer log.Tracef("<<< TenantListener::StorageSet(%v)", in.Names)
+	defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::StorageSet(%v) called", in.Names), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames())); err == nil {

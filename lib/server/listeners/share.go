@@ -30,8 +30,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	timing "github.com/CS-SI/SafeScale/lib/utils"
 	convert "github.com/CS-SI/SafeScale/lib/server/utils"
+	timing "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // ShareHandler ...
@@ -170,8 +170,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 
 // Unmount unmounts share from the given host
 func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (*google_protobuf.Empty, error) {
-	log.Infof(">>> Listeners: share unmount '%v'", in)
-	defer log.Tracef("<<< Listeners: share unmount '%v'", in)
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: share unmount '%v' called", in), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
