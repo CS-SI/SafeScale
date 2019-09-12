@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	timing "github.com/CS-SI/SafeScale/lib/utils"
 
 	"github.com/klauspost/reedsolomon"
 	log "github.com/sirupsen/logrus"
@@ -118,12 +119,12 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 
 //Push ...
 func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) error {
-	log.Tracef(">>> lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
-	defer log.Tracef("<<< lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Push(%s) called", fileLocalPath), log.TraceLevel)()
+
 	//localFile inspection
 	file, err := os.Open(fileLocalPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open '%s' : %s", fileLocalPath, err.Error())
+		return fmt.Errorf("failed to open '%s' : %s", fileLocalPath, err.Error())
 	}
 	defer func() { // FIXME: Catch error later
 		_ = file.Close()
@@ -276,8 +277,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 
 //Get ...
 func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) error {
-	log.Tracef(">>> lib.server.handlers.DataHandler::Get(%s)", fileName)
-	defer log.Tracef("<<< lib.server.handlers.DataHandler::Get(%s)", fileName)
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Get(%s) called", fileName), log.TraceLevel)()
 
 	// Check if the local file is available
 	if _, err := os.Stat(fileLocalPath); err == nil {
@@ -434,8 +434,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 
 // Delete ...
 func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
-	log.Tracef(">>> lib.server.handlers.DataHandler::Delete(%s)", fileName)
-	defer log.Tracef("<<< lib.server.handlers.DataHandler::Delete(%s)", fileName)
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Delete(%s) called", fileName), log.TraceLevel)()
 
 	bucketMap, _, buckets := handler.getBuckets()
 	metadataFileName, keyFileName := getFileNames(fileName)
@@ -481,8 +480,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 
 // List returns []fileName []UploadDate []fileSize [][]buckets, error
 func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int64, [][]string, error) {
-	log.Tracef(">>> lib.server.handlers.DataHandler::List()")
-	defer log.Tracef("<<< lib.server.handlers.DataHandler::List()")
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::List() called"), log.TraceLevel)()
 
 	bucketMap, _, buckets := handler.getBuckets()
 
@@ -521,7 +519,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		buffer.Reset()
 		_, err = bucketMap[bucketNames[0]].ReadObject(chunkGroupFileName, &buffer, 0, 0)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("Failed to read the chunkGroup from the bucket '%s' : %s", bucketNames[0], err.Error())
+			return nil, nil, nil, nil, fmt.Errorf("failed to read the chunkGroup from the bucket '%s' : %s", bucketNames[0], err.Error())
 		}
 		chunkGroup, err := utils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
 		if err != nil {
@@ -531,7 +529,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		//Check if all needed buckets are known
 		ok := true
 		for _, cgBucketName := range chunkGroup.GetBucketNames() {
-			if _, ok := bucketMap[cgBucketName]; !ok {
+			if _, ok = bucketMap[cgBucketName]; !ok {
 				break
 			}
 		}

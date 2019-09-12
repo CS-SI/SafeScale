@@ -294,9 +294,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	// Loads primary gateway metadata
 	primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
 	if err != nil {
-		return err
-	}
-	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			if !ok {
 				msg := fmt.Sprintf("failed to load gateway metadata of network '%s'", networkName)
@@ -315,9 +312,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	// Loads secondary gateway metadata
 	if !gwFailoverDisabled {
 		secondaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.SecondaryGatewayId)
-		if err != nil {
-			return err
-		}
 		if err != nil {
 			if _, ok := err.(utils.ErrNotFound); ok {
 				if !ok {
@@ -442,7 +436,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	// Step 2: awaits gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if !gwFailoverDisabled {
-		_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+		if secondaryGatewayTask != nil {
+			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+		}
 	}
 	_, mastersStatus = mastersTask.Wait()
 
@@ -465,7 +461,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		}
 		_, primaryGatewayStatus = primaryGatewayTask.Wait()
 		if !gwFailoverDisabled {
-			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+			if secondaryGatewayTask != nil {
+				_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+			}
 		}
 	}
 
@@ -632,8 +630,7 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 
 // configureCluster ...
 func (b *foreman) configureCluster(task concurrency.Task) error {
-	log.Tracef(">>> safescale.cluster.controller.foreman::configureCluster()")
-	defer log.Tracef("<<< safescale.cluster.controller.foreman::configureCluster()")
+	defer utils.TimerWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), log.TraceLevel)()
 
 	var err error
 	started := time.Now()
@@ -924,8 +921,7 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 // This function is intended to be call as a goroutine
 func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	pbGateway := params.(*pb.Host)
-	// log.Tracef(">>> lib.server.cluster.control.foreman::taskInstallGateway(%s)", pbGateway.Name)
-	// defer log.Tracef("<<< lib.server.cluster.control.foreman::taskInstallGateway(%s)", pbGateway.Name)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskInstallGateway(%s) called", pbGateway.Id), log.TraceLevel)()
 
 	hostLabel := "gateway"
 	log.Debugf("[%s] starting installation...", hostLabel)
@@ -986,8 +982,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	// Convert parameters
 	gw := params.(*pb.Host)
 
-	log.Tracef(">>> lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
-	defer log.Tracef("<<< lib.server.cluster.control.foreman::taskConfigureGateway(%s)", gw.Name)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskConfigureGateway(%s) called", gw.Name), log.TraceLevel)()
 
 	started := time.Now()
 
@@ -1012,8 +1007,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	count := p["count"].(int)
 	def := p["masterDef"].(*pb.HostDefinition)
 
-	log.Tracef(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
-	defer log.Tracef(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskCreateMasters(%d) called", count), log.TraceLevel)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1062,8 +1056,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	def := p["masterDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 
-	log.Tracef(">>>{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index)
-	defer log.Tracef("<<<{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index)
+	defer utils.TimerWithLevel(fmt.Sprintf("{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index), log.TraceLevel)()
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1098,13 +1091,13 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 			})
 		})
 		if mErr != nil {
-			log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
-			return nil, fmt.Errorf("failed to update Cluster metadata: %s", err.Error())
+			log.Errorf("[%s] creation failed: %s", hostLabel, mErr.Error())
+			return nil, fmt.Errorf("failed to update Cluster metadata: %s", mErr.Error())
 		}
 	}
 	if err != nil {
-		err = client.DecorateError(err, "creation of host resource", false)
 		log.Errorf("[%s] host resource creation failed: %s", hostLabel, err.Error())
+		err = client.DecorateError(err, "creation of host resource", false)
 		return nil, err
 	}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
@@ -1149,8 +1142,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-	log.Tracef(">>> lib.server.cluster.control.Foreman::taskConfigureMasters()")
-	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskConfigureMasters()")
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMasters() called"), log.TraceLevel)()
 
 	list := b.cluster.ListMasterIDs(t)
 	if len(list) <= 0 {
@@ -1198,8 +1190,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	log.Tracef(">>> lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
-	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s)", index, pbHost.Name)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s) called", index, pbHost.Name), log.TraceLevel)()
 
 	started := time.Now()
 
@@ -1230,8 +1221,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	public := p["public"].(bool)
 	def := p["nodeDef"].(*pb.HostDefinition)
 
-	log.Tracef(">>> lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
-	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
+	defer utils.TimerWithLevel(fmt.Sprintf("<<< lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public), log.TraceLevel)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1279,8 +1269,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	def := p["nodeDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 
-	log.Tracef(">>> lib.server.cluster.control.Foreman::taskCreateNode(%d)", index)
-	defer log.Tracef("<<< lib.server.cluster.control.Foreman::taskCreateNode(%d)", index)
+	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNode(%d) called", index), log.TraceLevel)()
 
 	hostLabel := fmt.Sprintf("node #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1327,8 +1316,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		}
 	}
 	if err != nil {
-		err = client.DecorateError(err, "creation of host resource", true)
 		log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
+		err = client.DecorateError(err, "creation of host resource", true)
 		return nil, err
 	}
 	hostLabel = fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
@@ -1480,7 +1469,11 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 		log.Debugf("[cluster %s] adding feature 'kong4gateway'", clusterName)
 		feat, err := install.NewEmbeddedFeature(task, "kong4gateway")
 		if err != nil {
-			log.Errorf("[cluster %s] failed to instanciate embedded feature '%s': %s\n", clusterName, feat.DisplayName(), err.Error())
+			if feat != nil {
+				log.Errorf("[cluster %s] failed to instantiate embedded feature '%s': %s\n", clusterName, feat.DisplayName(), err.Error())
+			} else {
+				log.Errorf("[cluster %s] failed to instantiate embedded feature 'kong4gateway': %s\n", clusterName, err.Error())
+			}
 			return err
 		}
 		target := install.NewClusterTarget(task, b.cluster)

@@ -381,8 +381,8 @@ var clusterCreateCommand = cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) error {
-		err := extractClusterArgument(c)
+	Action: func(c *cli.Context) (err error) {
+		err = extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -459,12 +459,12 @@ var clusterCreateCommand = cli.Command{
 				nodesDef = &pb.HostDefinition{
 					ImageId: los,
 					Sizing: &pb.HostSizing{
-						MinCpuCount: int32(cpu),
-						MaxCpuCount: int32(cpu) * 2,
+						MinCpuCount: cpu,
+						MaxCpuCount: cpu * 2,
 						MinRamSize:  ram,
 						MaxRamSize:  ram * 2.0,
-						MinDiskSize: int32(disk),
-						GpuCount:    int32(gpu),
+						MinDiskSize: disk,
+						GpuCount:    gpu,
 					},
 				}
 				gatewaysDef = nodesDef
@@ -472,7 +472,7 @@ var clusterCreateCommand = cli.Command{
 				mastersDef = gatewaysDef         // ... nor for masters
 			}
 		}
-		clusterInstance, err = cluster.Create(concurrency.RootTask(), control.Request{
+		clusterInstance, err := cluster.Create(concurrency.RootTask(), control.Request{
 			Name:                    clusterName,
 			Complexity:              complexity,
 			CIDR:                    cidr,
@@ -485,9 +485,16 @@ var clusterCreateCommand = cli.Command{
 		})
 		if err != nil {
 			if clusterInstance != nil {
-				_ = clusterInstance.Delete(concurrency.RootTask())
+				cluDel := clusterInstance.Delete(concurrency.RootTask())
+				if cluDel != nil {
+					log.Warnf("Error deleting cluster instance: %s", cluDel)
+				}
 			}
 			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+		}
+		if clusterInstance == nil {
+			msg := fmt.Sprintf("failed to create cluster: unknown reason")
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 		}
 
@@ -732,12 +739,12 @@ var clusterExpandCommand = cli.Command{
 				nodesDef = &pb.HostDefinition{
 					ImageId: los,
 					Sizing: &pb.HostSizing{
-						MinCpuCount: int32(cpu),
-						MaxCpuCount: int32(cpu) * 2,
+						MinCpuCount: cpu,
+						MaxCpuCount: cpu * 2,
 						MinRamSize:  ram,
 						MaxRamSize:  ram * 2.0,
-						MinDiskSize: int32(disk),
-						GpuCount:    int32(gpu),
+						MinDiskSize: disk,
+						GpuCount:    gpu,
 					},
 				}
 			}
