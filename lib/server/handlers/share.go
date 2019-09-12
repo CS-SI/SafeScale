@@ -206,7 +206,6 @@ func (handler *ShareHandler) Create(
 	if err != nil {
 		return nil, infraErr(err)
 	}
-	newShare := share
 	defer func() {
 		if err != nil {
 			derr := ms.Delete()
