@@ -56,13 +56,13 @@ func (w LoggedProvider) GetTenantParameters() map[string]interface{} {
 
 // trace ...
 func (w LoggedProvider) trace(s string) (string, time.Time) {
-	logrus.Tracef(">>> stacks.%s::%s() called", w.Name, s)
+	logrus.Tracef("stacks.%s::%s() called", w.Name, s)
 	return s, time.Now()
 }
 
 // prepare ...
 func (w LoggedProvider) prepare(s string, startTime time.Time) {
-	logrus.Tracef("<<< stacks.%s::%s() done in [%s] ms", w.Name, s, utils.FmtDuration(time.Since(startTime)))
+	logrus.Tracef("stacks.%s::%s() done in [%s] ms", w.Name, s, utils.FmtDuration(time.Since(startTime)))
 }
 
 // NewLoggedProvider ...
