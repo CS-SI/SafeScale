@@ -147,12 +147,7 @@ func (b *foreman) ExecuteScript(
 
 // construct ...
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
-	log.Infof("Constructing cluster '%s'...", req.Name)
-	defer func() {
-		if err == nil {
-			log.Infof("Cluster '%s' construction successful.", req.Name)
-		}
-	}()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("Constructing cluster '%s'...", req.Name), err, log.InfoLevel)()
 
 	if task == nil {
 		task = concurrency.RootTask()
