@@ -48,6 +48,8 @@ var (
 	clusterInstance api.Cluster
 )
 
+var ClusterCommandName = "cluster"
+
 // ClusterCommand command
 var ClusterCommand = cli.Command{
 	Name:      "cluster",
@@ -116,6 +118,7 @@ var clusterListCommand = cli.Command{
 	Usage:   "List available clusters",
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		list, err := cluster.List()
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("Failed to get cluster list: %v", err)))
@@ -164,6 +167,7 @@ var clusterInspectCommand = cli.Command{
 	// Displays information about the cluster 'clustername'.`,
 	// 	},
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -382,6 +386,7 @@ var clusterCreateCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) (err error) {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err = extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -539,6 +544,7 @@ var clusterDeleteCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -576,6 +582,7 @@ var clusterStopCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -604,6 +611,7 @@ var clusterStartCommand = cli.Command{
 	// Start the cluster (make it available for duty).`,
 	// 	},
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -629,6 +637,7 @@ var clusterStateCommand = cli.Command{
 	// Get the cluster state.`,
 	// 	},
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -710,6 +719,7 @@ var clusterExpandCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -789,6 +799,7 @@ var clusterShrinkCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -848,6 +859,7 @@ var clusterDcosCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -884,6 +896,7 @@ var clusterKubectlCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -912,6 +925,7 @@ var clusterRunCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -968,6 +982,7 @@ var clusterListFeaturesCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		features, err := install.ListFeatures("cluster")
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
@@ -995,6 +1010,7 @@ var clusterAddFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1055,6 +1071,7 @@ var clusterCheckFeatureCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1116,6 +1133,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1210,6 +1228,7 @@ var clusterNodeListCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1254,6 +1273,7 @@ var clusterNodeInspectCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1299,6 +1319,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1340,6 +1361,7 @@ var clusterNodeStopCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1370,6 +1392,7 @@ var clusterNodeStartCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1395,6 +1418,7 @@ var clusterNodeStateCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1433,6 +1457,7 @@ var clusterMasterListCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ClusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)

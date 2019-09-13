@@ -17,12 +17,15 @@
 package commands
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
+
+var ImageCmdName = "image"
 
 // ImageCmd command
 var ImageCmd = cli.Command{
@@ -43,6 +46,7 @@ var imageList = cli.Command{
 			Usage: "List all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ImageCmdName, c.Command.Name, c.Args())
 		images, err := client.New().Image.List(c.Bool("all"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error())))
