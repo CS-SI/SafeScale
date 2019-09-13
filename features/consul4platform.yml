@@ -26,20 +26,30 @@ feature:
     install:
         bash:
             check:
-                pace: stack
+                pace: masters,gateways
                 steps:
-                    stack:
+                    masters:
                         targets:
                             gateways: no
                             hosts: no
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack consul4safescale || exit 192
+                            sfDoesDockerRunStack consul4platform || exit 192
+                            exit 0
+
+                    gateways:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfDoesDockerRunContainer consul:{{ .Version }} consul4platform_agent_1 || exit 192
                             exit 0
 
             add:
-                pace: config-all,config-server,config-agent,stack,compose,start-stack,start-on-gw,server-started,agent-started,agent-started-on-gw
+                pace: config-all,config-server,config-agent-nodes,config-agent-gateways,stack,compose,start-stack,start-on-gw,server-started,agent-started,agent-started-on-gw
                 steps:
                     config-all:
                         targets:
@@ -48,9 +58,9 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/consul/consul.d ${SF_VARDIR}/consul
+                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
 
-                            cat >${SF_ETCDIR}/consul/consul.d/node-exporter.json <<-EOF
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
                             {
                                 "service": {
                                     "name": "{{ .Hostname }}",
@@ -69,56 +79,56 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            cat >${SF_ETCDIR}/consul/config.json <<-EOF
+                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
                             {
-                                "advertise_addr" : "{{ .HostIP }}",
+                                "advertise_addr": "{{ .HostIP }}",
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
                                 "client_addr": "0.0.0.0",
                                 "data_dir": "/consul/data",
                                 "datacenter": "{{ .ClusterName }}",
-                                "leave_on_terminate" : true,
-                                "retry_join" : [
-                                    "consul.server"
+                                "leave_on_terminate": true,
+                                "retry_join": [
+                                    "consul4platform_server"
                                 ],
-                                "node_name": "{{ .HostIP }}",
-                                "server_name" : "server.{{ .Hostname }}.consul",
-                                "skip_leave_on_interrupt" : true,
-                            {{- if gt (len .MasterIPs) 1 }}
+                                "node_name": "{{ .Hostname }}",
+                                "server_name": "server.{{ .Hostname }}.consul",
+                                "skip_leave_on_interrupt": true,
+                            {{ if gt (len .MasterIPs) 1 }}
                                 "bootstrap_expect": {{ len .MasterIPs }},
                             {{ end -}}
-                                "server" : true,
-                                "ui" : true,
+                                "server": true,
+                                "ui": true,
                                 "autopilot": {
                                     "cleanup_dead_servers": true
                                 },
                                 "disable_update_check": true,
                                 "log_level": "warn",
                                 "telemetry": {
-                                    "prometheus_retention_time": "2m"
+                                    "prometheus_retention_time": "24h"
                                 }
                             }
                             EOF
-                            chmod 0644 ${SF_ETCDIR}/consul/*.json
+                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
                             exit 0
 
-                    config-agent:
+                    config-agent-nodes:
                         targets:
                             gateways: all
                             hosts: no
                             masters: no
                             nodes: all
                         run: |
-                            cat >${SF_ETCDIR}/consul/config.json <<-EOF
+                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
                             {
-                                "advertise_addr" : "{{ .HostIP }}",
+                                "advertise_addr": "{{ .HostIP }}",
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
                                 "client_addr": "0.0.0.0",
                                 "data_dir": "/consul/data",
                                 "datacenter": "{{ .ClusterName }}",
-                                "retry_join" : [
-                                    "consul.server"
+                                "retry_join": [
+                                    "consul4platform_server"
                                 ],
-                                "node_name": "{{ .HostIP }}",
+                                "node_name": "{{ .Hostname }}",
                                 "leave_on_terminate" : true,
                                 "skip_leave_on_interrupt" : false,
                                 "server" : false,
@@ -126,11 +136,43 @@ feature:
                                 "disable_update_check": true,
                                 "log_level": "warn",
                                 "telemetry": {
-                                    "prometheus_retention_time": "2m"
+                                    "prometheus_retention_time": "24h"
                                 }
                             }
                             EOF
-                            chmod 0644 ${SF_ETCDIR}/consul/*.json
+                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
+                            exit 0
+
+                    config-agent-gateways:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: all
+                        run: |
+                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
+                            {
+                                "advertise_addr": "{{ .HostIP }}",
+                                "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
+                                "client_addr": "0.0.0.0",
+                                "data_dir": "/consul/data",
+                                "datacenter": "{{ .ClusterName }}",
+                                "retry_join": [
+                                    {{ range .MasterIPs }}{{.}},
+                                ],
+                                "node_name": "{{ .Hostname }}",
+                                "leave_on_terminate" : true,
+                                "skip_leave_on_interrupt" : false,
+                                "server" : false,
+                                "ui" : false,
+                                "disable_update_check": true,
+                                "log_level": "warn",
+                                "telemetry": {
+                                    "prometheus_retention_time": "24h"
+                                }
+                            }
+                            EOF
+                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
                             exit 0
 
                     stack:
@@ -140,11 +182,11 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            cat >${SF_ETCDIR}/consul/stack.yml <<-EOF
+                            cat >${SF_ETCDIR}/consul4platform/stack.yml <<-EOF
                             version: '3.3'
 
                             networks:
-                                consul-net:
+                                consul4platform_net:
                                     external: true
 
                             services:
@@ -152,13 +194,11 @@ feature:
                                     image: consul:{{ .Version }}
                                     command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
                                     volumes:
-                                        - ${SF_ETCDIR}/consul/config.json:/consul/config/config.json:ro
-                                        - ${SF_ETCDIR}/consul/consul.d:/consul/config/consul.d
-                                        - ${SF_VARDIR}/consul:/consul/data
+                                        - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
+                                        - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
+                                        - ${SF_VARDIR}/consul4platform:/consul/data
                                     networks:
-                                        consul-net:
-                                            aliases:
-                                                - consul.server
+                                        - consul4platform_net
                                     ports:
                                         - target: 8500
                                           published: 8500
@@ -182,17 +222,15 @@ feature:
                                     image: consul:{{ .Version }}
                                     command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
                                     networks:
-                                        consul-net:
-                                            aliases:
-                                                - consul.agent
+                                        - consul4platform_net
                                     ports:
                                         - target: 8500
                                           published: 8500
                                           mode: host
                                     volumes:
-                                        - ${SF_ETCDIR}/consul/config.json:/consul/config/config.json:ro
-                                        - ${SF_ETCDIR}/consul/consul.d:/consul/config/consul.d
-                                        - ${SF_VARDIR}/consul:/consul/data
+                                        - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
+                                        - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
+                                        - ${SF_VARDIR}/consul4platform:/consul/data
                                     deploy:
                                         mode: global
                                         endpoint_mode: dnsrr
@@ -208,8 +246,8 @@ feature:
                                             constraints:
                                                 - node.role == worker
                             EOF
-                            chown safescale:safescale ${SF_ETCDIR}/consul/stack.yml
-                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul/stack.yml
+                            chown safescale:safescale ${SF_ETCDIR}/consul4platform/stack.yml
+                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul4platform/stack.yml
                             exit 0
 
                     compose:
@@ -219,7 +257,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            cat >${SF_ETCDIR}/consul/docker-compose.yml <<-EOF
+                            cat >${SF_ETCDIR}/consul4platform/docker-compose.yml <<-EOF
                             version: '2.1'
 
                             services:
@@ -229,13 +267,13 @@ feature:
                                     ports:
                                         - "{{.HostIP}}:8500:8500"
                                     volumes:
-                                        - ${SF_ETCDIR}/consul/config.json:/consul/config/config.json:ro
-                                        - ${SF_ETCDIR}/consul/consul.d:/consul/config/consul.d
-                                        - ${SF_VARDIR}/consul:/consul/data
+                                        - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
+                                        - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
+                                        - ${SF_VARDIR}/consul4platform:/consul/data
                                     restart: on-failure
                             EOF
-                            chown safescale:safescale ${SF_ETCDIR}/consul/docker-compose.yml
-                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul/docker-compose.yml
+                            chown safescale:safescale ${SF_ETCDIR}/consul4platform/docker-compose.yml
+                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul4platform/docker-compose.yml
                             exit 0
 
                     start-stack:
@@ -245,10 +283,10 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul-net"; then
-                                docker network create -d overlay consul-net || exit 194
+                            if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul4platform_net"; then
+                                docker network create -d overlay consul4platform_net || exit 194
                             fi
-                            docker stack deploy -c ${SF_ETCDIR}/consul/stack.yml consul4safescale || exit 195
+                            docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || exit 195
                             exit 0
 
                     start-on-gw:
@@ -258,7 +296,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/consul/docker-compose.yml -p consul4safescale up -d || exit 196
+                            docker-compose -f ${SF_ETCDIR}/consul4platform/docker-compose.yml -p consul4platform up -d || exit 196
                             exit 0
 
                     server-started:
@@ -268,7 +306,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_server" || exit 197
+                            sfRetry 5m 5 "sfDoesDockerRunService consul:{{ .Version }} consul4platform_server" || exit 197
                             exit 0
 
                     agent-started:
@@ -278,7 +316,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_agent" || exit 198
+                            sfRetry 5m 5 "sfDoesDockerRunService consul:{{ .Version }} consul4platform_agent" || exit 198
                             exit 0
 
                     agent-started-on-gw:
@@ -288,7 +326,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_agent" || exit 198
+                            sfRetry 5m 5 "sfDoesDockerRunContainer consul:{{ .Version }} consul4platform_agent_1" || exit 199
                             exit 0
 
             remove:
@@ -301,7 +339,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm consul4safescale || exit 199
+                            docker stack rm consul4platform || exit 200
                             exit 0
 
                     stop-on-gw:
@@ -311,10 +349,11 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            if [ -f ${SF_ETCDIR}/consul/docker-compose.yml ]; then
-                                docker-compose -f ${SF_ETCDIR}/consul/docker-compose.yml -p consul4safescale rm --force --stop || exit 200
+                            if [ -f ${SF_ETCDIR}/consul4platform/docker-compose.yml ]; then
+                                docker-compose -f ${SF_ETCDIR}/consul4platform/docker-compose.yml -p consul4platform rm --force --stop || exit 201
                             fi
                             exit 0
+
                     cleanup:
                         targets:
                             gateways: all
@@ -322,8 +361,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfRemoveDockerImage consul
-                            rm -rf ${SF_ETCDIR}/consul ${SF_VARDIR}/consul
+                            sfRemoveDockerImage consul || exit 202
+                            rm -rf ${SF_ETCDIR}/consul4platform ${SF_VARDIR}/consul4platform
                             exit 0
 
     proxy:
@@ -358,13 +397,13 @@ feature:
               content: |
                   {
                       "paths": [
-                          "/registry/consul/"
+                          "/_platform/registry/consul/"
                       ],
                       "service": {
                           "id": "{{ .consul_http_svc }}"
                       },
                       "source-control": {
-                          "whitelist": [ "{{ .CIDR }}", "{{ .EndpointIP }}", "127.0.0.1" ]
+                          "whitelist": [ "{{ .CIDR }}", "127.0.0.1" ]
                       }
                   }
 ...
