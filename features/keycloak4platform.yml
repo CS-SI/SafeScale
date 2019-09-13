@@ -21,7 +21,7 @@ feature:
         cluster: all
     requirements:
         features:
-            - postgresxl4safescale
+            - postgresql4platform
 
     parameters:
         - KeycloakAdminPassword
@@ -51,9 +51,9 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            mkdir -p ${SF_ETCDIR}/keycloak4safescale/build
+                            mkdir -p ${SF_ETCDIR}/keycloak4platform/build
 
-                            cat >${SF_ETCDIR}/keycloak4safescale/build/standalone-ha.xml.patch <<-'EOF'
+                            cat >${SF_ETCDIR}/keycloak4platform/build/standalone-ha.xml.patch <<-'EOF'
                             --- standalone-ha.xml	2019-07-10 15:45:31.706239257 +0200
                             +++ standalone-ha.xml.new	2019-07-10 15:46:06.850275164 +0200
                             @@ -52,6 +52,13 @@
@@ -142,21 +142,21 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            cat >${SF_ETCDIR}/keycloak4safescale/build/my-docker-entrypoint.sh <<-'EOF'
+                            cat >${SF_ETCDIR}/keycloak4platform/build/my-docker-entrypoint.sh <<-'EOF'
                             #!/bin/bash
 
                             export ADMIN_PG_PASSWORD="$(cat /run/secrets/safescale.postgresxl.password)"
                             export DB_PASSWORD="$(cat /run/secrets/safescale.keycloak.db_password)"
                             export DB_VENDOR=POSTGRES
                             export DB_ADDR=postgresxl4safescale_coordinator
-                            export DB_DATABASE=keycloak4safescale
-                            export DB_USER=keycloak4safescale
+                            export DB_DATABASE=keycloak4platform
+                            export DB_USER=keycloak4platform
                             export KEYCLOAK_USER=admin
                             export KEYCLOAK_PASSWORD="$(cat /run/secrets/safescale.keycloak.admin_password)"
 
                             cat >/root/.pgpass <<-EOF2
                             *:5432:*:postgres:$ADMIN_PG_PASSWORD
-                            *:5432:keycloak4safescale:keycloak4safescale:$DB_PASSWORD
+                            *:5432:keycloak4platform:keycloak4platform:$DB_PASSWORD
                             EOF2
                             chmod 0600 /root/.pgpass
 
@@ -170,7 +170,7 @@ feature:
 
                             # # Create database if needed
                             # if ! $PSQL $DB_DATABASE -c '\q' &>/dev/null; then
-                            #     echo "Creating database keycloak4safescale..."
+                            #     echo "Creating database keycloak4platform..."
                             #     cat  <<-SQLEOF | $PSQL
                             # CREATE DATABASE $DB_DATABASE;
                             # CREATE USER $DB_USER;
@@ -187,7 +187,7 @@ feature:
                             exec /opt/jboss/tools/docker-entrypoint.sh $@
                             EOF
 
-                            cat >${SF_ETCDIR}/keycloak4safescale/build/Dockerfile <<-'EOF'
+                            cat >${SF_ETCDIR}/keycloak4platform/build/Dockerfile <<-'EOF'
                             FROM jboss/keycloak:4.8.3.Final
 
                             WORKDIR /opt/jboss
@@ -216,7 +216,7 @@ feature:
                             CMD ["-b", "0.0.0.0"]
                             EOF
 
-                            docker build --network host -t keycloak4safescale:latest ${SF_ETCDIR}/keycloak4safescale/build || exit 192
+                            docker build --network host -t keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || exit 192
                             exit 0
 
                     secret:
@@ -238,8 +238,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE DATABASE keycloak4safescale;" || exit 195
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE USER keycloak4safescale;" || exit 196
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE DATABASE keycloak4platform;" || exit 195
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE USER keycloak4platform;" || exit 196
                             exit 0
 
                     stack:
@@ -249,11 +249,11 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            cat >${SF_ETCDIR}/keycloak4safescale/stack.yml <<-EOF
+                            cat >${SF_ETCDIR}/keycloak4platform/stack.yml <<-EOF
                             version: '3.3'
                             services:
                                 server:
-                                    image: keycloak4safescale:latest
+                                    image: keycloak4platform:latest
                                     environment:
                                         - PROXY_ADDRESS_FORWARDING=true
                                         # - KEYCLOAK_LOGLEVEL=DEBUG
@@ -299,8 +299,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/keycloak4safescale/stack.yml keycloak4safescale || exit 197
-                            sfRetry 5m 5 "sfDoesDockerRunService keycloak4safescale:latest keycloak4safescale_server" || exit 198
+                            docker stack deploy -c ${SF_ETCDIR}/keycloak4platform/stack.yml keycloak4platform || exit 197
+                            sfRetry 5m 5 "sfDoesDockerRunService keycloak4platform:latest keycloak4platform_server" || exit 198
                             exit 0
 
             remove:
@@ -313,11 +313,11 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm keycloak4safescale || exit 199
+                            docker stack rm keycloak4platform || exit 199
                             docker secret rm safescale.keycloak.db_password safescale.keycloak.admin_password &>/dev/null
-                            # VPL: add database keycloak4safescale deletion
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP DATABASE keycloak4safescale;"
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP USER keycloak4safescale;"
+                            # VPL: add database keycloak4platform deletion
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP DATABASE keycloak4platform;"
+                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP USER keycloak4platform;"
                             exit 0
 
                     cleanup:
@@ -327,12 +327,12 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfRemoveDockerImage keycloak4safescale:latest
-                            rm -drf ${SF_ETCDIR}/keycloak4safescale ${SF_VARDIR}/keycloak4safescale
+                            sfRemoveDockerImage keycloak4platform:latest
+                            rm -drf ${SF_ETCDIR}/keycloak4platform ${SF_VARDIR}/keycloak4platform
 
     proxy:
         rules:
-            - name: keycloak4safescale_backend
+            - name: keycloak4platform_backend
               type: upstream
               targets:
                   masters: all
@@ -342,17 +342,17 @@ feature:
                       "weight": 100
                   }
 
-            - name: keycloak4safescale_svc
+            - name: keycloak4platform_svc
               type: service
               targets:
                   masters: any
               content: |
                   {
                       "protocol": "https",
-                      "host": "keycloak4safescale_backend"
+                      "host": "keycloak4platform_backend"
                   }
 
-            - name: keycloak4safescale_route
+            - name: keycloak4platform_route
               type: route
               targets:
                   masters: any
@@ -361,7 +361,7 @@ feature:
                         "paths": [ "/auth/" ],
                         "strip_path": false,
                         "protocols":["https"],
-                        "service": { "id": "{{.keycloak4safescale_svc}}" }
+                        "service": { "id": "{{ .keycloak4platform_svc }}" }
                   }
 
 ...
