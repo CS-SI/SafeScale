@@ -149,6 +149,28 @@ func (b *foreman) ExecuteScript(
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	defer utils.TimerErrWithLevel(fmt.Sprintf("Constructing cluster '%s'...", req.Name), err, log.InfoLevel)()
 
+	state := ClusterState.Unknown
+
+	defer func() {
+		if err != nil {
+			state = ClusterState.Error
+		} else {
+			state = ClusterState.Created
+		}
+
+		metaErr := b.cluster.UpdateMetadata(task, func() error {
+			// Cluster created and configured successfully
+			return b.cluster.GetProperties(task).LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
+				v.(*clusterpropsv1.State).State = state
+				return nil
+			})
+		})
+
+		if metaErr != nil {
+			log.Warnf("error updating metadata cluster metadata")
+		}
+	}()
+
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -429,12 +451,23 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Step 2: awaits gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
+	if primaryGatewayStatus != nil {
+		// FIXME Abort other tasks
+		mastersTask.Abort()
+		privateNodesTask.Abort()
+		return primaryGatewayStatus
+	}
 	if !gwFailoverDisabled {
 		if secondaryGatewayTask != nil {
 			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+			if secondaryGatewayStatus != nil {
+				// FIXME Abort other tasks
+				mastersTask.Abort()
+				privateNodesTask.Abort()
+				return secondaryGatewayStatus
+			}
 		}
 	}
-	_, mastersStatus = mastersTask.Wait()
 
 	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
 	defer func() {
@@ -445,29 +478,42 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			}
 		}
 	}()
+	_, mastersStatus = mastersTask.Wait()
+	if mastersStatus != nil {
+		privateNodesTask.Abort()
+		return mastersStatus
+	}
 
 	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
-	if primaryGatewayStatus == nil && secondaryGatewayStatus == nil && mastersStatus == nil {
-		// Configure Gateway(s) and waits for the result
-		primaryGatewayTask = task.New().Start(b.taskConfigureGateway, srvutils.ToPBHost(primaryGateway))
-		if !gwFailoverDisabled {
-			secondaryGatewayTask = task.New().Start(b.taskConfigureGateway, srvutils.ToPBHost(secondaryGateway))
-		}
-		_, primaryGatewayStatus = primaryGatewayTask.Wait()
+	// Configure Gateway(s) and waits for the result
+	primaryGatewayTask = task.New().Start(b.taskConfigureGateway, srvutils.ToPBHost(primaryGateway))
+	if !gwFailoverDisabled {
+		secondaryGatewayTask = task.New().Start(b.taskConfigureGateway, srvutils.ToPBHost(secondaryGateway))
+	}
+	_, primaryGatewayStatus = primaryGatewayTask.Wait()
+	if primaryGatewayStatus != nil {
 		if !gwFailoverDisabled {
 			if secondaryGatewayTask != nil {
-				_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+				secondaryGatewayTask.Abort()
+			}
+		}
+		return primaryGatewayStatus
+	}
+
+	if !gwFailoverDisabled {
+		if secondaryGatewayTask != nil {
+			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+			if secondaryGatewayStatus != nil {
+				return secondaryGatewayStatus
 			}
 		}
 	}
 
 	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
-	if primaryGatewayStatus == nil && secondaryGatewayStatus == nil && mastersStatus == nil {
-		_, mastersStatus = task.New().Run(b.taskConfigureMasters, nil)
+	_, mastersStatus = task.New().Run(b.taskConfigureMasters, nil)
+	if mastersStatus != nil {
+		return mastersStatus
 	}
-
-	// Step 5: awaits nodes creation
-	_, privateNodesStatus = privateNodesTask.Wait()
 
 	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
 	defer func() {
@@ -481,27 +527,17 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}()
 
-	// Step 6: Starts nodes configuration, if all masters and nodes
-	// have been created and gateway has been configured with success
-	if primaryGatewayStatus == nil && secondaryGatewayStatus == nil && mastersStatus == nil && privateNodesStatus == nil {
-		_, privateNodesStatus = task.New().Run(b.taskConfigureNodes, nil)
+	// Step 5: awaits nodes creation
+	_, privateNodesStatus = privateNodesTask.Wait()
+	if privateNodesStatus != nil {
+		return privateNodesStatus
 	}
 
-	if primaryGatewayStatus != nil {
-		err = primaryGatewayStatus // value of err may trigger defer calls, don't change anything here
-		return err
-	}
-	if secondaryGatewayStatus != nil {
-		err = secondaryGatewayStatus // value of err may trigger defer calls, don't change anything here
-		return err
-	}
-	if mastersStatus != nil {
-		err = mastersStatus // value of err may trigger defer calls, don't change anything here
-		return err
-	}
+	// Step 6: Starts nodes configuration, if all masters and nodes
+	// have been created and gateway has been configured with success
+	_, privateNodesStatus = task.New().Run(b.taskConfigureNodes, nil)
 	if privateNodesStatus != nil {
-		err = privateNodesStatus // value of err may trigger defer calls, don't change anything here
-		return err
+		return privateNodesStatus
 	}
 
 	// At the end, configure cluster as a whole
@@ -510,13 +546,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return err
 	}
 
-	return b.cluster.UpdateMetadata(task, func() error {
-		// Cluster created and configured successfully
-		return b.cluster.GetProperties(task).LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
-			v.(*clusterpropsv1.State).State = ClusterState.Created
-			return nil
-		})
-	})
+	return nil
 }
 
 // complementHostDefinition complements req with default values if needed
@@ -624,7 +654,7 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 
 // configureCluster ...
 func (b *foreman) configureCluster(task concurrency.Task) (err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), err, log.TraceLevel)()
 
 	started := time.Now()
 
@@ -912,9 +942,9 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	pbGateway := params.(*pb.Host)
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskInstallGateway(%s) called", pbGateway.Id), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskInstallGateway(%s) called", pbGateway.Id), err, log.TraceLevel)()
 
 	hostLabel := "gateway"
 	log.Debugf("[%s] starting installation...", hostLabel)
@@ -971,11 +1001,11 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	gw := params.(*pb.Host)
 
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskConfigureGateway(%s) called", gw.Name), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskConfigureGateway(%s) called", gw.Name), err, log.TraceLevel)()
 
 	started := time.Now()
 
@@ -994,13 +1024,13 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	count := p["count"].(int)
 	def := p["masterDef"].(*pb.HostDefinition)
 
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskCreateMasters(%d) called", count), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskCreateMasters(%d) called", count), err, log.TraceLevel)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1134,8 +1164,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMasters() called"), log.TraceLevel)()
+func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMasters() called"), err, log.TraceLevel)()
 
 	list := b.cluster.ListMasterIDs(t)
 	if len(list) <= 0 {
@@ -1177,13 +1207,13 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert params
 	p := params.(data.Map)
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s) called", index, pbHost.Name), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s) called", index, pbHost.Name), err, log.TraceLevel)()
 
 	started := time.Now()
 
@@ -1191,7 +1221,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	log.Debugf("[%s] starting configuration...\n", hostLabel)
 
 	// install docker and docker-compose feature
-	err := b.installDockerCompose(t, pbHost, hostLabel)
+	err = b.installDockerCompose(t, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1214,7 +1244,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	public := p["public"].(bool)
 	def := p["nodeDef"].(*pb.HostDefinition)
 
-	defer utils.TimerWithLevel(fmt.Sprintf("<<< lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public), err, log.TraceLevel)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1486,13 +1516,13 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
-func (b *foreman) installRemoteDesktop(task concurrency.Task) error {
+func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
-	defer utils.Timer(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName))()
+	defer utils.TimerErr(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName), err)()
 
 	disabled := false
-	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
 		if !disabled {
 			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
