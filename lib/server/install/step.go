@@ -229,7 +229,7 @@ type step struct {
 // Run executes the step on all the concerned hosts
 func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResults, err error) {
 	results = stepResults{}
-	defer utils.TimerErrWithLevel(fmt.Sprintf("running step '%s' on %d hosts...", is.Name, len(hosts)), err, log.DebugLevel)
+	defer utils.TimerErrWithLevel(fmt.Sprintf("running step '%s' on %d hosts...", is.Name, len(hosts)), &err, log.DebugLevel)
 
 	if is.Serial || s.Serialize {
 		subtask := concurrency.NewTask(is.Worker.feature.task)

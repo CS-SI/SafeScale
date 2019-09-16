@@ -147,7 +147,7 @@ func (b *foreman) ExecuteScript(
 
 // construct ...
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("Constructing cluster '%s'...", req.Name), err, log.InfoLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("Constructing cluster '%s'...", req.Name), &err, log.InfoLevel)()
 
 	state := ClusterState.Unknown
 
@@ -654,7 +654,7 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 
 // configureCluster ...
 func (b *foreman) configureCluster(task concurrency.Task) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), err, log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), &err, log.TraceLevel)()
 
 	started := time.Now()
 
@@ -944,7 +944,7 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 // This function is intended to be call as a goroutine
 func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	pbGateway := params.(*pb.Host)
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskInstallGateway(%s) called", pbGateway.Id), err, log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskInstallGateway(%s) called", pbGateway.Id), &err, log.TraceLevel)()
 
 	hostLabel := "gateway"
 	log.Debugf("[%s] starting installation...", hostLabel)
@@ -1005,7 +1005,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	// Convert parameters
 	gw := params.(*pb.Host)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskConfigureGateway(%s) called", gw.Name), err, log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskConfigureGateway(%s) called", gw.Name), &err, log.TraceLevel)()
 
 	started := time.Now()
 
@@ -1030,7 +1030,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	count := p["count"].(int)
 	def := p["masterDef"].(*pb.HostDefinition)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskCreateMasters(%d) called", count), err, log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskCreateMasters(%d) called", count), &err, log.TraceLevel)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1165,7 +1165,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMasters() called"), err, log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMasters() called"), &err, log.TraceLevel)()
 
 	list := b.cluster.ListMasterIDs(t)
 	if len(list) <= 0 {
@@ -1213,7 +1213,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s) called", index, pbHost.Name), err, log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s) called", index, pbHost.Name), &err, log.TraceLevel)()
 
 	started := time.Now()
 
@@ -1244,11 +1244,11 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	public := p["public"].(bool)
 	def := p["nodeDef"].(*pb.HostDefinition)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public), err, log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public), &err, log.TraceLevel)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer utils.TimerErr(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName), err)()
+	defer utils.TimerErr(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName), &err)()
 
 	if count <= 0 {
 		log.Debugf("[cluster %s] no nodes to create.", clusterName)
@@ -1448,7 +1448,7 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s) called...", index, pbHost.Name), err, log.TraceLevel)
+	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s) called...", index, pbHost.Name), &err, log.TraceLevel)
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...", hostLabel)
@@ -1519,7 +1519,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
-	defer utils.TimerErr(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName), err)()
+	defer utils.TimerErr(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName), &err)()
 
 	disabled := false
 	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
@@ -1639,7 +1639,7 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
 	// install docker-compose (and docker) feature
-	defer utils.TimerErr(fmt.Sprintf("[%s] adding feature 'docker-compose'...", hostLabel), err)()
+	defer utils.TimerErr(fmt.Sprintf("[%s] adding feature 'docker-compose'...", hostLabel), &err)()
 
 	feat, err := install.NewEmbeddedFeature(task, "docker-compose")
 	if err != nil {

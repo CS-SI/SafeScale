@@ -496,7 +496,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	}
 
 	// Executes userdata phase2 script to finalize host installation
-	defer utils.TimerErrWithLevel(fmt.Sprintf("Starting configuration of the gateway '%s'", gw.Name), err, log.InfoLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("Starting configuration of the gateway '%s'", gw.Name), &err, log.InfoLevel)()
 	content, err := userData.Generate("phase2")
 	if err != nil {
 		return nil, err
