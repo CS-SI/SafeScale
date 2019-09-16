@@ -569,7 +569,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 	host.LastState = toHostState(server.Status)
 	if host.LastState == HostState.ERROR || host.LastState == HostState.STARTING {
-		log.Warn("[TRACE] Unexpected host's last state: %v", host.LastState)
+		log.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
 	}
 
 	// Updates Host Property propsv1.HostDescription
