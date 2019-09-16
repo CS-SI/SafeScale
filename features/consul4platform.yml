@@ -18,7 +18,7 @@
 feature:
     suitableFor:
         host: no
-        cluster: swarm
+        cluster: all
 
     parameters:
         - Version=1.5
@@ -26,9 +26,9 @@ feature:
     install:
         bash:
             check:
-                pace: masters,gateways
+                pace: stack
                 steps:
-                    masters:
+                    stack:
                         targets:
                             gateways: no
                             hosts: no
@@ -38,18 +38,8 @@ feature:
                             sfDoesDockerRunStack consul4platform || exit 192
                             exit 0
 
-                    gateways:
-                        targets:
-                            gateways: all
-                            hosts: no
-                            masters: any
-                            nodes: no
-                        run: |
-                            sfDoesDockerRunContainer consul:{{ .Version }} consul4platform_agent_1 || exit 192
-                            exit 0
-
             add:
-                pace: config-all,config-server,config-agent-nodes,config-agent-gateways,stack,compose,start-stack,start-on-gw,server-started,agent-started,agent-started-on-gw
+                pace: config-all,config-server,config-agent,stack,start,server-started,agent-started
                 steps:
                     config-all:
                         targets:
@@ -75,27 +65,33 @@ feature:
                     config-server:
                         targets:
                             gateways: no
-                            hosts: yes
+                            hosts: no
                             masters: all
                             nodes: no
                         run: |
+                            # PEERS=
+                            # for i in {{ .MasterIPs }}; do
+                            #     [ "$i" != "{{ .HostIP }}" ] && PEERS="${PEERS}\"{{.}}\","
+                            # done
+                            # PEERS=${PEERS%,*}
                             cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
                             {
-                                "advertise_addr": "{{ .HostIP }}",
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
                                 "client_addr": "0.0.0.0",
                                 "data_dir": "/consul/data",
                                 "datacenter": "{{ .ClusterName }}",
                                 "leave_on_terminate": true,
-                                "retry_join": [
-                                    "consul4platform_server"
-                                ],
                                 "node_name": "{{ .Hostname }}",
                                 "server_name": "server.{{ .Hostname }}.consul",
                                 "skip_leave_on_interrupt": true,
                             {{ if gt (len .MasterIPs) 1 }}
                                 "bootstrap_expect": {{ len .MasterIPs }},
-                            {{ end -}}
+                                "retry_join": [
+                                    "consul4platform_server"
+                                ],
+                            {{ else }}
+                                "bootstrap": true,
+                            {{ end }}
                                 "server": true,
                                 "ui": true,
                                 "autopilot": {
@@ -111,54 +107,23 @@ feature:
                             chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
                             exit 0
 
-                    config-agent-nodes:
+                    config-agent:
                         targets:
                             gateways: all
                             hosts: no
                             masters: no
                             nodes: all
                         run: |
+                            # SERVER="{{ range .MasterIPs }}\"{{.}}\", {{ end }}"
+                            # SERVERS=${SERVERS%,*}
                             cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
                             {
-                                "advertise_addr": "{{ .HostIP }}",
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
                                 "client_addr": "0.0.0.0",
                                 "data_dir": "/consul/data",
                                 "datacenter": "{{ .ClusterName }}",
                                 "retry_join": [
                                     "consul4platform_server"
-                                ],
-                                "node_name": "{{ .Hostname }}",
-                                "leave_on_terminate" : true,
-                                "skip_leave_on_interrupt" : false,
-                                "server" : false,
-                                "ui" : false,
-                                "disable_update_check": true,
-                                "log_level": "warn",
-                                "telemetry": {
-                                    "prometheus_retention_time": "24h"
-                                }
-                            }
-                            EOF
-                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
-                            exit 0
-
-                    config-agent-gateways:
-                        targets:
-                            gateways: all
-                            hosts: no
-                            masters: no
-                            nodes: all
-                        run: |
-                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
-                            {
-                                "advertise_addr": "{{ .HostIP }}",
-                                "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
-                                "client_addr": "0.0.0.0",
-                                "data_dir": "/consul/data",
-                                "datacenter": "{{ .ClusterName }}",
-                                "retry_join": [
-                                    {{ range .MasterIPs }}{{.}},
                                 ],
                                 "node_name": "{{ .Hostname }}",
                                 "leave_on_terminate" : true,
@@ -186,26 +151,36 @@ feature:
                             version: '3.3'
 
                             networks:
-                                consul4platform_net:
-                                    external: true
+                                net:
+                                    driver: overlay
+                                    attachable: true
 
                             services:
                                 server:
                                     image: consul:{{ .Version }}
-                                    command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
+                                    command: "agent -server -log-level debug -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
                                     volumes:
                                         - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
                                         - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
                                         - ${SF_VARDIR}/consul4platform:/consul/data
                                     networks:
-                                        - consul4platform_net
+                                        - net
                                     ports:
-                                        - target: 8500
-                                          published: 8500
+                                        - published: 8500
+                                          target: 8500
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: udp
                                           mode: host
                                     deploy:
                                         mode: global
-                                        endpoint_mode: dnsrr
+                                        # endpoint_mode: dnsrr
                                         update_config:
                                             parallelism: 1
                                             failure_action: rollback
@@ -216,16 +191,25 @@ feature:
                                             window: 120s
                                         placement:
                                             constraints:
-                                                - node.role == manager
+                                                - node.labels.safescale.host.role == master
 
                                 agent:
                                     image: consul:{{ .Version }}
                                     command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
                                     networks:
-                                        - consul4platform_net
+                                        - net
                                     ports:
-                                        - target: 8500
-                                          published: 8500
+                                        - published: 8500
+                                          target: 8500
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: udp
                                           mode: host
                                     volumes:
                                         - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
@@ -233,7 +217,7 @@ feature:
                                         - ${SF_VARDIR}/consul4platform:/consul/data
                                     deploy:
                                         mode: global
-                                        endpoint_mode: dnsrr
+                                        # endpoint_mode: dnsrr
                                         update_config:
                                             parallelism: 1
                                             failure_action: rollback
@@ -244,59 +228,23 @@ feature:
                                             window: 120s
                                         placement:
                                             constraints:
-                                                - node.role == worker
+                                                - node.labels.safescale.host.role != master
                             EOF
                             chown safescale:safescale ${SF_ETCDIR}/consul4platform/stack.yml
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul4platform/stack.yml
                             exit 0
 
-                    compose:
-                        targets:
-                            gateways: all
-                            hosts: no
-                            masters: no
-                            nodes: no
-                        run: |
-                            cat >${SF_ETCDIR}/consul4platform/docker-compose.yml <<-EOF
-                            version: '2.1'
-
-                            services:
-                                agent:
-                                    image: consul:{{ .Version }}
-                                    command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
-                                    ports:
-                                        - "{{.HostIP}}:8500:8500"
-                                    volumes:
-                                        - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
-                                        - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
-                                        - ${SF_VARDIR}/consul4platform:/consul/data
-                                    restart: on-failure
-                            EOF
-                            chown safescale:safescale ${SF_ETCDIR}/consul4platform/docker-compose.yml
-                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul4platform/docker-compose.yml
-                            exit 0
-
-                    start-stack:
+                    start:
                         targets:
                             gateways: no
                             hosts: no
                             masters: any
                             nodes: no
                         run: |
-                            if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul4platform_net"; then
-                                docker network create -d overlay consul4platform_net || exit 194
-                            fi
+                            # if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul4platform_net"; then
+                            #     docker network create -d overlay consul4platform_net || exit 194
+                            # fi
                             docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || exit 195
-                            exit 0
-
-                    start-on-gw:
-                        targets:
-                            gateways: all
-                            hosts: no
-                            masters: no
-                            nodes: no
-                        run: |
-                            docker-compose -f ${SF_ETCDIR}/consul4platform/docker-compose.yml -p consul4platform up -d || exit 196
                             exit 0
 
                     server-started:
@@ -319,39 +267,17 @@ feature:
                             sfRetry 5m 5 "sfDoesDockerRunService consul:{{ .Version }} consul4platform_agent" || exit 198
                             exit 0
 
-                    agent-started-on-gw:
-                        targets:
-                            gateways: all
-                            hosts: no
-                            masters: no
-                            nodes: no
-                        run: |
-                            sfRetry 5m 5 "sfDoesDockerRunContainer consul:{{ .Version }} consul4platform_agent_1" || exit 199
-                            exit 0
-
             remove:
-                pace: stop-stack,stop-on-gw,cleanup
+                pace: stop,cleanup
                 steps:
-                    stop-stack:
+                    stop:
                         targets:
                             gateways: no
-                            hosts: yes
+                            hosts: no
                             masters: any
                             nodes: no
                         run: |
                             docker stack rm consul4platform || exit 200
-                            exit 0
-
-                    stop-on-gw:
-                        targets:
-                            gateways: all
-                            hosts: no
-                            masters: no
-                            nodes: no
-                        run: |
-                            if [ -f ${SF_ETCDIR}/consul4platform/docker-compose.yml ]; then
-                                docker-compose -f ${SF_ETCDIR}/consul4platform/docker-compose.yml -p consul4platform rm --force --stop || exit 201
-                            fi
                             exit 0
 
                     cleanup:
