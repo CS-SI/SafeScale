@@ -235,7 +235,7 @@ feature:
                             version: '2.1'
                             services:
                                 server:
-                                    image: keycloak4gateway
+                                    image: keycloak4gateway:latest
                                     environment:
                                         - DB_VENDOR=POSTGRES
                                         - DB_ADDR={{ .HostIP }}
@@ -346,7 +346,7 @@ feature:
                         "paths": [ "/auth/" ],
                         "strip_path": false,
                         "protocols":["https"],
-                        "service": { "id": "{{.keycloak4gateway_svc}}" }
+                        "service": { "id": "{{ .keycloak4gateway_svc }}" }
                   }
 
 ...
