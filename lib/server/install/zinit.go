@@ -26,7 +26,7 @@ func init() {
 
 	allEmbedded = []*Feature{
 		dockerFeature(),
-		dockerComposeFeature(),
+		// dockerComposeFeature(),
 		ntpServerFeature(),
 		ntpClientFeature(),
 		ansibleFeature(),
@@ -51,6 +51,8 @@ func init() {
 		helmFeature(),
 		sparkFeature(),
 		elassandraFeature(),
+		consul4platformFeature(),
+		monitoring4platformFeature(),
 	}
 
 	for _, item := range allEmbedded {
