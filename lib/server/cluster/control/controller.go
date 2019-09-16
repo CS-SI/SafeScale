@@ -989,7 +989,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 // Delete destroys everything related to the infrastructure built for the Cluster
 func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if c == nil {
-		panic("Calling lib.server.cluster.control.Controller::Delete from nil pointer!")
+		return utils.InvalidInstanceError()
 	}
 
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::Delete() called"), &err, log.TraceLevel)()
@@ -1096,7 +1096,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 // Stop stops the Cluster is its current state is compatible
 func (c *Controller) Stop(task concurrency.Task) (err error) {
 	if c == nil {
-		panic("Calling c.Stop with c==nil!")
+		return utils.InvalidInstanceError()
 	}
 
 	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::Stop() called"), &err)()
@@ -1106,19 +1106,96 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	}
 
 	state, _ := c.ForceGetState(task)
-	if state == ClusterState.Nominal || state == ClusterState.Degraded {
-		return c.Stop(task)
+	if state == ClusterState.Stopped {
+		return nil
 	}
-	if state != ClusterState.Stopped {
+
+	if state != ClusterState.Nominal && state != ClusterState.Degraded {
 		return fmt.Errorf("failed to stop Cluster because of it's current state: %s", state.String())
 	}
-	return nil
+
+	// Updates metadata to mark the cluster as Stopping
+	err := c.UpdateMetadata(task, func() error {
+		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
+			v.(*clusterpropsv1.State).State = ClusterState.Stopping
+			return nil
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	// Stops the resources of the cluster
+
+	c.RLock(task)
+	var (
+		nodes                         []*clusterpropsv1.Node
+		masters                       []*clusterpropsv1.Node
+		gatewayID, secondaryGatewayID string
+	)
+	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+		nodesV1 := v.(*clusterpropsv1.Nodes)
+		masters = nodesV1.Masters
+		nodes = nodesV1.PrivateNodes
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get list of hosts: %v", err)
+	}
+	if c.Properties.Lookup(Property.NetworkV2) {
+		err = c.Properties.LockForRead(Property.NetworkV2).ThenUse(func(v interface{}) error {
+			networkV2 := v.(*clusterpropsv2.Network)
+			gatewayID = networkV2.GatewayID
+			secondaryGatewayID = networkV2.SecondaryGatewayID
+			return nil
+		})
+	} else {
+		err = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
+			gatewayID = v.(*clusterpropsv1.Network).GatewayID
+			return nil
+		})
+	}
+	if err != nil {
+		return err
+	}
+
+	// Stop nodes
+	taskGroup := concurrency.NewTaskGroup(task)
+	for _, n := range nodes {
+		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+	}
+	// Stop masters
+	for _, n := range masters {
+		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+	}
+	// Stop gateway(s)
+	_ = taskGroup.Start(c.asyncStopHost, gatewayID)
+	if secondaryGatewayID != "" {
+		_ = taskGroup.Start(c.asyncStopHost, secondaryGatewayID)
+	}
+	_, err = taskGroup.Wait()
+	if err != nil {
+		return err
+	}
+
+	// Updates metadata to mark the cluster as Stopped
+	return c.UpdateMetadata(task, func() error {
+		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
+			v.(*clusterpropsv1.State).State = ClusterState.Stopped
+			state = ClusterState.Stopped
+			return nil
+		})
+	})
+}
+
+func (c *Controller) asyncStopHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	return nil, c.service.StopHost(params.(string))
 }
 
 // Start starts the Cluster
 func (c *Controller) Start(task concurrency.Task) (err error) {
 	if c == nil {
-		panic("Calling c.Start with c==nil!")
+		return utils.InvalidInstanceError()
 	}
 
 	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::Start() called"), &err)()
@@ -1131,18 +1208,87 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	if err != nil {
 		return err
 	}
-	if state == ClusterState.Stopped {
-		return c.UpdateMetadata(task, func() error {
-			return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
-				v.(*clusterpropsv1.State).State = ClusterState.Nominal
-				return nil
-			})
-		})
+	if state == ClusterState.Nominal || state == ClusterState.Degraded || state == ClusterState.Starting {
+		return nil
 	}
-	if state != ClusterState.Nominal && state != ClusterState.Degraded {
+	if state != ClusterState.Stopped {
 		return fmt.Errorf("failed to start Cluster because of it's current state: %s", state.String())
 	}
-	return nil
+
+	// Updates metadata to mark the cluster as Starting
+	err = c.UpdateMetadata(task, func() error {
+		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
+			v.(*clusterpropsv1.State).State = ClusterState.Starting
+			return nil
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	// Starts the resources of the cluster
+	c.RLock(task)
+	var (
+		nodes                         []*clusterpropsv1.Node
+		masters                       []*clusterpropsv1.Node
+		gatewayID, secondaryGatewayID string
+	)
+	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+		nodesV1 := v.(*clusterpropsv1.Nodes)
+		masters = nodesV1.Masters
+		nodes = nodesV1.PrivateNodes
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get list of hosts: %v", err)
+	}
+	if c.Properties.Lookup(Property.NetworkV2) {
+		err = c.Properties.LockForRead(Property.NetworkV2).ThenUse(func(v interface{}) error {
+			networkV2 := v.(*clusterpropsv2.Network)
+			gatewayID = networkV2.GatewayID
+			secondaryGatewayID = networkV2.SecondaryGatewayID
+			return nil
+		})
+	} else {
+		err = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
+			gatewayID = v.(*clusterpropsv1.Network).GatewayID
+			return nil
+		})
+	}
+	if err != nil {
+		return err
+	}
+
+	// Start gateway(s)
+	taskGroup := concurrency.NewTaskGroup(task)
+	_ = taskGroup.Start(c.asyncStartHost, gatewayID)
+	if secondaryGatewayID != "" {
+		_ = taskGroup.Start(c.asyncStartHost, secondaryGatewayID)
+	}
+	// Start masters
+	for _, n := range masters {
+		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+	}
+	// Start nodes
+	for _, n := range nodes {
+		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+	}
+	_, err = taskGroup.Wait()
+	if err != nil {
+		return err
+	}
+
+	// Updates metadata to mark the cluster as Stopped
+	return c.UpdateMetadata(task, func() error {
+		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
+			v.(*clusterpropsv1.State).State = ClusterState.Nominal
+			return nil
+		})
+	})
+}
+
+func (c *Controller) asyncStartHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	return nil, c.service.StartHost(params.(string))
 }
 
 // // sanitize tries to rebuild manager struct based on what is available on ObjectStorage
