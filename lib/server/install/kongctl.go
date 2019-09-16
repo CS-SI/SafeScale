@@ -134,21 +134,26 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
-func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variables) error {
-	ruleName := rule["name"].(string)
+// Returns rule name and error
+func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variables) (string, error) {
 	ruleType := rule["type"].(string)
 
+	ruleName, err := k.realizeRuleData(strings.Trim(rule["name"].(string), "\n"), *values)
+	if err != nil {
+		return "", err
+	}
 	content, err := k.realizeRuleData(strings.Trim(rule["content"].(string), "\n"), *values)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var sourceControl map[string]interface{}
 
 	// Sets the values useable in all cases
 	if k.network.VIP != nil {
-		// w.variables["EndpointIP"] = network.VIP.PublicIP
-		(*values)["EndpointIP"] = k.network.VIP.PublicIP
+		// VPL: for now, no public IP on VIP, so uses the IP of the first Gateway
+		// (*values)["EndpointIP"] = k.network.VIP.PublicIP
+		(*values)["EndpointIP"] = k.gatewayPublicIP
 		(*values)["DefaultRouteIP"] = k.network.VIP.PrivateIP
 	} else {
 		(*values)["EndpointIP"] = k.gatewayPublicIP
@@ -167,7 +172,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		unjsoned := map[string]interface{}{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
-			return fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
+			return ruleName, fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		if _, ok := unjsoned["source-control"]; ok {
 			sourceControl = unjsoned["source-control"].(map[string]interface{})
@@ -177,14 +182,14 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 			unjsoned["name"] = ruleName
 		}
 		jsoned, _ := json.Marshal(&unjsoned)
-		content = string(jsoned)
+		content := string(jsoned)
 
 		response, _, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
-			return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
 		log.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
-		return k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
+		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":
 		url = "routes/"
@@ -192,7 +197,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		unjsoned := map[string]interface{}{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
-			return fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
+			return ruleName, fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		if _, ok := unjsoned["source-control"]; ok {
 			sourceControl = unjsoned["source-control"].(map[string]interface{})
@@ -206,10 +211,10 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		content = string(jsoned)
 		response, _, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
-			return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
 		log.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
-		return k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
+		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "upstream":
 		url = "upstreams/"
@@ -220,14 +225,14 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		_, _, err = k.get(ruleName, url)
 		if err != nil {
 			if _, ok := err.(utils.ErrNotFound); !ok {
-				return err
+				return "", err
 			}
 			create = true
 		}
 		if create {
 			err = k.createUpstream(ruleName, values)
 			if err != nil {
-				return err
+				return "", err
 			}
 		}
 
@@ -235,18 +240,18 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		url += "/targets"
 		_, _, err = k.post(ruleName, url, content, values, false)
 		if err != nil {
-			return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
 		log.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
-		return nil
+		return "", nil
 
 	default:
-		return fmt.Errorf("syntax error in rule '%s': '%s' isn't a valid type", ruleName, ruleType)
+		return ruleName, fmt.Errorf("syntax error in rule '%s': '%s' isn't a valid type", ruleName, ruleType)
 	}
 }
 
 func (k *KongController) realizeRuleData(content string, v Variables) (string, error) {
-	contentTmpl, err := template.New("proxy_rule").Parse(content)
+	contentTmpl, err := template.New("proxy_content").Parse(content)
 	if err != nil {
 		return "", fmt.Errorf("error preparing rule: %s", err.Error())
 	}
