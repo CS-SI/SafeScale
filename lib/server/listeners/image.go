@@ -41,7 +41,7 @@ type ImageListener struct{}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: list images called"), log.InfoLevel)()
+	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: list images called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
