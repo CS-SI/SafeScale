@@ -474,7 +474,6 @@ func (handler *HostHandler) Create(
 	if err != nil {
 		return nil, infraErrf(err, "Metadata creation failed")
 	}
-	log.Infof("Compute resource created: '%s'", host.Name)
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
