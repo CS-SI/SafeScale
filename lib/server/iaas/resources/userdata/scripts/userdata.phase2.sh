@@ -798,7 +798,7 @@ lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 update_kernel_settings || fail 217
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 # For compatibility with previous user_data implementation (until v19.03.x)...
 ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
 

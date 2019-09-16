@@ -170,6 +170,6 @@ ensure_network_connectivity
 
 touch /etc/cloud/cloud-init.disabled
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 set +x
 exit 0
