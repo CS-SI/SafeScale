@@ -90,20 +90,20 @@ func dockerFeature() *Feature {
 	}
 }
 
-// dockerComposeFeature ...
-func dockerComposeFeature() *Feature {
-	name := "docker-compose"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
+// // dockerComposeFeature ...
+// func dockerComposeFeature() *Feature {
+// 	name := "docker-compose"
+// 	filename, specs, err := loadSpecFile(name)
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
+// 	return &Feature{
+// 		displayName: name,
+// 		fileName:    filename,
+// 		embedded:    true,
+// 		specs:       specs,
+// 	}
+// }
 
 // ntpServerFeature ...
 func ntpServerFeature() *Feature {
@@ -468,6 +468,36 @@ func kibanaFeature() *Feature {
 // elassandraFeature ...
 func elassandraFeature() *Feature {
 	name := "elassandra"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// consul4platformFeature ...
+func consul4platformFeature() *Feature {
+	name := "consul4platform"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// monitoring4platformFeature ...
+func monitoring4platformFeature() *Feature {
+	name := "monitoring4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

@@ -47,6 +47,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
@@ -530,7 +531,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 
 	// At the end, configure cluster as a whole
-	err = b.configureCluster(task)
+	err = b.configureCluster(task, data.Map{
+		"PrimaryGateway":   primaryGateway,
+		"SecondaryGateway": secondaryGateway,
+	})
 	if err != nil {
 		return err
 	}
@@ -650,9 +654,16 @@ func (b *foreman) configureCluster(task concurrency.Task) (err error) {
 	log.Infof("[cluster %s] configuring cluster...", b.cluster.Name)
 	defer func() {
 		if err == nil {
-			log.Infof("[cluster %s] configuration successful in [%s]", b.cluster.Name, utils.FmtDuration(time.Since(started)))
+			log.Infof("[cluster %s] configuration successful.", b.cluster.Name)
+		} else {
+			log.Errorf("[cluster %s] configuration failed: %s", b.cluster.Name, err.Error())
 		}
 	}()
+
+	err = b.createSwarm(task, params)
+	if err != nil {
+		return err
+	}
 
 	// Installs reverseproxy feature on cluster (gateways)
 	err = b.installReverseProxy(task)
@@ -680,6 +691,131 @@ func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) 
 		return b.makers.MinimumRequiredServers(task, b)
 	}
 	return 0, 0, 0
+}
+
+// configureCluster configures cluster
+func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskParameters) error {
+	var (
+		p                                data.Map
+		ok                               bool
+		primaryGateway, secondaryGateway *resources.Host
+	)
+	if p, ok = params.(data.Map); !ok {
+		return utils.InvalidParameterError("params", "must be a data.Map")
+	}
+	if primaryGateway, ok = p["PrimaryGateway"].(*resources.Host); !ok || primaryGateway == nil {
+		return utils.InvalidParameterError("params", "key 'PrimaryGateway' must be defined and can't be nil")
+	}
+	secondaryGateway, ok = p["SecondaryGateway"].(*resources.Host)
+
+	clientInstance := client.New()
+	clientHost := clientInstance.Host
+	clientSSH := clientInstance.Ssh
+
+	cluster := b.cluster
+
+	// Join masters in Docker Swarm as managers
+	joinCmd := ""
+	for _, hostID := range cluster.ListMasterIDs(task) {
+		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+		}
+		if joinCmd == "" {
+			retcode, _, _, err := clientSSH.Run(hostID, "docker swarm init && docker node update "+host.Name+" --label-add safescale.host.role=master",
+				client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			if err != nil || retcode != 0 {
+				return fmt.Errorf("failed to init docker swarm")
+			}
+			retcode, token, stderr, err := clientSSH.Run(hostID, "docker swarm join-token manager -q", client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			if err != nil || retcode != 0 {
+				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
+			}
+			token = strings.Trim(token, "\n")
+			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, host.PrivateIp)
+		} else {
+			masterJoinCmd := joinCmd + " && docker node update " + host.Name + " --label-add safescale.host.role=master"
+			retcode, _, stderr, err := clientSSH.Run(hostID, masterJoinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			if err != nil || retcode != 0 {
+				return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
+			}
+		}
+	}
+
+	selectedMasterID, err := b.Cluster().FindAvailableMaster(task)
+	if err != nil {
+		return fmt.Errorf("failed to find an available docker manager: %v", err)
+	}
+	selectedMaster, err := clientHost.Inspect(selectedMasterID, client.DefaultExecutionTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata of docker manager: %s", err.Error())
+	}
+
+	// build command to join Docker Swarm as workers
+	joinCmd, err = b.getSwarmJoinCommand(task, selectedMaster, true)
+	if err != nil {
+		return err
+	}
+
+	// Join private node in Docker Swarm as workers
+	for _, hostID := range cluster.ListNodeIDs(task) {
+		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+		}
+		retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		if err != nil || retcode != 0 {
+			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
+		}
+		labelCmd := "docker node update " + host.Name + " --label-add safescale.host.role=node"
+		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		if err != nil || retcode != 0 {
+			return fmt.Errorf("failed to label swarm worker '%s' as node: %s", host.Name, stderr)
+		}
+	}
+
+	// Join gateways in Docker Swarm as workers
+	retcode, _, stderr, err := clientSSH.Run(primaryGateway.ID, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil || retcode != 0 {
+		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
+	}
+	labelCmd := "docker node update " + primaryGateway.Name + " --label-add safescale.host.role=gateway"
+	retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil || retcode != 0 {
+		return fmt.Errorf("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.Name, stderr)
+	}
+
+	if secondaryGateway != nil {
+		retcode, _, stderr, err := clientSSH.Run(secondaryGateway.ID, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		if err != nil || retcode != 0 {
+			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
+		}
+		labelCmd := "docker node update " + secondaryGateway.Name + " --label-add safescale.host.role=node"
+		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		if err != nil || retcode != 0 {
+			return fmt.Errorf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.Name, stderr)
+		}
+	}
+
+	return nil
+}
+
+// getSwarmJoinCommand builds the command to obtain swarm token
+func (b *foreman) getSwarmJoinCommand(task concurrency.Task, selectedMaster *pb.Host, worker bool) (string, error) {
+	clientInstance := client.New()
+	var memberType string
+	if worker {
+		memberType = "worker"
+	} else {
+		memberType = "manager"
+	}
+	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
+	retcode, token, stderr, err := clientInstance.Ssh.Run(selectedMaster.Id, tokenCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil || retcode != 0 {
+		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
+	}
+	token = strings.Trim(token, "\n")
+	return fmt.Sprintf("docker swarm join --token %s %s", token, selectedMaster.PrivateIp), nil
 }
 
 // uploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
@@ -771,13 +907,39 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 
 	log.Debugf("Joining nodes to cluster...")
 
-	clientHost := client.New().Host
+	clientInstance := client.New()
+	clientHost := clientInstance.Host
+	clientSSH := clientInstance.Ssh
+
+	selectedMasterID, err := b.Cluster().FindAvailableMaster(task)
+	if err != nil {
+		return fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
+	}
+	selectedMaster, err := clientHost.Inspect(selectedMasterID, client.DefaultExecutionTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+	}
+	joinCmd, err := b.getSwarmJoinCommand(task, selectedMaster, true)
+	if err != nil {
+		return err
+	}
+
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
 		pbHost, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			return err
+		}
+
+		retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		if err != nil || retcode != 0 {
+			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
+		}
+		nodeLabel := "docker node update " + pbHost.Name + " --label-add safescale.host.role=node"
+		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, nodeLabel, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		if err != nil || retcode != 0 {
+			return fmt.Errorf("failed to add label to docker Swarm worker '%s': %s", pbHost.Name, stderr)
 		}
 
 		if b.makers.JoinMasterToCluster != nil {
@@ -818,14 +980,16 @@ func (b *foreman) leaveMastersFromList(task concurrency.Task, public bool, hosts
 
 // leaveNodesFromList makes nodes from a list leave the cluster
 func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, selectedMasterID string) error {
-	if b.makers.LeaveNodeFromCluster == nil {
-		return nil
+	log.Debugf("Instructing nodes to leave cluster...")
+
+	selectedMaster, err := b.Cluster().FindAvailableMaster(task)
+	if err != nil {
+		return err
 	}
 
-	log.Debugf("Ordering nodes to leave cluster...")
-
 	clientHost := client.New().Host
-	// Joins to cluster is done sequentially, experience shows too many join at the same time
+
+	// Unjoins from cluster are done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
 		pbHost, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
@@ -836,12 +1000,87 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 			}
 			return err
 		}
-		err = b.makers.LeaveNodeFromCluster(task, b, pbHost, selectedMasterID)
+
+		if b.makers.LeaveNodeFromCluster != nil {
+			err = b.makers.LeaveNodeFromCluster(task, b, pbHost, selectedMasterID)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = b.leaveNodeFromSwarm(task, pbHost, selectedMaster)
 		if err != nil {
 			return err
 		}
 	}
 
+	return nil
+}
+
+func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, selectedMaster string) error {
+	if selectedMaster == "" {
+		var err error
+		selectedMaster, err = b.Cluster().FindAvailableMaster(task)
+		if err != nil {
+			return err
+		}
+	}
+
+	clientSSH := client.New().Ssh
+
+	// Check worker is member of the Swarm
+	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
+	retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		// node is already expelled from Docker Swarm
+		return nil
+	}
+	// node is a worker in the Swarm: 1st ask worker to leave Swarm
+	cmd = "docker swarm leave"
+	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("failed to make node '%s' leave swarm: %s", pbHost.Name, stderr)
+	}
+
+	// 2nd: wait the Swarm worker to appear as down from Swarm master
+	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			if err != nil {
+				return err
+			}
+			if retcode != 0 {
+				return fmt.Errorf("'%s' not in Down state", pbHost.Name)
+			}
+			return nil
+		},
+		utils.GetHostTimeout(),
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, utils.GetHostTimeout())
+		default:
+			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
+		}
+	}
+
+	// 3rd, ask master to remove node from Swarm
+	cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
+	retcode, _, stderr, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr)
+	}
 	return nil
 }
 
@@ -940,7 +1179,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	}
 
 	// Installs docker and docker-compose on gateway
-	err = b.installDockerCompose(t, pbGateway, hostLabel)
+	err = b.installDocker(t, pbGateway, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1203,7 +1442,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	log.Debugf("[%s] starting configuration...\n", hostLabel)
 
 	// install docker and docker-compose feature
-	err = b.installDockerCompose(t, pbHost, hostLabel)
+	err := b.installDocker(t, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1433,7 +1672,7 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 	log.Debugf("[%s] starting configuration...", hostLabel)
 
 	// Docker and docker-compose installation is mandatory on all nodes
-	err = b.installDockerCompose(t, pbHost, hostLabel)
+	err := b.installDocker(t, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1594,11 +1833,11 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	return nil
 }
 
+// intallDocker installs docker and docker-compose
+func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) error {
 func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	// install docker-compose (and docker) feature
 	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'docker-compose'...", hostLabel), &err, log.DebugLevel)()
-
-	feat, err := install.NewEmbeddedFeature(task, "docker-compose")
+	feat, err := install.NewEmbeddedFeature(task, "docker")
 	if err != nil {
 		return err
 	}
@@ -1608,8 +1847,10 @@ func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, h
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		return fmt.Errorf("[%s] failed to add feature 'docker-compose' on host '%s': %s", hostLabel, pbHost.Name, msg)
+		log.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
+		return fmt.Errorf("failed to add feature 'docker' on host '%s': %s", pbHost.Name, msg)
 	}
+	log.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil
 }
 

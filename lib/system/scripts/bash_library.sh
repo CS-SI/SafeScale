@@ -439,13 +439,13 @@ sfDoesDockerRunContainer() {
 	[ $# -eq 0 ] && return 1
 	local IMAGE=$1
 	shift
-	local NAME=
-	[ $# -ge 1 ] && NAME=$1
+	local INSTANCE=
+	[ $# -ge 1 ] && INSTANCE=$1
 
 	local LIST=$(docker container ls {{ "--format '{{.Image}}|{{.Names}}|{{.Status}}'" }})
 	[ -z "$LIST" ] && return 1
 	[ "$IMAGE" != "$(echo "$LIST" | cut -d'|' -f1 | grep "$IMAGE" | uniq)" ] && return 1
-	[ ! -z "$NAME" -a "$NAME" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$NAME" | uniq)" ] && return 1
+	[ ! -z "$INSTANCE" -a "$INSTANCE" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ] && return 1
 	echo $LIST | cut -d'|' -f3 | grep -i "^up" &>/dev/null || return 1
 	return 0
 }
@@ -461,11 +461,11 @@ sfDoesDockerRunService() {
 	if [ -z "$LIST" ]; then
 		return 1
 	fi
-	local RIMAGE=$(echo "$LIST" | cut -d'|' -f1)
+	local RIMAGE=$(echo "$LIST" | cut -d'|' -f1 | sort | uniq)
 	if [ "$IMAGE" != "$RIMAGE" ]; then
 		return 1
 	fi
-	local RNAME=$(echo "$LIST" | cut -d'|' -f2)
+	local RNAME=$(echo "$LIST" | cut -d'|' -f2 | sort | uniq)
 	if ! expr match "$RNAME" "^${NAME}\." &>/dev/null; then
 		return 1
 	fi
