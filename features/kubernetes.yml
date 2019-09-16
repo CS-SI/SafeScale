@@ -21,7 +21,7 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
+
         # "clusterSizing" not honored currently
         clusterSizing:
             dcos:

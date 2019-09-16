@@ -20,7 +20,6 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
             - kubernetes
         cluster:
             small:
@@ -108,6 +107,6 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            rm -rf /usr/local/spark-{{.SparkVersion}}-bin-hadoop* 
+                            rm -rf /usr/local/spark-{{.SparkVersion}}-bin-hadoop*
                             rm -f /usr/local/spark
 ...

@@ -27,7 +27,6 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
 
     parameters:
         - GtmNodePort=6666
