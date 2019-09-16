@@ -19,6 +19,7 @@ package concurrency
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,24 +27,21 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
+// TaskGroupResult is a map of the TaskResult of each task
+// The index is the ID of the sub-Task running the action.
+type TaskGroupResult map[string]TaskResult
+
 // TaskGroup is the task group interface
 type TaskGroup interface {
-	ForceID(string) Task
-	GetID() string
-	GetSignature() string
-	GetStatus() TaskStatus
-	GetContext() context.Context
-	Reset() Task
-	Submit(TaskAction, TaskParameters)
-	Start()
-	TryWait() (bool, error)
-	Wait() error
-	WaitFor() (bool, error)
+	TryWait() (bool, map[string]TaskResult, error)
+	Wait() (map[string]TaskResult, error)
+	WaitFor(time.Duration) (bool, map[string]TaskResult, error)
 }
 
 // task is a structure allowing to identify (indirectly) goroutines
 type taskGroup struct {
 	lock sync.Mutex
+	last uint
 	*task
 	subtasks []Task
 }
@@ -85,7 +83,7 @@ func (tg *taskGroup) GetID() string {
 }
 
 // GetSignature builds the "signature" of the task passed as parameter,
-// ie a string representation of the task ID in the format "{task <id>}".
+// ie a string representation of the task ID in the format "{taskgroup <id>}".
 func (tg *taskGroup) Signature() string {
 	if !Trace.Tasks {
 		return ""
@@ -95,11 +93,15 @@ func (tg *taskGroup) Signature() string {
 
 // GetStatus returns the current task status
 func (tg *taskGroup) GetStatus() TaskStatus {
-	return tg.task.GetStatus()
+	tg.task.lock.Lock()
+	defer tg.task.lock.Unlock()
+	return tg.task.status
 }
 
 // GetContext returns the current task status
 func (tg *taskGroup) GetContext() context.Context {
+	tg.task.lock.Lock()
+	defer tg.task.lock.Unlock()
 	return tg.task.GetContext()
 }
 
@@ -110,6 +112,7 @@ func (tg *taskGroup) ForceID(id string) Task {
 }
 
 // Start runs in goroutine the function with parameters
+// Each sub-Task created has its ID forced to TaskGroup ID + "-<index>".
 func (tg *taskGroup) Start(action TaskAction, params TaskParameters) Task {
 	tg.lock.Lock()
 	defer tg.lock.Unlock()
@@ -119,7 +122,8 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) Task {
 		panic(fmt.Sprintf("Can't start new task in group '%s': neither ready nor running!", tg.GetID()))
 	}
 
-	subtask := tg.task.New().Start(action, params)
+	tg.last++
+	subtask := tg.task.New().ForceID(tg.task.id+"-"+strconv.Itoa(int(tg.last))).Start(action, params)
 	tg.subtasks = append(tg.subtasks, subtask)
 	if status != RUNNING {
 		tg.task.lock.Lock()
@@ -131,13 +135,12 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) Task {
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (tg *taskGroup) Wait() (TaskResult, error) {
-	status := tg.task.GetStatus()
-	if status == DONE {
+	if tg.task.status == DONE {
 		tg.task.lock.Lock()
 		defer tg.task.lock.Unlock()
 		return tg.result, tg.task.err
 	}
-	if status != RUNNING {
+	if tg.task.status != RUNNING {
 		return nil, fmt.Errorf("can't wait task group '%s': not running", tg.GetID())
 	}
 
@@ -167,8 +170,7 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 
 // TryWait tries to wait on a task; if done returns the error and true, if not returns nil and false
 func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
-	status := tg.GetStatus()
-	if status != RUNNING {
+	if tg.task.status != RUNNING {
 		return false, nil, fmt.Errorf("can't wait task group '%s': not running", tg.GetID())
 	}
 	for _, s := range tg.subtasks {
@@ -182,11 +184,15 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
 }
 
 // WaitFor waits for the task to end, for 'duration' duration
-// If duration elapsed, returns (false, nil)
+// If duration elapsed, returns (false, nil, nil)
+// By design, duration can't be less than 1ms.
 func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
-	status := tg.GetStatus()
-	if status != RUNNING {
+	if tg.task.status != RUNNING {
 		return false, nil, fmt.Errorf("can't wait task '%s': not running", tg.GetID())
+	}
+
+	if duration < time.Millisecond {
+		duration = time.Millisecond
 	}
 
 	for {
@@ -206,8 +212,7 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 
 // Reset resets the task for reuse
 func (tg *taskGroup) Reset() Task {
-	status := tg.GetStatus()
-	if status == RUNNING {
+	if tg.task.status == RUNNING {
 		panic(fmt.Sprintf("Can't reset task group '%s': group running!", tg.GetID()))
 	}
 
