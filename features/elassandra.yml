@@ -22,12 +22,12 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
             - kong
+
     parameters:
         - KeepDataOnRemoval=yes
         - ClusterName=safescale
-    
+
     install:
         bash:
             check:
@@ -149,37 +149,37 @@ feature:
 
     proxy:
         rules:
-            - name: elasticsearch_http_svc
+            - name: elassandra_http_svc
               type: service
               targets:
                   hosts: true
                   masters: all
               content: |
                   {
-                      "name": "elasticsearch_http_{{.Hostname}}",
+                      "name": "elassandra_http_{{.Hostname}}",
                       "url": "http://{{.HostIP}}:9200/"
                   }
 
-            - name: elasticsearch_transport_svc
+            - name: elassandra_transport_svc
               type: service
               targets:
                   hosts: true
                   masters: all
               content: |
                   {
-                      "name": "elasticsearch_transport_{{.Hostname}}",
+                      "name": "elassandra_transport_{{.Hostname}}",
                       "url": "http://{{.HostIP}}:9300/"
                   }
 
-            - name: elasticsearch_http_route
+            - name: elassandra_http_route
               type: route
               targets:
                   hosts: true
                   masters: all
               content: |
                   {
-                      "paths": ["/monitoring/elasticsearch/"],
-                      "service": { "id": "{{.elasticsearch_http_svc}}" }
+                      "paths": ["/elassandra/"],
+                      "service": { "id": "{{.elassandra_http_svc}}" }
                   }
 
 ...

@@ -23,7 +23,6 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
             - consul4platform
 
     parameters:
@@ -48,7 +47,8 @@ feature:
                             exit 0
 
             add:
-                pace: prometheus,am-executor,alertmanager,grafana,portainer,stack,secrets,network,start,running
+                # pace: prometheus,am-executor,alertmanager,grafana,portainer,stack,secrets,network,start,running
+                pace: prometheus,am-executor,alertmanager,grafana,portainer,stack,start,running
                 steps:
                     prometheus:
                         targets:
@@ -84,7 +84,7 @@ feature:
 
                                 - job_name: consul
                                   consul_sd_configs:
-                                      - server: 'tasks.consul-server:8500'
+                                      - server: 'consul4platform_server:8500'
                                   relabel_configs:
                                       - source_labels: [__meta_consul_tags]
                                         regex: .*,monitor,.*
@@ -328,7 +328,7 @@ feature:
                                 - name: Prometheus
                                   type: prometheus
                                   access: proxy
-                                  url: http://tasks.prometheus:9090
+                                  url: http://monitoring4platform_prometheus:9090
                                   isDefault: true
                                   version: 1
                                   editable: true
@@ -362,8 +362,11 @@ feature:
                             version: '3.3'
 
                             networks:
-                                monitoring4platform-net:
+                                consul4platform_net:
                                     external: true
+                                net:
+                                    driver: overlay
+                                    attachable: false
 
                             configs:
                                 node_rules:
@@ -371,16 +374,16 @@ feature:
                                 task_rules:
                                     file: ${SF_ETCDIR}/monitoring4platform/prometheus/rules/swarm_task.yml
 
-                            secrets:
-                                safescale.portainer-ui.admin_password:
-                                    external: true
+                            # secrets:
+                            #     safescale.portainer-ui.admin_password:
+                            #         external: true
 
                             services:
                                 cadvisor:
                                     image: google/cadvisor
                                     command: -logtostderr -docker_only
                                     networks:
-                                        - monitoring4platform-net
+                                        - net
                                     volumes:
                                         - /var/run/docker.sock:/var/run/docker.sock:ro
                                         - /:/rootfs:ro
@@ -398,7 +401,7 @@ feature:
                                 grafana:
                                     image: grafana/grafana:{{ .GrafanaVersion }}
                                     networks:
-                                        - monitoring4platform-net
+                                        - net
                                     ports:
                                         - published: 3000
                                           target: 3000
@@ -436,7 +439,7 @@ feature:
                                         - /usr/local/bin/safescaled:/usr/local/bin/safescaled:ro
                                         - /usr/local/bin/safescale:/usr/local/bin/safescale:ro
                                     networks:
-                                        - monitoring4platform-net
+                                        - net
                                     deploy:
                                         mode: replicated
                                         replicas: 1
@@ -452,7 +455,7 @@ feature:
                                 alertmanager:
                                     image: prom/alertmanager:{{ .AlertmanagerVersion }}
                                     networks:
-                                        - monitoring4platform-net
+                                        - net
                                     command:
                                         - '--config.file=/etc/alertmanager/alertmanager.yml'
                                         - '--storage.path=/alertmanager'
@@ -475,7 +478,7 @@ feature:
                                 unsee:
                                     image: cloudflare/unsee:v0.8.0
                                     networks:
-                                        - monitoring4platform-net
+                                        - net
                                     environment:
                                         - "ALERTMANAGER_URIS=default:http://alertmanager:9093"
                                     deploy:
@@ -490,7 +493,7 @@ feature:
                                 node-exporter:
                                     image: prom/node-exporter:{{ .NodeExporterVersion}}
                                     networks:
-                                        - monitoring4platform-net
+                                        - net
                                     ports:
                                         - published: 9100
                                           target: 9100
@@ -517,7 +520,7 @@ feature:
                                 prometheus:
                                     image: prom/prometheus:{{.PrometheusVersion}}
                                     networks:
-                                        - monitoring4platform-net
+                                        - net
                                     command:
                                         - '--config.file=/etc/prometheus/prometheus.yml'
                                         - '--storage.tsdb.path=/prometheus'
@@ -542,79 +545,79 @@ feature:
                                             reservations:
                                                 memory: 128M
 
-                                portainer-agent:
-                                    image: portainer/agent
-                                    environment:
-                                        # REQUIRED: Should be equal to the service name prefixed by "tasks." when
-                                        # deployed inside an overlay network
-                                        AGENT_CLUSTER_ADDR: tasks.portainer-agent
-                                        # AGENT_PORT: 9001
-                                        # LOG_LEVEL: debug
-                                    volumes:
-                                        - /var/run/docker.sock:/var/run/docker.sock
-                                        - /var/lib/docker/volumes:/var/lib/docker/volumes
-                                    networks:
-                                        - monitoring4platform-net
-                                    deploy:
-                                        mode: global
-                                        placement:
-                                            constraints:
-                                                - node.platform.os == linux
-                                        resources:
-                                            limits:
-                                                memory: 128M
-                                            reservations:
-                                                memory: 64M
+                                # portainer-agent:
+                                #     image: portainer/agent
+                                #     environment:
+                                #         # REQUIRED: Should be equal to the service name prefixed by "tasks." when
+                                #         # deployed inside an overlay network
+                                #         AGENT_CLUSTER_ADDR: tasks.portainer-agent
+                                #         # AGENT_PORT: 9001
+                                #         # LOG_LEVEL: debug
+                                #     volumes:
+                                #         - /var/run/docker.sock:/var/run/docker.sock
+                                #         - /var/lib/docker/volumes:/var/lib/docker/volumes
+                                #     networks:
+                                #         - monitoring4platform_net
+                                #     deploy:
+                                #         mode: global
+                                #         placement:
+                                #             constraints:
+                                #                 - node.platform.os == linux
+                                #         resources:
+                                #             limits:
+                                #                 memory: 128M
+                                #             reservations:
+                                #                 memory: 64M
 
-                                portainer-ui:
-                                    image: portainer/portainer
-                                    command:
-                                        - -H tcp://tasks.portainer-agent:9001
-                                        - --tlsskipverify
-                                        - --admin-password-file /run/secrets/admin_password
-                                    networks:
-                                        - monitoring4platform-net
-                                    ports:
-                                        - published: 9000
-                                          target: 9000
-                                          mode: host
-                                    volumes:
-                                        - ${SF_VARDIR}/monitoring4platform:/data
-                                    deploy:
-                                        mode: replicated
-                                        replicas: 1
-                                        placement:
-                                            constraints:
-                                                - node.role == manager
-                                        resources:
-                                            limits:
-                                                memory: 128M
-                                            reservations:
-                                                memory: 64M
-                                    secrets:
-                                        - source: safescale.portainer-ui.admin_password
-                                          target: admin_password
+                                # portainer-ui:
+                                #     image: portainer/portainer
+                                #     command:
+                                #         - -H tcp://tasks.portainer-agent:9001
+                                #         - --tlsskipverify
+                                #         - --admin-password-file /run/secrets/admin_password
+                                #     networks:
+                                #         - monitoring4platform_net
+                                #     ports:
+                                #         - published: 9000
+                                #           target: 9000
+                                #           mode: host
+                                #     volumes:
+                                #         - ${SF_VARDIR}/monitoring4platform:/data
+                                #     deploy:
+                                #         mode: replicated
+                                #         replicas: 1
+                                #         placement:
+                                #             constraints:
+                                #                 - node.role == manager
+                                #         resources:
+                                #             limits:
+                                #                 memory: 128M
+                                #             reservations:
+                                #                 memory: 64M
+                                #     secrets:
+                                #         - source: safescale.portainer-ui.admin_password
+                                #           target: admin_password
                             EOF
 
-                    network:
-                        targets:
-                            hosts: no
-                            masters: any
-                            nodes: no
-                        run: |
-                            if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^monitoring4platform-net"; then
-                                docker network create -d overlay monitoring4platform-net || exit 194
-                            fi
-                            exit 0
+                    # network:
+                    #     targets:
+                    #         hosts: no
+                    #         masters: any
+                    #         nodes: no
+                    #     run: |
+                    #         if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^monitoring4platform_net"; then
+                    #             docker network create -d overlay monitoring4platform_net || exit 194
+                    #         fi
+                    #         exit 0
 
-                    secrets:
-                        targets:
-                            hosts: no
-                            masters: any
-                            nodes: no
-                        run: |
-                            echo "{{.ClusterAdminPassword}}" | docker secret create safescale.portainer-ui.admin_password -
-                            exit 0
+                    # secrets:
+                    #     targets:
+                    #         hosts: no
+                    #         masters: any
+                    #         nodes: no
+                    #     run: |
+                    #         echo "{{.ClusterAdminPassword}}" | docker secret create safescale.portainer-ui.admin_password -
+                    #         exit 0
 
                     start:
                         targets:
@@ -663,7 +666,7 @@ feature:
                             sfRemoveDockerImage cloudflare/unsee:v0.8.0
                             sfRemoveDockerImage google/cadvisor
 
-                            docker network rm monitoring4platform-net
+                            docker network rm monitoring4platform_net
 
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
