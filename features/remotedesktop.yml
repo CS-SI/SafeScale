@@ -17,7 +17,7 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
+
     suitableFor:
         host: yes
         cluster: all
@@ -527,7 +527,7 @@ feature:
 
     proxy:
         rules:
-            - name: guacamole
+            - name: remotedesktop_guacamole_{{ .Hostname }}
               type: service
               targets:
                   hosts: true
@@ -538,15 +538,15 @@ feature:
                       "url": "http://{{.HostIP}}:9080/guacamole/"
                   }
 
-            - name: remotedesktop
+            - name: remotedesktop_{{ .Hostname }}
               type: route
               targets:
                   hosts: true
                   masters: all
               content: |
                   {
-                      "name": "remotedesktop-{{.Hostname}}",
-                      "paths": ["/remotedesktop/{{.Hostname}}"],
-                      "service": { "id": "{{.guacamole}}" }
+                      "name": "remotedesktop_guacamole_{{.Hostname}}",
+                      "paths": ["/_platform/remotedesktop/{{.Hostname}}"],
+                      "service": { "name": "remotedesktop_guacamole_{{ .Hostname }}" }
                   }
 ...
