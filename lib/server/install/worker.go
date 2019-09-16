@@ -770,14 +770,20 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 	rule := params.(data.Map)["rule"].(map[interface{}]interface{})
 	vars := params.(data.Map)["vars"].(*Variables)
 
-	err := ctrl.Apply(rule, vars)
+	hostName := (*vars)["Hostname"].(string)
+	ruleName, err := ctrl.Apply(rule, vars)
 
 	// FIXME Check this later
 	if err != nil {
-		log.Errorf("failed to apply proxy rule '%s' for host '%s': %s", rule["name"].(string), (*vars)["Hostname"], err.Error())
-		return nil, fmt.Errorf("failed to apply proxy rule '%s' for host '%s': %s", rule["name"].(string), (*vars)["Hostname"], err.Error())
+		msg := "failed to apply proxy rule"
+		if ruleName != "" {
+			msg += " '" + ruleName + "'"
+		}
+		msg += " for host '" + hostName + "': " + err.Error()
+		log.Error(msg)
+		return nil, fmt.Errorf(msg)
 	}
-	log.Debugf("successfully applied proxy rule '%s' for host '%s'", rule["name"].(string), (*vars)["Hostname"])
+	log.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 	return nil, nil
 }
 
