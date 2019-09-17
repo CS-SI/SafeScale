@@ -441,12 +441,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	mastersTask := task.New().Start(b.taskCreateMasters, data.Map{
 		"count":     masterCount,
 		"masterDef": mastersDef,
+		"nokeep": !req.KeepOnFailure,
 	})
 
 	privateNodesTask := task.New().Start(b.taskCreateNodes, data.Map{
 		"count":   privateNodeCount,
 		"public":  false,
 		"nodeDef": nodesDef,
+		"nokeep": !req.KeepOnFailure,
 	})
 
 	// Step 2: awaits gateway installation end and masters installation end
@@ -1029,6 +1031,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	p := params.(data.Map)
 	count := p["count"].(int)
 	def := p["masterDef"].(*pb.HostDefinition)
+	nokeep := p["nokeep"].(bool)
 
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskCreateMasters(%d) called", count), &err, log.TraceLevel)()
 
@@ -1050,6 +1053,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 			"index":     i + 1,
 			"masterDef": def,
 			"timeout":   timeout,
+			"nokeep": nokeep,
 		})
 		subtasks = append(subtasks, subtask)
 	}
@@ -1078,6 +1082,9 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	index := p["index"].(int)
 	def := p["masterDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
+	nokeep := p["nokeep"].(bool)
+
+	_ = nokeep // FIXME Why is unused ??
 
 	defer utils.TimerWithLevel(fmt.Sprintf("{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index), log.TraceLevel)()
 
@@ -1243,6 +1250,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	count := p["count"].(int)
 	public := p["public"].(bool)
 	def := p["nodeDef"].(*pb.HostDefinition)
+	nokeep := p["nokeep"].(bool)
 
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public), &err, log.TraceLevel)()
 
@@ -1264,6 +1272,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 			"type":    NodeType.Node,
 			"nodeDef": def,
 			"timeout": timeout,
+			"nokeep": nokeep,
 		})
 		subtasks = append(subtasks, subtask)
 	}
@@ -1285,20 +1294,20 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 
 // taskCreateNode creates a Node in the Cluster
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	index := p["index"].(int)
 	def := p["nodeDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
+	nokeep := p["nokeep"].(bool)
 
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNode(%d) called", index), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNode(%d) called", index), &err, log.TraceLevel)()
 
 	hostLabel := fmt.Sprintf("node #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
 
 	// Create the host
-	var err error
 	hostDef := *def
 	hostDef.Name, err = b.buildHostname(t, "node", NodeType.Node)
 	if err != nil {
@@ -1329,7 +1338,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 				return nil
 			})
 		})
-		if mErr != nil {
+		if mErr != nil && nokeep {
 			derr := clientHost.Delete([]string{pbHost.Id}, utils.GetLongOperationTimeout())
 			if derr != nil {
 				log.Errorf("failed to delete node after failure")
