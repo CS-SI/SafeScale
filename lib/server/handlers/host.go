@@ -802,7 +802,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	err = handler.service.DeleteHost(host.ID)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
+		case resources.ErrResourceNotFound: // FIXME Unhandled timeout
 			deleteMetadataOnly = true
 		default:
 			return infraErrf(err, "can't delete host")
