@@ -274,7 +274,7 @@ feature:
                             global:
                                 smtp_smarthost: 'not.defined:587'
                                 smtp_hello: '{{.HostIP}}'
-                                smtp_from: 'alertmanager@{{.Hostname}}'
+                                smtp_from: 'alertmanager4platform@{{.Hostname}}'
 
                             templates:
                                 - /etc/alertmanager/templates/*.tmpl
@@ -294,7 +294,7 @@ feature:
 
                                 - name: 'executor'
                                   webhook_configs:
-                                      - url: http://stacks.am-executor:8080
+                                      - url: http://monitoring4platform.am-executor:8080
 
                             inhibit_rules:
                                 - source_match:
@@ -392,6 +392,11 @@ feature:
                                         - /var/lib/docker/:/var/lib/docker:ro
                                     deploy:
                                         mode: global
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
                                         resources:
                                             limits:
                                                 memory: 128M
@@ -422,7 +427,12 @@ feature:
                                         mode: global
                                         placement:
                                             constraints:
-                                                - node.role == manager
+                                                - node.labels.safescale.host.role == master
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
                                         resources:
                                             limits:
                                                 memory: 128M
@@ -446,6 +456,11 @@ feature:
                                         placement:
                                             constraints:
                                                 - node.role == manager
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
                                         resources:
                                             limits:
                                                 memory: 128M
@@ -468,7 +483,12 @@ feature:
                                         replicas: 1
                                         placement:
                                             constraints:
-                                                - node.role == manager
+                                                - node.labels.safescale.host.role == master
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
                                         resources:
                                             limits:
                                                 memory: 128M
@@ -479,11 +499,22 @@ feature:
                                     image: cloudflare/unsee:v0.8.0
                                     networks:
                                         - net
+                                    ports:
+                                        - published: 8180
+                                          target: 8080
+                                          mode: host
                                     environment:
-                                        - "ALERTMANAGER_URIS=default:http://alertmanager:9093"
+                                        - "ALERTMANAGER_URIS=default:http://monitoring4platform_alertmanager:9093"
                                     deploy:
-                                        mode: replicated
-                                        replicas: 1
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.labels.safescale.host.role == master
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
                                         resources:
                                             limits:
                                                 memory: 128M
@@ -511,6 +542,11 @@ feature:
                                         - '--no-collector.ipvs'
                                     deploy:
                                         mode: global
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
                                         resources:
                                             limits:
                                                 memory: 128M
@@ -521,10 +557,17 @@ feature:
                                     image: prom/prometheus:{{.PrometheusVersion}}
                                     networks:
                                         - net
+                                        - consul4platform_net
+                                    ports:
+                                        - published: 9090
+                                          target: 9090
+                                          mode: host
                                     command:
                                         - '--config.file=/etc/prometheus/prometheus.yml'
                                         - '--storage.tsdb.path=/prometheus'
-                                        - '--storage.tsdb.retention=24h'
+                                        - '--storage.tsdb.retention.time=24h'
+                                        - '--web.external-url=http://{{ .EndpointIP }}/_platform/monitoring/prometheus/'
+                                        - '--web.route-prefix=/'
                                     volumes:
                                         - ${SF_ETCDIR}/monitoring4platform/prometheus/config.yml:/etc/prometheus/prometheus.yml
                                         - ${SF_VARDIR}/monitoring4platform/prometheus:/prometheus
@@ -539,6 +582,11 @@ feature:
                                         placement:
                                             constraints:
                                                 - node.role == manager
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
                                         resources:
                                             limits:
                                                 memory: 2048M
@@ -563,6 +611,11 @@ feature:
                                 #         placement:
                                 #             constraints:
                                 #                 - node.platform.os == linux
+                                #         restart_policy:
+                                #             condition: on-failure
+                                #             delay: 5s
+                                #             max_attempts: 3
+                                #             window: 120s
                                 #         resources:
                                 #             limits:
                                 #                 memory: 128M
@@ -589,6 +642,11 @@ feature:
                                 #         placement:
                                 #             constraints:
                                 #                 - node.role == manager
+                                #         restart_policy:
+                                #             condition: on-failure
+                                #             delay: 5s
+                                #             max_attempts: 3
+                                #             window: 120s
                                 #         resources:
                                 #             limits:
                                 #                 memory: 128M
@@ -666,8 +724,6 @@ feature:
                             sfRemoveDockerImage cloudflare/unsee:v0.8.0
                             sfRemoveDockerImage google/cadvisor
 
-                            docker network rm monitoring4platform_net
-
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/monitoring4platform ${SF_VARDIR}/monitoring4platform
@@ -686,6 +742,27 @@ feature:
                       "weight": 100
                   }
 
+            - name: monitoring4platform_prometheus_backend
+              type: upstream
+              targets:
+                  hosts: no
+                  masters: all
+              content: |
+                  {
+                      "target": "{{.HostIP}}:9090",
+                      "weight": 100
+                  }
+
+            - name: monitoring4platform_unsee_backend
+              type: upstream
+              targets:
+                  hosts: no
+                  masters: all
+              content: |
+                  {
+                      "target": "{{.HostIP}}:8180",
+                      "weight": 100
+                  }
 
             - name: monitoring4platform_grafana_http_svc
               type: service
@@ -698,6 +775,28 @@ feature:
                       "host": "monitoring4platform_grafana_http_backend"
                   }
 
+            - name: monitoring4platform_prometheus_svc
+              type: service
+              targets:
+                  hosts: true
+                  masters: one
+              content: |
+                  {
+                      "protocol": "http",
+                      "host": "monitoring4platform_prometheus_backend"
+                  }
+
+            - name: monitoring4platform_unsee_svc
+              type: service
+              targets:
+                  hosts: true
+                  masters: one
+              content: |
+                  {
+                      "protocol": "http",
+                      "host": "monitoring4platform_unsee_backend"
+                  }
+
             - name: monitoring4platform_grafana_http_route
               type: route
               targets:
@@ -708,7 +807,36 @@ feature:
                       "paths": [ "/_platform/monitoring/grafana/" ],
                       "service": { "id": "{{ .monitoring4platform_grafana_http_svc }}" },
                       "source-control": {
-                          "whitelist": [ "{{ .CIDR }}", "127.0.0.1" ]
+                          "whitelist": [ "{{ .CIDR }}", "{{ .EndpointIP }}", "127.0.0.1" ]
+                      }
+                  }
+
+            - name: monitoring4platform_prometheus_route
+              type: route
+              targets:
+                  hosts: true
+                  masters: one
+              content: |
+                  {
+                      "paths": [ "/_platform/monitoring/prometheus/" ],
+                      "strip_path": true,
+                      "service": { "id": "{{ .monitoring4platform_prometheus_svc }}" },
+                      "source-control": {
+                          "whitelist": [ "{{ .CIDR }}", "{{ .EndpointIP }}", "127.0.0.1" ]
+                      }
+                  }
+
+            - name: monitoring4platform_unsee_route
+              type: route
+              targets:
+                  hosts: true
+                  masters: one
+              content: |
+                  {
+                      "paths": [ "/_platform/monitoring/alerts/" ],
+                      "service": { "id": "{{ .monitoring4platform_unsee_svc }}" },
+                      "source-control": {
+                          "whitelist": [ "{{ .CIDR }}", "{{ .EndpointIP }}", "127.0.0.1" ]
                       }
                   }
 
