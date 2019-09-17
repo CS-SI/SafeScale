@@ -73,7 +73,7 @@ var (
 	alternateAPIConsumerKey       string
 )
 
-// provider is the providerementation of the OVH provider
+// provider is the provider implementation of the OVH provider
 type provider struct {
 	*openstack.Stack
 
@@ -82,7 +82,7 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
-// New creates a new instance of cloudferro provider
+// New creates a new instance of ovh provider
 func New() providerapi.Provider {
 	return &provider{}
 }

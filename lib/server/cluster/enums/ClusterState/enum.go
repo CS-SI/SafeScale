@@ -36,7 +36,7 @@ const (
 	Created
 	// Creating the cluster is currently created
 	Creating
-	// Error when an error occured on gathering cluster state
+	// Error when an error occurred on gathering cluster state
 	Error
 	// Removed tells the struct still exist but the underlying cluster has been totally wiped out
 	Removed
