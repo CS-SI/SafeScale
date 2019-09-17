@@ -156,9 +156,7 @@ feature:
                                     volumes:
                                         - ${SF_ETCDIR}/edgeproxy4network/kong.conf:/etc/kong/kong.conf:ro
                                         - ${SF_ETCDIR}/edgeproxy4network/includes:/etc/kong/includes:ro
-                                    # networks:
-                                    #     - safescale-gw
-                                    network_mode: "bridge"
+                                    network_mode: "host"
                                     ports:
                                         - "0.0.0.0:443:443"
                                         - "{{ .HostIP }}:6443:6443"
