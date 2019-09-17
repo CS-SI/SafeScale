@@ -639,11 +639,11 @@ func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
 func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, withSudo)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
@@ -701,10 +701,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 	ends := time.Since(begins)
 	duration := utils.FmtDuration(ends)
 	if err == nil {
-		log.Infof("host [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, duration, stdout)
+		log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, phase, duration, stdout)
 		return stdout, nil
 	} else {
-		log.Errorf("failure creating host resource [%s] in [%s]: %v", ssh.Host, duration, err)
+		log.Errorf("failure creating host resource phase [%s] [%s] in [%s]: %v", phase, ssh.Host, duration, err)
 	}
 
 	originalErr := err
@@ -716,15 +716,15 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 	retcode, stdout, stderr, logErr := logCmd.RunWithTimeout(timeout)
 	if logErr == nil {
 		if retcode == 0 {
-			return "", fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.%s.log: %s", ssh.Host, originalErr.Error(), phase, stdout)
+			return "", fmt.Errorf("server '%s' phase [%s] is not ready yet: %s - log content of file user_data.%s.log: %s", ssh.Host, phase, originalErr.Error(), phase, stdout)
 		}
 		if len(stdout) > 0 {
 			log.Error(fmt.Errorf("captured output: %s", stdout))
 		}
-		return "", fmt.Errorf("server '%s' is not ready yet: %s - error reading user_data.%s.log: %s", ssh.Host, originalErr.Error(), phase, stderr)
+		return "", fmt.Errorf("server '%s' phase [%s] is not ready yet: %s - error reading user_data.%s.log: %s", ssh.Host, phase, originalErr.Error(), phase, stderr)
 	}
 
-	return "", fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
+	return "", fmt.Errorf("server '%s' phase [%s] is not ready yet: %s", ssh.Host, phase, originalErr.Error())
 }
 
 // Copy copies a file/directory from/to local to/from remote
