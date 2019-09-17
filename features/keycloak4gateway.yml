@@ -146,9 +146,7 @@ feature:
                             #!/bin/bash
 
                             case ${DB_VENDOR,,} in
-                                postgres) ADMIN_PG_PASSWORD="$(cat /run/secrets/postgres4gateway)"
-                                          export DB_PASSWORD="$(cat /run/secrets/keycloak4gateway-db)"
-
+                                postgres)
                                           cat >/root/.pgpass <<-EOF2
                             *:5432:*:postgres:$ADMIN_PG_PASSWORD
                             *:5432:keycloak4gateway:keycloak4gateway:$KEYCLOAK_PG_PASSWORD
@@ -301,7 +299,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose -p keycloak4gateway rm --stop --force || exit 196
+                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway rm --stop --force || exit 196
                             exit 0
 
                     cleanup:
