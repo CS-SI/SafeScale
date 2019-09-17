@@ -873,7 +873,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 		if err != nil {
 			break
 		}
-		subtask := task.New().Start(b.taskConfigureNode, map[string]interface{}{
+		subtask := task.New().Start(b.taskConfigureNode, data.Map{
 			"index": i + 1,
 			"host":  host,
 		})
