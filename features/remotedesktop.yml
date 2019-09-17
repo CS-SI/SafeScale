@@ -546,7 +546,7 @@ feature:
               content: |
                   {
                       "name": "remotedesktop_guacamole_{{.Hostname}}",
-                      "paths": ["/_platform/remotedesktop/{{.Hostname}}"],
+                      "paths": ["/remotedesktop/{{.Hostname}}"],
                       "service": { "name": "remotedesktop_guacamole_{{ .Hostname }}" }
                   }
 ...
