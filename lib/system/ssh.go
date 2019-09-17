@@ -665,6 +665,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 	}
 	log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
 
+	originalPhase := phase
 	if phase == "ready" {
 		phase = "phase2"
 	}
@@ -701,10 +702,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 	ends := time.Since(begins)
 	duration := utils.FmtDuration(ends)
 	if err == nil {
-		log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, phase, duration, stdout)
+		log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, duration, stdout)
 		return stdout, nil
 	} else {
-		log.Errorf("failure creating host resource phase [%s] [%s] in [%s]: %v", phase, ssh.Host, duration, err)
+		log.Errorf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, duration, err)
 	}
 
 	originalErr := err
