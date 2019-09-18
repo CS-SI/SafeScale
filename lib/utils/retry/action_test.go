@@ -76,9 +76,9 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		timeout time.Duration
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name      string
+		args      args
+		wantErr   bool
 		wantTOErr bool
 	}{
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false, true},
@@ -89,8 +89,16 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testStart := time.Now()
-			if err := WhileUnsuccessfulDelay5Seconds(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+			var err error
+			if err = WhileUnsuccessfulDelay5Seconds(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
 				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				if tt.wantTOErr {
+					if _, ok := err.(ErrTimeout); !ok {
+						t.Errorf("Timeout error not received...")
+					}
+				}
 			}
 			delta := time.Since(testStart)
 			if delta.Seconds() >= tt.args.timeout.Seconds()+2 && !tt.wantTOErr {
@@ -106,9 +114,9 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 		timeout time.Duration
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name      string
+		args      args
+		wantErr   bool
 		wantTOErr bool
 	}{
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, true, false},
@@ -119,8 +127,16 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testStart := time.Now()
-			if err := WhileUnsuccessfulDelay5SecondsTimeout(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+			var err error
+			if err = WhileUnsuccessfulDelay5SecondsTimeout(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
 				t.Errorf("WhileUnsuccessfulDelay5SecondsTimeout() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				if tt.wantTOErr {
+					if _, ok := err.(ErrTimeout); !ok {
+						t.Errorf("Timeout error not received...")
+					}
+				}
 			}
 			delta := time.Since(testStart)
 			if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 { // 0.5 seconds tolerance
