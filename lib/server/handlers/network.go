@@ -125,9 +125,16 @@ func (handler *NetworkHandler) Create(
 	defer func() {
 		if err != nil {
 			if newNetwork != nil {
-				derr := handler.service.DeleteNetwork(newNetwork.ID) // FIXME Unhandled timeout
+				derr := handler.service.DeleteNetwork(newNetwork.ID)
 				if derr != nil {
-					log.Errorf("Failed to delete network: %+v", derr)
+					switch derr.(type) {
+					case resources.ErrResourceNotFound:
+						log.Errorf("Failed to delete network, resource not found: %+v", derr)
+					case retry.ErrTimeout, resources.ErrTimeout:
+						log.Errorf("Failed to delete network, timeout: %+v", derr)
+					default:
+						log.Errorf("Failed to delete network, other reason: %+v", derr)
+					}
 				}
 			}
 		}
@@ -149,7 +156,7 @@ func (handler *NetworkHandler) Create(
 		defer func() {
 			if err != nil {
 				if newNetwork != nil {
-					derr := handler.service.DeleteVIP(newNetwork.VIP)  // FIXME Unhandled timeout
+					derr := handler.service.DeleteVIP(newNetwork.VIP)
 					if derr != nil {
 						log.Errorf("Failed to delete VIP: %+v", derr)
 					}
@@ -411,11 +418,19 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	defer func() {
 		if err != nil {
 			log.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
-			derr := handler.service.DeleteHost(gw.ID)  // FIXME Unhandled timeout
+			derr := handler.service.DeleteHost(gw.ID)
 			if derr != nil {
-				log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", request.Name, derr)
+				switch derr.(type) {
+				case resources.ErrResourceNotFound:
+					log.Errorf("Cleaning up on failure, failed to delete gateway '%s', resource not found: %v", request.Name, derr)
+				case retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("Cleaning up on failure, failed to delete gateway '%s', timeout: %v", request.Name, derr)
+				default:
+					log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", request.Name, derr)
+				}
+			} else {
+				log.Infof("Cleaning up on failure, gateway '%s' deleted", request.Name)
 			}
-			log.Infof("Cleaning up on failure, gateway '%s' deleted", request.Name)
 		}
 	}()
 

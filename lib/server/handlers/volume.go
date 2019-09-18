@@ -228,9 +228,16 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	newVolume := volume
 	defer func() {
 		if err != nil {
-			derr := handler.service.DeleteVolume(newVolume.ID)  // FIXME Unhandled timeout
+			derr := handler.service.DeleteVolume(newVolume.ID)
 			if derr != nil {
-				log.Debugf("failed to delete volume '%s': %v", newVolume.Name, derr)
+				switch derr.(type) {
+				case resources.ErrResourceNotFound:
+					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
+				case retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
+				default:
+					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
+				}
 			}
 		}
 	}()
@@ -361,9 +368,16 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Starting from here, remove volume attachment if exit with error
 				defer func() {
 					if err != nil {
-						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)  // FIXME Unhandled timeout
+						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)
 						if derr != nil {
-							log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+							switch derr.(type) {
+							case resources.ErrResourceNotFound:
+								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+							case retry.ErrTimeout, resources.ErrTimeout:
+								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+							default:
+								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+							}
 						}
 					}
 				}()
@@ -456,9 +470,16 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			if derr != nil {
 				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 			}
-			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)  // FIXME Unhandled timeout
+			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
 			if derr != nil {
-				log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+				switch derr.(type) {
+				case resources.ErrResourceNotFound:
+					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+				case retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+				default:
+					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+				}
 			}
 		}
 	}()

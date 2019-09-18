@@ -369,7 +369,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 	var wg sync.WaitGroup
 
-	concurrency := math.Min(4, float64(len(templates)/2)) // FIXME Enjoy safety
+	concurrency := math.Min(4, float64(len(templates)/2))
 	sem := make(chan bool, int(concurrency))
 
 	hostAnalysis := func(template resources.HostTemplate) error {

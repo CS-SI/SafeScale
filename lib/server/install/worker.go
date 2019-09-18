@@ -389,7 +389,6 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
 	if w.action == Action.Add && !s.SkipProxy {
-		// FIXME REVIEW the nil check for w.cluster, if not there and a feature is added to a gateway, it panics
 		if w.cluster != nil {
 			err := w.setReverseProxy()
 			if err != nil {

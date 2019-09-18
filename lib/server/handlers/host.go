@@ -424,9 +424,16 @@ func (handler *HostHandler) Create(
 	}
 	defer func() {
 		if err != nil {
-			derr := handler.service.DeleteHost(host.ID) // FIXME Unhandled timeout
+			derr := handler.service.DeleteHost(host.ID)
 			if derr != nil {
-				log.Errorf("Failed to delete host '%s': %v", host.Name, derr)
+				switch derr.(type) {
+				case resources.ErrResourceNotFound:
+					log.Errorf("Failed to delete host '%s', resource not found: %v", host.Name, derr)
+				case retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("Failed to delete host '%s', timeout: %v", host.Name, derr)
+				default:
+					log.Errorf("Failed to delete host '%s', other reason: %v", host.Name, derr)
+				}
 			}
 		}
 	}()
@@ -668,8 +675,8 @@ func retrieveForensicsData(sshHandler *SSHHandler, host *resources.Host) {
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
-		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName + "sh")
-		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name + ":/opt/safescale/var/log/user_data.phase2.log", dumpName + "log")
+		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name+":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName+"sh")
+		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name+":/opt/safescale/var/log/user_data.phase2.log", dumpName+"log")
 	}
 }
 
@@ -680,9 +687,9 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-			return nil, infraErr(err)
+			return nil, err
 		default:
-			return nil, infraErr(err)
+			return nil, err
 		}
 	}
 	if network != nil {
@@ -699,13 +706,16 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-			return nil, infraErr(err)
+			return nil, err
 		default:
-			return nil, infraErr(err)
+			return nil, err
 		}
 	}
 
-	// FIXME Unhandled nil, nil
+	if network == nil {
+		return nil, fmt.Errorf("failure getting or creating default network")
+	}
+
 	return network, nil
 }
 
@@ -765,7 +775,10 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 		}
 	}
 
-	// FIXME Unhandled nil, nil
+	if host == nil {
+		return nil, fmt.Errorf("failure inspecting host [%s]", ref)
+	}
+
 	return host, nil
 }
 
