@@ -18,6 +18,9 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -45,7 +48,9 @@ func NewTemplateHandler(svc iaas.Service) TemplateAPI {
 }
 
 // List returns the template list
-func (handler *TemplateHandler) List(ctx context.Context, all bool) ([]resources.HostTemplate, error) {
-	tlist, err := handler.service.ListTemplates(all)
+func (handler *TemplateHandler) List(ctx context.Context, all bool) (tlist []resources.HostTemplate, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::List() called"), &err, logrus.TraceLevel)()
+
+	tlist, err = handler.service.ListTemplates(all)
 	return tlist, infraErr(err)
 }

@@ -74,7 +74,7 @@ func NewHostHandler(svc iaas.Service) HostAPI {
 
 // Start starts a host
 func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Start(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Start(%s) called", ref), &err, log.TraceLevel)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -86,14 +86,30 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	id := mh.Get().ID
 	err = handler.service.StartHost(id)
 	if err != nil {
-		return infraErr(err)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+			return infraErr(err)
+		default:
+			return infraErr(err)
+		}
 	}
-	return infraErr(handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout()))
+
+	err = handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout())
+	if err != nil {
+		switch err.(type) {
+		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+			return infraErr(err)
+		default:
+			return infraErr(err)
+		}
+	}
+
+	return err
 }
 
 // Stop stops a host
 func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Stop(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Stop(%s) called", ref), &err, log.TraceLevel)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -105,14 +121,29 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	id := mh.Get().ID
 	err = handler.service.StopHost(id)
 	if err != nil {
-		return infraErr(err)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+			return infraErr(err)
+		default:
+			return infraErr(err)
+		}
 	}
-	return infraErr(handler.service.WaitHostState(id, HostState.STOPPED, utils.GetHostTimeout()))
+
+	err = handler.service.WaitHostState(id, HostState.STOPPED, utils.GetHostTimeout())
+	if err != nil {
+		switch err.(type) {
+		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+			return infraErr(err)
+		default:
+			return infraErr(err)
+		}
+	}
+	return err
 }
 
 // Reboot reboots a host
 func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Reboot(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Reboot(%s) called", ref), &err, log.TraceLevel)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -124,7 +155,12 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	id := mh.Get().ID
 	err = handler.service.RebootHost(id)
 	if err != nil {
-		return infraErr(err)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+			return infraErr(err)
+		default:
+			return infraErr(err)
+		}
 	}
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
@@ -133,14 +169,22 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 		utils.GetHostTimeout(),
 	)
 	if err != nil {
-		return infraErrf(err, "timeout waiting host '%s' to be rebooted", ref)
+		switch err.(type) {
+		case resources.ErrTimeout, retry.ErrTimeout:
+			return infraErrf(err, "timeout waiting host '%s' to be rebooted", ref)
+		case resources.ErrResourceNotFound:
+			return infraErr(err)
+		default:
+			return infraErr(err)
+		}
 	}
+
 	return nil
 }
 
 // Resize ...
 func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Resize(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Resize(%s) called", ref), &err, log.TraceLevel)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -163,7 +207,12 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	host := mh.Get()
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
-		return nil, infraErr(err)
+		switch err.(type) {
+		case resources.ErrTimeout, retry.ErrTimeout, resources.ErrResourceNotFound:
+			return nil, infraErr(err)
+		default:
+			return nil, infraErr(err)
+		}
 	}
 
 	if host.Properties.Lookup(HostProperty.SizingV1) {
@@ -186,9 +235,13 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	}
 
 	newHost, err = handler.service.ResizeHost(id, hostSizeRequest)
-
 	if err != nil {
-		return nil, infraErrf(err, "Error resizing host '%s'", ref)
+		switch err.(type) {
+		case resources.ErrTimeout, retry.ErrTimeout, resources.ErrResourceNotFound:
+			return nil, infraErrf(err, "Error resizing host '%s'", ref)
+		default:
+			return nil, infraErrf(err, "Error resizing host '%s'", ref)
+		}
 	}
 	if newHost == nil {
 		return nil, throwErrf("Unknown error resizing host '%s'", ref)
@@ -206,7 +259,7 @@ func (handler *HostHandler) Create(
 	ctx context.Context,
 	name string, net string, los string, public bool, sizingParam interface{}, force bool,
 ) (newHost *resources.Host, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Create(%s) called", name), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Create(%s) called", name), &err, log.TraceLevel)()
 
 	if handler == nil {
 		return nil, utils.InvalidInstanceError()
@@ -233,7 +286,11 @@ func (handler *HostHandler) Create(
 
 	host, err := handler.service.GetHostByName(name)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
+		switch err.(type) {
+		case resources.ErrResourceNotFound:
+		case retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErrf(err, "failure creating host: failed to check if host resource name '%s' is already used: %v", name, err)
+		default:
 			return nil, infraErrf(err, "failure creating host: failed to check if host resource name '%s' is already used: %v", name, err)
 		}
 	} else {
@@ -286,7 +343,12 @@ func (handler *HostHandler) Create(
 	if sizing != nil {
 		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
 		if err != nil {
-			return nil, infraErrf(err, "failed to find template corresponding to requested resources")
+			switch err.(type) {
+			case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+				return nil, infraErrf(err, "failed to find template corresponding to requested resources")
+			default:
+				return nil, infraErrf(err, "failed to find template corresponding to requested resources")
+			}
 		}
 		if len(templates) > 0 {
 			template = templates[0]
@@ -310,7 +372,12 @@ func (handler *HostHandler) Create(
 	} else {
 		template, err = handler.service.SelectTemplateByName(templateName)
 		if err != nil {
-			return nil, err
+			switch err.(type) {
+			case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+				return nil, err
+			default:
+				return nil, err
+			}
 		}
 	}
 
@@ -324,7 +391,13 @@ func (handler *HostHandler) Create(
 		2*utils.GetDefaultDelay(),
 	)
 	if err != nil {
-		return nil, infraErrf(err, "failed to find image to use on compute resource")
+		defaultErr := infraErrf(err, "failed to find image to use on compute resource")
+		switch err.(type) {
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, defaultErr
+		default:
+			return nil, defaultErr
+		}
 	}
 
 	hostRequest := resources.HostRequest{
@@ -340,14 +413,18 @@ func (handler *HostHandler) Create(
 	var userData *userdata.Content
 	host, userData, err = handler.service.CreateHost(hostRequest)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceInvalidRequest); ok {
+		switch err.(type) {
+		case resources.ErrResourceInvalidRequest:
 			return nil, infraErr(err)
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErrf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
+		default:
+			return nil, infraErrf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
 		}
-		return nil, infraErrf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
 	}
 	defer func() {
 		if err != nil {
-			derr := handler.service.DeleteHost(host.ID)
+			derr := handler.service.DeleteHost(host.ID) // FIXME Unhandled timeout
 			if derr != nil {
 				log.Errorf("Failed to delete host '%s': %v", host.Name, derr)
 			}
@@ -602,7 +679,8 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	network, err = handler.service.GetNetworkByName(resources.SingleHostNetworkName)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
+		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErr(err)
 		default:
 			return nil, infraErr(err)
 		}
@@ -618,12 +696,22 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	}
 
 	network, err = handler.service.CreateNetwork(request)
-	return network, infraErr(err)
+	if err != nil {
+		switch err.(type) {
+		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErr(err)
+		default:
+			return nil, infraErr(err)
+		}
+	}
+
+	// FIXME Unhandled nil, nil
+	return network, nil
 }
 
 // List returns the host list
 func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resources.Host, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::List(%v) called", all), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::List(%v) called", all), &err, log.TraceLevel)()
 
 	if all {
 		return handler.service.ListHosts()
@@ -643,7 +731,7 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 // ForceInspect ...
 // If not found, return (nil, err)
 func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host *resources.Host, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::ForceInspect(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::ForceInspect(%s) called", ref), &err, log.TraceLevel)()
 
 	host, err = handler.Inspect(ctx, ref)
 	if err != nil {
@@ -656,7 +744,7 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
 func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Inspect(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Inspect(%s) called", ref), &err, log.TraceLevel)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -669,14 +757,21 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 	host = mh.Get()
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
-		return nil, infraErr(err)
+		switch err.(type) {
+		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErr(err)
+		default:
+			return nil, infraErr(err)
+		}
 	}
+
+	// FIXME Unhandled nil, nil
 	return host, nil
 }
 
 // Delete deletes host referenced by ref
 func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Delete(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Delete(%s) called", ref), &err, log.TraceLevel)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -799,12 +894,31 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 	// Conditions are met, delete host
 	var deleteMetadataOnly bool
+	var moreTimeNeeded bool
 	err = handler.service.DeleteHost(host.ID)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound: // FIXME Unhandled timeout
+		case resources.ErrResourceNotFound:
 			deleteMetadataOnly = true
+		case resources.ErrTimeout:
+			moreTimeNeeded = true
+		case retry.ErrTimeout:
+			moreTimeNeeded = true
 		default:
+			return infraErrf(err, "can't delete host")
+		}
+	}
+
+	// FIXME Add GetHostState verification
+	if moreTimeNeeded {
+		if state, ok := handler.service.GetHostState(host.ID); ok == nil { // FIXME Unhandled timeout
+			log.Warnf("While deleting the status was [%s]", state)
+			if state != HostState.ERROR {
+				deleteMetadataOnly = true
+			} else {
+				return infraErrf(err, "can't delete host")
+			}
+		} else {
 			return infraErrf(err, "can't delete host")
 		}
 	}
@@ -862,7 +976,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 // SSH returns ssh parameters to access the host referenced by ref
 func (handler *HostHandler) SSH(ctx context.Context, ref string) (sshConfig *system.SSHConfig, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::SSH(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::SSH(%s) called", ref), &err, log.TraceLevel)()
 
 	// host, err := svc.Inspect(ref)
 	// if err != nil {
