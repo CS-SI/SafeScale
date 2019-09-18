@@ -77,6 +77,7 @@ func (handler *ShareHandler) Create(
 	shareName, hostName, path string, securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
 ) (share *propsv1.HostShare, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Create(%s) called", shareName), &err, log.TraceLevel)()
 
 	// Check if a share already exists with the same name
 	server, _, _, err := handler.Inspect(ctx, shareName)
@@ -227,7 +228,8 @@ func (handler *ShareHandler) Create(
 }
 
 // Delete a share from host
-func (handler *ShareHandler) Delete(ctx context.Context, name string) error {
+func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Delete(%s) called", name), &err, log.TraceLevel)()
 	// Retrieve info about the share
 	server, share, _, err := handler.ForceInspect(ctx, name)
 	if err != nil {
@@ -300,12 +302,13 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) error {
 }
 
 // List return the list of all shares from all servers
-func (handler *ShareHandler) List(ctx context.Context) (map[string]map[string]*propsv1.HostShare, error) {
+func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[string]*propsv1.HostShare, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::List() called"), &err, log.TraceLevel)()
 	shares := map[string]map[string]*propsv1.HostShare{}
 
 	var servers []string
 	ms := metadata.NewShare(handler.service)
-	err := ms.Browse(func(hostName string, shareID string) error {
+	err = ms.Browse(func(hostName string, shareID string) error {
 		servers = append(servers, hostName)
 		return nil
 	})
@@ -339,6 +342,7 @@ func (handler *ShareHandler) List(ctx context.Context) (map[string]map[string]*p
 
 // Mount a share on a local directory of an host
 func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string, withCache bool) (mount *propsv1.HostRemoteMount, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Mount(%s,%s) called", shareName,hostName), &err, log.TraceLevel)()
 	// Retrieve info about the share
 	server, share, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
@@ -549,7 +553,8 @@ func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, pat
 }
 
 // Unmount a share from local directory of an host
-func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) error {
+func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Unmount(%s,%s) called", shareName,hostName), &err, log.TraceLevel)()
 	server, share, _, err := handler.ForceInspect(ctx, shareName)
 	if err != nil {
 		return throwErr(err)
@@ -656,8 +661,8 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 func (handler *ShareHandler) ForceInspect(
 	ctx context.Context,
 	shareName string,
-) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
-
+) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::ForceInspect() called"), &err, log.TraceLevel)()
 	host, share, mounts, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		return nil, nil, nil, throwErr(err)
@@ -673,7 +678,8 @@ func (handler *ShareHandler) ForceInspect(
 func (handler *ShareHandler) Inspect(
 	ctx context.Context,
 	shareName string,
-) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
+) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Inspect() called"), &err, log.TraceLevel)()
 
 	hostName, err := metadata.LoadShare(handler.service, shareName)
 	if err != nil {
@@ -694,7 +700,6 @@ func (handler *ShareHandler) Inspect(
 
 	var (
 		shareID string
-		share   *propsv1.HostShare
 	)
 	err = server.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)

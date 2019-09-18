@@ -65,7 +65,8 @@ func NewSSHHandler(svc iaas.Service) *SSHHandler {
 }
 
 // GetConfig creates SSHConfig to connect to an host
-func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (*system.SSHConfig, error) {
+func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (sshConfig *system.SSHConfig, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::GetConfig() called"), &err, log.TraceLevel)()
 	host := resources.NewHost()
 
 	switch hostParam.(type) {
@@ -94,7 +95,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		}
 	}
 
-	sshConfig := system.SSHConfig{
+	sshConfig = &system.SSHConfig{
 		PrivateKey: host.PrivateKey,
 		Port:       22,
 		Host:       host.GetAccessIP(),
@@ -125,12 +126,12 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 
 	sshConfig.Host = host.GetAccessIP()
 
-	return &sshConfig, nil
+	return sshConfig, nil
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) error {
-	var err error
+func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::WaitServerReady() called"), &err, log.TraceLevel)()
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
 	if err != nil {
@@ -141,10 +142,8 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (int, string, string, error) {
-	var stdOut, stdErr string
-	var retCode int
-	var err error
+func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::Run() called"), &err, log.TraceLevel)()
 
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
@@ -234,7 +233,9 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy copy file/directory
-func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (int, string, string, error) {
+func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::Copy() called"), &err, log.TraceLevel)()
+
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string

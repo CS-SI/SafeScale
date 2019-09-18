@@ -62,15 +62,16 @@ func NewVolumeHandler(svc iaas.Service) VolumeAPI {
 }
 
 // List returns the network list
-func (handler *VolumeHandler) List(ctx context.Context, all bool) ([]resources.Volume, error) {
+func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::List() called"), &err, log.TraceLevel)()
+
 	if all {
 		volumes, err := handler.service.ListVolumes()
 		return volumes, infraErr(err)
 	}
 
-	var volumes []resources.Volume
 	mv := metadata.NewVolume(handler.service)
-	err := mv.Browse(func(volume *resources.Volume) error {
+	err = mv.Browse(func(volume *resources.Volume) error {
 		volumes = append(volumes, *volume)
 		return nil
 	})
@@ -83,7 +84,9 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) ([]resources.V
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
-func (handler *VolumeHandler) Delete(ctx context.Context, ref string) error {
+func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Delete() called"), &err, log.TraceLevel)()
+
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
 		switch err.(type) {
@@ -114,10 +117,14 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) error {
 
 	err = handler.service.DeleteVolume(volume.ID)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
+		switch err.(type) {
+		case resources.ErrResourceNotFound:
+			log.Warnf("Unable to find the volume on provider side, cleaning up metadata")
+		case resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
+			return infraErrf(err, "can't delete volume")
+		default:
 			return infraErrf(err, "can't delete volume")
 		}
-		log.Warnf("Unable to find the volume on provider side, cleaning up metadata")
 	}
 	err = mv.Delete()
 	if err != nil {
@@ -146,8 +153,8 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) error {
 func (handler *VolumeHandler) Inspect(
 	ctx context.Context,
 	ref string,
-) (*resources.Volume, map[string]*propsv1.HostLocalMount, error) {
-
+) (volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Inspect() called"), &err, log.TraceLevel)()
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
@@ -156,9 +163,9 @@ func (handler *VolumeHandler) Inspect(
 		err := infraErr(err)
 		return nil, nil, err
 	}
-	volume := mv.Get()
+	volume = mv.Get()
 
-	mounts := map[string]*propsv1.HostLocalMount{}
+	mounts = map[string]*propsv1.HostLocalMount{}
 	hostSvc := NewHostHandler(handler.service)
 
 	err = volume.Properties.LockForRead(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
@@ -202,20 +209,26 @@ func (handler *VolumeHandler) Inspect(
 
 // Create a volume
 func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (volume *resources.Volume, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Inspect() called"), &err, log.TraceLevel)()
 	volume, err = handler.service.CreateVolume(resources.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
 	})
 	if err != nil {
-		return nil, infraErr(err)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErr(err)
+		default:
+			return nil, infraErr(err)
+		}
 	}
 
 	// starting from here delete volume if function ends with failure
 	newVolume := volume
 	defer func() {
 		if err != nil {
-			derr := handler.service.DeleteVolume(newVolume.ID)
+			derr := handler.service.DeleteVolume(newVolume.ID)  // FIXME Unhandled timeout
 			if derr != nil {
 				log.Debugf("failed to delete volume '%s': %v", newVolume.Name, derr)
 			}
@@ -251,6 +264,8 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 
 // Attach a volume to an host
 func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Attach() called"), &err, log.TraceLevel)()
+
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
@@ -336,12 +351,17 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 					VolumeID: volume.ID,
 				})
 				if err != nil {
-					return infraErrf(err, "can't attach volume '%s'", volumeName)
+					switch err.(type) {
+					case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
+						return infraErrf(err, "can't attach volume '%s'", volumeName)
+					default:
+						return infraErrf(err, "can't attach volume '%s'", volumeName)
+					}
 				}
 				// Starting from here, remove volume attachment if exit with error
 				defer func() {
 					if err != nil {
-						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)
+						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)  // FIXME Unhandled timeout
 						if derr != nil {
 							log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 						}
@@ -436,7 +456,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			if derr != nil {
 				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 			}
-			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
+			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)  // FIXME Unhandled timeout
 			if derr != nil {
 				log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 			}
@@ -547,7 +567,9 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) error {
+func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Detach() called"), &err, log.TraceLevel)()
+
 	// Load volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
@@ -634,8 +656,12 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				// ... then detach volume
 				err = handler.service.DeleteVolumeAttachment(host.ID, attachment.AttachID)
 				if err != nil {
-					err = infraErr(err)
-					return err
+					switch err.(type) {
+					case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
+						return infraErr(err)
+					default:
+						return infraErr(err)
+					}
 				}
 
 				// Updates host property propsv1.VolumesV1

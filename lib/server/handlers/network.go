@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"os"
 	"strings"
 
@@ -74,7 +75,7 @@ func (handler *NetworkHandler) Create(
 	sizing resources.SizingRequirements, theos string, gwname string,
 	failover bool,
 ) (network *resources.Network, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Create() called"), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Create() called"), &err, log.TraceLevel)()
 
 	if gwname != "" && failover {
 		return nil, fmt.Errorf("can't name gateway when failover is requested")
@@ -85,6 +86,8 @@ func (handler *NetworkHandler) Create(
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound:
+		case resources.ErrResourceInvalidRequest, resources.ErrTimeout, retry.ErrTimeout:
+			return nil, infraErrf(err, "failed to check if a network already exists with name '%s'", name)
 		default:
 			return nil, infraErrf(err, "failed to check if a network already exists with name '%s'", name)
 		}
@@ -109,7 +112,12 @@ func (handler *NetworkHandler) Create(
 		CIDR:      cidr,
 	})
 	if err != nil {
-		return nil, infraErr(err)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, resources.ErrTimeout, retry.ErrTimeout:
+			return nil, infraErr(err)
+		default:
+			return nil, infraErr(err)
+		}
 	}
 
 	newNetwork := network
@@ -117,7 +125,7 @@ func (handler *NetworkHandler) Create(
 	defer func() {
 		if err != nil {
 			if newNetwork != nil {
-				derr := handler.service.DeleteNetwork(newNetwork.ID)
+				derr := handler.service.DeleteNetwork(newNetwork.ID) // FIXME Unhandled timeout
 				if derr != nil {
 					log.Errorf("Failed to delete network: %+v", derr)
 				}
@@ -129,14 +137,19 @@ func (handler *NetworkHandler) Create(
 	if failover {
 		network.VIP, err = handler.service.CreateVIP(network.ID, fmt.Sprintf("for gateways of network %s", network.Name))
 		if err != nil {
-			return nil, infraErrf(err, "failed to create VIP")
+			switch err.(type) {
+			case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+				return nil, infraErrf(err, "failed to create VIP")
+			default:
+				return nil, infraErrf(err, "failed to create VIP")
+			}
 		}
 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
 			if err != nil {
 				if newNetwork != nil {
-					derr := handler.service.DeleteVIP(newNetwork.VIP)
+					derr := handler.service.DeleteVIP(newNetwork.VIP)  // FIXME Unhandled timeout
 					if derr != nil {
 						log.Errorf("Failed to delete VIP: %+v", derr)
 					}
@@ -166,7 +179,12 @@ func (handler *NetworkHandler) Create(
 	var template *resources.HostTemplate
 	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
-		return nil, infraErrf(err, "Error creating network: Error selecting template")
+		switch err.(type) {
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErrf(err, "Error creating network: Error selecting template")
+		default:
+			return nil, infraErrf(err, "Error creating network: Error selecting template")
+		}
 	}
 	if len(tpls) > 0 {
 		template = tpls[0]
@@ -188,7 +206,12 @@ func (handler *NetworkHandler) Create(
 	}
 	img, err := handler.service.SearchImage(theos)
 	if err != nil {
-		return nil, infraErrf(err, "error creating network: Error searching image '%s'", theos)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErrf(err, "error creating network: Error searching image '%s'", theos)
+		default:
+			return nil, infraErrf(err, "error creating network: Error searching image '%s'", theos)
+		}
 	}
 
 	var primaryGatewayName, secondaryGatewayName string
@@ -376,14 +399,19 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	log.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
 	gw, userData, err := handler.service.CreateGateway(request)
 	if err != nil {
-		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", request.Name)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", request.Name)
+		default:
+			return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", request.Name)
+		}
 	}
 
 	// Starting from here, deletes the primary gateway if exiting with error
 	defer func() {
 		if err != nil {
 			log.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
-			derr := handler.service.DeleteHost(gw.ID)
+			derr := handler.service.DeleteHost(gw.ID)  // FIXME Unhandled timeout
 			if derr != nil {
 				log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", request.Name, derr)
 			}
@@ -394,7 +422,12 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	// Reloads the host to be sure all the properties are updated
 	gw, err = handler.service.InspectHost(gw)
 	if err != nil {
-		return nil, infraErr(err)
+		switch err.(type) {
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			return nil, infraErr(err)
+		default:
+			return nil, infraErr(err)
+		}
 	}
 
 	// Binds gateway to VIP
@@ -555,9 +588,14 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 
 func (handler *NetworkHandler) deleteGateway(gw *resources.Host) {
 	log.Warnf("Cleaning up on failure, deleting gateway '%s'...", gw.Name)
-	derr := handler.service.DeleteHost(gw.ID)
-	if derr != nil {
-		log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", gw.Name, derr)
+	err := handler.service.DeleteHost(gw.ID)
+	if err != nil {
+		switch err.(type) {
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", gw.Name, err)
+		default:
+			log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", gw.Name, err)
+		}
 	}
 	log.Infof("Cleaning up on failure, gateway '%s' deleted", gw.Name)
 }
@@ -572,9 +610,14 @@ func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) {
 }
 
 func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resources.Host) {
-	derr := handler.service.UnbindHostFromVIP(vip, host)
-	if derr != nil {
-		log.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", derr)
+	err := handler.service.UnbindHostFromVIP(vip, host)
+	if err != nil {
+		switch err.(type) {
+		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			log.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", err)
+		default:
+			log.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", err)
+		}
 	} else {
 		log.Infof("Cleaning up on failure, host '%s' bind removed from VIP", host.Name)
 	}
@@ -582,7 +625,7 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 
 // List returns the network list
 func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*resources.Network, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::List(%v) called", all), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::List(%v) called", all), &err, log.TraceLevel)()
 
 	if all {
 		return handler.service.ListNetworks()
@@ -604,7 +647,7 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*r
 
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *resources.Network, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Inspect(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Inspect(%s) called", ref), &err, log.TraceLevel)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
@@ -615,7 +658,7 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network
 
 // Delete deletes network referenced by ref
 func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Delete(%s) called", ref), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Delete(%s) called", ref), &err, log.TraceLevel)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
@@ -623,7 +666,12 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			err = infraErrf(err, "failed to load metadata of network '%s', trying to delete network anyway", ref)
 			cleanErr := handler.service.DeleteNetwork(ref)
 			if cleanErr != nil {
-				_ = infraErrf(cleanErr, "error deleting network on cleanup after failure to load metadata '%s'", ref)
+				switch cleanErr.(type) {
+				case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+					_ = infraErrf(cleanErr, "error deleting network on cleanup after failure to load metadata '%s'", ref)
+				default:
+					_ = infraErrf(cleanErr, "error deleting network on cleanup after failure to load metadata '%s'", ref)
+				}
 			}
 		}
 		return err
@@ -677,11 +725,16 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 				}
 			}
 
-			err = handler.service.DeleteGateway(network.GatewayID)
-			// allow no gateway, but log it
+			err = handler.service.DeleteGateway(network.GatewayID) // allow no gateway, but log it
 			if err != nil {
-				log.Errorf("Failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
+				switch err.(type) {
+				case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("Failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
+				default:
+					log.Errorf("Failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
+				}
 			}
+
 			err = mh.Delete()
 			if err != nil {
 				return infraErr(err)
@@ -700,11 +753,16 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 				}
 			}
 
-			err = handler.service.DeleteGateway(network.SecondaryGatewayID)
-			// allow no gateway, but log it
+			err = handler.service.DeleteGateway(network.SecondaryGatewayID) // allow no gateway, but log it
 			if err != nil {
-				log.Errorf("Failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
+				switch err.(type) {
+				case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
+				default:
+					log.Errorf("failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
+				}
 			}
+
 			err = mh.Delete()
 			if err != nil {
 				return infraErr(err)
@@ -716,20 +774,22 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	if network.VIP != nil {
 		err = handler.service.DeleteVIP(network.VIP)
 		if err != nil {
-			log.Errorf("Failed to delete VIP: %v", err)
+			log.Errorf("failed to delete VIP: %v", err)
 		}
 	}
 
 	// delete network, with tolerance
 	err = handler.service.DeleteNetwork(network.ID)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
-			// Delete metadata,
-			log.Error("Can't delete network")
-		} else {
+		switch err.(type) {
+		case resources.ErrResourceNotFound:
 			// If network doesn't exist anymore on the provider infrastructure, don't fail
 			// to cleanup the metadata
 			log.Warnf("network not found on provider side, cleaning up metadata.")
+		case retry.ErrTimeout, resources.ErrTimeout:
+			log.Error("can't delete network due to a timeout")
+		default:
+			log.Error("can't delete network, other reason")
 		}
 	}
 
