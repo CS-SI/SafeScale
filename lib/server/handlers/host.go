@@ -799,12 +799,31 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 	// Conditions are met, delete host
 	var deleteMetadataOnly bool
+	var moreTimeNeeded bool
 	err = handler.service.DeleteHost(host.ID)
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound: // FIXME Unhandled timeout
 			deleteMetadataOnly = true
+		case resources.ErrTimeout:
+			moreTimeNeeded = true
+		case retry.ErrTimeout:
+			moreTimeNeeded = true
 		default:
+			return infraErrf(err, "can't delete host")
+		}
+	}
+
+	// FIXME Add GetHostState verification
+	if moreTimeNeeded {
+		if state, ok := handler.service.GetHostState(host.ID); ok == nil {
+			log.Warnf("While deleting the status was [%s]", state)
+			if state != HostState.ERROR {
+				deleteMetadataOnly = true
+			} else {
+				return infraErrf(err, "can't delete host")
+			}
+		} else {
 			return infraErrf(err, "can't delete host")
 		}
 	}
