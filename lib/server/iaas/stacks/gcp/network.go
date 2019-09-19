@@ -349,6 +349,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
 	if err != nil {
+		// FIXME Detect if there is a timeout...
 		return err
 	}
 

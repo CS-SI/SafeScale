@@ -281,6 +281,7 @@ func (handler *NetworkHandler) Create(
 		// Starting from here, deletes the primary gateway if exiting with error
 		defer func() {
 			if err != nil {
+				// FIXME Ensure consistency if possible
 				handler.deleteGateway(primaryGateway)
 				handler.deleteGatewayMetadata(primaryMetadata)
 				if failover {
@@ -299,6 +300,7 @@ func (handler *NetworkHandler) Create(
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if err != nil {
+					// FIXME Ensure consistency if possible
 					handler.deleteGateway(secondaryGateway)
 					handler.deleteGatewayMetadata(secondaryMetadata)
 					handler.unbindHostFromVIP(newNetwork.VIP, secondaryGateway)
