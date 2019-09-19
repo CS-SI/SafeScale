@@ -354,13 +354,18 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// Retry creation until success, for 10 minutes
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-
 			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
 			if err != nil {
 				if server != nil {
 					killErr := s.DeleteHost(server.ID)
 					if killErr != nil {
-						return errors.Wrap(err, killErr.Error())
+						switch killErr.(type) {
+						case retry.ErrTimeout, resources.ErrTimeout:
+							logrus.Error("Timeout cleaning up gcp instance")
+							return errors.Wrap(err, killErr.Error())
+						default:
+							return errors.Wrap(err, killErr.Error())
+						}
 					}
 				}
 
@@ -388,7 +393,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			if err != nil {
 				killErr := s.DeleteHost(host.ID)
 				if killErr != nil {
-					return errors.Wrap(err, killErr.Error())
+					switch killErr.(type) {
+					case retry.ErrTimeout, resources.ErrTimeout:
+						logrus.Error("Timeout cleaning up gcp instance")
+						return errors.Wrap(err, killErr.Error())
+					default:
+						return errors.Wrap(err, killErr.Error())
+					}
 				}
 				return err
 			}
@@ -412,7 +423,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			logrus.Infof("Cleanup, deleting host '%s'", newHost.Name)
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
-				logrus.Warnf("Error deleting host: %v", derr)
+				switch derr.(type) {
+				case resources.ErrResourceNotFound:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+				case retry.ErrTimeout, resources.ErrTimeout:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+				default:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+				}
 			}
 		}
 	}()

@@ -987,13 +987,14 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		return err
 	}
 
+	// FIXME Look deleteNodeFunc and deleteMasterFunc err usage
 	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		_ = c.DeleteSpecificNode(t, params.(string), "") // FIXME Don't ignore errors
-		return nil, nil
+		funcErr := c.DeleteSpecificNode(t, params.(string), "")
+		return nil, funcErr
 	}
 	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		_ = c.deleteMaster(t, params.(string))  // FIXME Don't ignore errors
-		return nil, nil
+		funcErr := c.deleteMaster(t, params.(string))
+		return nil, funcErr
 	}
 
 	// Deletes the nodes

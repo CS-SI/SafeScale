@@ -126,8 +126,11 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	if err != nil {
 		return fmt.Errorf("failed to open '%s' : %s", fileLocalPath, err.Error())
 	}
-	defer func() { // FIXME: Catch error later
-		_ = file.Close()
+	defer func() {
+		cleanErr := file.Close()
+		if cleanErr != nil {
+			log.Errorf("error closing file: %s", file.Name())
+		}
 	}()
 
 	fileStats, err := file.Stat()
@@ -281,20 +284,23 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 
 	// Check if the local file is available
 	if _, err := os.Stat(fileLocalPath); err == nil {
-		return fmt.Errorf("File '%s' already exists", fileLocalPath)
+		return fmt.Errorf("file '%s' already exists", fileLocalPath)
 	}
 	file, err := os.Create(fileLocalPath)
 	if err != nil {
-		return fmt.Errorf("Failed to create the file '%s' : %s", fileLocalPath, err.Error())
+		return fmt.Errorf("failed to create the file '%s' : %s", fileLocalPath, err.Error())
 	}
 	defer func() {
-		// Suppres local file if Get didn't succeed
+		// Suppress local file if Get didn't succeed
 		if err != nil {
 			if derr := os.Remove(fileLocalPath); derr != nil {
 				log.Errorf("Failed to delete file '%s': %s", fileLocalPath, derr.Error())
 			}
 		} else {
-			_ = file.Close() // FIXME: Catch error later
+			cleanErr := file.Close()
+			if cleanErr != nil {
+				log.Errorf("error closing file: %s", file.Name())
+			}
 		}
 	}()
 

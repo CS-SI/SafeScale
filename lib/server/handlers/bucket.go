@@ -127,7 +127,7 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 		mountPoint = resources.DefaultBucketMountPoint + bucketName
 	}
 
-	authOpts, _ := handler.service.GetAuthenticationOptions()  // FIXME Unhandled errors
+	authOpts, _ := handler.service.GetAuthenticationOptions()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]

@@ -487,7 +487,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
-				log.Errorf("Failed to delete host '%s': %v", newHost.Name, derr)
+				switch derr.(type) {
+				case resources.ErrResourceNotFound:
+					log.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+				case retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+				default:
+					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+				}
 			}
 		}
 	}()

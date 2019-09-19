@@ -608,8 +608,10 @@ func (handler *NetworkHandler) deleteGateway(gw *resources.Host) {
 	err := handler.service.DeleteHost(gw.ID)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-			log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", gw.Name, err)
+		case resources.ErrResourceNotFound:
+			log.Errorf("Cleaning up on failure, failed to delete gateway '%s', resource not found: %v", gw.Name, err)
+		case retry.ErrTimeout, resources.ErrTimeout:
+			log.Errorf("Cleaning up on failure, failed to delete gateway '%s', timeout: %v", gw.Name, err)
 		default:
 			log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", gw.Name, err)
 		}
@@ -745,8 +747,10 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			err = handler.service.DeleteGateway(network.GatewayID) // allow no gateway, but log it
 			if err != nil {
 				switch err.(type) {
-				case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-					log.Errorf("Failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
+				case resources.ErrResourceNotFound:
+					log.Errorf("Failed to delete primary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
+				case retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("Failed to delete primary gateway, timeout: %s", openstack.ProviderErrorToString(err))
 				default:
 					log.Errorf("Failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
 				}
@@ -773,8 +777,10 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			err = handler.service.DeleteGateway(network.SecondaryGatewayID) // allow no gateway, but log it
 			if err != nil {
 				switch err.(type) {
-				case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-					log.Errorf("failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
+				case resources.ErrResourceNotFound:
+					log.Errorf("failed to delete secondary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
+				case retry.ErrTimeout, resources.ErrTimeout:
+					log.Errorf("failed to delete secondary gateway, timeout: %s", openstack.ProviderErrorToString(err))
 				default:
 					log.Errorf("failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
 				}

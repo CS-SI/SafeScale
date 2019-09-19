@@ -569,7 +569,7 @@ func (handler *HostHandler) Create(
 		return nil, infraErr(err)
 	}
 
-	_, err = sshCfg.WaitServerReady("phase1", utils.GetHostCreationTimeout()) // FIXME Force Initial SSH_TIMEOUT on phase1, see the code error
+	_, err = sshCfg.WaitServerReady("phase1", utils.GetHostCreationTimeout())
 	if err != nil {
 		derr := err
 		err = nil
@@ -908,7 +908,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	// Conditions are met, delete host
 	var deleteMetadataOnly bool
 	var moreTimeNeeded bool
-	err = handler.service.DeleteHost(host.ID)
+	err = handler.service.DeleteHost(host.ID) // FIXME DeleteHost, check retry.ErrTimeout
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound:
