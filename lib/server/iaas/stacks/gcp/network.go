@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/davecgh/go-spew/spew"
 	"strconv"
 
@@ -347,10 +348,15 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 	if err != nil {
-		// FIXME Detect if there is a timeout...
-		return err
+		switch err.(type) {
+		case retry.ErrTimeout, resources.ErrTimeout:
+			logrus.Warnf("Timeout waiting for subnetwork deletion")
+			return err
+		default:
+			return err
+		}
 	}
 
 	// Delete routes and firewall
@@ -366,7 +372,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 		}
 	}
 
@@ -386,7 +392,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 		}
 	}
 
@@ -422,7 +428,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		case resources.ErrResourceInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("Error creating gateway : %s", err)
+			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
 		}
 	}
 
