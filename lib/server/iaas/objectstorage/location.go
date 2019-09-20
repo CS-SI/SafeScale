@@ -65,7 +65,7 @@ func (l *location) getStowLocation() stow.Location {
 
 // Connect connects to an Object Storage Location
 func (l *location) connect() error {
-	// FIXME GCP Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
+	// FIXME GCP Remove specific driver code, Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
 	var config stow.ConfigMap
 
 	if l.config.Type == "google" {

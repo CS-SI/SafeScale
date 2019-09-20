@@ -145,23 +145,23 @@ type Object interface {
 	GetMetadata() ObjectMetadata
 }
 
-// FIXME GCP This is a problem
+// FIXME GCP Remove specific driver code
 // Config ...
 type Config struct {
-	Type         string
-	EnvAuth      bool
-	AuthVersion  int
-	AuthURL      string
-	EndpointType string
-	Endpoint     string
-	TenantDomain string
-	Tenant       string
-	Domain       string
-	User         string
-	Key          string
-	SecretKey    string
-	Region       string
+	Type             string
+	EnvAuth          bool
+	AuthVersion      int
+	AuthURL          string
+	EndpointType     string
+	Endpoint         string
+	TenantDomain     string
+	Tenant           string
+	Domain           string
+	User             string
+	Key              string
+	SecretKey        string
+	Region           string
 	AvailabilityZone string
-	ProjectId    string
-	Credentials  string
+	ProjectId        string
+	Credentials      string
 }

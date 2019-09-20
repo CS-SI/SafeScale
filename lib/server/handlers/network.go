@@ -281,11 +281,24 @@ func (handler *NetworkHandler) Create(
 		// Starting from here, deletes the primary gateway if exiting with error
 		defer func() {
 			if err != nil {
-				// FIXME Ensure consistency if possible
-				handler.deleteGateway(primaryGateway)
-				handler.deleteGatewayMetadata(primaryMetadata)
+				derr := handler.deleteGateway(primaryGateway)
+				if derr != nil {
+					switch derr.(type) {
+					case retry.ErrTimeout, resources.ErrTimeout:
+						log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+					default:
+					}
+				}
+				dmerr := handler.deleteGatewayMetadata(primaryMetadata)
+				if dmerr != nil {
+					switch dmerr.(type) {
+					case retry.ErrTimeout, resources.ErrTimeout:
+						log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+					default:
+					}
+				}
 				if failover {
-					handler.unbindHostFromVIP(newNetwork.VIP, primaryGateway)
+					_ = handler.unbindHostFromVIP(newNetwork.VIP, primaryGateway)
 				}
 			}
 		}()
@@ -300,10 +313,23 @@ func (handler *NetworkHandler) Create(
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if err != nil {
-					// FIXME Ensure consistency if possible
-					handler.deleteGateway(secondaryGateway)
-					handler.deleteGatewayMetadata(secondaryMetadata)
-					handler.unbindHostFromVIP(newNetwork.VIP, secondaryGateway)
+					derr := handler.deleteGateway(secondaryGateway)
+					if derr != nil {
+						switch derr.(type) {
+						case retry.ErrTimeout, resources.ErrTimeout:
+							log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+						default:
+						}
+					}
+					dmerr := handler.deleteGatewayMetadata(secondaryMetadata)
+					if dmerr != nil {
+						switch dmerr.(type) {
+						case retry.ErrTimeout, resources.ErrTimeout:
+							log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+						default:
+						}
+					}
+					_ = handler.unbindHostFromVIP(newNetwork.VIP, secondaryGateway)
 				}
 			}()
 		}
@@ -603,9 +629,9 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	return nil, nil
 }
 
-func (handler *NetworkHandler) deleteGateway(gw *resources.Host) {
+func (handler *NetworkHandler) deleteGateway(gw *resources.Host) (err error) {
 	log.Warnf("Cleaning up on failure, deleting gateway '%s'...", gw.Name)
-	err := handler.service.DeleteHost(gw.ID)
+	err = handler.service.DeleteHost(gw.ID)
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound:
@@ -617,19 +643,21 @@ func (handler *NetworkHandler) deleteGateway(gw *resources.Host) {
 		}
 	}
 	log.Infof("Cleaning up on failure, gateway '%s' deleted", gw.Name)
+	return err
 }
 
-func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) {
+func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) (err error) {
 	name := m.Get().Name
 	log.Warnf("Cleaning up on failure, deleting gateway '%s' metadata", name)
 	derr := m.Delete()
 	if derr != nil {
 		log.Errorf("Cleaning up on failure, failed to delete gateway '%s' metadata: %+v", name, derr)
 	}
+	return derr
 }
 
-func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resources.Host) {
-	err := handler.service.UnbindHostFromVIP(vip, host)
+func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resources.Host) (err error) {
+	err = handler.service.UnbindHostFromVIP(vip, host)
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
@@ -640,6 +668,7 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 	} else {
 		log.Infof("Cleaning up on failure, host '%s' bind removed from VIP", host.Name)
 	}
+	return err
 }
 
 // List returns the network list

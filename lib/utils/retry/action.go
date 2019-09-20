@@ -144,7 +144,7 @@ func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Durati
 }
 
 // WhileUnsuccessfulWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
-// waiting 'delay' after each try, expiting after 'timeout'
+// waiting 'delay' after each try, expiring after 'timeout'
 func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
