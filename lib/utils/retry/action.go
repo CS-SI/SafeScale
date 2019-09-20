@@ -37,7 +37,7 @@ type Try struct {
 type action struct {
 	// Officer is used to apply needed delay between 2 tries. If nil, no delay will be used.
 	Officer *Officer
-	// ReArbitertry is called for every try to determine if next try is wanted
+	// Arbiter is called for every try to determine if next try is wanted
 	Arbiter Arbiter
 	// First is called before the loop of retries
 	First func() error
@@ -134,7 +134,7 @@ func WhileUnsuccessfulDelay1Second(run func() error, timeout time.Duration) erro
 
 // WhileUnsuccessfulDelay5Seconds retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 5 seconds after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) error {
+func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) error { // FIXME Nest errors
 	return WhileUnsuccessful(run, 5*time.Second, timeout)
 }
 
@@ -337,6 +337,8 @@ func (a action) loop() error {
 
 		// Asks what to do now
 		verdict, retryErr := arbiter(try)
+
+		// Notify to interested parties
 		if a.Notify != nil {
 			a.Notify(try, verdict)
 		}

@@ -29,6 +29,7 @@ func (b errBase) Error() string {
 // ErrTimeout is returned when the time limit has been reached.
 type ErrTimeout struct {
 	b     errBase
+	cause error
 	limit time.Duration
 }
 
@@ -43,15 +44,27 @@ func (e ErrTimeout) Error() string {
 	return msgFinal
 }
 
+func (e ErrTimeout) Cause() error {
+	return e.cause
+}
+
 // TimeoutError ...
-func TimeoutError(limit time.Duration) ErrTimeout {
-	return ErrTimeout{limit: limit}
+func TimeoutError(limit time.Duration, err error) ErrTimeout {
+	return ErrTimeout{
+		limit: limit,
+		cause: err,
+	}
 }
 
 // ErrLimit is returned when the maximum attempts has been reached.
 type ErrLimit struct {
 	b     errBase
+	cause error
 	limit uint
+}
+
+func (e ErrLimit) Cause() error {
+	return e.cause
 }
 
 // Error
@@ -67,6 +80,9 @@ func (e ErrLimit) Error() string {
 }
 
 // LimitError ...
-func LimitError(limit uint) ErrLimit {
-	return ErrLimit{limit: limit}
+func LimitError(limit uint, err error) ErrLimit {
+	return ErrLimit{
+		cause: err,
+		limit: limit,
+	}
 }
