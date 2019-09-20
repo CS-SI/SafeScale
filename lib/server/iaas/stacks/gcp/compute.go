@@ -797,7 +797,21 @@ func (s *Stack) DeleteHost(id string) (err error) {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostCleanupTimeout())
+
+	waitErr := retry.WhileUnsuccessfulDelay5Seconds(func() error {
+		_, recErr := service.Instances.Get(projectID, zone, instanceName).Do()
+		if gerr, ok := recErr.(*googleapi.Error); ok {
+			if gerr.Code == 404 {
+				return nil
+			}
+		}
+		return fmt.Errorf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr)
+	}, common.GetContextTimeout())
+
+	if waitErr != nil {
+		logrus.Error(errors.Cause(waitErr))
+	}
 
 	return err
 }

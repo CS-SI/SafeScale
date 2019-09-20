@@ -1240,7 +1240,7 @@ func (s *Stack) DeleteHost(id string) error {
 			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
 		},
 		0,
-		2*utils.GetContextTimeout(),
+		utils.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
 		log.Debugf("failed to remove host '%s': %s", id, outerRetryErr.Error())
