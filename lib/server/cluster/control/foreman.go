@@ -1082,8 +1082,6 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	timeout := p["timeout"].(time.Duration)
 	nokeep := p["nokeep"].(bool)
 
-	_ = nokeep // FIXME Why is unused ??
-
 	defer utils.TimerErrWithLevel(fmt.Sprintf("{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index), &err, log.TraceLevel)()
 
 	hostLabel := fmt.Sprintf("master #%d", index)
@@ -1117,7 +1115,11 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 				return nil
 			})
 		})
-		if mErr != nil {
+		if mErr != nil && nokeep {
+			derr := clientHost.Delete([]string{pbHost.Id}, utils.GetLongOperationTimeout())
+			if derr != nil {
+				log.Errorf("failed to delete master after failure")
+			}
 			log.Errorf("[%s] creation failed: %s", hostLabel, mErr.Error())
 			return nil, fmt.Errorf("failed to update Cluster metadata: %s", mErr.Error())
 		}
