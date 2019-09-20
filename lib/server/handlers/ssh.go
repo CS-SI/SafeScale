@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"strings"
 	"time"
 
@@ -73,7 +74,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	case string:
 		mh, err := metadata.LoadHost(handler.service, hostParam.(string))
 		if err != nil {
-			return nil, infraErr(err)
+			return nil, err
 		}
 		host = mh.Get()
 	case *resources.Host:
@@ -84,7 +85,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 
 	cfg, err := handler.service.GetConfigurationOptions()
 	if err != nil {
-		return nil, infraErr(err)
+		return nil, err
 	}
 	user := resources.DefaultUser
 	if userIf, ok := cfg.Get("OperatorUsername"); ok {
@@ -108,7 +109,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 			hostSvc := NewHostHandler(handler.service)
 			gw, err := hostSvc.Inspect(ctx, hostNetworkV1.DefaultGatewayID)
 			if err != nil {
-				return throwErr(err)
+				return err
 			}
 			GatewayConfig := system.SSHConfig{
 				PrivateKey: gw.PrivateKey,
@@ -135,10 +136,10 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
 	if err != nil {
-		return logicErrf(err, "Failed to read SSH config")
+		return errors.Wrapf(err, "Failed to read SSH config")
 	}
 	_, waitErr := ssh.WaitServerReady("ready", timeout)
-	return infraErr(waitErr)
+	return waitErr
 }
 
 // Run tries to execute command 'cmd' on the host
@@ -148,13 +149,13 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
-		return 0, "", "", throwErr(err)
+		return 0, "", "", err
 	}
 
 	// retrieve ssh config to perform some commands
 	ssh, err := handler.GetConfig(ctx, host)
 	if err != nil {
-		return 0, "", "", infraErr(err)
+		return 0, "", "", err
 	}
 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
@@ -170,9 +171,6 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 			}
 		},
 	)
-	if err != nil {
-		err = infraErr(err)
-	}
 
 	return retCode, stdOut, stdErr, err
 }
@@ -225,7 +223,6 @@ func extractPath(in string) (string, error) {
 	}
 	_, err := extracthostName(in)
 	if err != nil {
-		err = infraErr(err)
 		return "", err
 	}
 
@@ -242,31 +239,27 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 	// Try extract host
 	hostFrom, err := extracthostName(from)
 	if err != nil {
-		err = infraErr(err)
 		return 0, "", "", err
 	}
 	hostTo, err := extracthostName(to)
 	if err != nil {
-		err = infraErr(err)
 		return 0, "", "", err
 	}
 
 	// Host checks
 	if hostFrom != "" && hostTo != "" {
-		return 0, "", "", logicErr(fmt.Errorf("copy between 2 hosts is not supported yet"))
+		return 0, "", "", fmt.Errorf("copy between 2 hosts is not supported yet")
 	}
 	if hostFrom == "" && hostTo == "" {
-		return 0, "", "", logicErr(fmt.Errorf("no host name specified neither in from nor to"))
+		return 0, "", "", fmt.Errorf("no host name specified neither in from nor to")
 	}
 
 	fromPath, err := extractPath(from)
 	if err != nil {
-		err = infraErr(err)
 		return 0, "", "", err
 	}
 	toPath, err := extractPath(to)
 	if err != nil {
-		err = infraErr(err)
 		return 0, "", "", err
 	}
 
@@ -285,16 +278,15 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
-		return 0, "", "", throwErr(err)
+		return 0, "", "", err
 	}
 
 	// retrieve ssh config to perform some commands
 	ssh, err := handler.GetConfig(ctx, host.ID)
 	if err != nil {
-		err = infraErr(err)
 		return 0, "", "", err
 	}
 
 	cRc, cStcOut, cStdErr, cErr := ssh.Copy(remotePath, localPath, upload)
-	return cRc, cStcOut, cStdErr, infraErr(cErr)
+	return cRc, cStcOut, cStdErr, cErr
 }

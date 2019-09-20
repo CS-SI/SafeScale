@@ -67,7 +67,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 
 	if all {
 		volumes, err := handler.service.ListVolumes()
-		return volumes, infraErr(err)
+		return volumes, err
 	}
 
 	mv := metadata.NewVolume(handler.service)
@@ -76,7 +76,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 		return nil
 	})
 	if err != nil {
-		return nil, infraErrf(err, "Error listing volumes")
+		return nil, errors.Wrapf(err, "Error listing volumes")
 	}
 	return volumes, nil
 }
@@ -94,7 +94,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 			return resources.ResourceNotFoundError("volume", ref)
 		default:
 			log.Debugf("Failed to delete volume: %+v", err)
-			return infraErrf(err, "failed to delete volume")
+			return errors.Wrapf(err, "failed to delete volume")
 		}
 	}
 	volume := mv.Get()
@@ -107,7 +107,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 			for _, v := range volumeAttachmentsV1.Hosts {
 				list = append(list, v)
 			}
-			return logicErr(fmt.Errorf("still attached to %d host%s: %s", nbAttach, utils.Plural(nbAttach), strings.Join(list, ", ")))
+			return fmt.Errorf("still attached to %d host%s: %s", nbAttach, utils.Plural(nbAttach), strings.Join(list, ", "))
 		}
 		return nil
 	})
@@ -121,14 +121,14 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 		case resources.ErrResourceNotFound:
 			log.Warnf("Unable to find the volume on provider side, cleaning up metadata")
 		case resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
-			return infraErrf(err, "can't delete volume")
+			return errors.Wrapf(err, "can't delete volume")
 		default:
-			return infraErrf(err, "can't delete volume")
+			return errors.Wrapf(err, "can't delete volume")
 		}
 	}
 	err = mv.Delete()
 	if err != nil {
-		return infraErr(err)
+		return err
 	}
 
 	select {
@@ -158,9 +158,8 @@ func (handler *VolumeHandler) Inspect(
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
-			return nil, nil, logicErr(resources.ResourceNotFoundError("volume", ref))
+			return nil, nil, resources.ResourceNotFoundError("volume", ref)
 		}
-		err := infraErr(err)
 		return nil, nil, err
 	}
 	volume = mv.Get()
@@ -218,9 +217,9 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
-			return nil, infraErr(err)
+			return nil, err
 		default:
-			return nil, infraErr(err)
+			return nil, err
 		}
 	}
 
@@ -245,7 +244,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	md, err := metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		log.Debugf("Error creating volume: saving volume metadata: %+v", err)
-		return nil, infraErrf(err, "error creating volume '%s' saving its metadata", name)
+		return nil, errors.Wrapf(err, "error creating volume '%s' saving its metadata", name)
 	}
 
 	// starting from here delete volume if function ends with failure
@@ -279,14 +278,14 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			return err
 		}
-		return infraErr(err)
+		return err
 	}
 
 	// Get Host data
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
-		return throwErr(err)
+		return err
 	}
 
 	var (
@@ -323,11 +322,11 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				if device, found := hostVolumesV1.DevicesByID[volume.ID]; found {
 					mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]]
 					if !ok {
-						return logicErr(fmt.Errorf("metadata inconsistency for volume '%s' attached to host '%s'", volume.Name, host.Name))
+						return fmt.Errorf("metadata inconsistency for volume '%s' attached to host '%s'", volume.Name, host.Name)
 					}
 					path := mount.Path
 					if path != mountPoint {
-						return logicErr(fmt.Errorf("volume '%s' is already attached in '%s:%s'", volume.Name, host.Name, path))
+						return fmt.Errorf("volume '%s' is already attached in '%s:%s'", volume.Name, host.Name, path)
 					}
 					return nil
 				}
@@ -335,12 +334,12 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Check if there is no other device mounted in the path (or in subpath)
 				for _, i := range hostMountsV1.LocalMountsByPath {
 					if strings.Index(i.Path, mountPoint) == 0 {
-						return logicErr(fmt.Errorf("can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
+						return fmt.Errorf("can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path)
 					}
 				}
 				for _, i := range hostMountsV1.RemoteMountsByPath {
 					if strings.Index(i.Path, mountPoint) == 0 {
-						return logicErr(fmt.Errorf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
+						return fmt.Errorf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path)
 					}
 				}
 
@@ -349,7 +348,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Get list of disks before attachment
 				oldDiskSet, err := handler.listAttachedDevices(ctx, host)
 				if err != nil {
-					err := logicErrf(err, "failed to get list of connected disks")
+					err := errors.Wrapf(err, "failed to get list of connected disks")
 					return err
 				}
 				vaID, err := handler.service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
@@ -360,9 +359,9 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				if err != nil {
 					switch err.(type) {
 					case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
-						return infraErrf(err, "can't attach volume '%s'", volumeName)
+						return errors.Wrapf(err, "can't attach volume '%s'", volumeName)
 					default:
-						return infraErrf(err, "can't attach volume '%s'", volumeName)
+						return errors.Wrapf(err, "can't attach volume '%s'", volumeName)
 					}
 				}
 				// Starting from here, remove volume attachment if exit with error
@@ -392,20 +391,20 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						// Get new of disk after attachment
 						newDiskSet, err := handler.listAttachedDevices(ctx, host)
 						if err != nil {
-							err := logicErrf(err, "failed to get list of connected disks")
+							err := errors.Wrapf(err, "failed to get list of connected disks")
 							return err
 						}
 						// Isolate the new device
 						newDisk = newDiskSet.Difference(oldDiskSet)
 						if newDisk.Cardinality() == 0 {
-							return logicErr(fmt.Errorf("disk not yet attached, retrying"))
+							return fmt.Errorf("disk not yet attached, retrying")
 						}
 						return nil
 					},
 					utils.GetContextTimeout(),
 				)
 				if retryErr != nil {
-					return logicErr(fmt.Errorf("failed to confirm the disk attachment after %s", utils.GetContextTimeout()))
+					return fmt.Errorf("failed to confirm the disk attachment after %s", utils.GetContextTimeout())
 				}
 
 				// Recovers real device name from the system
@@ -415,17 +414,15 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				sshHandler := NewSSHHandler(handler.service)
 				sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 				if err != nil {
-					err = infraErr(err)
 					return err
 				}
 
 				server, err = nfs.NewServer(sshConfig)
 				if err != nil {
-					return infraErr(err)
+					return err
 				}
 				volumeUUID, err = server.MountBlockDevice(deviceName, mountPoint, format, doNotFormat)
 				if err != nil {
-					err = infraErr(err)
 					return err
 				}
 
@@ -461,7 +458,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		})
 	})
 	if err != nil {
-		return infraErrf(err, "can't attach volume")
+		return errors.Wrapf(err, "can't attach volume")
 	}
 
 	defer func() {
@@ -486,7 +483,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 
 	_, err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
-		return infraErrf(err, "can't attach volume")
+		return errors.Wrapf(err, "can't attach volume")
 	}
 
 	defer func() {
@@ -508,7 +505,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 
 	mh, err := metadata.SaveHost(handler.service, host)
 	if err != nil {
-		return infraErrf(err, "can't attach volume")
+		return errors.Wrapf(err, "can't attach volume")
 	}
 
 	defer func() {
@@ -563,7 +560,6 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 		func() error {
 			retcode, stdout, stderr, err = sshHandler.Run(ctx, host.ID, cmd)
 			if err != nil {
-				err = infraErr(err)
 				return err
 			}
 			if retcode != 0 {
@@ -577,7 +573,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 		utils.GetContextTimeout(),
 	)
 	if retryErr != nil {
-		return nil, logicErrf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", utils.GetContextTimeout()))
+		return nil, errors.Wrapf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", utils.GetContextTimeout()))
 	}
 	disks := strings.Split(stdout, "\n")
 	set := mapset.NewThreadUnsafeSet()
@@ -595,9 +591,9 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
-			return infraErr(err)
+			return err
 		}
-		return infraErr(resources.ResourceNotFoundError("volume", volumeName))
+		return resources.ResourceNotFoundError("volume", volumeName)
 	}
 	mountPath := ""
 
@@ -605,7 +601,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
-		return throwErr(err)
+		return err
 	}
 
 	// Obtain volume attachment ID
@@ -615,7 +611,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 		// Check the volume is effectively attached
 		attachment, found := hostVolumesV1.VolumesByID[volume.ID]
 		if !found {
-			return logicErr(fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name))
+			return fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name)
 		}
 
 		// Obtain mounts information
@@ -625,7 +621,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 			mountPath = hostMountsV1.LocalMountsByDevice[device]
 			mount := hostMountsV1.LocalMountsByPath[mountPath]
 			if mount == nil {
-				return logicErr(errors.Wrap(fmt.Errorf("metadata inconsistency: no mount corresponding to volume attachment"), ""))
+				return errors.Wrap(fmt.Errorf("metadata inconsistency: no mount corresponding to volume attachment"), "")
 			}
 
 			// Check if volume has other mount(s) inside it
@@ -634,14 +630,14 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 					continue
 				}
 				if strings.Index(p, mount.Path) == 0 {
-					return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
-						volume.Name, host.Name, mount.Path, host.Name, p))
+					return fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
+											volume.Name, host.Name, mount.Path, host.Name, p)
 				}
 			}
 			for p := range hostMountsV1.RemoteMountsByPath {
 				if strings.Index(p, mount.Path) == 0 {
-					return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
-						volume.Name, host.Name, mount.Path, host.Name, p))
+					return fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
+											volume.Name, host.Name, mount.Path, host.Name, p)
 				}
 			}
 
@@ -651,8 +647,8 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 
 				for _, v := range hostSharesV1.ByID {
 					if strings.Index(v.Path, mount.Path) == 0 {
-						return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', '%s:%s' is shared",
-							volume.Name, host.Name, mount.Path, host.Name, v.Path))
+						return fmt.Errorf("can't detach volume '%s' from '%s:%s', '%s:%s' is shared",
+													volume.Name, host.Name, mount.Path, host.Name, v.Path)
 					}
 				}
 
@@ -660,17 +656,17 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				sshHandler := NewSSHHandler(handler.service)
 				sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 				if err != nil {
-					err = logicErrf(err, "error getting ssh config")
+					err = errors.Wrapf(err, "error getting ssh config")
 					return err
 				}
 				nfsServer, err := nfs.NewServer(sshConfig)
 				if err != nil {
-					err = logicErrf(err, "error creating nfs service")
+					err = errors.Wrapf(err, "error creating nfs service")
 					return err
 				}
 				err = nfsServer.UnmountBlockDevice(attachment.Device)
 				if err != nil {
-					_ = logicErrf(err, "error unmounting block device")
+					_ = errors.Wrapf(err, "error unmounting block device")
 					//return err
 				}
 
@@ -679,9 +675,9 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				if err != nil {
 					switch err.(type) {
 					case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
-						return infraErr(err)
+						return err
 					default:
-						return infraErr(err)
+						return err
 					}
 				}
 
@@ -711,11 +707,10 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	// Updates metadata
 	_, err = metadata.SaveHost(handler.service, host)
 	if err != nil {
-		return infraErr(err)
+		return err
 	}
 	_, err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
-		err = infraErr(err)
 		return err
 	}
 

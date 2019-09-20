@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"regexp"
 
@@ -64,15 +65,15 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
-			return infraErrf(err, "failed to search of bucket '%s' already exists", name)
+			return errors.Wrapf(err, "failed to search of bucket '%s' already exists", name)
 		}
 	}
 	if bucket != nil {
-		return logicErr(resources.ResourceDuplicateError("bucket", name))
+		return resources.ResourceDuplicateError("bucket", name)
 	}
 	_, err = handler.service.CreateBucket(name)
 	if err != nil {
-		return infraErrf(err, "failed to create bucket '%s'", name)
+		return errors.Wrapf(err, "failed to create bucket '%s'", name)
 	}
 	return nil
 }
@@ -82,7 +83,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::Create() called"), &err, logrus.TraceLevel)()
 	err = handler.service.DeleteBucket(name)
 	if err != nil {
-		return infraErrf(err, "failed to delete bucket '%s'", name)
+		return errors.Wrapf(err, "failed to delete bucket '%s'", name)
 	}
 	return nil
 }
@@ -94,9 +95,9 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 	b, err := handler.service.GetBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
-			return nil, logicErr(resources.ResourceNotFoundError("bucket", name))
+			return nil, resources.ResourceNotFoundError("bucket", name)
 		}
-		return nil, infraErrf(err, "failed to inspect bucket '%s'", name)
+		return nil, errors.Wrapf(err, "failed to inspect bucket '%s'", name)
 	}
 	mb = &resources.Bucket{
 		Name: b.GetName(),
@@ -111,14 +112,14 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 	// Check bucket existence
 	_, err = handler.service.GetBucket(bucketName)
 	if err != nil {
-		return infraErr(err)
+		return err
 	}
 
 	// Get Host ID
 	hostHandler := NewHostHandler(handler.service)
 	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
-		return logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
+		return fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	// Create mount point
@@ -166,7 +167,7 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 	}
 
 	rerr := exec(ctx, "mount_object_storage.sh", data, host.ID, handler.service)
-	return logicErr(rerr)
+	return rerr
 }
 
 // Unmount a bucket
@@ -178,7 +179,7 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			return err
 		}
-		return infraErr(err)
+		return err
 	}
 
 	// Get Host ID
@@ -188,7 +189,7 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			return err
 		}
-		return infraErrf(err, "failed to get host '%s':", hostName)
+		return errors.Wrapf(err, "failed to get host '%s':", hostName)
 	}
 
 	data := struct {
@@ -198,5 +199,5 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 	}
 
 	rerr := exec(ctx, "umount_object_storage.sh", data, host.ID, handler.service)
-	return infraErr(rerr)
+	return rerr
 }

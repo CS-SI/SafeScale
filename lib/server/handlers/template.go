@@ -52,5 +52,5 @@ func (handler *TemplateHandler) List(ctx context.Context, all bool) (tlist []res
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::List() called"), &err, logrus.TraceLevel)()
 
 	tlist, err = handler.service.ListTemplates(all)
-	return tlist, infraErr(err)
+	return tlist, err
 }

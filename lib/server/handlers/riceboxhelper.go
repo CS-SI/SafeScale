@@ -19,6 +19,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"github.com/pkg/errors"
 	"text/template"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -32,20 +33,20 @@ func getBoxContent(script string, data interface{}) (string, error) {
 
 	box, err := rice.FindBox("../handlers/scripts")
 	if err != nil {
-		return "", infraErrf(err, "Unable to find script folder ../handlers/scripts")
+		return "", errors.Wrapf(err, "Unable to find script folder ../handlers/scripts")
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
-		return "", infraErrf(err, "Unable to recover script content")
+		return "", errors.Wrapf(err, "Unable to recover script content")
 	}
 	tpl, err := template.New("TemplateName").Parse(scriptContent)
 	if err != nil {
-		return "", infraErrf(err, "Unable to parse script content")
+		return "", errors.Wrapf(err, "Unable to parse script content")
 	}
 
 	var buffer bytes.Buffer
 	if err = tpl.Execute(&buffer, data); err != nil {
-		return "", infraErrf(err, "Error in script execution")
+		return "", errors.Wrapf(err, "Error in script execution")
 	}
 
 	tplcmd := buffer.String()
@@ -57,23 +58,23 @@ func getBoxContent(script string, data interface{}) (string, error) {
 func exec(ctx context.Context, script string, data interface{}, hostid string, svc iaas.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
-		return infraErrf(err, "Unable to get the script string")
+		return errors.Wrapf(err, "Unable to get the script string")
 	}
 	// retrieve ssh config to perform some commands
 	sshHandler := NewSSHHandler(svc)
 	ssh, err := sshHandler.GetConfig(ctx, hostid)
 	if err != nil {
-		return infraErrf(err, "Unable to fetch the SSHConfig from the host")
+		return errors.Wrapf(err, "Unable to fetch the SSHConfig from the host")
 	}
 
 	cmd, err := ssh.SudoCommand(scriptCmd)
 	if err != nil {
-		return infraErrf(err, "Unable to convert the script string in a SSHCommand struct")
+		return errors.Wrapf(err, "Unable to convert the script string in a SSHCommand struct")
 	}
 	_, err = cmd.Output()
 
 	if err != nil {
-		return infraErrf(err, "Unable to execute the command as a root user on the host")
+		return errors.Wrapf(err, "Unable to execute the command as a root user on the host")
 	}
 	return nil
 }
