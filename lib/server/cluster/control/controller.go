@@ -481,12 +481,12 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (string, error) {
 }
 
 // UpdateMetadata writes Cluster config in Object Storage
-func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error) error {
+func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error) (err error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 
-	defer utils.TimerWithLevel(fmt.Sprintf("{task %s} lib.server.cluster.control.Controller::UpdateMetadata() called", task.GetID()), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("{task %s} lib.server.cluster.control.Controller::UpdateMetadata() called", task.GetID()), &err, log.TraceLevel)()
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -494,7 +494,7 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 	c.metadata.Acquire()
 	defer c.metadata.Release()
 
-	err := c.metadata.Reload(task)
+	err = c.metadata.Reload(task)
 	if err != nil {
 		return err
 	}
@@ -834,6 +834,8 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 	if selectedMaster == "" {
 		selectedMaster, err = c.FindAvailableMaster(task)
 		if err != nil {
+			// FIXME Try deletion anyway ?
+			_ = c.deleteNode(task, node, "")
 			return err
 		}
 	}
@@ -890,7 +892,7 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 
 // deleteNode deletes the node specified by its ID
 func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) (err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::deleteNode(%s) called", node.Name), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::deleteNode(%s) called", node.Name), &err, log.TraceLevel)()
 
 	if c == nil {
 		panic("Calling lib.server.cluster.control.Controller::deleteNode() from nil pointer!")
@@ -1007,7 +1009,10 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, _ = s.Wait()
+			_, subErr := s.Wait()
+			if subErr != nil {
+				log.Error(subErr)
+			}
 		}
 	}
 
@@ -1021,7 +1026,10 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, _ = s.Wait()
+			_, subErr := s.Wait()
+			if subErr != nil {
+				log.Error(subErr)
+			}
 		}
 	}
 

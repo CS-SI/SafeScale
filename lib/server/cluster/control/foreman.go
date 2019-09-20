@@ -1074,7 +1074,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	index := p["index"].(int)
@@ -1084,12 +1084,11 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 
 	_ = nokeep // FIXME Why is unused ??
 
-	defer utils.TimerWithLevel(fmt.Sprintf("{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index), log.TraceLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index), &err, log.TraceLevel)()
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
 
-	var err error
 	hostDef := *def
 	hostDef.Name, err = b.buildHostname(t, "master", NodeType.Master)
 	if err != nil {

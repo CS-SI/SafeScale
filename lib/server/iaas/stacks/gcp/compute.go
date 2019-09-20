@@ -448,7 +448,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *resources.Host, err error) {
 	if s == nil {
 		panic("Calling s.WaitHostReady with s==nil!")
 	}
@@ -465,7 +465,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	default:
 		panic("hostParam must be a string or a *resources.Host!")
 	}
-	defer common.TimerWithLevel(fmt.Sprintf("stacks.gcp::WaitHostReady(%s) called", host.ID), logrus.TraceLevel)()
+	defer common.TimerErrWithLevel(fmt.Sprintf("stacks.gcp::WaitHostReady(%s) called", host.ID), &err, logrus.TraceLevel)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
