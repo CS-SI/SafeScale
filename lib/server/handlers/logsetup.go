@@ -19,6 +19,7 @@ package handlers
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"io"
 	"os"
 
@@ -83,6 +84,10 @@ func isKnownErr(err error) bool {
 		known = true
 	case resources.ErrTimeout:
 		known = true
+	case retry.ErrLimit:
+		known = true
+	case retry.ErrTimeout:
+		known = true
 	default:
 		known = false
 	}
@@ -98,7 +103,6 @@ func infraErrf(err error, message string, a ...interface{}) error {
 
 	if isKnownErr(errors.Cause(err)) {
 		log.Error(err)
-		// knownErr := errors.WithMessage(err, fmt.Sprintf(message, a...))
 		return err
 	}
 
