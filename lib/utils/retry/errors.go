@@ -2,6 +2,7 @@ package retry
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -46,6 +47,8 @@ func AddConsequence(err error, cons error) error {
 		if ok {
 			nerr := conseq.AddConsequence(cons)
 			return nerr
+		} else {
+			logrus.Error(err)
 		}
 	}
 	return err

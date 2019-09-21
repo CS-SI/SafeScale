@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/pkg/errors"
 	"strconv"
 	"strings"
 	txttmpl "text/template"
@@ -178,9 +180,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Generate needed password for account cladm
 	cladmPassword, err := utils.GeneratePassword(16)
 	if err != nil {
-		msg := fmt.Sprintf("failed to generate password for user cladm: %s", err.Error())
-		log.Errorf("[cluster %s] %s", req.Name, msg)
-		return fmt.Errorf(msg)
+		return fmt.Errorf("[cluster %s] failed to generate password for user cladm: %s", req.Name, err.Error())
 	}
 
 	// Determine default image
@@ -275,9 +275,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	clientNetwork := clientInstance.Network
 	network, err := clientNetwork.Create(def, utils.GetExecutionTimeout())
 	if err != nil {
-		msg := fmt.Sprintf("failed to create network '%s': %s", networkName, err.Error())
-		log.Errorf("[cluster %s] %s", req.Name, msg)
-		return fmt.Errorf(msg)
+		return fmt.Errorf("[cluster %s] failed to create network '%s': %s", req.Name, networkName, err.Error())
 	}
 	log.Debugf("[cluster %s] network '%s' creation successful.", req.Name, networkName)
 	req.NetworkID = network.Id
@@ -286,7 +284,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := clientNetwork.Delete([]string{network.Id}, utils.GetExecutionTimeout())
 			if derr != nil {
-				log.Errorf("after failure, failed to delete network '%s'", networkName)
+				cleanErr := errors.WithMessagef(err, "after failure, failed to delete network '%s'", networkName)
+				err = retry.AddConsequence(err, cleanErr)
 			}
 		}
 	}()
@@ -419,7 +418,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := b.cluster.DeleteMetadata(task)
 			if derr != nil {
-				log.Debugf("after failure, failed to delete metadata of cluster")
+				cleanErr := errors.WithMessage(derr, "after failure, failed to delete metadata of cluster")
+				err = retry.AddConsequence(err, cleanErr)
 			}
 		}
 	}()
@@ -441,20 +441,20 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	mastersTask := task.New().Start(b.taskCreateMasters, data.Map{
 		"count":     masterCount,
 		"masterDef": mastersDef,
-		"nokeep": !req.KeepOnFailure,
+		"nokeep":    !req.KeepOnFailure,
 	})
 
 	privateNodesTask := task.New().Start(b.taskCreateNodes, data.Map{
 		"count":   privateNodeCount,
 		"public":  false,
 		"nodeDef": nodesDef,
-		"nokeep": !req.KeepOnFailure,
+		"nokeep":  !req.KeepOnFailure,
 	})
 
 	// Step 2: awaits gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		mastersTask.Abort() // FIXME What about cleanup ?
+		mastersTask.Abort()      // FIXME What about cleanup ?
 		privateNodesTask.Abort() // FIXME What about cleanup ?
 		return primaryGatewayStatus
 	}
@@ -462,7 +462,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if secondaryGatewayTask != nil {
 			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
 			if secondaryGatewayStatus != nil {
-				mastersTask.Abort() // FIXME What about cleanup ?
+				mastersTask.Abort()      // FIXME What about cleanup ?
 				privateNodesTask.Abort() // FIXME What about cleanup ?
 				return secondaryGatewayStatus
 			}
@@ -474,7 +474,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := client.New().Host.Delete(b.cluster.ListMasterIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
-				log.Errorf("[cluster %s] after failure, failed to delete masters", req.Name)
+				cleanErr := errors.WithMessagef(derr, "[cluster %s] after failure, failed to delete masters", req.Name)
+				err = retry.AddConsequence(err, cleanErr)
 			}
 		}
 	}()
@@ -521,9 +522,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			clientHost := clientInstance.Host
 			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
-				log.Debugf("failed to remove private nodes on failure")
+				cleanErr := errors.WithMessage(derr, "failed to remove private nodes on failure")
+				err = retry.AddConsequence(err, cleanErr)
 			}
-
 		}
 	}()
 
@@ -1051,7 +1052,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 			"index":     i + 1,
 			"masterDef": def,
 			"timeout":   timeout,
-			"nokeep": nokeep,
+			"nokeep":    nokeep,
 		})
 		subtasks = append(subtasks, subtask)
 	}
@@ -1271,7 +1272,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 			"type":    NodeType.Node,
 			"nodeDef": def,
 			"timeout": timeout,
-			"nokeep": nokeep,
+			"nokeep":  nokeep,
 		})
 		subtasks = append(subtasks, subtask)
 	}
