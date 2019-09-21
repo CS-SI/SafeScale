@@ -46,6 +46,71 @@ func quick_sleepy_failure() error {
 	return fmt.Errorf("Always fails...")
 }
 
+func CreateErrorWithNConsequences(n uint) (err error) {
+	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	if err != nil {
+		for loop := uint(0); loop < n; loop++ {
+			nerr := fmt.Errorf("Random cleanup problem")
+			err = AddConsequence(err, nerr)
+		}
+	}
+	return err
+}
+
+func CreateDeferredErrorWithNConsequences(n uint) (err error) {
+	defer func() {
+		if err != nil {
+			for loop := uint(0); loop < n; loop++ {
+				nerr := fmt.Errorf("Random cleanup problem")
+				err = AddConsequence(err, nerr)
+			}
+		}
+	}()
+
+	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	return err
+}
+
+func TestConsequence(t *testing.T) {
+	recovered := CreateErrorWithNConsequences(1)
+	if recovered != nil {
+		cons := Consequences(recovered)
+		if len(cons) == 0 {
+			t.Errorf("This error should have consequences...")
+		}
+	}
+
+	recovered = CreateErrorWithNConsequences(0)
+	if recovered != nil {
+		cons := Consequences(recovered)
+		if len(cons) != 0 {
+			t.Errorf("This error should have NO consequences...")
+		}
+	}
+}
+
+func TestDeferredConsequence(t *testing.T) {
+	recovered := CreateDeferredErrorWithNConsequences(1)
+	if recovered != nil {
+		cons := Consequences(recovered)
+		if len(cons) == 0 {
+			t.Errorf("This error should have consequences...")
+		} else {
+			for _, con := range cons {
+				fmt.Println(con)
+			}
+		}
+	}
+
+	recovered = CreateDeferredErrorWithNConsequences(0)
+	if recovered != nil {
+		cons := Consequences(recovered)
+		if len(cons) != 0 {
+			t.Errorf("This error should have NO consequences...")
+		}
+	}
+}
+
 func TestWhileUnsuccessfulDelay5Seconds(t *testing.T) {
 	type args struct {
 		run     func() error
