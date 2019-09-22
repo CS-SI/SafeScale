@@ -32,6 +32,14 @@ func TraceOnExitErr(in string, err *error) func() {
 	}
 }
 
+func TraceOnExitErrAsTrace(in string, err *error) func() {
+	return func() {
+		if !(err == nil || (err != nil && *err == nil)) {
+			logrus.Trace(fmt.Sprintf("%s... finished WITH ERROR [%+v]", in, *err))
+		}
+	}
+}
+
 func TimerWithLevel(in string, level logrus.Level) func() {
 	switch level {
 	case logrus.TraceLevel:

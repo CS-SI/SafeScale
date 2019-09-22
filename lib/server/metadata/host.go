@@ -90,7 +90,7 @@ func (mh *Host) ReadByID(id string) (err error) {
 		panic("m.item is nil!")
 	}
 
-	defer utils.TraceOnExitErr(fmt.Sprintf("Reading host metadata: %s", id), &err)()
+	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Reading host metadata: %s", id), &err)()
 
 	host := resources.NewHost()
 	err = mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
@@ -114,7 +114,7 @@ func (mh *Host) ReadByName(name string) (err error) {
 		panic("m.item is nil!")
 	}
 
-	defer utils.TraceOnExitErr(fmt.Sprintf("Reading host metadata by name: %s", name), &err)()
+	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Reading host metadata by name: %s", name), &err)()
 
 	host := resources.NewHost()
 	err = mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
