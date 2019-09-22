@@ -45,8 +45,11 @@ func AddConsequence(err error, cons error) error {
 	if err != nil {
 		conseq, ok := err.(consequencer)
 		if ok {
-			nerr := conseq.AddConsequence(cons)
-			return nerr
+			if cons != nil {
+				nerr := conseq.AddConsequence(cons)
+				return nerr
+			}
+			return conseq
 		} else {
 			logrus.Error(err)
 		}

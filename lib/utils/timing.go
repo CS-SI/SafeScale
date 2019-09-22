@@ -16,10 +16,18 @@ func TimerErr(in string, err *error) func() {
 	logrus.Info(in)
 	start := time.Now()
 	return func() {
-		if err == nil || (err != nil && *err == nil){
+		if err == nil || (err != nil && *err == nil) {
 			logrus.Info(fmt.Sprintf("%s... finished in: [%s]", in, FmtDuration(time.Since(start))))
 		} else {
 			logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v] in: %s", in, *err, FmtDuration(time.Since(start))))
+		}
+	}
+}
+
+func TraceOnExitErr(in string, err *error) func() {
+	return func() {
+		if !(err == nil || (err != nil && *err == nil)) {
+			logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v]", in, *err))
 		}
 	}
 }
@@ -59,7 +67,7 @@ func TimerErrWithLevel(in string, err *error, level logrus.Level) func() {
 		logrus.Debug(in)
 		start := time.Now()
 		return func() {
-			if err == nil || (err != nil && *err == nil){
+			if err == nil || (err != nil && *err == nil) {
 				logrus.Debug(fmt.Sprintf("%s... finished in: [%s]", in, FmtDuration(time.Since(start))))
 			} else {
 				logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v] in: %s", in, *err, FmtDuration(time.Since(start))))
@@ -69,7 +77,7 @@ func TimerErrWithLevel(in string, err *error, level logrus.Level) func() {
 		logrus.Info(in)
 		start := time.Now()
 		return func() {
-			if err == nil || (err != nil && *err == nil){
+			if err == nil || (err != nil && *err == nil) {
 				logrus.Info(fmt.Sprintf("%s... finished in: [%s]", in, FmtDuration(time.Since(start))))
 			} else {
 				logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v] in: %s", in, *err, FmtDuration(time.Since(start))))
@@ -79,7 +87,7 @@ func TimerErrWithLevel(in string, err *error, level logrus.Level) func() {
 		logrus.Warn(in)
 		start := time.Now()
 		return func() {
-			if err == nil || (err != nil && *err == nil){
+			if err == nil || (err != nil && *err == nil) {
 				logrus.Warn(fmt.Sprintf("%s... finished in: [%s]", in, FmtDuration(time.Since(start))))
 			} else {
 				logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v] in: %s", in, *err, FmtDuration(time.Since(start))))
@@ -89,7 +97,7 @@ func TimerErrWithLevel(in string, err *error, level logrus.Level) func() {
 		logrus.Error(in)
 		start := time.Now()
 		return func() {
-			if err == nil || (err != nil && *err == nil){
+			if err == nil || (err != nil && *err == nil) {
 				logrus.Error(fmt.Sprintf("%s... finished in: [%s]", in, FmtDuration(time.Since(start))))
 			} else {
 				logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v] in: %s", in, *err, FmtDuration(time.Since(start))))
@@ -99,7 +107,7 @@ func TimerErrWithLevel(in string, err *error, level logrus.Level) func() {
 		logrus.Trace(in)
 		start := time.Now()
 		return func() {
-			if err == nil || (err != nil && *err == nil){
+			if err == nil || (err != nil && *err == nil) {
 				logrus.Trace(fmt.Sprintf("%s... finished in: [%s]", in, FmtDuration(time.Since(start))))
 			} else {
 				logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v] in: %s", in, *err, FmtDuration(time.Since(start))))
@@ -109,7 +117,7 @@ func TimerErrWithLevel(in string, err *error, level logrus.Level) func() {
 		logrus.Debug(in)
 		start := time.Now()
 		return func() {
-			if err == nil || (err != nil && *err == nil){
+			if err == nil || (err != nil && *err == nil) {
 				logrus.Debug(fmt.Sprintf("%s... finished in: [%s]", in, FmtDuration(time.Since(start))))
 			} else {
 				logrus.Error(fmt.Sprintf("%s... finished WITH ERROR [%+v] in: %s", in, *err, FmtDuration(time.Since(start))))
