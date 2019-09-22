@@ -16,11 +16,15 @@
 
 package resources
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // ErrTimeout defines a Timeout error
 type ErrTimeout struct {
 	Message string
+	dur     time.Duration
 }
 
 func (e ErrTimeout) Error() string {
@@ -38,6 +42,15 @@ type ErrResourceNotFound struct {
 	ErrResource
 }
 
+type ErrResourceTimeout struct {
+	ErrResource
+	dur time.Duration
+}
+
+func (e ErrResourceTimeout) Error() string {
+	return fmt.Sprintf("failed to get '%s' '%s' information after %s", e.ResourceType, e.Name, e.dur)
+}
+
 // ResourceNotFoundError creates a ResourceNotFound error
 func ResourceNotFoundError(resource, name string) ErrResourceNotFound {
 	return ErrResourceNotFound{
@@ -45,6 +58,23 @@ func ResourceNotFoundError(resource, name string) ErrResourceNotFound {
 			Name:         name,
 			ResourceType: resource,
 		},
+	}
+}
+
+func ResourceTimeoutError(resource, name string, dur time.Duration) ErrResourceTimeout {
+	return ErrResourceTimeout{
+		ErrResource: ErrResource{
+			Name:         name,
+			ResourceType: resource,
+		},
+		dur: dur,
+	}
+}
+
+func TimeoutError(message string, dur time.Duration) ErrTimeout {
+	return ErrTimeout{
+		Message: message,
+		dur:     dur,
 	}
 }
 

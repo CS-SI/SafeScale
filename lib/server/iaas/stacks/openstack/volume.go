@@ -223,15 +223,14 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *Stack) DeleteVolume(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteVolume(%s) called", id), log.TraceLevel)()
+func (s *Stack) DeleteVolume(id string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::DeleteVolume(%s) called", id), &err, log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling openstack.Stack::DeleteVolume() from nil pointer!")
 	}
 
 	var (
-		err     error
 		timeout = utils.GetBigDelay()
 	)
 
@@ -253,10 +252,9 @@ func (s *Stack) DeleteVolume(id string) error {
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return fmt.Errorf("timeout after %v to delete volume: %v", timeout, err)
+			return retryErr
 		}
-		log.Debugf("Error deleting volume: %+v", retryErr)
-		return errors.Wrap(retryErr, fmt.Sprintf("Error deleting volume: %v", retryErr))
+		return retryErr
 	}
 	return nil
 }

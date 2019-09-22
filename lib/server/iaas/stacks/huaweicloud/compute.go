@@ -636,7 +636,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			if err != nil {
 				msg += fmt.Sprintf(": %v", err)
 			}
-			return nil, fmt.Errorf(msg)
+			return nil, resources.TimeoutError(msg, utils.GetHostTimeout())
 		}
 		return nil, retryErr
 	}
@@ -906,7 +906,7 @@ func (s *Stack) DeleteHost(id string) error {
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
-					return fmt.Errorf("host '%s' not deleted after %v", id, utils.GetContextTimeout())
+					return resources.TimeoutError(fmt.Sprintf("host '%s' not deleted after %v", id, utils.GetContextTimeout()), utils.GetContextTimeout())
 				}
 				return innerRetryErr
 			}
@@ -1139,7 +1139,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			if err != nil {
 				msg += fmt.Sprintf(": %v", err)
 			}
-			return nil, fmt.Errorf(msg)
+			return nil, resources.TimeoutError(msg, timeout)
 		}
 		return nil, retryErr
 	}

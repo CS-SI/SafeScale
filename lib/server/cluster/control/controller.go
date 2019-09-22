@@ -1066,6 +1066,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		return err
 	}
 
+	// FIXME Either delete the metadata or mark the metadata as FAILURE
 	// Deletes the metadata
 	err = c.DeleteMetadata(task)
 	if err != nil {

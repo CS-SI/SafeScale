@@ -647,7 +647,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				if _, ok := err.(resources.ErrResourceNotAvailable); ok {
 					return err
 				}
-				return fmt.Errorf("failed to delete subnet after %v: %v", utils.GetContextTimeout(), err)
+				return resources.TimeoutError(fmt.Sprintf("failed to delete subnet after %v: %v", utils.GetContextTimeout(), err), utils.GetContextTimeout())
 			}
 		}
 		return fmt.Errorf("failed to delete subnet after %v: %v", utils.GetContextTimeout(), retryErr)
