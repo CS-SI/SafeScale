@@ -831,23 +831,50 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 		}
 	}
 
+	defer func() {
+		if err != nil {
+			// Delete metadata if there
+			if mn.Get() != nil {
+				derr := mn.Delete()
+				if derr != nil {
+					err = retry.AddConsequence(err, derr)
+				}
+			}
+		}
+	}()
+
+	waitMore := false
 	// delete network, with tolerance
 	err = handler.service.DeleteNetwork(network.ID)
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceNotFound:
-			// If network doesn't exist anymore on the provider infrastructure, don't fail
-			// to cleanup the metadata
+			// If network doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
 			log.Warnf("network not found on provider side, cleaning up metadata.")
+			return err
 		case retry.ErrTimeout, resources.ErrTimeout:
 			log.Error("can't delete network due to a timeout")
+			waitMore = true
 		default:
 			log.Error("can't delete network, other reason")
 		}
 	}
+	if waitMore {
+		errWaitMore := retry.WhileUnsuccessfulDelay1Second(func() error {
+			recNet, recErr := handler.service.GetNetwork(network.ID)
+			if recNet != nil {
+				return fmt.Errorf("still there")
+			}
+			if _, ok := recErr.(resources.ErrResourceNotFound); ok {
+				return nil
+			}
+			return fmt.Errorf("another kind of error")
+		}, utils.GetContextTimeout())
+		if errWaitMore != nil {
+			err = retry.AddConsequence(err, errWaitMore)
+		}
+	}
 
-	// Delete metadata,
-	err = mn.Delete()
 	if err != nil {
 		return err
 	}

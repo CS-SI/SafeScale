@@ -199,8 +199,9 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	}
 
 	// At this point, no network has been found with given reference
-	log.Debugf(resources.ResourceNotFoundError("network(GetNetwork)", id).Error())
-	return nil, errors.Wrap(resources.ResourceNotFoundError("network(GetNetwork)", id), "")
+	errNotFound := resources.ResourceNotFoundError("network(GetNetwork)", id)
+	log.Debug(errNotFound)
+	return nil, errNotFound
 }
 
 // ListNetworks lists available networks
