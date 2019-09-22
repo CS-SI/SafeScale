@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	//Path is the path to use to reach Cluster Definitions/Metadata
+	// Path is the path to use to reach Cluster Definitions/Metadata
 	clusterFolderName = "clusters"
 )
 

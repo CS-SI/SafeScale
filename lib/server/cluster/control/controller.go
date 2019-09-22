@@ -89,7 +89,7 @@ func (c *Controller) Restore(task concurrency.Task, foreman *foreman) {
 }
 
 // Create creates the necessary infrastructure of the Cluster
-func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman) error {
+func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman) (err error) {
 	if foreman == nil {
 		panic("Calling lib.server.cluster.control.Controller::Create() from nil pointer!")
 	}
@@ -99,8 +99,8 @@ func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman
 
 	c.Lock(task)
 
-	//VPL: For now, always disable addition of feature proxycache-client
-	err := c.Properties.LockForWrite(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	// VPL: For now, always disable addition of feature proxycache-client
+	err = c.Properties.LockForWrite(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		v.(*clusterpropsv1.Features).Disabled["proxycache"] = struct{}{}
 		return nil
 	})
@@ -108,7 +108,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman
 		log.Errorf("failed to disable feature 'proxycache': %v", err)
 		return err
 	}
-	//ENDVPL
+	// ENDVPL
 
 	c.foreman = foreman
 	c.Unlock(task)
@@ -835,7 +835,8 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 		selectedMaster, err = c.FindAvailableMaster(task)
 		if err != nil {
 			// FIXME Try deletion anyway ?
-			_ = c.deleteNode(task, node, "")
+			errDelNode := c.deleteNode(task, node, "")
+			err = retry.AddConsequence(err, errDelNode)
 			return err
 		}
 	}
@@ -883,6 +884,9 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	if selectedMaster == "" {
 		selectedMaster, err = c.FindAvailableMaster(task)
 		if err != nil {
+			// FIXME Try deletion anyway ?
+			errDelNode := c.deleteNode(task, node, "")
+			err = retry.AddConsequence(err, errDelNode)
 			return err
 		}
 	}

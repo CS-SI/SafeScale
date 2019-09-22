@@ -126,7 +126,8 @@ func (b *foreman) Cluster() api.Cluster {
 func (b *foreman) ExecuteScript(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string,
-) (int, string, string, error) {
+) (errCode int, stdOut string, stdErr string, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("Executing Script in '%s'...", hostID), &err, log.DebugLevel)()
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, err := system.GetBashLibrary()
@@ -311,7 +312,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			if !ok {
-				return fmt.Errorf("[cluster %s] failed to load gateway metadata of network '%s'", req.Name, networkName)
+				return errors.WithMessagef(err, "[cluster %s] failed to load gateway metadata of network '%s'", req.Name, networkName)
 			}
 		}
 		return err
@@ -392,7 +393,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 				networkV2.SecondaryGatewayID = secondaryGateway.ID
 				networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
 				networkV2.DefaultRouteIP = network.VirtualIp.PrivateIp
-				//VPL: no public IP on VIP yet...
+				// VPL: no public IP on VIP yet...
 				// networkV2.EndpointIP = network.VirtualIp.PublicIp
 				networkV2.EndpointIP = primaryGateway.GetPublicIP()
 			} else {
@@ -730,7 +731,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 	var (
 		host   *pb.Host
 		hostID string
-		errors []string
+		errs   []string
 	)
 
 	var subtasks []concurrency.Task
@@ -749,17 +750,17 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 	}
 	// Deals with the metadata read failure
 	if err != nil {
-		errors = append(errors, "failed to get metadata of host '%s': %s", hostID, err.Error())
+		errs = append(errs, "failed to get metadata of host '%s': %s", hostID, err.Error())
 	}
 
 	for _, s := range subtasks {
 		_, state := s.Wait()
 		if state != nil {
-			errors = append(errors, state.Error())
+			errs = append(errs, state.Error())
 		}
 	}
-	if len(errors) > 0 {
-		return fmt.Errorf(strings.Join(errors, "\n"))
+	if len(errs) > 0 {
+		return fmt.Errorf(strings.Join(errs, "\n"))
 	}
 	return nil
 }
@@ -850,14 +851,14 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 }
 
 // installNodeRequirements ...
-func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeType.Enum, pbHost *pb.Host, hostLabel string) error {
+func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeType.Enum, pbHost *pb.Host, hostLabel string) (err error) {
 	// Get installation script based on node type; if == "", do nothing
 	script, params := b.getNodeInstallationScript(task, nodeType)
 	if script == "" {
 		return nil
 	}
 
-	log.Debugf("[%s] installing system requirements...", hostLabel)
+	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] installing system requirements...", hostLabel), &err, log.DebugLevel)()
 
 	if b.makers.GetTemplateBox == nil {
 		err := errors.New("missing callback GetTemplateBox")
@@ -974,7 +975,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 }
 
 // configureDockerSwarm
-//func (b *foreman) configureDockerSwarm(task concurrency.Task, gw *pb.Host, hostLabel string) error {
+// func (b *foreman) configureDockerSwarm(task concurrency.Task, gw *pb.Host, hostLabel string) error {
 //	cmd := fmt.Sprintf("docker swarm init --advertise-addr %s", gw.GetPrivateIp())
 //	retcode, _, _, err := client.New().Ssh.Run(gw.Id, cmd, utils.GetConnectionTimeout(), 2*utils.GetLongOperationTimeout())
 //	if err != nil {
@@ -984,7 +985,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 //		return fmt.Errorf("failed to initialize docker swarm on '%s'", hostLabel)
 //	}
 //	return nil
-//}
+// }
 
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
@@ -1042,15 +1043,15 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 		})
 		subtasks = append(subtasks, subtask)
 	}
-	var errors []string
+	var errs []string
 	for _, s := range subtasks {
 		_, state := s.Wait()
 		if state != nil {
-			errors = append(errors, state.Error())
+			errs = append(errs, state.Error())
 		}
 	}
-	if len(errors) > 0 {
-		msg := strings.Join(errors, "\n")
+	if len(errs) > 0 {
+		msg := strings.Join(errs, "\n")
 		return nil, fmt.Errorf("[cluster %s] failed to create master(s): %s", clusterName, msg)
 	}
 
@@ -1178,15 +1179,15 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 		subtasks = append(subtasks, subtask)
 	}
 
-	var errors []string
+	var errs []string
 	for _, s := range subtasks {
 		_, state := s.Wait()
 		if state != nil {
-			errors = append(errors, state.Error())
+			errs = append(errs, state.Error())
 		}
 	}
-	if len(errors) > 0 {
-		return nil, fmt.Errorf(strings.Join(errors, "\n"))
+	if len(errs) > 0 {
+		return nil, fmt.Errorf(strings.Join(errs, "\n"))
 	}
 
 	log.Debugf("[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, utils.FmtDuration(time.Since(started)))
@@ -1258,15 +1259,15 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 		subtasks = append(subtasks, subtask)
 	}
 
-	var errors []string
+	var errs []string
 	for _, s := range subtasks {
 		_, state := s.Wait()
 		if state != nil {
-			errors = append(errors, state.Error())
+			errs = append(errs, state.Error())
 		}
 	}
-	if len(errors) > 0 {
-		return nil, fmt.Errorf(strings.Join(errors, "\n"))
+	if len(errs) > 0 {
+		return nil, fmt.Errorf(strings.Join(errs, "\n"))
 	}
 
 	log.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, utils.Plural(count))
@@ -1373,10 +1374,10 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (task concurrency.TaskResult, err error) {
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer utils.Timer(fmt.Sprintf("[cluster %s] nodes configuration called", clusterName))()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("[cluster %s] nodes configuration called", clusterName), &err, log.DebugLevel)()
 
 	list := b.cluster.ListNodeIDs(t)
 	if len(list) <= 0 {
@@ -1390,8 +1391,7 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 		pbHost *pb.Host
 		i      int
 		hostID string
-		errors []string
-		err    error
+		errs   []string
 	)
 
 	var subtasks []concurrency.Task
@@ -1409,17 +1409,17 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 	}
 	// Deals with the metadata read failure
 	if err != nil {
-		errors = append(errors, "failed to get metadata of host '%s': %s", hostID, err.Error())
+		errs = append(errs, "failed to get metadata of host '%s': %s", hostID, err.Error())
 	}
 
 	for _, s := range subtasks {
 		_, err := s.Wait()
 		if err != nil {
-			errors = append(errors, err.Error())
+			errs = append(errs, err.Error())
 		}
 	}
-	if len(errors) > 0 {
-		return nil, fmt.Errorf(strings.Join(errors, "\n"))
+	if len(errs) > 0 {
+		return nil, fmt.Errorf(strings.Join(errs, "\n"))
 	}
 
 	log.Debugf("[cluster %s] nodes configuration successful.", clusterName)
@@ -1543,21 +1543,20 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 }
 
 // install proxycache-client feature if not disabled
-func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host, hostLabel string) error {
+func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'proxycache-client' ...", hostLabel), &err, log.DebugLevel)()
+
 	disabled := false
 	b.cluster.RLock(task)
-	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
 	b.cluster.RUnlock(task)
 	if err != nil {
-		log.Debugf("[%s] adding feature 'proxycache-client'...", hostLabel)
 		return errors.WithMessagef(err, "[%s] installation failed", hostLabel)
 	}
 	if !disabled {
-		log.Debugf("[%s] adding feature 'proxycache-client'...", hostLabel)
-
 		feature, err := install.NewFeature(task, "proxycache-client")
 		if err != nil {
 			return errors.WithMessagef(err, "[%s] failed to prepare feature 'proxycache-client'", hostLabel)
@@ -1576,21 +1575,20 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 }
 
 // install proxycache-server feature if not disabled
-func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host, hostLabel string) error {
+func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'proxycache-server' ...", hostLabel), &err, log.DebugLevel)()
+
 	disabled := false
 	b.cluster.RLock(task)
-	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
 	b.cluster.RUnlock(task)
 	if err != nil {
-		log.Debugf("[%s] adding feature 'proxycache-server'...", hostLabel)
 		return errors.WithMessagef(err, "[%s] installation failed", hostLabel)
 	}
 	if !disabled {
-		log.Debugf("[%s] adding feature 'proxycache-server'...", hostLabel)
-
 		feat, err := install.NewEmbeddedFeature(task, "proxycache-server")
 		if err != nil {
 			return errors.WithMessagef(err, "[%s] failed to prepare feature 'proxycache-server'", hostLabel)
