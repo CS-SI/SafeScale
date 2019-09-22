@@ -19,8 +19,6 @@ package metadata
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -186,10 +184,12 @@ func RemoveVolume(svc iaas.Service, volumeID string) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadVolume(svc iaas.Service, ref string) (*Volume, error) {
-	mv := NewVolume(svc)
+func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Loading volume metadata: %s", ref), &err)()
+
+	mv = NewVolume(svc)
 	var innerErr error
-	err := retry.WhileUnsuccessfulDelay1Second(
+	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			innerErr = mv.ReadByID(ref)
 			if innerErr != nil {
@@ -208,7 +208,6 @@ func LoadVolume(svc iaas.Service, ref string) (*Volume, error) {
 	)
 	if err != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
-			log.Debugf("timeout reading metadata of volume '%s'", ref)
 			return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of volume '%s'", ref))
 		}
 		return nil, err

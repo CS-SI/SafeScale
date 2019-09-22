@@ -70,12 +70,14 @@ func (mh *Host) Get() *resources.Host {
 }
 
 // Write updates the metadata corresponding to the host in the Object Storage
-func (mh *Host) Write() error {
+func (mh *Host) Write() (err error) {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
-	err := mh.item.WriteInto(ByNameFolderName, *mh.name)
+	defer utils.TraceOnExitErr(fmt.Sprintf("Writing host metadata: %s", *mh.id), &err)()
+
+	err = mh.item.WriteInto(ByNameFolderName, *mh.name)
 	if err != nil {
 		return err
 	}
@@ -83,13 +85,15 @@ func (mh *Host) Write() error {
 }
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
-func (mh *Host) ReadByID(id string) error {
+func (mh *Host) ReadByID(id string) (err error) {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
+	defer utils.TraceOnExitErr(fmt.Sprintf("Reading host metadata: %s", id), &err)()
+
 	host := resources.NewHost()
-	err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err = mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -104,14 +108,16 @@ func (mh *Host) ReadByID(id string) error {
 	return nil
 }
 
-// ReadByName reads the metadata of a network identified by name
-func (mh *Host) ReadByName(name string) error {
+// ReadByName reads the metadata of a host identified by name
+func (mh *Host) ReadByName(name string) (err error) {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
+	defer utils.TraceOnExitErr(fmt.Sprintf("Reading host metadata by name: %s", name), &err)()
+
 	host := resources.NewHost()
-	err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err = mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -126,25 +132,32 @@ func (mh *Host) ReadByName(name string) error {
 	return nil
 }
 
-// Delete updates the metadata corresponding to the network
-func (mh *Host) Delete() error {
+// Delete updates the metadata corresponding to the host
+func (mh *Host) Delete() (err error) {
 	if mh.item == nil {
 		panic("mh.item is nil!")
 	}
 
-	err := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
-	if err != nil {
-		return err
+	defer utils.TraceOnExitErr(fmt.Sprintf("Deleting host metadata by name: %v", *mh), &err)()
+
+	// FIXME Merge errors
+	err1 := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
+	err2 := mh.item.DeleteFrom(ByNameFolderName, *mh.name)
+
+	if err1 != nil {
+		return err1
 	}
-	err = mh.item.DeleteFrom(ByNameFolderName, *mh.name)
 	if err != nil {
-		return err
+		return err2
 	}
+
 	return nil
 }
 
 // Browse walks through host folder and executes a callback for each entries
-func (mh *Host) Browse(callback func(*resources.Host) error) error {
+func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Browsing host metadata: %v", *mh), &err)()
+
 	return mh.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
 		host := resources.NewHost()
 		err := host.Deserialize(buf)
@@ -156,9 +169,11 @@ func (mh *Host) Browse(callback func(*resources.Host) error) error {
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc iaas.Service, host *resources.Host) (*Host, error) {
-	mh := NewHost(svc)
-	err := mh.Carry(host).Write()
+func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Saving host metadata: %v", host), &err)()
+
+	mh = NewHost(svc)
+	err = mh.Carry(host).Write()
 	if err != nil {
 		return nil, err
 	}
@@ -212,11 +227,13 @@ func RemoveHost(svc iaas.Service, host *resources.Host) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadHost(svc iaas.Service, ref string) (*Host, error) {
+func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Load host metadata: %v", ref), &err)()
+
 	// We first try looking for host by ID from metadata
-	mh := NewHost(svc)
+	mh = NewHost(svc)
 	var innerErr error
-	err := retry.WhileUnsuccessfulDelay1Second(
+	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			innerErr = mh.ReadByID(ref)
 			if innerErr != nil {

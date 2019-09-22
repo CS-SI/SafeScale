@@ -93,20 +93,29 @@ func (m *Network) Get() *resources.Network {
 }
 
 // Write updates the metadata corresponding to the network in the Object Storage
-func (m *Network) Write() error {
+func (m *Network) Write() (err error) {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	err := m.item.WriteInto(ByIDFolderName, *m.id)
-	if err != nil {
-		return err
+	defer utils.TraceOnExitErr(fmt.Sprintf("Write network metadata: %v", *m), &err)()
+
+	err1 := m.item.WriteInto(ByIDFolderName, *m.id)
+	err2 := m.item.WriteInto(ByNameFolderName, *m.name)
+
+	if err1 != nil {
+		return err1
 	}
-	return m.item.WriteInto(ByNameFolderName, *m.name)
+	if err2 != nil {
+		return err2
+	}
+	return nil
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
-func (m *Network) Reload() error {
-	err := m.ReadByID(*m.id)
+func (m *Network) Reload() (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Reload network metadata: %v", *m), &err)()
+
+	err = m.ReadByID(*m.id)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return utils.NotFoundError(fmt.Sprintf("the metadata of Network '%s' vanished", *m.name))
@@ -117,13 +126,15 @@ func (m *Network) Reload() error {
 }
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
-func (m *Network) ReadByID(id string) error {
+func (m *Network) ReadByID(id string) (err error) {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 
+	defer utils.TraceOnExitErr(fmt.Sprintf("Read network metadata: %v", *m), &err)()
+
 	network := resources.NewNetwork()
-	err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err = m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -140,13 +151,15 @@ func (m *Network) ReadByID(id string) error {
 }
 
 // ReadByName reads the metadata of a network identified by name
-func (m *Network) ReadByName(name string) error {
+func (m *Network) ReadByName(name string) (err error) {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 
+	defer utils.TraceOnExitErr(fmt.Sprintf("Read network metadata by name: %v", *m), &err)()
+
 	network := resources.NewNetwork()
-	err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err = m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -163,25 +176,35 @@ func (m *Network) ReadByName(name string) error {
 }
 
 // Delete deletes the metadata corresponding to the network
-func (m *Network) Delete() error {
+func (m *Network) Delete() (err error) {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 
+	defer utils.TraceOnExitErr(fmt.Sprintf("Delete network metadata: %v", *m), &err)()
+
 	// Delete the entry in 'ByIDFolderName' folder
-	err := m.item.DeleteFrom(ByIDFolderName, *m.id)
-	if err != nil {
-		return err
-	}
+	err1 := m.item.DeleteFrom(ByIDFolderName, *m.id)
 	// Delete the entry in 'ByNameFolderName' folder
-	return m.item.DeleteFrom(ByNameFolderName, *m.name)
+	err2 := m.item.DeleteFrom(ByNameFolderName, *m.name)
+
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+
+	return nil
 }
 
 // Browse walks through all the metadata objects in network
-func (m *Network) Browse(callback func(*resources.Network) error) error {
+func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
+
+	defer utils.TraceOnExitErr(fmt.Sprintf("Browse network metadata: %v", *m), &err)()
 
 	return m.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
 		network := resources.Network{}
@@ -194,7 +217,9 @@ func (m *Network) Browse(callback func(*resources.Network) error) error {
 }
 
 // AttachHost links host ID to the network
-func (m *Network) AttachHost(host *resources.Host) error {
+func (m *Network) AttachHost(host *resources.Host) (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Attach host to network metadata: %v", *m), &err)()
+
 	network := m.Get()
 	return network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
@@ -205,9 +230,11 @@ func (m *Network) AttachHost(host *resources.Host) error {
 }
 
 // DetachHost unlinks host ID from network
-func (m *Network) DetachHost(hostID string) error {
+func (m *Network) DetachHost(hostID string) (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Detach host from metadata: %v", *m), &err)()
+
 	network := m.Get()
-	err := network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+	err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		hostName, found := networkHostsV1.ByID[hostID]
 		if found {
@@ -223,10 +250,11 @@ func (m *Network) DetachHost(hostID string) error {
 }
 
 // ListHosts returns the list of resources.Host attached to the network (excluding gateway)
-func (m *Network) ListHosts() ([]*resources.Host, error) {
+func (m *Network) ListHosts() (list []*resources.Host, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Lists hosts from network metadata: %v", *m), &err)()
+
 	network := m.Get()
-	var list []*resources.Host
-	err := network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		for id := range networkHostsV1.ByID {
 			mh, err := LoadHost(m.item.GetService(), id)
@@ -258,8 +286,10 @@ func (m *Network) Release() {
 }
 
 // SaveNetwork saves the Network definition in Object Storage
-func SaveNetwork(svc iaas.Service, net *resources.Network) (*Network, error) {
-	mn := NewNetwork(svc)
+func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Save network metadata: %v", *net), &err)()
+
+	mn = NewNetwork(svc)
 	return mn, mn.Carry(net).Write()
 }
 
@@ -272,10 +302,12 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadNetwork(svc iaas.Service, ref string) (*Network, error) {
-	mn := NewNetwork(svc)
+func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Load network metadata: %s", ref), &err)()
+
+	mn = NewNetwork(svc)
 	var innerErr error
-	err := retry.WhileUnsuccessfulDelay1Second(
+	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			innerErr = mn.ReadByID(ref)
 			if innerErr != nil {
@@ -312,9 +344,11 @@ type Gateway struct {
 }
 
 // NewGateway creates an instance of metadata.Gateway
-func NewGateway(svc iaas.Service, networkID string) (*Gateway, error) {
+func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Creating gateway in network metadata: %s", networkID), &err)()
+
 	network := NewNetwork(svc)
-	err := network.ReadByID(networkID)
+	err = network.ReadByID(networkID)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return nil, utils.NotFoundError("failed to find metadata of network using gateway")
@@ -354,11 +388,14 @@ func (mg *Gateway) Write() error {
 }
 
 // Read reads the metadata of a gateway of a network identified by ID from Object Storage
-func (mg *Gateway) Read() error {
+func (mg *Gateway) Read() (err error) {
 	if mg.network == nil {
 		panic("mg.network is nil!")
 	}
-	err := mg.network.Reload()
+
+	defer utils.TraceOnExitErr(fmt.Sprintf("Read gateway metadata from network metadata"), &err)()
+
+	err = mg.network.Reload()
 	if err != nil {
 		return err
 	}
@@ -374,8 +411,10 @@ func (mg *Gateway) Read() error {
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 // It's advised to Acquire/Release around Reload()...
-func (mg *Gateway) Reload() error {
-	err := mg.Read()
+func (mg *Gateway) Reload() (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Reload gateway from network metadata"), &err)()
+
+	err = mg.Read()
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return utils.NotFoundError(fmt.Sprintf("metadata about the gateway of network '%s' doesn't exist anymore", mg.networkID))
@@ -386,7 +425,9 @@ func (mg *Gateway) Reload() error {
 }
 
 // Delete updates the metadata of the network concerning the gateway
-func (mg *Gateway) Delete() error {
+func (mg *Gateway) Delete() (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Delete gateway from network metadata"), &err)()
+
 	if mg.network == nil {
 		panic("mg.network is nil!")
 	}
@@ -396,7 +437,7 @@ func (mg *Gateway) Delete() error {
 
 	mg.network.Acquire()
 	mg.network.Get().GatewayID = ""
-	err := mg.network.Write()
+	err = mg.network.Write()
 	mg.network.Release()
 	if err != nil {
 		return err
@@ -417,8 +458,10 @@ func (mg *Gateway) Release() {
 }
 
 // LoadGateway returns the metadata of the Gateway of a network
-func LoadGateway(svc iaas.Service, networkID string) (*Gateway, error) {
-	mg, err := NewGateway(svc, networkID)
+func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Loading gateway from network metadata: %s", networkID), &err)()
+
+	mg, err = NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
 	}
@@ -448,8 +491,10 @@ func LoadGateway(svc iaas.Service, networkID string) (*Gateway, error) {
 }
 
 // SaveGateway saves the metadata of a gateway
-func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (*Gateway, error) {
-	mg, err := NewGateway(svc, networkID)
+func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *Gateway, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Saving gateway in network metadata: %s", networkID), &err)()
+
+	mg, err = NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
 	}
