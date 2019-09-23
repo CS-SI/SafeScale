@@ -202,6 +202,12 @@ export -f sfRetry
 sfFirewall() {
 	[ $# -eq 0 ] && return 0
 	which firewall-cmd &>/dev/null || return 1
+	# Restart firewalld if failed
+	if [ "$(sfGetFact "use_systemd")" = "1" ]; then
+		if sudo systemctl is-failed firewalld; then
+			sudo systemctl restart firewalld || return $?
+		fi
+	fi
 	# sudo may be superfluous if executed as root, but won't harm
 	sudo firewall-cmd "$@"
 }
@@ -479,13 +485,9 @@ export -f sfDoesDockerRunService
 # tells if a stack is running in Swarm mode
 sfDoesDockerRunStack() {
 	[  $# -ne 1 ] && return 1
-	local NAME=$1
-
-	local LIST=$(docker stack ps $NAME {{ "--format '{{.CurrentState}}'" }} | grep -i running)
-	[ -z "$LIST" ] && return 1
-	return 0
+	docker stack ps $1 {{ "--filter 'desired-state=running'" }} &>/dev/null
 }
-export -f sfDoesDockerRunService
+export -f sfDoesDockerRunStack
 
 sfRemoveDockerImage() {
 	local list=$(docker image ls {{ "--format '{{.Repository}}:{{.Tag}}|{{.ID}}'" }} | grep "^$1")
