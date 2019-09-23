@@ -21,9 +21,13 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+
     parameters:
         - Username
         - Password
+        - GuacamolePort=9080
+        - TomcatPort=9009
+
     install:
         bash:
             check:
@@ -263,8 +267,8 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/remotedesktop/image
-                            cd ${SF_ETCDIR}/remotedesktop/image
+                            mkdir -p ${SF_ETCDIR}/remotedesktop/build
+                            cd ${SF_ETCDIR}/remotedesktop/build
 
                             VERSION=1.0.0
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
@@ -278,7 +282,7 @@ feature:
                             masters: all
                         timeout: 10
                         run: |
-                            cd ${SF_ETCDIR}/remotedesktop/image
+                            cd ${SF_ETCDIR}/remotedesktop/build
 
                             cat >supervisord.conf <<-'EOF'
                             [supervisord]
@@ -476,7 +480,6 @@ feature:
 
                             # build image
                             docker build -t remotedesktop:latest --network=host . || exit 202
-                            rm -rf ${SF_ETCDIR}/remotedesktop/image
                             exit 0
 
                     start:
@@ -501,14 +504,44 @@ feature:
                                     image: remotedesktop
                                     network_mode: "bridge"
                                     ports:
-                                        - {{ .HostIP }}:9080:8080
-                                        - {{ .HostIP }}:9009:8009
+                                        - {{ .HostIP }}:{{ .GuacamolePort }}:8080
+                                        - {{ .HostIP }}:{{ .TomcatPort }}:8009
                                     restart: always
                             EOF
 
-                            # Allow only gateway to connect to port 9080
-                            sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source not address="{{.DefaultRouteIP}}" port protocol="tcp" port="9080" reject'
+                            # Defines FirewallD zone and service for RemoteDesktop (deny access by default)
+                            cat >/usr/lib/firewalld/services/safescale_remotedesktop_guacd.xml <<-'EOF'
+                            <?xml version="1.0" encoding="utf-8"?>
+                            <service>
+                                <short>SafeScale RemoteDesktop GUACD</short>
+                                <description>GUACD is the Guacamole daemon proxying desktop to HTTP, used by SafeScale to propose Remote Desktop.</description>
+                                <port protocol="tcp" port="{{ .GuacamolePort }}"/>
+                            </service>
+                            EOF
+
+                            cat >/usr/lib/firewalld/zones/safescale_remotedesktop.xml <<-'EOF'
+                            <?xml version="1.0" encoding="utf-8"?>
+                            <zone target="DROP">
+                                <short>Drop any connection to SafeScale remote desktop</short>
+                            </zone>
+                            EOF
                             sfFirewallReload
+
+                            # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
+                            sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }}
+                            {{ if .SecondaryGatewayIP }}
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }}
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }}
+                            {{ end }}
+                            sfFirewallReload
+                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.DefaultRouteIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
+                            # {{ if .SecondaryGatewayIP }}
+                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.PrimaryGatewayIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
+                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.SecondaryGatewayIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
+                            # {{ end }}
+                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" port protocol="tcp" port="{{.GuacamolePort}}" reject'
+                            # sfFirewallReload
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
@@ -534,8 +567,7 @@ feature:
                   masters: all
               content: |
                   {
-                      "name": "remotedesktop_{{.Hostname}}",
-                      "url": "http://{{.HostIP}}:9080/guacamole/"
+                      "url": "http://{{.HostIP}}:{{.GuacamolePort}}/guacamole/"
                   }
 
             - name: remotedesktop_{{ .Hostname }}
@@ -545,8 +577,8 @@ feature:
                   masters: all
               content: |
                   {
-                      "name": "remotedesktop_guacamole_{{.Hostname}}",
-                      "paths": ["/remotedesktop/{{.Hostname}}"],
+                      "paths": ["/_platform/remotedesktop/{{.Hostname}}"],
+                      "strip_path": true,
                       "service": { "name": "remotedesktop_guacamole_{{ .Hostname }}" }
                   }
 ...
