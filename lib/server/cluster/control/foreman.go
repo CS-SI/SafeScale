@@ -395,9 +395,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 				// VPL: no public IP on VIP yet...
 				// networkV2.EndpointIP = network.VirtualIp.PublicIp
 				networkV2.EndpointIP = primaryGateway.GetPublicIP()
+				networkV2.PrimaryPublicIP = primaryGateway.GetPublicIP()
+				networkV2.SecondaryPublicIP = secondaryGateway.GetPublicIP()
 			} else {
 				networkV2.DefaultRouteIP = primaryGateway.GetPrivateIP()
 				networkV2.EndpointIP = primaryGateway.GetPublicIP()
+				networkV2.PrimaryPublicIP = networkV2.EndpointIP
 			}
 			return nil
 		})

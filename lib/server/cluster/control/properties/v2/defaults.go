@@ -23,6 +23,7 @@ import (
 )
 
 // Defaults ...
+// NOT FROZEN YET
 type Defaults struct {
 	// GatewaySizing keeps the default node definition
 	GatewaySizing resources.SizingRequirements `json:"gateway_sizing"`
