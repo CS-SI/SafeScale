@@ -747,6 +747,7 @@ func (w *worker) setReverseProxy() (err error) {
 				"vars": &primaryGatewayVariables,
 			})
 
+			var errS error
 			if secondaryKongController != nil {
 				tS := w.feature.task.New()
 				secondaryGatewayVariables["HostIP"] = h.PrivateIp
@@ -756,10 +757,16 @@ func (w *worker) setReverseProxy() (err error) {
 					"rule": rule,
 					"vars": &secondaryGatewayVariables,
 				})
-				_, _ = tS.Wait()
+				_, errS = tS.Wait()
 			}
 
-			_, _ = tP.Wait()
+			_, errP := tP.Wait()
+			if errP != nil {
+				return errP
+			}
+			if errS != nil {
+				return errS
+			}
 		}
 	}
 	return nil
