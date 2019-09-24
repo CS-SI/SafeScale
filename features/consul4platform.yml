@@ -39,7 +39,7 @@ feature:
                             exit 0
 
             add:
-                pace: config-all,config-server,config-agent,stack,start,server-started,agent-started
+                pace: config-masters,config-nodes,config-gws,stack,start,ready
                 steps:
                     config-all:
                         targets:
@@ -48,39 +48,46 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
-
-                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
-                            {
-                                "service": {
-                                    "name": "{{ .Hostname }}",
-                                    "tags": [ "monitoring" ],
-                                    "port": 9100,
-                                    "address": "{{ .HostIP }}"
-                                }
-                            }
-                            EOF
                             exit 0
 
-                    config-server:
+                    config-masters:
                         targets:
                             gateways: no
                             hosts: no
                             masters: all
                             nodes: no
                         run: |
-                            # PEERS=
-                            # for i in {{ .MasterIPs }}; do
-                            #     [ "$i" != "{{ .HostIP }}" ] && PEERS="${PEERS}\"{{.}}\","
-                            # done
-                            # PEERS=${PEERS%,*}
+                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "{{ .Hostname }}",
+                                    "tags": [ "master", "monitoring" ],
+                                    "port": 63001,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/cadvisor.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "cadvisor@{{ .Hostname }}",
+                                    "tags": [ "master", "monitoring" ],
+                                    "port": 63000,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
                             cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
                             {
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
                                 "client_addr": "0.0.0.0",
                                 "data_dir": "/consul/data",
                                 "datacenter": "{{ .ClusterName }}",
-                                "leave_on_terminate": true,
+                                "leave_on_terminate": false,
                                 "node_name": "{{ .Hostname }}",
                                 "server_name": "server.{{ .Hostname }}.consul",
                                 "skip_leave_on_interrupt": true,
@@ -107,15 +114,37 @@ feature:
                             chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
                             exit 0
 
-                    config-agent:
+                    config-nodes:
                         targets:
-                            gateways: all
+                            gateways: no
                             hosts: no
                             masters: no
                             nodes: all
                         run: |
-                            # SERVER="{{ range .MasterIPs }}\"{{.}}\", {{ end }}"
-                            # SERVERS=${SERVERS%,*}
+                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "{{ .Hostname }}",
+                                    "tags": [ "node", "monitoring" ],
+                                    "port": 63001,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/cadvisor.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "cadvisor@{{ .Hostname }}",
+                                    "tags": [ "node", "monitoring" ],
+                                    "port": 63000,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
                             cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
                             {
                                 "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
@@ -126,7 +155,62 @@ feature:
                                     "consul4platform_server"
                                 ],
                                 "node_name": "{{ .Hostname }}",
-                                "leave_on_terminate" : true,
+                                "leave_on_terminate" : false,
+                                "skip_leave_on_interrupt" : false,
+                                "server" : false,
+                                "ui" : false,
+                                "disable_update_check": true,
+                                "log_level": "warn",
+                                "telemetry": {
+                                    "prometheus_retention_time": "24h"
+                                }
+                            }
+                            EOF
+                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
+                            exit 0
+
+                    config-gws:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "{{ .Hostname }}",
+                                    "tags": [ "gateway", "monitoring" ],
+                                    "port": 63001,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/cadvisor.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "cadvisor@{{ .Hostname }}",
+                                    "tags": [ "gateway", "monitoring" ],
+                                    "port": 63000,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
+                            {
+                                "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
+                                "client_addr": "0.0.0.0",
+                                "data_dir": "/consul/data",
+                                "datacenter": "{{ .ClusterName }}",
+                                "retry_join": [
+                                    "consul4platform_server"
+                                ],
+                                "node_name": "{{ .Hostname }}",
+                                "leave_on_terminate" : false,
                                 "skip_leave_on_interrupt" : false,
                                 "server" : false,
                                 "ui" : false,
@@ -158,7 +242,7 @@ feature:
                             services:
                                 server:
                                     image: consul:{{ .Version }}
-                                    command: "agent -server -log-level debug -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
+                                    command: "agent -server -ui-content-path /_platform/registry/consul/ui/ -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
                                     volumes:
                                         - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
                                         - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
@@ -247,24 +331,14 @@ feature:
                             docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || exit 195
                             exit 0
 
-                    server-started:
+                    ready:
                         targets:
                             gateways: no
                             hosts: no
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService consul:{{ .Version }} consul4platform_server" || exit 197
-                            exit 0
-
-                    agent-started:
-                        targets:
-                            gateways: no
-                            hosts: no
-                            masters: any
-                            nodes: no
-                        run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService consul:{{ .Version }} consul4platform_agent" || exit 198
+                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || exit 197
                             exit 0
 
             remove:
