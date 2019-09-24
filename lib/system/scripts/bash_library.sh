@@ -485,7 +485,9 @@ export -f sfDoesDockerRunService
 # tells if a stack is running in Swarm mode
 sfDoesDockerRunStack() {
 	[  $# -ne 1 ] && return 1
-	docker stack ps $1 {{ "--filter 'desired-state=running'" }} &>/dev/null
+	local NAME=$1
+
+	docker stack ps $NAME {{ "--filter 'desired-state=running'" }} &>/dev/null
 }
 export -f sfDoesDockerRunStack
 
@@ -577,10 +579,12 @@ sfDetectFacts() {
 		redhat|centos)
 			FACTS["redhat_like"]=1
 			FACTS["debian_like"]=0
+			FACTS["docker_version"]=$(yum info docker-ce)
 			;;
 		debian|ubuntu)
 			FACTS["redhat_like"]=0
 			FACTS["debian_like"]=1
+			FACTS["docker_version"]=$(apt info docker-ce 2>/dev/null | grep "^Version" | cut -d: -f2 | cut -d~ -f1)
 			;;
 	esac
 	if systemctl | grep '\-.mount' &>/dev/null; then
@@ -602,6 +606,7 @@ sfDetectFacts() {
 	[ $val -le 0 ] && val=1
 	FACTS["2/3_of_threads"]=$val
 
+	FACTS["docker_version"]=
 	sfProbeGPU
 
 	declare -p FACTS >"${SERIALIZED_FACTS}"
