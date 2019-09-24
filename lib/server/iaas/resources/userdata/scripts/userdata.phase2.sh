@@ -172,6 +172,10 @@ identify_nics() {
     fi
     [ -z $PR_IFs ] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
 
+    # Keeps track of interfaces identified for future scripting use
+    echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
+    echo "$PU_IF" >${SF_VARDIR}/state/public_nics
+
     echo "NICS identified: $NICS"
     echo "    private NIC(s): $PR_IFs"
     echo "    public NIC: $PU_IF"
