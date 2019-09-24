@@ -140,11 +140,11 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 
 	ruleName, err := k.realizeRuleData(strings.Trim(rule["name"].(string), "\n"), *values)
 	if err != nil {
-		return "", err
+		return rule["name"].(string), err
 	}
 	content, err := k.realizeRuleData(strings.Trim(rule["content"].(string), "\n"), *values)
 	if err != nil {
-		return "", err
+		return ruleName, err
 	}
 
 	var sourceControl map[string]interface{}
@@ -243,7 +243,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
 		log.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
-		return "", nil
+		return ruleName, nil
 
 	default:
 		return ruleName, fmt.Errorf("syntax error in rule '%s': '%s' isn't a valid type", ruleName, ruleType)
