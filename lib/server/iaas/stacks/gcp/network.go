@@ -19,7 +19,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/davecgh/go-spew/spew"
 	"strconv"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	timeouts "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -351,7 +349,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 	if err != nil {
 		switch err.(type) {
-		case retry.ErrTimeout, resources.ErrTimeout:
+		case utils.ErrTimeout:
 			logrus.Warnf("Timeout waiting for subnetwork deletion")
 			return err
 		default:
@@ -405,6 +403,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+	// FIXME Add trace
 	if req.Network == nil {
 		panic("req.Network is nil!")
 	}
@@ -425,7 +424,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest:
+		case utils.ErrInvalidRequest:
 			return nil, userData, err
 		default:
 			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
@@ -439,7 +438,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		return nil
 	})
 	if err != nil {
-		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", err))
+		return nil, userData, err
 	}
 
 	return host, userData, err

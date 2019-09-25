@@ -131,7 +131,7 @@ func (m *Network) ReadByID(id string) (err error) {
 		panic("m.item is nil!")
 	}
 
-	defer utils.TraceOnExitErr(fmt.Sprintf("Read network metadata: %v", *m), &err)()
+	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Read network metadata: %v", *m), &err)()
 
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
@@ -156,7 +156,7 @@ func (m *Network) ReadByName(name string) (err error) {
 		panic("m.item is nil!")
 	}
 
-	defer utils.TraceOnExitErr(fmt.Sprintf("Read network metadata by name: %v", *m), &err)()
+	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Read network metadata by name: %v", *m), &err)()
 
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {

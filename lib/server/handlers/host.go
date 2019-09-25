@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"os"
 	"os/user"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -79,16 +80,16 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		return errors.Wrapf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
+		return err
 	}
 	if mh == nil {
-		return fmt.Errorf("host '%s' not found", ref)
+		return resources.ResourceNotFoundError("host", ref)
 	}
 	id := mh.Get().ID
 	err = handler.service.StartHost(id)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+		case utils.ErrNotFound, utils.ErrTimeout:
 			return err
 		default:
 			return err
@@ -98,7 +99,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	err = handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+		case utils.ErrNotFound, utils.ErrTimeout:
 			return err
 		default:
 			return err
@@ -114,16 +115,16 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		return errors.Wrapf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
+		return err
 	}
 	if mh == nil {
-		return fmt.Errorf("host '%s' not found", ref)
+		return resources.ResourceNotFoundError("host", ref)
 	}
 	id := mh.Get().ID
 	err = handler.service.StopHost(id)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+		case utils.ErrNotFound, utils.ErrTimeout:
 			return err
 		default:
 			return err
@@ -133,7 +134,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	err = handler.service.WaitHostState(id, HostState.STOPPED, utils.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+		case utils.ErrNotFound, utils.ErrTimeout:
 			return err
 		default:
 			return err
@@ -157,7 +158,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	err = handler.service.RebootHost(id)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound, resources.ErrTimeout, retry.ErrTimeout:
+		case utils.ErrNotFound, utils.ErrTimeout:
 			return err
 		default:
 			return err
@@ -171,9 +172,9 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrTimeout, retry.ErrTimeout:
-			return errors.Wrapf(err, "timeout waiting host '%s' to be rebooted", ref)
-		case resources.ErrResourceNotFound:
+		case utils.ErrTimeout:
+			return err
+		case utils.ErrNotFound:
 			return err
 		default:
 			return err
@@ -189,10 +190,10 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to load host metadata")
+		return nil, err
 	}
 	if mh == nil {
-		return nil, fmt.Errorf("host '%s' not found", ref)
+		return nil, resources.ResourceNotFoundError("host", ref)
 	}
 
 	id := mh.Get().ID
@@ -209,7 +210,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrTimeout, retry.ErrTimeout, resources.ErrResourceNotFound:
+		case utils.ErrTimeout, utils.ErrNotFound:
 			return nil, err
 		default:
 			return nil, err
@@ -228,7 +229,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 			return nil
 		})
 		if err != nil {
-			return nil, errors.Wrapf(err, "Unable to parse host metadata '%s", ref)
+			return nil, err
 		}
 		if descent {
 			log.Warn("Asking for less resources..., ain't gonna happen :(")
@@ -238,10 +239,10 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	newHost, err = handler.service.ResizeHost(id, hostSizeRequest)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrTimeout, retry.ErrTimeout, resources.ErrResourceNotFound:
-			return nil, errors.Wrapf(err, "Error resizing host '%s'", ref)
+		case utils.ErrTimeout, utils.ErrNotFound:
+			return nil, err
 		default:
-			return nil, errors.Wrapf(err, "Error resizing host '%s'", ref)
+			return nil, err
 		}
 	}
 	if newHost == nil {
@@ -288,14 +289,14 @@ func (handler *HostHandler) Create(
 	host, err := handler.service.GetHostByName(name)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
-		case retry.ErrTimeout, resources.ErrTimeout:
-			return nil, errors.Wrapf(err, "failure creating host: failed to check if host resource name '%s' is already used: %v", name, err)
+		case utils.ErrNotFound:
+		case utils.ErrTimeout:
+			return nil, err
 		default:
-			return nil, errors.Wrapf(err, "failure creating host: failed to check if host resource name '%s' is already used: %v", name, err)
+			return nil, err
 		}
 	} else {
-		return nil, fmt.Errorf("failed to create host '%s': name is already used", name)
+		return nil, resources.ResourceDuplicateError("host", name)
 	}
 
 	var (
@@ -309,10 +310,10 @@ func (handler *HostHandler) Create(
 		networkHandler := NewNetworkHandler(handler.service)
 		defaultNetwork, err = networkHandler.Inspect(ctx, net)
 		if err != nil {
-			if _, ok := err.(resources.ErrResourceNotFound); ok {
+			if _, ok := err.(utils.ErrNotFound); ok {
 				return nil, err
 			}
-			return nil, errors.Wrapf(err, "failed to get network resource data: '%s'", net)
+			return nil, err
 		}
 		if defaultNetwork == nil {
 			return nil, fmt.Errorf("failed to find network '%s'", net)
@@ -345,10 +346,10 @@ func (handler *HostHandler) Create(
 		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
 		if err != nil {
 			switch err.(type) {
-			case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-				return nil, errors.Wrapf(err, "failed to find template corresponding to requested resources")
+			case utils.ErrNotFound, utils.ErrTimeout:
+				return nil, err
 			default:
-				return nil, errors.Wrapf(err, "failed to find template corresponding to requested resources")
+				return nil, err
 			}
 		}
 		if len(templates) > 0 {
@@ -367,14 +368,13 @@ func (handler *HostHandler) Create(
 			msg += ")"
 			log.Infof(msg)
 		} else {
-			log.Errorf("failed to find template corresponding to requested resources")
-			return nil, errors.Wrapf(fmt.Errorf(""), "failed to find template corresponding to requested resources")
+			return nil, fmt.Errorf("failed to find template corresponding to requested resources")
 		}
 	} else {
 		template, err = handler.service.SelectTemplateByName(templateName)
 		if err != nil {
 			switch err.(type) {
-			case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+			case utils.ErrNotFound, utils.ErrTimeout:
 				return nil, err
 			default:
 				return nil, err
@@ -392,12 +392,11 @@ func (handler *HostHandler) Create(
 		2*utils.GetDefaultDelay(),
 	)
 	if err != nil {
-		defaultErr := errors.Wrapf(err, "failed to find image to use on compute resource")
 		switch err.(type) {
-		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-			return nil, defaultErr
+		case utils.ErrNotFound, utils.ErrTimeout:
+			return nil, err
 		default:
-			return nil, defaultErr
+			return nil, err
 		}
 	}
 
@@ -415,12 +414,12 @@ func (handler *HostHandler) Create(
 	host, userData, err = handler.service.CreateHost(hostRequest)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest:
+		case utils.ErrInvalidRequest:
 			return nil, err
-		case resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
-			return nil, errors.Wrapf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
+		case utils.ErrNotFound, utils.ErrTimeout:
+			return nil, err
 		default:
-			return nil, errors.Wrapf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
+			return nil, err
 		}
 	}
 	defer func() {
@@ -428,14 +427,15 @@ func (handler *HostHandler) Create(
 			derr := handler.service.DeleteHost(host.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case resources.ErrResourceNotFound:
+				case utils.ErrNotFound:
 					log.Errorf("Failed to delete host '%s', resource not found: %v", host.Name, derr)
-				case retry.ErrTimeout, resources.ErrTimeout:
+				case utils.ErrTimeout:
 					log.Errorf("Failed to delete host '%s', timeout: %v", host.Name, derr)
 				default:
 					log.Errorf("Failed to delete host '%s', other reason: %v", host.Name, derr)
 				}
 			}
+			err = retry.AddConsequence(err, derr)
 		}
 	}()
 
@@ -451,7 +451,7 @@ func (handler *HostHandler) Create(
 	mh := metadata.NewHost(handler.service)
 	err = mh.Carry(host).Write()
 	if err != nil {
-		return nil, errors.Wrapf(err, "Metadata creation failed")
+		return nil, err
 	}
 	log.Infof("Compute resource created: '%s'", host.Name)
 
@@ -461,6 +461,7 @@ func (handler *HostHandler) Create(
 			derr := mh.Delete()
 			if derr != nil {
 				log.Errorf("failed to remove host metadata after host creation failure")
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -557,7 +558,7 @@ func (handler *HostHandler) Create(
 	// Updates host metadata
 	err = mh.Write()
 	if err != nil {
-		return nil, errors.Wrapf(err, "Metadata creation failed")
+		return nil, err
 	}
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
@@ -619,18 +620,18 @@ func (handler *HostHandler) Create(
 	// Executes the script on the remote host
 	retcode, stdout, stderr, err := sshHandler.Run(ctx, host.Name, command)
 	if err != nil {
-		retrieveForensicsData(sshHandler, host)
+		retrieveForensicsData(ctx, sshHandler, host)
 
 		return nil, err
 	}
 	if retcode != 0 {
+		retrieveForensicsData(ctx, sshHandler, host)
+
 		// Setting err will trigger defers
 		err = fmt.Errorf("failed to finalize host installation: stdout[%s], stderr[%s]", stdout, stderr)
 		if client.IsProvisioningError(err) {
 			log.Error(err)
 		}
-
-		retrieveForensicsData(sshHandler, host)
 
 		return nil, err
 	}
@@ -646,11 +647,12 @@ func (handler *HostHandler) Create(
 	_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
-			return nil, errors.Wrapf(err, "Timeout creating host '%s'", host.Name)
+			return nil, err
 		}
 
 		if client.IsProvisioningError(err) {
 			log.Errorf("%+v", err)
+			// FIXME Check error type
 			return nil, fmt.Errorf("error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
@@ -669,15 +671,39 @@ func (handler *HostHandler) Create(
 	return host, nil
 }
 
-func retrieveForensicsData(sshHandler *SSHHandler, host *resources.Host) {
+func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host *resources.Host) ([]string, []string){
+	if sshHandler == nil || host == nil {
+		return []string{}, []string{}
+	}
+
+	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat /opt/safescale/var/log/user_data.phase2.log; exit $?"))
+	warnings := []string{}
+	errors := []string{}
+
+	if recoverCode == 0 && recoverErr == nil {
+		lines := strings.Split(recoverStdOut, "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "An error occurred in line") {
+				warnings = append(warnings, line)
+			}
+			if strings.HasPrefix(line, "PROVISIONING_ERROR") {
+				errors = append(errors, line)
+			}
+		}
+	}
+
+	return warnings, errors
+}
+
+func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *resources.Host) {
 	if sshHandler == nil || host == nil {
 		return
 	}
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
-		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name+":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName+"sh")
-		_, _, _, _ = sshHandler.Copy(context.TODO(), host.Name+":/opt/safescale/var/log/user_data.phase2.log", dumpName+"log")
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName+"sh")
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/opt/safescale/var/log/user_data.phase2.log", dumpName+"log")
 	}
 }
 
@@ -687,7 +713,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	network, err = handler.service.GetNetworkByName(resources.SingleHostNetworkName)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+		case utils.ErrInvalidRequest, utils.ErrNotFound, utils.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -706,7 +732,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	network, err = handler.service.CreateNetwork(request)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+		case utils.ErrInvalidRequest, utils.ErrNotFound, utils.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -734,7 +760,7 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 		return nil
 	})
 	if err != nil {
-		return hosts, errors.Wrapf(err, "Error listing monitored hosts: browse")
+		return hosts, err
 	}
 	return hosts, nil
 }
@@ -769,7 +795,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest, resources.ErrResourceNotFound, retry.ErrTimeout, resources.ErrTimeout:
+		case utils.ErrInvalidRequest, utils.ErrNotFound, utils.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -792,7 +818,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return resources.ResourceNotFoundError("host", ref)
 		}
-		return errors.Wrapf(err, "can't delete host '%s'", ref)
+		return err
 	}
 
 	host := mh.Get()
@@ -912,14 +938,12 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	err = handler.service.DeleteHost(host.ID) // FIXME DeleteHost, check retry.ErrTimeout
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
+		case utils.ErrNotFound:
 			deleteMetadataOnly = true
-		case resources.ErrTimeout:
-			moreTimeNeeded = true
-		case retry.ErrTimeout:
+		case utils.ErrTimeout:
 			moreTimeNeeded = true
 		default:
-			return errors.Wrapf(err, "can't delete host")
+			return err
 		}
 	}
 
@@ -930,10 +954,10 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 			if state != HostState.ERROR {
 				deleteMetadataOnly = true
 			} else {
-				return errors.Wrapf(err, "can't delete host")
+				return err
 			}
 		} else {
-			return errors.Wrapf(err, "can't delete host")
+			return err
 		}
 	}
 

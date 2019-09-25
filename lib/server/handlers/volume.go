@@ -76,7 +76,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error listing volumes")
+		return nil, err
 	}
 	return volumes, nil
 }
@@ -94,7 +94,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 			return resources.ResourceNotFoundError("volume", ref)
 		default:
 			log.Debugf("Failed to delete volume: %+v", err)
-			return errors.Wrapf(err, "failed to delete volume")
+			return err
 		}
 	}
 	volume := mv.Get()
@@ -118,12 +118,12 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	err = handler.service.DeleteVolume(volume.ID)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
+		case utils.ErrNotFound:
 			log.Warnf("Unable to find the volume on provider side, cleaning up metadata")
-		case resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
-			return errors.Wrapf(err, "can't delete volume")
+		case utils.ErrInvalidRequest, utils.ErrTimeout:
+			return err
 		default:
-			return errors.Wrapf(err, "can't delete volume")
+			return err
 		}
 	}
 	err = mv.Delete()
@@ -216,7 +216,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	})
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
+		case utils.ErrNotFound, utils.ErrInvalidRequest, utils.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -230,13 +230,14 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 			derr := handler.service.DeleteVolume(newVolume.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case resources.ErrResourceNotFound:
+				case utils.ErrNotFound:
 					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
-				case retry.ErrTimeout, resources.ErrTimeout:
+				case utils.ErrTimeout:
 					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
 				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -244,7 +245,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	md, err := metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		log.Debugf("Error creating volume: saving volume metadata: %+v", err)
-		return nil, errors.Wrapf(err, "error creating volume '%s' saving its metadata", name)
+		return nil, err
 	}
 
 	// starting from here delete volume if function ends with failure
@@ -253,6 +254,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 			derr := md.Delete()
 			if derr != nil {
 				log.Warnf("Failed to delete metadata of volume '%s'", newVolume.Name)
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -275,7 +277,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); ok {
+		if _, ok := err.(utils.ErrNotFound); ok {
 			return err
 		}
 		return err
@@ -348,7 +350,6 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Get list of disks before attachment
 				oldDiskSet, err := handler.listAttachedDevices(ctx, host)
 				if err != nil {
-					err := errors.Wrapf(err, "failed to get list of connected disks")
 					return err
 				}
 				vaID, err := handler.service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
@@ -358,10 +359,10 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				})
 				if err != nil {
 					switch err.(type) {
-					case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
-						return errors.Wrapf(err, "can't attach volume '%s'", volumeName)
+					case utils.ErrNotFound, utils.ErrInvalidRequest, utils.ErrTimeout:
+						return err
 					default:
-						return errors.Wrapf(err, "can't attach volume '%s'", volumeName)
+						return err
 					}
 				}
 				// Starting from here, remove volume attachment if exit with error
@@ -370,13 +371,14 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)
 						if derr != nil {
 							switch derr.(type) {
-							case resources.ErrResourceNotFound:
+							case utils.ErrNotFound:
 								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-							case retry.ErrTimeout, resources.ErrTimeout:
+							case utils.ErrTimeout:
 								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							default:
 								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							}
+							err = retry.AddConsequence(err, derr)
 						}
 					}
 				}()
@@ -391,7 +393,6 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						// Get new of disk after attachment
 						newDiskSet, err := handler.listAttachedDevices(ctx, host)
 						if err != nil {
-							err := errors.Wrapf(err, "failed to get list of connected disks")
 							return err
 						}
 						// Isolate the new device
@@ -441,6 +442,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						derr := server.UnmountBlockDevice(volumeUUID)
 						if derr != nil {
 							log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+							err = retry.AddConsequence(err, derr)
 						}
 					}
 				}()
@@ -458,7 +460,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		})
 	})
 	if err != nil {
-		return errors.Wrapf(err, "can't attach volume")
+		return err
 	}
 
 	defer func() {
@@ -466,24 +468,26 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			derr := server.UnmountBlockDevice(volumeUUID)
 			if derr != nil {
 				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+				err = retry.AddConsequence(err, derr)
 			}
 			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
 			if derr != nil {
 				switch derr.(type) {
-				case resources.ErrResourceNotFound:
+				case utils.ErrNotFound:
 					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-				case retry.ErrTimeout, resources.ErrTimeout:
+				case utils.ErrTimeout:
 					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				default:
 					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
 
 	_, err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
-		return errors.Wrapf(err, "can't attach volume")
+		return err
 	}
 
 	defer func() {
@@ -495,17 +499,19 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			})
 			if err2 != nil {
 				log.Warnf("Failed to set volume %s metadatas", volumeName)
+				err = retry.AddConsequence(err, err2)
 			}
 			_, err2 = metadata.SaveVolume(handler.service, volume)
 			if err2 != nil {
 				log.Warnf("Failed to save volume %s metadatas", volumeName)
+				err = retry.AddConsequence(err, err2)
 			}
 		}
 	}()
 
 	mh, err := metadata.SaveHost(handler.service, host)
 	if err != nil {
-		return errors.Wrapf(err, "can't attach volume")
+		return err
 	}
 
 	defer func() {
@@ -520,6 +526,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			})
 			if err2 != nil {
 				log.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
+				err = retry.AddConsequence(err, err2)
 			}
 			err2 = host.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 				hostMountsV1 := v.(*propsv1.HostMounts)
@@ -529,9 +536,13 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			})
 			if err2 != nil {
 				log.Warnf("Failed to set host '%s' metadata about mounts", volumeName)
+				err = retry.AddConsequence(err, err2)
+
 			}
-			if mh.Write() != nil {
+			err2 = mh.Write()
+			if err2 != nil {
 				log.Warnf("Failed to save host '%s' metadata", volumeName)
+				err = retry.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -548,11 +559,11 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	return nil
 }
 
-func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (mapset.Set, error) {
+func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (set mapset.Set, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.handlers.VolumeHandler::listAttachedDevices() called"), &err)()
 	var (
 		retcode        int
 		stdout, stderr string
-		err            error
 	)
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	sshHandler := NewSSHHandler(handler.service)
@@ -576,7 +587,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 		return nil, errors.Wrapf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", utils.GetContextTimeout()))
 	}
 	disks := strings.Split(stdout, "\n")
-	set := mapset.NewThreadUnsafeSet()
+	set = mapset.NewThreadUnsafeSet()
 	for _, k := range disks {
 		set.Add(k)
 	}
@@ -590,7 +601,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	// Load volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
+		if _, ok := err.(utils.ErrNotFound); !ok {
 			return err
 		}
 		return resources.ResourceNotFoundError("volume", volumeName)
@@ -621,7 +632,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 			mountPath = hostMountsV1.LocalMountsByDevice[device]
 			mount := hostMountsV1.LocalMountsByPath[mountPath]
 			if mount == nil {
-				return errors.Wrap(fmt.Errorf("metadata inconsistency: no mount corresponding to volume attachment"), "")
+				return fmt.Errorf("metadata inconsistency: no mount corresponding to volume attachment")
 			}
 
 			// Check if volume has other mount(s) inside it
@@ -656,17 +667,16 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				sshHandler := NewSSHHandler(handler.service)
 				sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 				if err != nil {
-					err = errors.Wrapf(err, "error getting ssh config")
 					return err
 				}
 				nfsServer, err := nfs.NewServer(sshConfig)
 				if err != nil {
-					err = errors.Wrapf(err, "error creating nfs service")
 					return err
 				}
 				err = nfsServer.UnmountBlockDevice(attachment.Device)
 				if err != nil {
-					_ = errors.Wrapf(err, "error unmounting block device")
+					// FIXME Think about this
+					log.Error(err)
 					//return err
 				}
 
@@ -674,7 +684,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				err = handler.service.DeleteVolumeAttachment(host.ID, attachment.AttachID)
 				if err != nil {
 					switch err.(type) {
-					case resources.ErrResourceNotFound, resources.ErrResourceInvalidRequest, retry.ErrTimeout, resources.ErrTimeout:
+					case utils.ErrNotFound, utils.ErrInvalidRequest, utils.ErrTimeout:
 						return err
 					default:
 						return err
@@ -722,7 +732,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 		if err != nil {
 			return fmt.Errorf("failed to stop volume detachment")
 		}
-		return fmt.Errorf("volume detachment canceld by user")
+		return fmt.Errorf("volume detachment cancelled by user")
 	default:
 	}
 

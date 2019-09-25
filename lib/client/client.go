@@ -18,7 +18,6 @@ package client
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	logr "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
@@ -128,13 +127,20 @@ func DecorateError(err error, action string, maySucceed bool) error {
 		if strings.Index(msg, " :") == 0 {
 			msg = msg[2:]
 		}
-		return errors.New(msg)
+		return fmt.Errorf(msg)
 	}
 	return err
 }
 
 // IsTimeoutError tells if the err is a timeout kind
 func IsTimeoutError(err error) bool {
+	// FIXME Look at that
+	/*
+	if _, ok := err.(common.ErrTimeout); ok {
+		return true
+	}
+	 */
+
 	return status.Code(err) == codes.DeadlineExceeded
 }
 

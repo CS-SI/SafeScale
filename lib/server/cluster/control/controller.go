@@ -649,6 +649,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -791,6 +792,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 			if derr != nil {
 				log.Errorf("failed to restore node ownership in cluster")
 			}
+			err = retry.AddConsequence(err, derr)
 		}
 	}()
 
@@ -940,6 +942,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 			if derr != nil {
 				log.Errorf("failed to restore node ownership in cluster")
 			}
+			err = retry.AddConsequence(err, derr)
 		}
 	}()
 
@@ -960,7 +963,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	// Finally delete host
 	err = client.New().Host.Delete([]string{node.ID}, utils.GetLongOperationTimeout())
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); ok {
+		if _, ok := err.(utils.ErrNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
 			err = nil
 		}
@@ -978,9 +981,12 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::Delete() called"), &err, log.TraceLevel)()
 
+
 	if task == nil {
 		task = concurrency.RootTask()
 	}
+
+	// FIXME Introduce dirty states in metadata, and wait until the end to mark the operation as a success (Removed)
 
 	// Updates metadata
 	err = c.UpdateMetadata(task, func() error {
@@ -993,7 +999,6 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		return err
 	}
 
-	// FIXME Look deleteNodeFunc and deleteMasterFunc err usage
 	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
 		funcErr := c.DeleteSpecificNode(t, params.(string), "")
 		return nil, funcErr
@@ -1055,6 +1060,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if err != nil {
 		return err
 	}
+
 	clientNetwork := client.New().Network
 	err = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
@@ -1066,7 +1072,6 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		return err
 	}
 
-	// FIXME Either delete the metadata or mark the metadata as FAILURE
 	// Deletes the metadata
 	err = c.DeleteMetadata(task)
 	if err != nil {

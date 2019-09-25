@@ -39,13 +39,15 @@ import (
 
 // Content is the structure to apply to userdata.sh template
 type Content struct {
-	// BashLibrary contains the basj library
+	// BashLibrary contains the bash library
 	BashLibrary string
 	// Header is the bash header for scripts
 	Header string
 	// User is the name of the default user (api.DefaultUser)
 	User string
-	// Password for the user safescale (for troubleshoot use, useable only in console)
+	// ExitOnError helper to quit script on error
+	ExitOnError string
+	// Password for the user safescale (for troubleshoot use, usable only in console)
 	Password string
 	// PublicKey is the public key used to create the Host
 	PublicKey string
@@ -142,17 +144,20 @@ func (ud *Content) Prepare(
 		return err
 	}
 
+	exitOnErrorHeader := ""
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
 		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) ||
 			strings.EqualFold("1", strings.TrimSpace(suffixCandidate)) {
 			scriptHeader = "set -Eeuxo pipefail"
+			exitOnErrorHeader = "echo 'PROVISIONING_ERROR: 222'"
 		}
 	}
 
 	ud.BashLibrary = bashLibrary
 	ud.Header = scriptHeader
 	ud.User = operatorUsername
+	ud.ExitOnError = exitOnErrorHeader
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces

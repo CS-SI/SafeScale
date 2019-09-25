@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"regexp"
 
@@ -65,15 +64,14 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
-			return errors.Wrapf(err, "failed to search of bucket '%s' already exists", name)
-		}
+			return err		}
 	}
 	if bucket != nil {
 		return resources.ResourceDuplicateError("bucket", name)
 	}
 	_, err = handler.service.CreateBucket(name)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create bucket '%s'", name)
+		return err
 	}
 	return nil
 }
@@ -83,7 +81,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::Create() called"), &err, logrus.TraceLevel)()
 	err = handler.service.DeleteBucket(name)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete bucket '%s'", name)
+		return err
 	}
 	return nil
 }
@@ -97,7 +95,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 		if err.Error() == "not found" {
 			return nil, resources.ResourceNotFoundError("bucket", name)
 		}
-		return nil, errors.Wrapf(err, "failed to inspect bucket '%s'", name)
+		return nil, err
 	}
 	mb = &resources.Bucket{
 		Name: b.GetName(),
@@ -176,7 +174,7 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 	// Check bucket existence
 	_, err = handler.Inspect(ctx, bucketName)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); ok {
+		if _, ok := err.(utils.ErrNotFound); ok {
 			return err
 		}
 		return err
@@ -186,10 +184,10 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 	hostHandler := NewHostHandler(handler.service)
 	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); ok {
+		if _, ok := err.(utils.ErrNotFound); ok {
 			return err
 		}
-		return errors.Wrapf(err, "failed to get host '%s':", hostName)
+		return err
 	}
 
 	data := struct {

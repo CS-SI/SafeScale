@@ -192,7 +192,7 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, utils.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tg.GetID()))
+			return false, nil, utils.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tg.GetID()), duration, nil)
 		default:
 			ok, result, err := tg.TryWait()
 			if ok {

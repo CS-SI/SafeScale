@@ -18,8 +18,6 @@ package metadata
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -260,7 +258,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	// If retry timed out, log it and return error ErrNotFound
 	if err != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
-			cause := errors.Cause(err)
+			cause := utils.Cause(err)
 			if _, ok := cause.(utils.ErrNotFound); ok {
 				return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of host '%s'", ref))
 			}

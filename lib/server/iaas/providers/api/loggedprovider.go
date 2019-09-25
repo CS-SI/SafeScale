@@ -62,7 +62,7 @@ func (w LoggedProvider) trace(s string) (string, time.Time) {
 
 // prepare ...
 func (w LoggedProvider) prepare(s string, startTime time.Time) {
-	logrus.Tracef("stacks.%s::%s() done in [%s] ms", w.Name, s, utils.FmtDuration(time.Since(startTime)))
+	logrus.Tracef("stacks.%s::%s() done in [%s]", w.Name, s, utils.FmtDuration(time.Since(startTime)))
 }
 
 // NewLoggedProvider ...

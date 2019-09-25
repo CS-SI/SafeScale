@@ -188,7 +188,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
+		if _, ok := err.(utils.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -223,6 +223,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -641,7 +642,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest:
+		case utils.ErrInvalidRequest:
 			return nil, userData, err
 		default:
 			return nil, userData, fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))

@@ -19,7 +19,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"strings"
 	"time"
 
@@ -136,7 +135,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to read SSH config")
+		return err
 	}
 	_, waitErr := ssh.WaitServerReady("ready", timeout)
 	return waitErr
@@ -160,7 +159,6 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			// retCode, stdOut, stdErr, err = handler.run(ssh, cmd) // FIXME It CAN lock
 			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, utils.GetHostTimeout())
 			return err
 		},
@@ -182,7 +180,7 @@ func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, 
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.Run() // FIXME It CAN lock
+	return sshCmd.Run() // FIXME It CAN lock, use RunWithTimeout instead
 }
 
 // run executes command on the host

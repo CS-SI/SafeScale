@@ -19,7 +19,8 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"github.com/pkg/errors"
+	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"text/template"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -29,27 +30,27 @@ import (
 //go:generate rice embed-go
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
-func getBoxContent(script string, data interface{}) (string, error) {
-
+func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("RiceboxHelper::getBoxContent() called"), &err)()
 	box, err := rice.FindBox("../handlers/scripts")
 	if err != nil {
-		return "", errors.Wrapf(err, "Unable to find script folder ../handlers/scripts")
+		return "", err
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
-		return "", errors.Wrapf(err, "Unable to recover script content")
+		return "", err
 	}
 	tpl, err := template.New("TemplateName").Parse(scriptContent)
 	if err != nil {
-		return "", errors.Wrapf(err, "Unable to parse script content")
+		return "", err
 	}
 
 	var buffer bytes.Buffer
 	if err = tpl.Execute(&buffer, data); err != nil {
-		return "", errors.Wrapf(err, "Error in script execution")
+		return "", err
 	}
 
-	tplcmd := buffer.String()
+	tplcmd = buffer.String()
 	// fmt.Println(tplcmd)
 	return tplcmd, nil
 }
@@ -58,23 +59,23 @@ func getBoxContent(script string, data interface{}) (string, error) {
 func exec(ctx context.Context, script string, data interface{}, hostid string, svc iaas.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to get the script string")
+		return err
 	}
 	// retrieve ssh config to perform some commands
 	sshHandler := NewSSHHandler(svc)
 	ssh, err := sshHandler.GetConfig(ctx, hostid)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to fetch the SSHConfig from the host")
+		return err
 	}
 
 	cmd, err := ssh.SudoCommand(scriptCmd)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to convert the script string in a SSHCommand struct")
+		return err
 	}
 	_, err = cmd.Output()
 
 	if err != nil {
-		return errors.Wrapf(err, "Unable to execute the command as a root user on the host")
+		return err
 	}
 	return nil
 }

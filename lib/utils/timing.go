@@ -40,6 +40,28 @@ func TraceOnExitErrAsTrace(in string, err *error) func() {
 	}
 }
 
+func TraceOnExitErrAsLevel(in string, err *error, level logrus.Level) func() {
+	return func() {
+		if !(err == nil || (err != nil && *err == nil)) {
+			msg := fmt.Sprintf("%s... finished WITH ERROR [%+v]", in, *err)
+			switch level {
+			case logrus.TraceLevel:
+				logrus.Trace(msg)
+			case logrus.DebugLevel:
+				logrus.Debug(msg)
+			case logrus.InfoLevel:
+				logrus.Info(msg)
+			case logrus.WarnLevel:
+				logrus.Warn(msg)
+			case logrus.ErrorLevel:
+				logrus.Error(msg)
+			default:
+				logrus.Warn(msg)
+			}
+		}
+	}
+}
+
 func TimerWithLevel(in string, level logrus.Level) func() {
 	switch level {
 	case logrus.TraceLevel:

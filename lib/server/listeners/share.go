@@ -94,7 +94,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 	_, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
+		case timing.ErrNotFound:
 			return &google_protobuf.Empty{}, grpc.Errorf(codes.NotFound, err.Error())
 		default:
 			return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())

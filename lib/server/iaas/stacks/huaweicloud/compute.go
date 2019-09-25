@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/pengux/check"
@@ -462,7 +461,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			host, err = s.WaitHostReady(host, utils.GetHostTimeout())
 			if err != nil {
 				switch err.(type) {
-				case resources.ErrResourceNotAvailable:
+				case utils.ErrNotAvailable:
 					return fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
 				default:
 					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
@@ -477,8 +476,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, err
 	}
 	if host == nil {
-		err = errors.New("unexpected problem creating host")
-		return nil, userData, err
+		return nil, userData, fmt.Errorf("unexpected problem creating host")
 	}
 
 	newHost := host
@@ -488,13 +486,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case resources.ErrResourceNotFound:
+				case utils.ErrNotFound:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
-				case retry.ErrTimeout, resources.ErrTimeout:
+				case utils.ErrTimeout:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -516,6 +515,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
+					err = retry.AddConsequence(err, derr)
 				}
 			}
 		}()

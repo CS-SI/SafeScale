@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"io"
 	"os"
@@ -72,21 +71,31 @@ func isKnownErr(err error) bool {
 	known := true
 
 	switch err.(type) {
-	case resources.ErrResourceNotFound:
+	case utils.ErrNotFound:
 		known = true
-	case resources.ErrResourceDuplicate:
+	case utils.ErrTimeout:
 		known = true
-	case resources.ErrResourceAccessDenied:
+	case utils.ErrAccessDenied:
 		known = true
-	case resources.ErrResourceInvalidRequest:
+	case utils.ErrInvalidRequest:
 		known = true
-	case resources.ErrResourceNotAvailable:
+	case utils.ErrDuplicate:
 		known = true
-	case resources.ErrTimeout:
+	case utils.ErrNotAvailable:
+		known = true
+	case utils.ErrCore:
+		known = true
+	case utils.ErrAborted:
+		known = true
+	case utils.ErrInvalidInstance:
+		known = true
+	case utils.ErrInvalidParameter:
+		known = true
+	case utils.ErrOverflow:
+		known = true
+	case utils.ErrNotImplemented:
 		known = true
 	case retry.ErrLimit:
-		known = true
-	case retry.ErrTimeout:
 		known = true
 	default:
 		known = false

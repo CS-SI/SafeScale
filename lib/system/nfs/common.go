@@ -19,7 +19,6 @@ package nfs
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -107,12 +106,10 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		func() error {
 			retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
 			if err != nil {
-				log.Errorf("Ssh operation failed: %s", err.Error())
-				return errors.Wrapf(err, "Ssh operation failed: %s", err.Error())
+				return fmt.Errorf("Ssh operation failed: %s", err.Error())
 			}
 			if retcode != 0 {
-				log.Debugf("Script copy failed: %s, %s", stdout, stderr)
-				return fmt.Errorf(stderr)
+				return fmt.Errorf("Script copy failed: %s, %s", stdout, stderr)
 			}
 			return nil
 		},
@@ -224,7 +221,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 				collected += errline + ";"
 			}
 		}
-		return errors.Wrapf(err, "%s: std error [%s]", msg, collected)
+		return utils.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
 	}
 	if retcode != 0 {
 		return fmt.Errorf("%s: Errorcode [%d], std error [%s], std output [%s]", msg, retcode, stderr, stdout)

@@ -18,8 +18,8 @@ package huaweicloud
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -115,7 +115,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 }
 
 // GetVolume returns the volume identified by id
-// If volume not found, returns (nil, nil) - TODO: returns resources.ErrResourceNotFound
+// If volume not found, returns (nil, nil) - TODO: returns utils.ErrNotFound
 func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	r := volumes.Get(s.Stack.VolumeClient, id)
 	volume, err := r.Extract()
@@ -123,8 +123,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		if _, ok := err.(gc.ErrDefault404); ok {
 			return nil, resources.ResourceNotFoundError("volume", id)
 		}
-		log.Debugf("Error getting volume: volume query failed: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}
 
 	av := resources.Volume{
@@ -160,8 +159,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	})
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			log.Debugf("Error listing volumes: list invocation: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", openstack.ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing volume types: %s", openstack.ProviderErrorToString(err)))
 		}
 		log.Warnf("Complete volume list empty")
 	}

@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"io/ioutil"
 	"math"
 	"net"
@@ -31,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -288,6 +288,7 @@ func isTenantScannable(tenant map[string]interface{}) (isScannable bool, err err
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
+	// FIXME Add trace
 	if group != nil {
 		defer group.Done()
 	}
@@ -343,10 +344,10 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			Name:      netName,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "Error waiting for server ready: %v", err)
+			return err
 		}
 		if network == nil {
-			return errors.Errorf("Failure creating network")
+			return fmt.Errorf("Failure creating network '%s'", netName)
 		}
 
 		defer func() {
@@ -354,11 +355,12 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			if delerr != nil {
 				log.Warnf("Error deleting network '%s'", network.ID)
 			}
+			err = retry.AddConsequence(err, delerr)
 		}()
 
 		_, err = metadata.SaveNetwork(serviceProvider, network)
 		if err != nil {
-			return errors.Errorf("Failure saving network metadata")
+			return err
 		}
 	}
 
@@ -462,7 +464,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			}
 			log.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
 		} else {
-			return errors.New("no gateway network")
+			return fmt.Errorf("no gateway network")
 		}
 
 		return nil

@@ -134,7 +134,7 @@ func WhileUnsuccessfulDelay1Second(run func() error, timeout time.Duration) erro
 
 // WhileUnsuccessfulDelay5Seconds retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 5 seconds after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) error { // FIXME Nest errors
+func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) error {
 	return WhileUnsuccessful(run, 5*time.Second, timeout)
 }
 

@@ -2,38 +2,12 @@ package retry
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/sirupsen/logrus"
 	"time"
 )
 
-type errBase struct {
-	msgs []string
-}
-
-func (b errBase) Plus(err string) {
-	if err != "" {
-		b.msgs = append(b.msgs, err)
-	}
-}
-
-func (b errBase) Error() string {
-	var message string
-	for _, m := range b.msgs {
-		if message != "" {
-			message += " + "
-		}
-		message += m
-	}
-	return message
-}
-
-// ErrTimeout is returned when the time limit has been reached.
-type ErrTimeout struct {
-	b            errBase
-	cause        error
-	consequences []error
-	limit        time.Duration
-}
+type ErrTimeout=utils.ErrTimeout
 
 func AddConsequence(err error, cons error) error {
 	type consequencer interface {
@@ -74,83 +48,51 @@ func Consequences(err error) []error {
 	return []error{}
 }
 
-func (e ErrTimeout) Consequences() []error {
-	return e.consequences
-}
-
-func (e ErrTimeout) AddConsequence(err error) error {
-	if e.consequences == nil {
-		e.consequences = []error{}
-	}
-	e.consequences = append(e.consequences, err)
-	return e
-}
-
-func (e ErrTimeout) Error() string {
-	msgFinal := e.b.Error()
-	msg := fmt.Sprintf("retries timed out after %s", e.limit)
-	if msgFinal != "" {
-		msgFinal = msg + " + " + msgFinal
-	} else {
-		msgFinal = msg
-	}
-	return msgFinal
-}
-
-func (e ErrTimeout) Cause() error {
-	return e.cause
-}
 
 // TimeoutError ...
-func TimeoutError(limit time.Duration, err error) ErrTimeout {
-	return ErrTimeout{
-		limit:        limit,
-		cause:        err,
-		consequences: []error{},
-	}
+func TimeoutError(limit time.Duration, err error) utils.ErrTimeout {
+	msg := fmt.Sprintf("retries timed out after %s", limit)
+	return utils.TimeoutError(msg, limit, err)
 }
 
 // ErrLimit is returned when the maximum attempts has been reached.
 type ErrLimit struct {
-	b            errBase
-	cause        error
-	consequences []error
-	limit        uint
+	utils.ErrCore
+	limit uint
 }
 
 func (e ErrLimit) Cause() error {
-	return e.cause
+	return e.ErrCore.Cause()
 }
 
 func (e ErrLimit) Consequences() []error {
-	return e.consequences
+	return e.ErrCore.Consequences()
 }
 
 func (e ErrLimit) AddConsequence(err error) error {
-	if e.consequences == nil {
-		e.consequences = []error{}
-	}
-	e.consequences = append(e.consequences, err)
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
 }
 
 // Error
 func (e ErrLimit) Error() string {
 	msg := fmt.Sprintf("retry limit exceeded after %d tries", e.limit)
-	msgFinal := e.b.Error()
+	msgFinal := e.ErrCore.Error()
 	if msgFinal != "" {
 		msgFinal = msg + " + " + msgFinal
 	} else {
 		msgFinal = msg
 	}
+
+	msgFinal += e.ErrCore.CauseFormatter()
+
 	return msgFinal
 }
 
 // LimitError ...
 func LimitError(limit uint, err error) ErrLimit {
 	return ErrLimit{
-		cause:        err,
-		limit:        limit,
-		consequences: []error{},
+		ErrCore: utils.NewErrCore("", err, []error{}),
+		limit:   limit,
 	}
 }

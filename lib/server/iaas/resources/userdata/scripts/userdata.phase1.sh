@@ -23,6 +23,7 @@ print_error() {
 trap print_error ERR
 
 fail() {
+  echo "PROVISIONING_ERROR: $1"
 	echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 	exit $1
 }

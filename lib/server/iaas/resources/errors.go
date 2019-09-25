@@ -18,146 +18,51 @@ package resources
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"time"
 )
 
-// ErrTimeout defines a Timeout error
-type ErrTimeout struct {
-	Message string
-	dur     time.Duration
-}
-
-func (e ErrTimeout) Error() string {
-	return e.Message
-}
-
-// ErrResource resource error
-type ErrResource struct {
-	Name         string
-	ResourceType string
-}
-
-// ErrResourceNotFound resource not found error
-type ErrResourceNotFound struct {
-	ErrResource
-}
-
-type ErrResourceTimeout struct {
-	ErrResource
-	dur time.Duration
-}
-
-func (e ErrResourceTimeout) Error() string {
-	return fmt.Sprintf("failed to get '%s' '%s' information after %s", e.ResourceType, e.Name, e.dur)
-}
-
-// ResourceNotFoundError creates a ResourceNotFound error
-func ResourceNotFoundError(resource, name string) ErrResourceNotFound {
-	return ErrResourceNotFound{
-		ErrResource{
-			Name:         name,
-			ResourceType: resource,
-		},
+// ResourceNotFoundError creates a ErrNotFound error
+func ResourceNotFoundError(resource, name string) utils.ErrNotFound {
+	msgFinal := fmt.Sprintf("failed to find %s", resource)
+	if name != "" {
+		msgFinal += fmt.Sprintf(" '%s'", name)
 	}
+
+	return utils.NotFoundError(msgFinal)
 }
 
-func ResourceTimeoutError(resource, name string, dur time.Duration) ErrResourceTimeout {
-	return ErrResourceTimeout{
-		ErrResource: ErrResource{
-			Name:         name,
-			ResourceType: resource,
-		},
-		dur: dur,
-	}
+func ResourceTimeoutError(resource, name string, dur time.Duration) utils.ErrTimeout {
+	msgFinal := fmt.Sprintf("timeout of '%s' waiting for '%s' '%s'", dur, resource, name)
+	return utils.TimeoutError(msgFinal, dur, nil)
 }
 
-func TimeoutError(message string, dur time.Duration) ErrTimeout {
-	return ErrTimeout{
-		Message: message,
-		dur:     dur,
-	}
-}
-
-func (e ErrResourceNotFound) Error() string {
-	tmpl := "failed to find %s"
-	if e.Name != "" {
-		tmpl += " '%s'"
-		return fmt.Sprintf(tmpl, e.ResourceType, e.Name)
-	}
-	return fmt.Sprintf(tmpl, e.ResourceType)
-}
-
-// ErrResourceNotAvailable resource not available error
-type ErrResourceNotAvailable struct {
-	ErrResource
+func TimeoutError(message string, dur time.Duration) utils.ErrTimeout {
+	return utils.TimeoutError(message, dur, nil)
 }
 
 // ResourceNotAvailableError creates a ResourceNotAvailable error
-func ResourceNotAvailableError(resource, name string) ErrResourceNotAvailable {
-	return ErrResourceNotAvailable{
-		ErrResource{
-			Name:         name,
-			ResourceType: resource,
-		},
-	}
-}
-func (e ErrResourceNotAvailable) Error() string {
-	return fmt.Sprintf("%s '%s' is unavailable", e.ResourceType, e.Name)
-}
-
-// ErrResourceDuplicate resource already exists error
-type ErrResourceDuplicate struct {
-	ErrResource
+func ResourceNotAvailableError(resource, name string) utils.ErrNotAvailable {
+	msgFinal := fmt.Sprintf("%s '%s' is unavailable", resource, name)
+	return utils.NotAvailableError(msgFinal)
 }
 
 // ResourceDuplicateError creates a ResourceAlreadyExists error
-func ResourceDuplicateError(resource, name string) ErrResourceDuplicate {
-	return ErrResourceDuplicate{
-		ErrResource{
-			Name:         name,
-			ResourceType: resource,
-		},
-	}
-}
-
-func (e ErrResourceDuplicate) Error() string {
-	return fmt.Sprintf("%s '%s' already exists", e.ResourceType, e.Name)
-}
-
-// ErrResourceInvalidRequest resource requested with invalid parameters
-type ErrResourceInvalidRequest struct {
-	ErrResource
+func ResourceDuplicateError(resource, name string) utils.ErrDuplicate {
+	msgFinal := fmt.Sprintf("%s '%s' already exists", resource, name)
+	return utils.DuplicateError(msgFinal)
 }
 
 // ResourceInvalidRequestError creates a ErrResourceInvalidRequest error
-func ResourceInvalidRequestError(resource, reason string) ErrResourceInvalidRequest {
-	return ErrResourceInvalidRequest{
-		ErrResource{
-			Name:         reason,
-			ResourceType: resource,
-		},
-	}
-}
+func ResourceInvalidRequestError(resource, reason string) utils.ErrInvalidRequest {
+	msgFinal := fmt.Sprintf("%s request is invalid: %s", resource, reason)
 
-func (e ErrResourceInvalidRequest) Error() string {
-	return fmt.Sprintf("%s request is invalid: %s", e.ResourceType, e.Name)
-}
-
-// ErrResourceAccessDenied ...
-type ErrResourceAccessDenied struct {
-	ErrResource
+	return utils.InvalidRequestError(msgFinal)
 }
 
 // ResourceAccessDeniedError creates a ErrResourceAccessDenied error
-func ResourceAccessDeniedError(resource, name string) ErrResourceAccessDenied {
-	return ErrResourceAccessDenied{
-		ErrResource{
-			Name:         name,
-			ResourceType: resource,
-		},
-	}
-}
+func ResourceAccessDeniedError(resource, name string) utils.ErrAccessDenied {
+	msgFinal := fmt.Sprintf("access to %s resource '%s' is denied", resource, name)
 
-func (e ErrResourceAccessDenied) Error() string {
-	return fmt.Sprintf("access to %s resource '%s' is denied", e.ErrResource.ResourceType, e.ErrResource.Name)
+	return utils.AccessDeniedError(msgFinal)
 }

@@ -214,7 +214,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	)
 	_ = os.Remove(f.Name())
 	if networkError {
-		return fmt.Errorf("An unrecoverable network error has occurred")
+		return fmt.Errorf("an unrecoverable network error has occurred")
 	}
 	if retryErr != nil {
 		switch retryErr.(type) {

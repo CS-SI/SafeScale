@@ -530,10 +530,10 @@ func (sc *SSHCommand) cleanup() error {
 	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
 		log.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
-		return fmt.Errorf("Unable to close SSH tunnels: %s", err1.Error())
+		return fmt.Errorf("unable to close SSH tunnels: %s", err1.Error())
 	}
 	if err2 != nil {
-		return fmt.Errorf("Unable to close SSH tunnels: %s", err2.Error())
+		return fmt.Errorf("unable to close SSH tunnels: %s", err2.Error())
 	}
 	return nil
 }
@@ -568,7 +568,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to create SSH Tunnels : %s", err.Error())
+		return nil, nil, fmt.Errorf("unable to create SSH Tunnels : %s", err.Error())
 	}
 	sshConfig := *ssh
 	if tunnel == nil {
@@ -585,7 +585,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string, *os.File, error) {
 	f, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
-		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
+		return "", nil, fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
 
 	options := sshOptions + " -oLogLevel=error"
@@ -597,21 +597,6 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		sshConfig.User,
 		sshConfig.Host,
 	)
-
-	/*
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		if cmdString != "" {
-			log.Debugf("[TRACE] %s", cmdString)
-		}
-		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", sshConfig.Host)), 0777)
-		partials := strings.Split(f.Name(), "/")
-		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", sshConfig.Host, partials[len(partials)-1]))
-		err = ioutil.WriteFile(dumpName, []byte(sshConfig.PrivateKey), 0644)
-		if err != nil {
-			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
-		}
-	}
-	 */
 
 	sudoOpt := ""
 	if withSudo {
@@ -633,6 +618,7 @@ func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
+	// FIXME Add traces
 	return ssh.command(cmdString, true)
 }
 
@@ -656,14 +642,16 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
-func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (string, error) {
+func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out string, err error) {
 	if phase == "" {
 		panic("phase can't be empty string")
 	}
 	if ssh.Host == "" {
 		panic("SSHConfig.Host is empty!")
 	}
+
 	log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
+	defer utils.TraceOnExitErr(fmt.Sprintf("Waiting for remote SSH phase '%s' of host '%s', timeout of %d minutes", phase, ssh.Host, int(timeout.Minutes())), &err)()
 
 	originalPhase := phase
 	if phase == "ready" {
@@ -675,7 +663,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 		stdout, stderr string
 	)
 	begins := time.Now()
-	err := retry.WhileUnsuccessfulDelay5Seconds(
+	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
 			if err != nil {
@@ -688,13 +676,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					log.Debugf("Remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
-					return fmt.Errorf("remote SSH not ready: error code: 255")
+					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 				}
-				log.Debugf("Remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
-				return fmt.Errorf("remote SSH not ready: error code: %s", stderr)
+				return fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
 			}
-			log.Debugf("Remote SSH ready: command finished with result: [%s]", stdout)
 			return nil
 		},
 		timeout,
@@ -739,7 +724,6 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	if err != nil {
 		return 0, "", "", fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
-	// log.Debugf("SSH Identity file: %s", identityfile.Name())
 
 	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}'{{.LocalPath}}' {{.User}}@{{.Host}}:'{{.RemotePath}}'{{else}}{{.User}}@{{.Host}}:'{{.RemotePath}}' '{{.LocalPath}}'{{end}}")
 	if err != nil {
@@ -771,7 +755,6 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}
 
 	sshCmdString := copyCommand.String()
-	// log.Debugf("cmd: %s", sshCmdString)
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
@@ -779,7 +762,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		keyFile: identityfile,
 	}
 
-	return sshCommand.Run() // FIXME It CAN lock
+	return sshCommand.Run() // FIXME It CAN lock, use .RunWithTimeout instead
 }
 
 // Exec executes the cmd using ssh

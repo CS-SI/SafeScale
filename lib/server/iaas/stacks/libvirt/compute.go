@@ -833,7 +833,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			networkDefault, err := s.GetNetwork("default")
 			if err != nil {
 				switch err.(type) {
-				case resources.ErrResourceNotFound:
+				case utils.ErrNotFound:
 					networkDefault, err = s.CreateNetwork(
 						resources.NetworkRequest{
 							Name:      "default",
@@ -936,8 +936,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// starting from here delete host if failure
 	defer func() {
 		if err != nil {
-			if err := s.DeleteHost(resourceName); err != nil {
+			if derr := s.DeleteHost(resourceName); derr != nil {
 				fmt.Printf("Failed to Delete the host %s : %s", resourceName, err.Error())
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()

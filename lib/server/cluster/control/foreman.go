@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/pkg/errors"
 	"strconv"
 	"strings"
 	txttmpl "text/template"
@@ -181,7 +180,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Generate needed password for account cladm
 	cladmPassword, err := utils.GeneratePassword(16)
 	if err != nil {
-		return errors.WithMessagef(err, "[cluster %s] failed to generate password for user cladm", req.Name)
+		return err
 	}
 
 	// Determine default image
@@ -276,7 +275,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	clientNetwork := clientInstance.Network
 	network, err := clientNetwork.Create(def, utils.GetExecutionTimeout())
 	if err != nil {
-		return errors.WithMessagef(err, "[cluster %s] failed to create network '%s'", req.Name, networkName)
+		return err
 	}
 	log.Debugf("[cluster %s] network '%s' creation successful.", req.Name, networkName)
 	req.NetworkID = network.Id
@@ -285,8 +284,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := clientNetwork.Delete([]string{network.Id}, utils.GetExecutionTimeout())
 			if derr != nil {
-				cleanErr := errors.WithMessagef(err, "after failure, failed to delete network '%s'", networkName)
-				err = retry.AddConsequence(err, cleanErr)
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -312,7 +310,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			if !ok {
-				return errors.WithMessagef(err, "[cluster %s] failed to load gateway metadata of network '%s'", req.Name, networkName)
+				return err
 			}
 		}
 		return err
@@ -329,7 +327,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil {
 			if _, ok := err.(utils.ErrNotFound); ok {
 				if !ok {
-					return errors.WithMessagef(err, "[cluster %s] failed to load secondary gateway metadata of network '%s'", req.Name, networkName)
+					return err
 				}
 			}
 			return err
@@ -345,7 +343,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	kpName = "cluster_" + req.Name + "_cladm_key"
 	kp, err = svc.CreateKeyPair(kpName)
 	if err != nil {
-		return errors.WithMessagef(err, "[cluster %s] failed to create Key Pair", req.Name)
+		return err
 	}
 
 	// Saving Cluster metadata, with status 'Creating'
@@ -404,15 +402,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		})
 	})
 	if err != nil {
-		return errors.WithMessagef(err, "[cluster %s] creation failed", req.Name)
+		return err
 	}
 
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			derr := b.cluster.DeleteMetadata(task)
 			if derr != nil {
-				cleanErr := errors.WithMessage(derr, "after failure, failed to delete metadata of cluster")
-				err = retry.AddConsequence(err, cleanErr)
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -467,8 +464,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := client.New().Host.Delete(b.cluster.ListMasterIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
-				cleanErr := errors.WithMessagef(derr, "[cluster %s] after failure, failed to delete masters", req.Name)
-				err = retry.AddConsequence(err, cleanErr)
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -515,8 +511,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			clientHost := clientInstance.Host
 			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
-				cleanErr := errors.WithMessage(derr, "failed to remove private nodes on failure")
-				err = retry.AddConsequence(err, cleanErr)
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -836,7 +831,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 		pbHost, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			// If host seems deleted, consider leaving as a success
-			if _, ok := err.(resources.ErrResourceNotFound); ok {
+			if _, ok := err.(utils.ErrNotFound); ok {
 				continue
 			}
 			return err
@@ -861,19 +856,18 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] installing system requirements...", hostLabel), &err, log.DebugLevel)()
 
 	if b.makers.GetTemplateBox == nil {
-		err := errors.New("missing callback GetTemplateBox")
-		return errors.WithMessagef(err, "[%s] system requirements installation failed", hostLabel)
+		return fmt.Errorf("missing callback GetTemplateBox")
 	}
 	box, err := b.makers.GetTemplateBox()
 	if err != nil {
-		return errors.WithMessagef(err, "[%s] system requirements installation failed", hostLabel)
+		return err
 	}
 
 	globalSystemRequirements := ""
 	if b.makers.GetGlobalSystemRequirements != nil {
 		result, err := b.makers.GetGlobalSystemRequirements(task, b)
 		if err != nil {
-			return errors.WithMessagef(err, "[%s] system requirements installation failed: %v", hostLabel)
+			return err
 		}
 		globalSystemRequirements = result
 	}
@@ -888,7 +882,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		}
 		jsoned, err := json.MarshalIndent(content, "", "    ")
 		if err != nil {
-			return errors.WithMessagef(err, "[%s] tenant parameters convert to JSON failed", hostLabel)
+			return err
 		}
 		params["reserved_TenantJSON"] = string(jsoned)
 	}
@@ -909,11 +903,10 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 
 	retcode, _, _, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
 	if err != nil {
-		return errors.WithMessagef(err, "[%s] system requirements installation failed", hostLabel)
+		return err
 	}
 	if retcode != 0 {
-		err := fmt.Errorf("[%s] system requirements installation failed: retcode=%d", hostLabel, retcode)
-		return errors.WithMessagef(err, "failed to install system requirements on '%s' with error code '%d'", pbHost.Name, retcode)
+		return fmt.Errorf("[%s] system requirements installation failed: retcode=%d", hostLabel, retcode)
 	}
 
 	log.Debugf("[%s] system requirements installation successful.", hostLabel)
@@ -1077,7 +1070,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	hostDef := *def
 	hostDef.Name, err = b.buildHostname(t, "master", NodeType.Master)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "[%s] creation failed: %s", hostLabel)
+		return nil, err
 	}
 
 	hostDef.Network = b.cluster.GetNetworkConfig(t).NetworkID
@@ -1106,7 +1099,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 			if derr != nil {
 				mErr = retry.AddConsequence(mErr, derr)
 			}
-			return nil, errors.WithMessagef(mErr, "[%s] creation failed updating metadata", hostLabel)
+			return nil, mErr
 		}
 	}
 	if err != nil {
@@ -1293,7 +1286,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	hostDef := *def
 	hostDef.Name, err = b.buildHostname(t, "node", NodeType.Node)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "[%s] host resource creation failed", hostLabel)
+		return nil, err
 	}
 	hostDef.Network = b.cluster.GetNetworkConfig(t).NetworkID
 	if timeout < utils.GetLongOperationTimeout() {
@@ -1324,7 +1317,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 			if derr != nil {
 				mErr = retry.AddConsequence(mErr, derr)
 			}
-			return nil, errors.WithMessage(mErr, "failed to create node")
+			return nil, mErr
 		}
 	}
 	if err != nil {
@@ -1471,23 +1464,18 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 		return nil
 	})
 	if err != nil {
-		return errors.WithMessagef(err, "[cluster %s] failed to install  embedded feature 'kong4gateway'", clusterName)
+		return err
 	}
 	if !disabled {
 		log.Debugf("[cluster %s] adding feature 'kong4gateway'", clusterName)
 		feat, err := install.NewEmbeddedFeature(task, "kong4gateway")
 		if err != nil {
-			featName := "kong4gateway"
-			if feat != nil {
-				featName = feat.DisplayName()
-			}
-
-			return errors.WithMessagef(err, "[cluster %s] failed to instantiate embedded feature '%s'", clusterName, featName)
+			return err
 		}
 		target := install.NewClusterTarget(task, b.cluster)
 		results, err := feat.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
-			return errors.WithMessagef(err, "[cluster %s] failed to add embedded feature '%s'", clusterName, feat.DisplayName())
+			return err
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
@@ -1513,7 +1501,7 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 		return nil
 	})
 	if err != nil {
-		return errors.WithMessagef(err, "[cluster %s] failed to install 'remotedesktop' feature", clusterName)
+		return err
 	}
 	if !disabled {
 		log.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
@@ -1524,14 +1512,14 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 		// Adds remotedesktop feature on master
 		feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
 		if err != nil {
-			return errors.WithMessagef(err, "[cluster %s] failed to instantiate feature 'remotedesktop'", clusterName)
+			return err
 		}
 		results, err := feat.Add(target, install.Variables{
 			"Username": "cladm",
 			"Password": adminPassword,
 		}, install.Settings{})
 		if err != nil {
-			return errors.WithMessagef(err, "[cluster %s] failed to add feature '%s'", clusterName, feat.DisplayName())
+			return err
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
@@ -1554,17 +1542,17 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 	})
 	b.cluster.RUnlock(task)
 	if err != nil {
-		return errors.WithMessagef(err, "[%s] installation failed", hostLabel)
+		return err
 	}
 	if !disabled {
 		feature, err := install.NewFeature(task, "proxycache-client")
 		if err != nil {
-			return errors.WithMessagef(err, "[%s] failed to prepare feature 'proxycache-client'", hostLabel)
+			return err
 		}
 		target := install.NewHostTarget(pbHost)
 		results, err := feature.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
-			return errors.WithMessagef(err, "[%s] failed to install feature 'proxycache-client'", hostLabel)
+			return err
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
@@ -1586,17 +1574,17 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	})
 	b.cluster.RUnlock(task)
 	if err != nil {
-		return errors.WithMessagef(err, "[%s] installation failed", hostLabel)
+		return err
 	}
 	if !disabled {
 		feat, err := install.NewEmbeddedFeature(task, "proxycache-server")
 		if err != nil {
-			return errors.WithMessagef(err, "[%s] failed to prepare feature 'proxycache-server'", hostLabel)
+			return err
 		}
 		target := install.NewHostTarget(pbHost)
 		results, err := feat.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
-			return errors.WithMessagef(err, "[%s] failed to install feature 'proxycache-server'", hostLabel)
+			return err
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
@@ -1612,11 +1600,11 @@ func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, h
 
 	feat, err := install.NewEmbeddedFeature(task, "docker-compose")
 	if err != nil {
-		return errors.WithMessagef(err, "[%s] failed to add feature 'docker-compose' on host '%s'", hostLabel, pbHost.Name)
+		return err
 	}
 	results, err := feat.Add(install.NewHostTarget(pbHost), install.Variables{}, install.Settings{})
 	if err != nil {
-		return errors.WithMessagef(err, "[%s] failed to add feature 'docker-compose' on host '%s'", hostLabel, pbHost.Name)
+		return err
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()

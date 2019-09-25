@@ -18,6 +18,7 @@ package nfs
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
@@ -28,8 +29,10 @@ type Server struct {
 	SSHConfig *system.SSHConfig
 }
 
-// NewServer instanciates a new nfs.Server struct
-func NewServer(sshconfig *system.SSHConfig) (*Server, error) {
+// NewServer instantiates a new nfs.Server struct
+func NewServer(sshconfig *system.SSHConfig) (srv *Server, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("NFS create new server called"), &err)()
+
 	if sshconfig == nil {
 		return nil, fmt.Errorf("invalid parameter: 'sshconfig' can't be nil")
 	}

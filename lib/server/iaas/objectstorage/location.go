@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/graymeta/stow"
@@ -192,6 +191,7 @@ func (l *location) GetBucket(bucketName string) (Bucket, error) {
 
 // CreateBucket ...
 func (l *location) CreateBucket(bucketName string) (Bucket, error) {
+	// FIXME Add trace
 	if l == nil {
 		return nil, utils.InvalidInstanceError()
 	}
@@ -204,7 +204,7 @@ func (l *location) CreateBucket(bucketName string) (Bucket, error) {
 
 	c, err := l.stowLocation.CreateContainer(bucketName)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to create bucket '%s'", bucketName))
+		return nil, err
 	}
 	return &bucket{
 		location:  l.stowLocation,
@@ -215,6 +215,7 @@ func (l *location) CreateBucket(bucketName string) (Bucket, error) {
 
 // DeleteBucket removes a bucket from Object Storage
 func (l *location) DeleteBucket(bucketName string) error {
+	// FIXME Add trace
 	if l == nil {
 		return utils.InvalidInstanceError()
 	}
@@ -227,7 +228,7 @@ func (l *location) DeleteBucket(bucketName string) error {
 
 	err := l.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to delete bucket '%s'", bucketName))
+		return err
 	}
 	return nil
 }

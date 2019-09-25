@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc"
 	"github.com/gobwas/glob"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"

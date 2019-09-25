@@ -21,7 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -86,26 +85,26 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateVolume(%s) called", request.Name), log.TraceLevel)()
+func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources.Volume, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::CreateVolume(%s) called", request.Name), &err, log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling openstack.Stack::CreateVolume() from nil pointer!")
 	}
 
-	volume, err := s.GetVolume(request.Name)
+	volume, err = s.GetVolume(request.Name)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
+		if _, ok := err.(utils.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
 	if volume != nil {
-		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
+		return nil, resources.ResourceDuplicateError("volume", request.Name)
 	}
 
 	az, err := s.SelectedAvailabilityZone()
 	if err != nil {
-		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
+		return nil, resources.ResourceDuplicateError("volume", request.Name)
 	}
 
 	var v resources.Volume
@@ -150,8 +149,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if err != nil {
-		log.Debugf("Error creating volume: volume creation invocation: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume : %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error creating volume : %s", ProviderErrorToString(err)))
 	}
 
 	return &v, nil
@@ -171,8 +169,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		if _, ok := err.(gc.ErrDefault404); ok {
 			return nil, resources.ResourceNotFoundError("volume", id)
 		}
-		log.Debugf("Error getting volume: volume query failed: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
 	}
 
 	av := resources.Volume{
@@ -214,8 +211,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	})
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			log.Debugf("Error listing volumes: list invocation: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
 		}
 		log.Warnf("Complete volume list empty")
 	}
@@ -282,8 +278,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		// }
 		// message := extractMessageFromBadRequest(r.Err)
 		// if message != ""
-		log.Debugf("Error creating volume attachment: actual attachment creation: %+v", err)
-		return "", errors.Wrap(err, fmt.Sprintf("Error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
+		return "", utils.Wrap(err, fmt.Sprintf("Error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
 	}
 
 	return va.ID, nil
@@ -299,8 +294,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 	if err != nil {
-		log.Debugf("Error getting volume attachment: get call: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
 	}
 	return &resources.VolumeAttachment{
 		ID:       va.ID,
@@ -322,8 +316,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	err := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumeattach.ExtractVolumeAttachments(page)
 		if err != nil {
-			log.Debugf("Error listing volume attachment: extracting attachments: %+v", err)
-			return false, errors.Wrap(err, "Error listing volume attachment: extracting attachments")
+			return false, utils.Wrap(err, "Error listing volume attachment: extracting attachments")
 		}
 		for _, va := range list {
 			ava := resources.VolumeAttachment{
@@ -337,8 +330,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 		return true, nil
 	})
 	if err != nil {
-		log.Debugf("Error listing volume attachment: listing attachments: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
 	}
 	return vs, nil
 }
@@ -354,8 +346,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {
-		log.Debugf("Error deleting volume attachment: deleting attachments: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("Error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
 	}
 	return nil
 }

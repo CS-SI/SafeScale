@@ -118,8 +118,8 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 }
 
 //Push ...
-func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) error {
-	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Push(%s) called", fileLocalPath), log.TraceLevel)()
+func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) (err error) {
+	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Push(%s) called", fileLocalPath), &err, log.TraceLevel)()
 
 	//localFile inspection
 	file, err := os.Open(fileLocalPath)
@@ -279,8 +279,8 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 }
 
 //Get ...
-func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) error {
-	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Get(%s) called", fileName), log.TraceLevel)()
+func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) (err error) {
+	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Get(%s) called", fileName), &err, log.TraceLevel)()
 
 	// Check if the local file is available
 	if _, err := os.Stat(fileLocalPath); err == nil {
@@ -439,8 +439,8 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 }
 
 // Delete ...
-func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
-	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Delete(%s) called", fileName), log.TraceLevel)()
+func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err error) {
+	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Delete(%s) called", fileName), &err, log.TraceLevel)()
 
 	bucketMap, _, buckets := handler.getBuckets()
 	metadataFileName, keyFileName := getFileNames(fileName)

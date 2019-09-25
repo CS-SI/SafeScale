@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"runtime"
 
 	"github.com/sirupsen/logrus"
@@ -27,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -38,7 +38,7 @@ func Run() {
 	clusterName := "test-cluster"
 	instance, err := cluster.Load(concurrency.RootTask(), clusterName)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); ok {
+		if _, ok := err.(utils.ErrNotFound); ok {
 			logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 			instance, err = cluster.Create(concurrency.RootTask(), control.Request{
 				Name:       clusterName,

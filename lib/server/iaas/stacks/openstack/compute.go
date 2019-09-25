@@ -29,7 +29,6 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -119,8 +118,8 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListImages() called"), log.TraceLevel)()
+func (s *Stack) ListImages() (imgList []resources.Image, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::ListImages() called"), &err, log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling stacks.openstack::ListImage from nil pointer!")
@@ -131,14 +130,11 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := images.List(s.ComputeClient, opts)
 
-	var imgList []resources.Image
-
 	// Define an anonymous function to be executed on each page's iteration
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+	err = pager.EachPage(func(page pagination.Page) (bool, error) {
 		imageList, err := images.ExtractImages(page)
 		if err != nil {
-			log.Debugf("Error listing images: %+v", err)
-			return false, errors.Wrap(err, fmt.Sprintf("Error listing images"))
+			return false, err
 		}
 
 		for _, img := range imageList {
@@ -149,17 +145,16 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 	})
 	if (len(imgList) == 0) || (err != nil) {
 		if err != nil {
-			log.Debugf("Error listing images: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
 		}
-		// log.Debugf("Image list empty !")
+		log.Debugf("Image list empty !")
 	}
 	return imgList, nil
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*resources.Image, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetImage(%s) called", id), log.TraceLevel)()
+func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::GetImage(%s) called", id), &err, log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling method GetImage from nil!")
@@ -167,15 +162,14 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 
 	img, err := images.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		log.Debugf("Error getting image: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting image: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error getting image: %s", ProviderErrorToString(err)))
 	}
 	return &resources.Image{ID: img.ID, Name: img.Name}, nil
 }
 
 // GetTemplate returns the Template referenced by id
-func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetTemplate(%s) called", id), log.TraceLevel)()
+func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::GetTemplate(%s) called", id), &err, log.TraceLevel)()
 
 	if s == nil {
 		panic("Calling method GetTemplate from nil!")
@@ -183,7 +177,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
-	err := retry.WhileUnsuccessfulDelay1Second(
+	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			var err error
 			flv, err = flavors.Get(s.ComputeClient, id).Extract()
@@ -192,8 +186,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 		2*utils.GetDefaultDelay(),
 	)
 	if err != nil {
-		log.Debugf("Error getting template: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
 	}
 	return &resources.HostTemplate{
 		Cores:    flv.VCPUs,
@@ -242,10 +235,9 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	})
 	if (len(flvList) == 0) || (err != nil) {
 		if err != nil {
-			log.Debugf("Error listing templates: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing templates"))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing templates"))
 		}
-		// log.Debugf("Template list empty !")
+		log.Debugf("Template list empty !")
 	}
 	return flvList, nil
 }
@@ -290,8 +282,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		log.Debugf("Error getting keypair: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting keypair"))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error getting keypair"))
 	}
 	return &resources.KeyPair{
 		ID:         kp.Name,
@@ -334,8 +325,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 	})
 	if (len(kpList) == 0) || (err != nil) {
 		if err != nil {
-			log.Debugf("Error listing keypairs: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing keypairs"))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing keypairs"))
 		}
 	}
 	return kpList, nil
@@ -351,8 +341,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		log.Debugf("Error deleting keypair: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting key pair: %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("Error deleting key pair: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -665,7 +654,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				net, err := s.GetNetwork(netid)
 				if err != nil {
 					switch err.(type) {
-					case resources.ErrResourceNotFound:
+					case utils.ErrNotFound:
 						log.Errorf(err.Error())
 					default:
 						log.Errorf("failed to get network '%s': %v", netid, err)
@@ -744,15 +733,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		// err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
-		// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
-		// defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 		defaultGatewayID = defaultGateway.ID
-		// 	return nil
-		// })
-		// if err != nil {
-		// 	return nil, userData, errors.Wrap(err, "")
-		// }
 	}
 
 	var nets []servers.Network
@@ -910,8 +891,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		utils.GetLongOperationTimeout(),
 	)
 	if err != nil {
-		log.Debugf("Error creating host: timeout: %+v", err)
-		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
+		return nil, userData, utils.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
 	log.Debugf("host resource created.")
 
@@ -923,13 +903,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case resources.ErrResourceNotFound:
+				case utils.ErrNotFound:
 					log.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
-				case retry.ErrTimeout, resources.ErrTimeout:
+				case utils.ErrTimeout:
 					log.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -941,8 +922,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			Pool: s.authOpts.FloatingIPPool,
 		}).Extract()
 		if err != nil {
-			log.Debugf("Error creating host: floating ip: %+v", err)
-			return nil, userData, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
+			return nil, userData, utils.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -952,6 +932,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				derr := floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
+					err = retry.AddConsequence(err, derr)
 				}
 			}
 		}()
@@ -962,8 +943,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}).ExtractErr()
 		if err != nil {
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-			log.Debugf(msg)
-			return nil, userData, errors.Wrap(err, msg)
+			return nil, userData, utils.Wrap(err, msg)
 		}
 
 		err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
@@ -1118,7 +1098,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	})
 	if len(hosts) == 0 || err != nil {
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("error listing hosts : %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing hosts : %s", ProviderErrorToString(err)))
 		}
 		log.Warnf("Hosts lists empty !")
 	}
@@ -1149,13 +1129,13 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 	})
 	if len(fips) == 0 {
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("No floating IP found for host '%s': %s", hostID, ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("No floating IP found for host '%s': %s", hostID, ProviderErrorToString(err)))
 		}
-		return nil, errors.Wrap(err, fmt.Sprintf("No floating IP found for host '%s'", hostID))
+		return nil, utils.Wrap(err, fmt.Sprintf("No floating IP found for host '%s'", hostID))
 
 	}
 	if len(fips) > 1 {
-		return nil, errors.Wrap(err, fmt.Sprintf("Configuration error, more than one Floating IP associated to host '%s'", hostID))
+		return nil, utils.Wrap(err, fmt.Sprintf("Configuration error, more than one Floating IP associated to host '%s'", hostID))
 	}
 	return &fips[0], nil
 }
@@ -1176,17 +1156,15 @@ func (s *Stack) DeleteHost(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					log.Debugf("Error deleting host: dissociate: %+v", err)
-					return errors.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+					return utils.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 				}
 				err = floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
 				if err != nil {
-					log.Debugf("Error deleting host: delete floating ip: %+v", err)
-					return errors.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+					return utils.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 				}
 			}
 		} else {
-			return errors.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
+			return utils.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
 		}
 	}
 
@@ -1244,8 +1222,7 @@ func (s *Stack) DeleteHost(id string) error {
 		utils.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		log.Debugf("failed to remove host '%s': %s", id, outerRetryErr.Error())
-		return errors.Wrap(outerRetryErr, fmt.Sprintf("Error deleting host: retry error"))
+		return utils.Wrap(outerRetryErr, fmt.Sprintf("Error deleting host: retry error"))
 	}
 	return nil
 }
@@ -1260,8 +1237,7 @@ func (s *Stack) StopHost(id string) error {
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		log.Debugf("Error stopping host: stopping host: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("error stopping host : %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("error stopping host : %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -1281,8 +1257,7 @@ func (s *Stack) RebootHost(id string) error {
 	}
 	if err != nil {
 		ftErr := fmt.Errorf("Error rebooting host [%s]: %s", id, ProviderErrorToString(err))
-		log.Debug(ftErr)
-		return errors.Wrap(err, ftErr.Error())
+		return utils.Wrap(err, ftErr.Error())
 	}
 	return nil
 }
@@ -1297,8 +1272,7 @@ func (s *Stack) StartHost(id string) error {
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		log.Debugf("Error starting host: starting host: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error starting host : %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("Error starting host : %s", ProviderErrorToString(err)))
 	}
 
 	return nil
@@ -1318,5 +1292,5 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 	// TODO RESIZE Call this
 	// servers.Resize()
 
-	return nil, errors.New("Not implemented yet")
+	return nil, fmt.Errorf("Not implemented yet")
 }

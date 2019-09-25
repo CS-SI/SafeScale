@@ -18,9 +18,6 @@ package metadata
 
 import (
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
@@ -252,10 +249,12 @@ func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) 
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadShare(svc iaas.Service, ref string) (string, error) {
+func LoadShare(svc iaas.Service, ref string) (share string, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Loading metadata share called..."), &err)()
+
 	ms := NewShare(svc)
 	var innerErr error
-	err := retry.WhileUnsuccessfulDelay1Second(
+	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			innerErr = ms.ReadByID(ref)
 			if innerErr != nil {
@@ -275,7 +274,7 @@ func LoadShare(svc iaas.Service, ref string) (string, error) {
 	// If retry timed out, log it and return error ErrNotFound
 	if err != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
-			log.Debugf("timeout reading metadata of share '%s'", ref)
+			// FIXME Ouch
 			return "", utils.NotFoundError(fmt.Sprintf("failed to load metadata of share '%s'", ref))
 		}
 		return "", err
