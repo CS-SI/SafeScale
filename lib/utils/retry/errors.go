@@ -96,3 +96,35 @@ func LimitError(limit uint, err error) ErrLimit {
 		limit:   limit,
 	}
 }
+
+// ErrStopRetry is returned when the maximum attempts has been reached.
+type ErrStopRetry struct {
+	utils.ErrCore
+}
+
+func (e ErrStopRetry) Cause() error {
+	return e.ErrCore.Cause()
+}
+
+func (e ErrStopRetry) Consequences() []error {
+	return e.ErrCore.Consequences()
+}
+
+func (e ErrStopRetry) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// Error
+func (e ErrStopRetry) Error() string {
+	msgFinal := fmt.Sprintf("stopping retries because of: %v", e.Cause())
+
+	return msgFinal
+}
+
+// StopRetryError ...
+func StopRetryError(message string, err error) ErrStopRetry {
+	return ErrStopRetry{
+		ErrCore: utils.NewErrCore(message, err, []error{}),
+	}
+}

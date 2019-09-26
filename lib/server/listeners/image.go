@@ -18,15 +18,12 @@ package listeners
 
 import (
 	"context"
-	"fmt"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	timing "github.com/CS-SI/SafeScale/lib/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,7 +38,7 @@ type ImageListener struct{}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: list images called"), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: list images called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

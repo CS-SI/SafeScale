@@ -76,6 +76,10 @@ func PrevailDone(arbiters ...Arbiter) Arbiter {
 func Unsuccessful() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
+			if _, ok := t.Err.(ErrStopRetry); ok {
+				return Verdict.Done, t.Err
+			}
+
 			return Verdict.Retry, nil
 		}
 		return Verdict.Done, nil
@@ -87,6 +91,10 @@ func Unsuccessful() Arbiter {
 func UnsuccessfulWhereRetcode255() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
+			if _, ok := t.Err.(ErrStopRetry); ok {
+				return Verdict.Done, t.Err
+			}
+
 			_, retCode, _ := utils.ExtractRetCode(t.Err)
 			if retCode == 255 {
 				return Verdict.Retry, nil
@@ -100,6 +108,10 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err == nil {
+			if _, ok := t.Err.(ErrStopRetry); ok {
+				return Verdict.Done, t.Err
+			}
+
 			return Verdict.Retry, nil
 		}
 		return Verdict.Done, nil
@@ -110,6 +122,10 @@ func Successful() Arbiter {
 func Timeout(limit time.Duration) Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
+			if _, ok := t.Err.(ErrStopRetry); ok {
+				return Verdict.Done, t.Err
+			}
+
 			if time.Since(t.Start) >= limit {
 				return Verdict.Abort, TimeoutError(limit, t.Err)
 			}
@@ -123,6 +139,10 @@ func Timeout(limit time.Duration) Arbiter {
 func Max(limit uint) Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
+			if _, ok := t.Err.(ErrStopRetry); ok {
+				return Verdict.Done, t.Err
+			}
+
 			if t.Count >= limit {
 				return Verdict.Abort, LimitError(limit, t.Err)
 			}

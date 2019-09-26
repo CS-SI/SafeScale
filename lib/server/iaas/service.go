@@ -537,8 +537,6 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	// FIXME Add trace
-
 	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err

@@ -17,12 +17,9 @@
 package handlers
 
 import (
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -44,106 +41,4 @@ func init() {
 	}
 
 	log.SetOutput(io.MultiWriter(os.Stdout, file))
-}
-
-// throwErr throws error as-is, without change.
-// Used as a way to tell other developers not to alter the error.
-func throwErr(err error) error {
-	return err
-}
-
-func throwErrf(format string, a ...interface{}) error {
-	return fmt.Errorf(format, a...)
-}
-
-// infraErr throws error with stack trace
-func infraErr(err error) error {
-	if err == nil {
-		return nil
-	}
-	log.Errorf("%+v", err)
-
-	tbr := errors.WithStack(err)
-	return tbr
-}
-
-func isKnownErr(err error) bool {
-	known := true
-
-	switch err.(type) {
-	case utils.ErrNotFound:
-		known = true
-	case utils.ErrTimeout:
-		known = true
-	case utils.ErrAccessDenied:
-		known = true
-	case utils.ErrInvalidRequest:
-		known = true
-	case utils.ErrDuplicate:
-		known = true
-	case utils.ErrNotAvailable:
-		known = true
-	case utils.ErrCore:
-		known = true
-	case utils.ErrAborted:
-		known = true
-	case utils.ErrInvalidInstance:
-		known = true
-	case utils.ErrInvalidParameter:
-		known = true
-	case utils.ErrOverflow:
-		known = true
-	case utils.ErrNotImplemented:
-		known = true
-	case retry.ErrLimit:
-		known = true
-	default:
-		known = false
-	}
-
-	return known
-}
-
-// infraErrf throws error with stack trace and adds message
-func infraErrf(err error, message string, a ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-
-	if isKnownErr(errors.Cause(err)) {
-		log.Error(err)
-		return err
-	}
-
-	tbr := errors.WithStack(err)
-	tbr = errors.WithMessage(tbr, fmt.Sprintf(message, a...))
-
-	log.Errorf("%+v", tbr)
-	return tbr
-}
-
-// logicErr ...
-func logicErr(err error) error {
-	if err == nil {
-		return nil
-	}
-	log.Errorf("%+v", err)
-	return err
-}
-
-// logicErrf ...
-func logicErrf(err error, message string, a ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-
-	if isKnownErr(errors.Cause(err)) {
-		log.Error(err)
-		// knownErr := errors.WithMessage(err, fmt.Sprintf(message, a...))
-		return err
-	}
-
-	tbr := errors.Wrap(err, fmt.Sprintf(message, a...))
-	log.Errorf("%+v", tbr)
-	return tbr
 }

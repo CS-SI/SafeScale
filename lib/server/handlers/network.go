@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/pkg/errors"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -596,9 +595,9 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	if returnCode != 0 {
 		retrieveForensicsData(task.GetContext(), sshHandler, gw)
 
-		warnings, errors := getPhaseWarningsAndErrors(task.GetContext(), sshHandler, gw)
+		warnings, errs := getPhaseWarningsAndErrors(task.GetContext(), sshHandler, gw)
 
-		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gw.Name, returnCode, warnings, errors)
+		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gw.Name, returnCode, warnings, errs)
 	}
 	log.Infof("Gateway '%s' successfully configured.", gw.Name)
 
@@ -715,9 +714,9 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			if cleanErr != nil {
 				switch cleanErr.(type) {
 				case utils.ErrNotFound, utils.ErrTimeout:
-					log.Warn(errors.Wrapf(cleanErr, "error deleting network on cleanup after failure to load metadata '%s'", ref))
+					log.Warnf("error deleting network on cleanup after failure to load metadata '%s': %v", ref, cleanErr)
 				default:
-					log.Warn(errors.Wrapf(cleanErr, "error deleting network on cleanup after failure to load metadata '%s'", ref))
+					log.Warnf("error deleting network on cleanup after failure to load metadata '%s': %v", ref, cleanErr)
 				}
 			}
 			err = retry.AddConsequence(err, cleanErr)

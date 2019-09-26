@@ -19,8 +19,8 @@ package handlers
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_processmanager.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ProcessManagerAPI

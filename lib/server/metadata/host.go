@@ -82,6 +82,17 @@ func (mh *Host) Write() (err error) {
 	return mh.item.WriteInto(ByIDFolderName, *mh.id)
 }
 
+func (mh *Host) ReadByIDorName(id string) (err error) {
+	errId := mh.ReadByID(id)
+	if errId != nil {
+		errName := mh.ReadByName(id)
+		if errName != nil {
+			return errName
+		}
+	}
+	return nil
+}
+
 // ReadByID reads the metadata of a network identified by ID from Object Storage
 func (mh *Host) ReadByID(id string) (err error) {
 	if mh.item == nil {
@@ -230,47 +241,30 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 
 	// We first try looking for host by ID from metadata
 	mh = NewHost(svc)
-	var innerErr error
-	err = retry.WhileUnsuccessfulDelay1Second(
+
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr = mh.ReadByID(ref)
+			innerErr := mh.ReadByIDorName(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
-					innerErr = mh.ReadByName(ref)
-					if innerErr != nil {
-						if _, ok := innerErr.(utils.ErrNotFound); ok {
-							return innerErr
-						}
-					}
+					return retry.StopRetryError("no metadata found", innerErr)
 				}
+
+				return innerErr
 			}
-			// // In case of inconsistency in Object Storage (had happened in the past...)
-			// host := mh.Get()
-			// ip := host.GetAccessIP()
-			// if ip == "" {
-			// 	log.Warnf("Host metadata inconsistent, AccessIP is empty. Retrying")
-			// 	return fmt.Errorf("host metadata inconsistent, AccessIP is empty")
-			// }
 			return nil
 		},
 		2*utils.GetDefaultDelay(),
 	)
-	// If retry timed out, log it and return error ErrNotFound
-	if err != nil {
-		if _, ok := err.(retry.ErrTimeout); ok {
-			cause := utils.Cause(err)
-			if _, ok := cause.(utils.ErrNotFound); ok {
-				return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of host '%s'", ref))
-			}
+	if retryErr != nil {
+		// If it's not a timeout is something we don't know how to handle yet
+		if _, ok := retryErr.(utils.ErrTimeout); !ok {
+			return nil, utils.Cause(retryErr)
 		}
 
-		return nil, err
+		return nil, retryErr
 	}
 
-	// Returns the error different than ErrNotFound to caller
-	if innerErr != nil {
-		return nil, innerErr
-	}
 	return mh, nil
 }
 

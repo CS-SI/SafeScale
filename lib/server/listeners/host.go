@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	timing "github.com/CS-SI/SafeScale/lib/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
@@ -70,7 +69,7 @@ type StoredCPUInfo struct {
 
 // Start ...
 func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host start '%s' called", in.Name), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host start '%s' called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
@@ -96,7 +95,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 
 // Stop ...
 func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host stop '%s' called", in.Name), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host stop '%s' called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -123,7 +122,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 
 // Reboot ...
 func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host reboot '%s' called", in.Name), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host reboot '%s' called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -150,7 +149,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 
 // List available hosts
 func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.HostList, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host list called"), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host list called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -181,7 +180,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 
 // Create a new host
 func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host create '%s' called", in.Name), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host create '%s' called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -242,7 +241,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 // Resize an host
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host resize '%s' done", in.Name), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host resize '%s' done", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -274,7 +273,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 // Status of a host
 func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostStatus, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host status '%s' called", in.Name), log.TraceLevel)()
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: host status '%s' called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

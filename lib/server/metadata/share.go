@@ -113,6 +113,17 @@ func (ms *Share) Write() error {
 	return ms.item.WriteInto(ByNameFolderName, *ms.name)
 }
 
+func (ms *Share) ReadByIDorName(id string) (err error) {
+	errId := ms.ReadByID(id)
+	if errId != nil {
+		errName := ms.ReadByName(id)
+		if errName != nil {
+			return errName
+		}
+	}
+	return nil
+}
+
 // ReadByID reads the metadata of an export identified by ID from Object Storage
 func (ms *Share) ReadByID(id string) error {
 	if ms.item == nil {
@@ -253,36 +264,30 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	defer utils.TraceOnExitErr(fmt.Sprintf("Loading metadata share called..."), &err)()
 
 	ms := NewShare(svc)
-	var innerErr error
-	err = retry.WhileUnsuccessfulDelay1Second(
+
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr = ms.ReadByID(ref)
+			innerErr := ms.ReadByIDorName(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
-					innerErr = ms.ReadByName(ref)
-					if innerErr != nil {
-						if _, ok := innerErr.(utils.ErrNotFound); ok {
-							return innerErr
-						}
-					}
+					return retry.StopRetryError("no metadata found", innerErr)
 				}
+				return innerErr
 			}
+
 			return nil
 		},
 		2*utils.GetDefaultDelay(),
 	)
 	// If retry timed out, log it and return error ErrNotFound
-	if err != nil {
-		if _, ok := err.(retry.ErrTimeout); ok {
-			// FIXME Ouch
-			return "", utils.NotFoundError(fmt.Sprintf("failed to load metadata of share '%s'", ref))
+	if retryErr != nil {
+		// If it's not a timeout is something we don't know how to handle yet
+		if _, ok := retryErr.(utils.ErrTimeout); !ok {
+			return "", utils.Cause(retryErr)
 		}
-		return "", err
+		return "", retryErr
 	}
-	// Returns the error different than ErrNotFound to caller
-	if innerErr != nil {
-		return "", innerErr
-	}
+
 	return ms.Get(), nil
 }
 

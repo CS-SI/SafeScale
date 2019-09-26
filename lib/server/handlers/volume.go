@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -584,7 +583,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 		utils.GetContextTimeout(),
 	)
 	if retryErr != nil {
-		return nil, errors.Wrapf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", utils.GetContextTimeout()))
+		return nil, utils.Wrap(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", utils.GetContextTimeout()))
 	}
 	disks := strings.Split(stdout, "\n")
 	set = mapset.NewThreadUnsafeSet()

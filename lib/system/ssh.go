@@ -454,7 +454,7 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
 	if strings.Contains(sc.Display(), "ENDSSH") {
-		defer utils.TimerWithLevel(fmt.Sprintf("Running command [%s] with timeout of %s", sc.Display(), timeout), log.DebugLevel)()
+		defer utils.TimerWithLevel(fmt.Sprintf("Running command with timeout of %s: [%s]", timeout, sc.Display()), log.DebugLevel)()
 	}
 
 	// Set up the outputs (std and err)
@@ -663,7 +663,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		stdout, stderr string
 	)
 	begins := time.Now()
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
 			if err != nil {
@@ -684,33 +684,12 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		},
 		timeout,
 	)
-	ends := time.Since(begins)
-	duration := utils.FmtDuration(ends)
-	if err == nil {
-		log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, duration, stdout)
-		return stdout, nil
-	} else {
-		log.Errorf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, duration, err)
+	if retryErr != nil {
+		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, utils.FmtDuration(time.Since(begins)), retryErr)
+		return stdout, retryErr
 	}
-
-	originalErr := err
-	logCmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/log/user_data.%s.log", phase))
-	if err != nil {
-		return "", err
-	}
-
-	retcode, stdout, stderr, logErr := logCmd.RunWithTimeout(timeout)
-	if logErr == nil {
-		if retcode == 0 {
-			return "", fmt.Errorf("server '%s' phase [%s] is not ready yet: %s - log content of file user_data.%s.log: %s", ssh.Host, phase, originalErr.Error(), phase, stdout)
-		}
-		if len(stdout) > 0 {
-			log.Error(fmt.Errorf("captured output: %s", stdout))
-		}
-		return "", fmt.Errorf("server '%s' phase [%s] is not ready yet: %s - error reading user_data.%s.log: %s", ssh.Host, phase, originalErr.Error(), phase, stderr)
-	}
-
-	return "", fmt.Errorf("server '%s' phase [%s] is not ready yet: %s", ssh.Host, phase, originalErr.Error())
+	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, utils.FmtDuration(time.Since(begins)), stdout)
+	return stdout, nil
 }
 
 // Copy copies a file/directory from/to local to/from remote

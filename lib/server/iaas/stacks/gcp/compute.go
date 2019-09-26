@@ -351,7 +351,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	var desistError error
 
 	// Retry creation until success, for 10 minutes
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
 			if err != nil {
@@ -408,8 +408,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		},
 		utils.GetLongOperationTimeout(),
 	)
-	if err != nil {
-		return nil, userData, err
+	if retryErr != nil {
+		return nil, userData, retryErr
 	}
 	if desistError != nil {
 		return nil, userData, resources.ResourceAccessDeniedError(request.ResourceName, fmt.Sprintf("Error creating host: %s", desistError.Error()))

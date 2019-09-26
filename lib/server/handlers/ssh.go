@@ -157,7 +157,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 		return 0, "", "", err
 	}
 
-	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
+	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, utils.GetHostTimeout())
 			return err
@@ -169,6 +169,9 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 			}
 		},
 	)
+	if retryErr != nil {
+		return retCode, stdOut, stdErr, retryErr
+	}
 
 	return retCode, stdOut, stdErr, err
 }

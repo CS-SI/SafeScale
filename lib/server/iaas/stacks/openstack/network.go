@@ -761,7 +761,6 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
-	// FIXME Add trace
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -788,7 +787,6 @@ func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
-	// FIXME Add trace
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
 	if err != nil {
 		return err

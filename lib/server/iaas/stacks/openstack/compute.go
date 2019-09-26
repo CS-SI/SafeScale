@@ -177,7 +177,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
-	err = retry.WhileUnsuccessfulDelay1Second(
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			var err error
 			flv, err = flavors.Get(s.ComputeClient, id).Extract()
@@ -185,8 +185,8 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 		},
 		2*utils.GetDefaultDelay(),
 	)
-	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
+	if retryErr != nil {
+		return nil, utils.Wrap(retryErr, fmt.Sprintf("error getting template: %s", ProviderErrorToString(retryErr)))
 	}
 	return &resources.HostTemplate{
 		Cores:    flv.VCPUs,
@@ -446,7 +446,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 					return nil
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
-					log.Println("received 'Internal Server Error', retrying servers.Get...")
+					log.Warnf("received 'Internal Server Error', retrying servers.Get...")
 					return err
 				}
 				// Any other error stops the retry
@@ -475,7 +475,6 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 	)
 	if retryErr != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
-			// FIXME Introduce ResourceTimeoutError
 			return nil, resources.TimeoutError(fmt.Sprintf("failed to get '%s' '%s' information after %s", "host", id, timeout), timeout)
 		}
 		return nil, retryErr
@@ -729,7 +728,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
 	defaultGateway := request.DefaultGateway
-	isGateway := (defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName)
+	isGateway := defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName
 	defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
@@ -847,7 +846,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	log.Debugf("requesting host resource creation...")
 	// Retry creation until success, for 10 minutes
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server, err := servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
@@ -890,8 +889,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		},
 		utils.GetLongOperationTimeout(),
 	)
-	if err != nil {
-		return nil, userData, utils.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
+	if retryErr != nil {
+		return nil, userData, utils.Wrap(retryErr, fmt.Sprintf("Error creating host: timeout"))
 	}
 	log.Debugf("host resource created.")
 

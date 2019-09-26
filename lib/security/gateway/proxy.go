@@ -286,7 +286,7 @@ func (p *proxyConfig) AuthenticationEnabled() bool {
 func Start(bindingURL string, failure chan bool) {
 
 	cfg, err := loadConfig()
-	failure <- (err != nil)
+	failure <- err != nil
 
 	if err != nil {
 		log.Error(err)

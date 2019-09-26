@@ -66,6 +66,14 @@ func CreateErrorWithNConsequences(n uint) (err error) {
 	return err
 }
 
+func CreateSkippableError() (err error) {
+	err = WhileSuccessfulDelay1Second(func() error {
+		fmt.Println("Around the world...")
+		return StopRetryError("no more", utils.NotFoundError("wrong place"))
+	}, time.Minute)
+	return err
+}
+
 func CreateComplexErrorWithNConsequences(n uint) (err error) {
 	err = WhileUnsuccessfulDelay1Second(complex_sleepy_failure, time.Duration(5)*time.Second)
 	if err != nil {
@@ -158,6 +166,24 @@ func TestVerifyErrorType(t *testing.T) {
 		}
 	}
 }
+
+func TestSkipRetries(t *testing.T)  {
+	recovered := CreateSkippableError()
+	if recovered != nil {
+		if _, ok := recovered.(utils.ErrTimeout); ok {
+			t.Errorf("It should NOT be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
+		}
+
+		if cause := utils.Cause(recovered); cause != nil {
+			if _, ok := cause.(utils.ErrNotFound); ok {
+				fmt.Println(cause.Error())
+			} else {
+				t.Errorf("This should be a NotFound error...")
+			}
+		}
+	}
+}
+
 
 func TestConsequence(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)

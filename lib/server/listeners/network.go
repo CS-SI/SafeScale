@@ -32,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	timing "github.com/CS-SI/SafeScale/lib/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
@@ -50,7 +49,7 @@ type NetworkListener struct{}
 
 // Create a new network
 func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) (net *pb.Network, err error) {
-	defer timing.TimerErrWithLevel(fmt.Sprintf("Listeners: network create '%s' called...", in.Name), &err, log.TraceLevel)()
+	// defer timing.TimerErrWithLevel(fmt.Sprintf("Listeners: network create '%s' called...", in.Name), &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -100,7 +99,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 
 // List existing networks
 func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (rv *pb.NetworkList, err error) {
-	defer timing.TimerErrWithLevel("Listeners: network list called", &err, log.TraceLevel)()
+	// defer timing.TimerErrWithLevel("Listeners: network list called", &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -131,7 +130,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *pb.Network, err error) {
-	defer timing.TimerErrWithLevel(fmt.Sprintf("Listeners: network inspect '%s' called'", in.Name), &err, log.TraceLevel)()
+	// defer timing.TimerErrWithLevel(fmt.Sprintf("Listeners: network inspect '%s' called'", in.Name), &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -164,7 +163,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 
 // Delete a network
 func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *google_protobuf.Empty, err error) {
-	defer timing.TimerErrWithLevel(fmt.Sprintf("Delete Network called for network '%s'", in.GetName()), &err, log.TraceLevel)()
+	// defer timing.TimerErrWithLevel(fmt.Sprintf("Delete Network called for network '%s'", in.GetName()), &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

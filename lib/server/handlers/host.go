@@ -19,7 +19,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
 	"os/user"
 	"strings"
@@ -164,20 +163,20 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 			return err
 		}
 	}
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			return handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout())
 		},
 		utils.GetHostTimeout(),
 	)
-	if err != nil {
-		switch err.(type) {
+	if retryErr != nil {
+		switch retryErr.(type) {
 		case utils.ErrTimeout:
-			return err
+			return retryErr
 		case utils.ErrNotFound:
-			return err
+			return retryErr
 		default:
-			return err
+			return retryErr
 		}
 	}
 
@@ -383,7 +382,7 @@ func (handler *HostHandler) Create(
 	}
 
 	var img *resources.Image
-	err = retry.WhileUnsuccessfulDelay1Second(
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			var innerErr error
 			img, innerErr = handler.service.SearchImage(los)
@@ -391,12 +390,12 @@ func (handler *HostHandler) Create(
 		},
 		2*utils.GetDefaultDelay(),
 	)
-	if err != nil {
-		switch err.(type) {
+	if retryErr != nil {
+		switch retryErr.(type) {
 		case utils.ErrNotFound, utils.ErrTimeout:
-			return nil, err
+			return nil, retryErr
 		default:
-			return nil, err
+			return nil, retryErr
 		}
 	}
 
@@ -576,7 +575,7 @@ func (handler *HostHandler) Create(
 		derr := err
 		err = nil
 		if client.IsTimeoutError(derr) {
-			return nil, errors.Wrapf(derr, "timeout waiting host '%s' to become ready", host.Name)
+			return nil, utils.Wrap(derr, fmt.Sprintf("timeout waiting host '%s' to become ready", host.Name))
 		}
 
 		if client.IsProvisioningError(derr) {
@@ -584,7 +583,7 @@ func (handler *HostHandler) Create(
 			return nil, fmt.Errorf("failed to provision host '%s', please check safescaled logs", host.Name)
 		}
 
-		return nil, errors.Wrapf(derr, "failed to wait host '%s' to become ready", host.Name)
+		return nil, utils.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
 	}
 
 	// Updates host link with networks
@@ -678,7 +677,7 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 
 	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat /opt/safescale/var/log/user_data.phase2.log; exit $?"))
 	warnings := []string{}
-	errors := []string{}
+	errs := []string{}
 
 	if recoverCode == 0 && recoverErr == nil {
 		lines := strings.Split(recoverStdOut, "\n")
@@ -687,12 +686,12 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 				warnings = append(warnings, line)
 			}
 			if strings.HasPrefix(line, "PROVISIONING_ERROR") {
-				errors = append(errors, line)
+				errs = append(errs, line)
 			}
 		}
 	}
 
-	return warnings, errors
+	return warnings, errs
 }
 
 func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *resources.Host) {
@@ -1015,11 +1014,6 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 // SSH returns ssh parameters to access the host referenced by ref
 func (handler *HostHandler) SSH(ctx context.Context, ref string) (sshConfig *system.SSHConfig, err error) {
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::SSH(%s) called", ref), &err, log.TraceLevel)()
-
-	// host, err := svc.Inspect(ref)
-	// if err != nil {
-	// 	return nil, errors.Wrapf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), "")
-	// }
 
 	sshHandler := NewSSHHandler(handler.service)
 	sshConfig, err = sshHandler.GetConfig(ctx, ref)
