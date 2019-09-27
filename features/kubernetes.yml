@@ -257,9 +257,14 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            [ ! -d ${SF_ETCDIR}/kong4gateway ] && exit 197
+                            if [ -d ${SF_ETCDIR}/edgeproxy4network ]; then
+                                TARGET_DIR=${SF_ETCDIR}/edgeproxy4network
+                            elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
+                                TARGET_DIR=${SF_ETCDIR}/kong4gateway
+                            fi
+                            [ -z "${TARGET_DIR+x}" ] && exit 197
 
-                            cat >${SF_ETCDIR}/kong4gateway/includes/kubernetes.conf <<-'EOF'
+                            cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
                             upstream kubernetes-api-cluster {
                                 {{range .MasterIPs}}server {{.}}:6443;
                                 {{end}}
