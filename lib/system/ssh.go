@@ -162,7 +162,7 @@ func (tunnel *SSHTunnel) Close() error {
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
 		log.Errorf("tunnel.cmd.Process.Kill() failed: %s\n", reflect.TypeOf(err).String())
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+		return fmt.Errorf("unable to close tunnel :%s", err.Error())
 	}
 	// Kills remaining processes if there are some
 	bytesCmd, err := exec.Command("pgrep", "-f", tunnel.cmdString).Output()
@@ -173,7 +173,7 @@ func (tunnel *SSHTunnel) Close() error {
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
 				log.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 		}
 	}
@@ -196,7 +196,7 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-// CreateTempFileFromString creates a tempory file containing 'content'
+// CreateTempFileFromString creates a temporary file containing 'content'
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, error) {
 	defaultTmpDir := "/tmp"
 	if runtime.GOOS == "windows" {
@@ -272,18 +272,20 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		return nil, err
 	}
 
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		if cmdString != "" {
-			log.Debugf("[TRACE] %s", cmdString)
+	/*
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			if cmdString != "" {
+				log.Debugf("[TRACE] %s", cmdString)
+			}
+			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
+			partials := strings.Split(f.Name(), "/")
+			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1]))
+			err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
+			if err != nil {
+				log.Warnf("[TRACE] Failure storing key in %s", dumpName)
+			}
 		}
-		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
-		partials := strings.Split(f.Name(), "/")
-		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1]))
-		err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
-		if err != nil {
-			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
-		}
-	}
+	*/
 
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
@@ -451,7 +453,9 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
-	log.Debugf("Running command [%s] with timeout of %s", sc.Display(), timeout)
+	if strings.Contains(sc.Display(), "ENDSSH") {
+		defer utils.TimerWithLevel(fmt.Sprintf("Running command with timeout of %s: [%s]", timeout, sc.Display()), log.DebugLevel)()
+	}
 
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
@@ -481,19 +485,19 @@ func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string
 
 		msgOut, closeErr = ioutil.ReadAll(stdOut)
 		if closeErr != nil {
-			log.Debugf("Error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
+			log.Debugf("error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
 			clean = false
 		}
 
 		msgErr, closeErr = ioutil.ReadAll(stderr)
 		if closeErr != nil {
-			log.Debugf("Error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
+			log.Debugf("error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
 			clean = false
 		}
 
 		err = sc.Wait()
 		if err != nil {
-			log.Debugf("Error waiting for command [%s]: %v", sc.Display(), err)
+			log.Debugf("error waiting for command [%s]: %v", sc.Display(), err)
 			clean = false
 		}
 
@@ -510,10 +514,10 @@ func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 		}
 		if !issues {
-			log.Warnf("There have been issues running this command [%s], please check daemon logs", sc.Display())
+			log.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display())
 		}
 	case <-time.After(timeout):
-		errMsg := fmt.Sprintf("Timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
+		errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
 		log.Warnf(errMsg)
 		return 0, "", "", fmt.Errorf(errMsg)
 	}
@@ -526,10 +530,10 @@ func (sc *SSHCommand) cleanup() error {
 	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
 		log.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
-		return fmt.Errorf("Unable to close SSH tunnels: %s", err1.Error())
+		return fmt.Errorf("unable to close SSH tunnels: %s", err1.Error())
 	}
 	if err2 != nil {
-		return fmt.Errorf("Unable to close SSH tunnels: %s", err2.Error())
+		return fmt.Errorf("unable to close SSH tunnels: %s", err2.Error())
 	}
 	return nil
 }
@@ -564,7 +568,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to create SSH Tunnels : %s", err.Error())
+		return nil, nil, fmt.Errorf("unable to create SSH Tunnels : %s", err.Error())
 	}
 	sshConfig := *ssh
 	if tunnel == nil {
@@ -581,7 +585,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string, *os.File, error) {
 	f, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
-		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
+		return "", nil, fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
 
 	options := sshOptions + " -oLogLevel=error"
@@ -593,19 +597,6 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		sshConfig.User,
 		sshConfig.Host,
 	)
-
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		if cmdString != "" {
-			log.Debugf("[TRACE] %s", cmdString)
-		}
-		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", sshConfig.Host)), 0777)
-		partials := strings.Split(f.Name(), "/")
-		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", sshConfig.Host, partials[len(partials)-1]))
-		err = ioutil.WriteFile(dumpName, []byte(sshConfig.PrivateKey), 0644)
-		if err != nil {
-			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
-		}
-	}
 
 	sudoOpt := ""
 	if withSudo {
@@ -627,17 +618,18 @@ func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
+	// FIXME Add traces
 	return ssh.command(cmdString, true)
 }
 
 func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, withSudo)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
@@ -650,15 +642,18 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
-func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (string, error) {
+func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out string, err error) {
 	if phase == "" {
 		panic("phase can't be empty string")
 	}
 	if ssh.Host == "" {
 		panic("SSHConfig.Host is empty!")
 	}
-	log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
 
+	log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
+	defer utils.TraceOnExitErr(fmt.Sprintf("Waiting for remote SSH phase '%s' of host '%s', timeout of %d minutes", phase, ssh.Host, int(timeout.Minutes())), &err)()
+
+	originalPhase := phase
 	if phase == "ready" {
 		phase = "phase2"
 	}
@@ -667,54 +662,34 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 		retcode        int
 		stdout, stderr string
 	)
-	err := retry.WhileUnsuccessfulDelay5Seconds(
+	begins := time.Now()
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
 			if err != nil {
 				return err
 			}
 
-			// retcode, stdout, stderr, err := cmd.Run() // FIXME It CAN lock
 			retcode, stdout, stderr, err = cmd.RunWithTimeout(timeout)
 			if err != nil {
 				return err
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					log.Debugf("Remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
-					return fmt.Errorf("remote SSH not ready: error code: 255")
+					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 				}
-				log.Debugf("Remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
-				return fmt.Errorf("remote SSH not ready: error code: %s", stderr)
+				return fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
 			}
-			log.Debugf("Remote SSH ready: command finished with result: [%s]", stdout)
 			return nil
 		},
 		timeout,
 	)
-	if err == nil {
-		return stdout, nil
+	if retryErr != nil {
+		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, utils.FmtDuration(time.Since(begins)), retryErr)
+		return stdout, retryErr
 	}
-
-	originalErr := err
-	logCmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/log/user_data.%s.log", phase))
-	if err != nil {
-		return "", err
-	}
-
-	// retcode, stdout, stderr, logErr := logCmd.Run() // FIXME It CAN lock
-	retcode, stdout, stderr, logErr := logCmd.RunWithTimeout(timeout)
-	if logErr == nil {
-		if retcode == 0 {
-			return "", fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.%s.log: %s", ssh.Host, originalErr.Error(), phase, stdout)
-		}
-		if len(stdout) > 0 {
-			log.Error(fmt.Errorf("captured output: %s", stdout))
-		}
-		return "", fmt.Errorf("server '%s' is not ready yet: %s - error reading user_data.%s.log: %s", ssh.Host, originalErr.Error(), phase, stderr)
-	}
-
-	return "", fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
+	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, utils.FmtDuration(time.Since(begins)), stdout)
+	return stdout, nil
 }
 
 // Copy copies a file/directory from/to local to/from remote
@@ -728,7 +703,6 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	if err != nil {
 		return 0, "", "", fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
-	log.Debugf("SSH Identity file: %s", identityfile.Name())
 
 	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}'{{.LocalPath}}' {{.User}}@{{.Host}}:'{{.RemotePath}}'{{else}}{{.User}}@{{.Host}}:'{{.RemotePath}}' '{{.LocalPath}}'{{end}}")
 	if err != nil {
@@ -760,7 +734,6 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}
 
 	sshCmdString := copyCommand.String()
-	log.Debugf("cmd: %s", sshCmdString)
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
@@ -768,7 +741,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		keyFile: identityfile,
 	}
 
-	return sshCommand.Run() // FIXME It CAN lock
+	return sshCommand.Run() // FIXME It CAN lock, use .RunWithTimeout instead
 }
 
 // Exec executes the cmd using ssh

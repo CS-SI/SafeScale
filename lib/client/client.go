@@ -18,13 +18,10 @@ package client
 
 import (
 	"fmt"
+	logr "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/pkg/errors"
-	logr "github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -60,8 +57,8 @@ type Client *Session
 
 // DefaultTimeout tells to use the timeout by default depending on context
 var (
-	DefaultConnectionTimeout = common.GetTimeoutFromEnv("SAFESCALE_CONNECTION_TIMEOUT", 30*time.Second)
-	DefaultExecutionTimeout  = common.GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", 5*time.Minute)
+	DefaultConnectionTimeout = common.GetConnectSSHTimeout()
+	DefaultExecutionTimeout  = common.GetExecutionTimeout()
 )
 
 // New returns an instance of safescale Client
@@ -130,13 +127,20 @@ func DecorateError(err error, action string, maySucceed bool) error {
 		if strings.Index(msg, " :") == 0 {
 			msg = msg[2:]
 		}
-		return errors.New(msg)
+		return fmt.Errorf(msg)
 	}
 	return err
 }
 
 // IsTimeoutError tells if the err is a timeout kind
 func IsTimeoutError(err error) bool {
+	// FIXME Look at that
+	/*
+		if _, ok := err.(common.ErrTimeout); ok {
+			return true
+		}
+	*/
+
 	return status.Code(err) == codes.DeadlineExceeded
 }
 

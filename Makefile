@@ -120,6 +120,7 @@ clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd cli && $(MAKE) $(@))
 	@(cd lib && $(MAKE) $(@))
+	# @(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)

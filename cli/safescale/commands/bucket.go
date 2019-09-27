@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -24,6 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
+
+var BucketCmdName = "bucket"
 
 // BucketCmd bucket command
 var BucketCmd = cli.Command{
@@ -44,6 +47,7 @@ var bucketList = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List buckets",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", BucketCmdName, c.Command.Name, c.Args())
 		resp, err := client.New().Bucket.List(0)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error())))
@@ -58,12 +62,13 @@ var bucketCreate = cli.Command{
 	Usage:     "Creates a bucket",
 	ArgsUsage: "<Bucket_name>",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", BucketCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		}
 
-		err := client.New().Bucket.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
+		err := client.New().Bucket.Create(c.Args().Get(0), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error())))
 		}
@@ -77,6 +82,7 @@ var bucketDelete = cli.Command{
 	Usage:     "Delete a bucket",
 	ArgsUsage: "<Bucket_name> [<Bucket_name>...]",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", BucketCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
@@ -86,7 +92,7 @@ var bucketDelete = cli.Command{
 		bucketList = append(bucketList, c.Args().First())
 		bucketList = append(bucketList, c.Args().Tail()...)
 
-		err := client.New().Bucket.Delete(bucketList, client.DefaultExecutionTimeout)
+		err := client.New().Bucket.Delete(bucketList, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
 		}
@@ -100,12 +106,13 @@ var bucketInspect = cli.Command{
 	Usage:     "Inspect a bucket",
 	ArgsUsage: "<Bucket_name>",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", BucketCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		}
 
-		resp, err := client.New().Bucket.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
+		resp, err := client.New().Bucket.Inspect(c.Args().Get(0), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error())))
 		}
@@ -125,12 +132,13 @@ var bucketMount = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", BucketCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		}
 
-		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
+		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error())))
 		}
@@ -144,12 +152,13 @@ var bucketUnmount = cli.Command{
 	Usage:     "Unmount a bucket from the filesytem of an host",
 	ArgsUsage: "<Bucket_name> <Host_name>",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", BucketCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		}
 
-		err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
+		err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error())))
 		}

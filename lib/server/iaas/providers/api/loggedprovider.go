@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -55,13 +56,13 @@ func (w LoggedProvider) GetTenantParameters() map[string]interface{} {
 
 // trace ...
 func (w LoggedProvider) trace(s string) (string, time.Time) {
-	logrus.Debugf(">>> stacks.%s::%s() called", w.Name, s)
+	logrus.Tracef("stacks.%s::%s() called", w.Name, s)
 	return s, time.Now()
 }
 
 // prepare ...
 func (w LoggedProvider) prepare(s string, startTime time.Time) {
-	logrus.Debugf("<<< stacks.%s::%s() done in %d ms", w.Name, s, time.Since(startTime).Nanoseconds()/1000000)
+	logrus.Tracef("stacks.%s::%s() done in [%s]", w.Name, s, utils.FmtDuration(time.Since(startTime)))
 }
 
 // NewLoggedProvider ...

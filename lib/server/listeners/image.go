@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
@@ -39,7 +38,7 @@ type ImageListener struct{}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
-	log.Infof("List images called")
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: list images called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

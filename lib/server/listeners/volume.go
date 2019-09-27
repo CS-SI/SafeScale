@@ -51,6 +51,8 @@ type VolumeListener struct{}
 
 // List the available volumes
 func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
+	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::List() called"), log.TraceLevel)()
+
 	if s == nil {
 		panic("Calling server.listeners.VolumeListener::List from nil pointer!")
 	}
@@ -63,10 +65,6 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes List"); err == nil {
 		defer utils.ProcessDeregister(ctx)
 	}
-
-	log.Infof("safescaled receiving 'volume list'")
-	log.Debugf(">>> server.listeners.VolumeListener::List()")
-	defer log.Debugf("<<< server.listeners.VolumeListener::List")
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -99,9 +97,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	}
 
 	volumeName := in.GetName()
-	log.Infof("safescaled receiving 'volume create %s'", volumeName)
-	log.Debugf(">>> server.listeners.VolumeListener::Create(%s)", volumeName)
-	defer log.Debugf("<<< server.listeners.VolumeListener::Create(%s)", volumeName)
+	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Create(%s) called", volumeName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
@@ -135,9 +131,8 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 
 	volumeName := in.GetVolume().GetName()
 	hostName := in.GetHost().GetName()
-	log.Infof("safescaled receiving 'volume attach %s %s'", volumeName, hostName)
-	log.Debugf(">>> server.listeners.VolumeListener::Attach(%s, %s)", volumeName, hostName)
-	defer log.Debugf("<<< server.listeners.VolumeListener::Attach(%s, %s)", volumeName, hostName)
+
+	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Attach(%s, %s) called", volumeName, hostName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Attach "+volumeName+" to host "+hostName)
@@ -177,9 +172,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 
 	volumeName := in.GetVolume().GetName()
 	hostName := in.GetHost().GetName()
-	log.Infof("safescaled receiving 'volume detach %s %s'", volumeName, hostName)
-	log.Debugf(">>> server.listeners.VolumeListener::Detach(%s, %s)", volumeName, hostName)
-	defer log.Debugf("<<< server.listeners.VolumeListener::Detach(%s, %s)", volumeName, hostName)
+	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Detach(%s, %s) called", volumeName, hostName), log.TraceLevel)()
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -206,9 +199,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 		panic("Calling server.listeners.VolumeListener::Delete with nil parameter!")
 	}
 
-	log.Infof("safescaled receiving 'volume delete %s'", in.Name)
-	log.Debugf(">>> server.listeners.VolumeListener::Delete(%s)", in.Name)
-	defer log.Debugf("<<< server.listeners.VolumeListener::Delete(%s)", in.Name)
+	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Delete(%s) called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -256,9 +247,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 		return nil, grpc.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
 	}
 
-	log.Infof("safescaled receiving 'volume inspect %s'", ref)
-	log.Debugf(">>> server.listeners.VolumeListener::Inspect(%s)", ref)
-	defer log.Debugf("<<< server.listeners.VolumeListener::Inspect(%s)", ref)
+	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Inspect(%s) called", ref), log.TraceLevel)()
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

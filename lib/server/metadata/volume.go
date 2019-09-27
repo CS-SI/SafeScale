@@ -19,8 +19,6 @@ package metadata
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -99,6 +97,17 @@ func (mv *Volume) Reload() error {
 			return utils.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
 		}
 		return err
+	}
+	return nil
+}
+
+func (mv *Volume) ReadByIDorName(id string) (err error) {
+	errId := mv.ReadByID(id)
+	if errId != nil {
+		errName := mv.ReadByName(id)
+		if errName != nil {
+			return errName
+		}
 	}
 	return nil
 }
@@ -186,36 +195,32 @@ func RemoveVolume(svc iaas.Service, volumeID string) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadVolume(svc iaas.Service, ref string) (*Volume, error) {
-	mv := NewVolume(svc)
-	var innerErr error
-	err := retry.WhileUnsuccessfulDelay1Second(
+func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Loading volume metadata: %s", ref), &err)()
+
+	mv = NewVolume(svc)
+
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr = mv.ReadByID(ref)
+			innerErr := mv.ReadByIDorName(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
-					innerErr = mv.ReadByName(ref)
-					if innerErr != nil {
-						if _, ok := innerErr.(utils.ErrNotFound); ok {
-							return innerErr
-						}
-					}
+					return retry.StopRetryError("no metadata found", innerErr)
 				}
+				return innerErr
 			}
+
 			return nil
 		},
 		2*utils.GetDefaultDelay(),
 	)
-	if err != nil {
-		if _, ok := err.(retry.ErrTimeout); ok {
-			log.Debugf("timeout reading metadata of volume '%s'", ref)
-			return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of volume '%s'", ref))
+	if retryErr != nil {
+		// If it's not a timeout is something we don't know how to handle yet
+		if _, ok := retryErr.(utils.ErrTimeout); !ok {
+			return nil, utils.Cause(retryErr)
 		}
-		return nil, err
+		return nil, retryErr
 	}
-	// Returns the error different than ErrNotFound to caller
-	if innerErr != nil {
-		return nil, innerErr
-	}
+
 	return mv, nil
 }

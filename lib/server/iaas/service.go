@@ -18,7 +18,6 @@ package iaas
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -160,7 +159,7 @@ func (svc *service) WaitHostState(hostID string, state HostState.Enum, timeout t
 		}
 		select {
 		case <-timer:
-			return utils.TimeoutError("Wait volume state timeout")
+			return utils.TimeoutError("Wait volume state timeout", timeout, nil)
 		default:
 			time.Sleep(1)
 		}
@@ -193,7 +192,7 @@ func (svc *service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, utils.TimeoutError("Wait host state timeout")
+			return nil, utils.TimeoutError("Wait host state timeout", timeout, nil)
 		}
 	}
 }
@@ -277,13 +276,14 @@ func filterBlacklistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
 
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) ([]*resources.HostTemplate, error) {
+func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (selectedTpls []*resources.HostTemplate, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Service::SelectTemplatesBySize() called"), &err)()
+
 	if svc == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 
 	allTpls, err := svc.ListTemplates(false)
-	var selectedTpls []*resources.HostTemplate
 	scannerTpls := map[string]bool{}
 	if err != nil {
 		return nil, err
@@ -305,7 +305,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 				}
 				log.Error(noHostError)
-				return nil, errors.New(noHostError)
+				return nil, fmt.Errorf(noHostError)
 			}
 		} else {
 			authOpts, err := svc.GetAuthenticationOptions()
@@ -330,7 +330,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 					}
 					log.Error(noHostError)
-					return nil, errors.New(noHostError)
+					return nil, fmt.Errorf(noHostError)
 				}
 			} else {
 				images := []resources.StoredCPUInfo{}
@@ -364,7 +364,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinFreq)
 					}
 					log.Error(noHostError)
-					return nil, errors.New(noHostError)
+					return nil, fmt.Errorf(noHostError)
 				}
 
 				for _, image := range images {

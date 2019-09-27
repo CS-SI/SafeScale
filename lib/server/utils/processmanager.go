@@ -36,13 +36,13 @@ func (pi *processInfo) toString() string {
 	return fmt.Sprintf("Task : %s\nCreation time : %s", pi.commandName, pi.launchTime.String())
 }
 
-var processMap map[string](processInfo)
+var processMap map[string]processInfo
 var mutexProcessManager sync.Mutex
 
 // ProcessRegister ...
 func ProcessRegister(ctx context.Context, cancelFunc func(), command string) error {
 	if processMap == nil {
-		processMap = map[string](processInfo){}
+		processMap = map[string]processInfo{}
 	}
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {

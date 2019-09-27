@@ -27,6 +27,7 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -34,8 +35,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -106,7 +105,7 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
+func (s *Stack) ListImages() (images []resources.Image, err error) {
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
@@ -145,7 +144,7 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*resources.Image, error) {
+func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
@@ -195,7 +194,7 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
+func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) {
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
@@ -239,7 +238,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 }
 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
@@ -355,7 +354,7 @@ func downloadImage(path string, downloadInfo map[string]interface{}) error {
 }
 
 // getImagePathFromID retrieve the storage path of an image from this image ID
-func getImagePathFromID(s *Stack, id string) (string, error) {
+func getImagePathFromID(s *Stack, id string) (path string, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -404,7 +403,7 @@ func getImagePathFromID(s *Stack, id string) (string, error) {
 }
 
 // getDiskFromID retrieve the disk with root partition of an image from this image ID
-func getDiskFromID(s *Stack, id string) (string, error) {
+func getDiskFromID(s *Stack, id string) (disk string, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -771,7 +770,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, utils.InvalidInstanceError()
 	}
@@ -785,7 +784,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	keyPair := request.KeyPair
 	defaultGateway := request.DefaultGateway
 
-	userData := userdata.NewContent()
+	userData = userdata.NewContent()
 
 	//----Check Inputs----
 	if resourceName == "" {
@@ -861,7 +860,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			networkDefault, err := s.GetNetwork("default")
 			if err != nil {
 				switch err.(type) {
-				case resources.ErrResourceNotFound:
+				case utils.ErrNotFound:
 					networkDefault, err = s.CreateNetwork(
 						resources.NetworkRequest{
 							Name:      "default",
@@ -961,10 +960,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		}
 	}
 
+	// starting from here delete host if failure
 	defer func() {
 		if err != nil {
-			if err := s.DeleteHost(resourceName); err != nil {
+			if derr := s.DeleteHost(resourceName); derr != nil {
 				fmt.Printf("Failed to Delete the host %s : %s", resourceName, err.Error())
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -1035,7 +1036,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}

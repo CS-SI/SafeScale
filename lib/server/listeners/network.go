@@ -48,9 +48,8 @@ var NetworkHandler = handlers.NewNetworkHandler
 type NetworkListener struct{}
 
 // Create a new network
-func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
-	log.Infof("Listeners: network create '%s' called", in.Name)
-	defer log.Debugf("Listeners: network create '%s' done", in.Name)
+func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) (net *pb.Network, err error) {
+	// defer timing.TimerErrWithLevel(fmt.Sprintf("Listeners: network create '%s' called...", in.Name), &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -99,9 +98,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 }
 
 // List existing networks
-func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (*pb.NetworkList, error) {
-	log.Infof("Listeners: network list called")
-	defer log.Debugf("Listeners: network list done")
+func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (rv *pb.NetworkList, err error) {
+	// defer timing.TimerErrWithLevel("Listeners: network list called", &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -126,14 +124,13 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	for _, network := range networks {
 		pbnetworks = append(pbnetworks, conv.ToPBNetwork(network))
 	}
-	rv := &pb.NetworkList{Networks: pbnetworks}
+	rv = &pb.NetworkList{Networks: pbnetworks}
 	return rv, nil
 }
 
 // Inspect returns infos on a network
-func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
-	log.Infof("Listeners: network inspect '%s' called'", in.Name)
-	defer log.Debugf("lib.server.listeners.NetworkListener.Inspect(%s) done'", in.Name)
+func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *pb.Network, err error) {
+	// defer timing.TimerErrWithLevel(fmt.Sprintf("Listeners: network inspect '%s' called'", in.Name), &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -165,8 +162,8 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Infof("Delete Network called for network '%s'", in.GetName())
+func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *google_protobuf.Empty, err error) {
+	// defer timing.TimerErrWithLevel(fmt.Sprintf("Delete Network called for network '%s'", in.GetName()), &err, log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -186,7 +183,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
-	err := handler.Delete(ctx, ref)
+	err = handler.Delete(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}

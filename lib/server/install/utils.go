@@ -19,13 +19,12 @@ package install
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/sirupsen/logrus"
 
 	// log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -187,7 +186,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(f.Name(), to, utils.GetDefaultDelay(), client.DefaultExecutionTimeout) // FIXME File operations
+			retcode, _, _, err := sshClt.Copy(f.Name(), to, utils.GetDefaultDelay(), utils.GetExecutionTimeout()) // FIXME File operations
 			if err != nil {
 				return err
 			}
@@ -195,7 +194,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), utils.GetBigDelay(), client.DefaultExecutionTimeout)
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), utils.GetBigDelay(), utils.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -215,7 +214,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	)
 	_ = os.Remove(f.Name())
 	if networkError {
-		return fmt.Errorf("An unrecoverable network error has occurred")
+		return fmt.Errorf("an unrecoverable network error has occurred")
 	}
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -244,7 +243,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = sshClt.Run(host.Name, cmd, utils.GetDefaultDelay(), client.DefaultExecutionTimeout)
+			retcode, _, _, err = sshClt.Run(host.Name, cmd, utils.GetDefaultDelay(), utils.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -384,7 +383,7 @@ func gatewayFromHost(host *pb.Host) *pb.Host {
 	if gwID == "" {
 		return host
 	}
-	gw, err := client.New().Host.Inspect(gwID, client.DefaultExecutionTimeout)
+	gw, err := client.New().Host.Inspect(gwID, utils.GetExecutionTimeout())
 	if err != nil {
 		return nil
 	}

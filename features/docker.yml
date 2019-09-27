@@ -57,23 +57,23 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
-                                    sfRetry 5m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || exit 192
-                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 193
+                                    sfRetry 7m 3 "sfApt update"
+                                    sfRetry 7m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
+                                    sfRetry 7m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || exit 192
+                                    sfRetry 7m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 193
                                     # Currently, no stable release of docker-ce for Ubuntu 19.04
                                     if dpkg --compare-versions $(sfGetFact "linux_version") gt 18.10; then
                                         echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) test" >/etc/apt/sources.list.d/docker.list
                                     else
                                         echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
                                     fi
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -qqy docker-ce" || exit 194
+                                    sfRetry 7m 3 "sfApt update"
+                                    sfRetry 7m 3 "sfApt install -qqy docker-ce" || exit 194
                                     ;;
                                 centos|rhel)
-                                    yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
-                                    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 193
-                                    yum install -y docker-ce || exit 194
+                                    sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
+                                    sfRetry 7m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 193
+                                    sfRetry 7m 3 yum install -y docker-ce || exit 194
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

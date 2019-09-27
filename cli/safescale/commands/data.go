@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"github.com/sirupsen/logrus"
 	"strings"
 
 	"github.com/urfave/cli"
@@ -25,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
+
+var DataCmdName = "data"
 
 // DataCmd command
 var DataCmd = cli.Command{
@@ -51,6 +54,7 @@ var dataPush = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <local_file_path>."))
@@ -63,7 +67,7 @@ var dataPush = cli.Command{
 		} else {
 			fileName = strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
 		}
-		err := client.New().Data.Push(localFilePath, fileName, client.DefaultExecutionTimeout)
+		err := client.New().Data.Push(localFilePath, fileName, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
 		}
@@ -82,6 +86,7 @@ var dataGet = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
@@ -95,7 +100,7 @@ var dataGet = cli.Command{
 			localFilePath = utils.AbsPathify(fileName)
 		}
 
-		err := client.New().Data.Get(localFilePath, fileName, client.DefaultExecutionTimeout)
+		err := client.New().Data.Get(localFilePath, fileName, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
 		}
@@ -108,13 +113,14 @@ var dataDelete = cli.Command{
 	Usage:     "delete a file of the storage",
 	ArgsUsage: "<file_name>",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
 		}
 
 		fileName := c.Args().First()
-		err := client.New().Data.Delete(fileName, client.DefaultExecutionTimeout)
+		err := client.New().Data.Delete(fileName, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
 		}
@@ -127,7 +133,8 @@ var dataList = cli.Command{
 	Usage:     "list all files in the storage",
 	ArgsUsage: "<local_file_path>",
 	Action: func(c *cli.Context) error {
-		filesList, err := client.New().Data.List(client.DefaultExecutionTimeout)
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
+		filesList, err := client.New().Data.List(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
 		}

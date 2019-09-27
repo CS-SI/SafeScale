@@ -183,13 +183,12 @@ func (s *Stack) DeleteVPC(id string) error {
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	log.Debugf(">>> huaweicloud.Stack::CreateNetwork(%s)", req.Name)
-	defer log.Debugf("<<< huaweicloud.Stack::CreateNetwork(%s)", req.Name)
+func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.Network, err error) {
+	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateNetwork(%s) called", req.Name), log.TraceLevel)()
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
+		if _, ok := err.(utils.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -218,16 +217,18 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
+	// starting from here delete network
 	defer func() {
 		if err != nil {
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
 
-	network := resources.NewNetwork()
+	network = resources.NewNetwork()
 	network.ID = subnet.ID
 	network.Name = subnet.Name
 	network.CIDR = subnet.CIDR
@@ -617,6 +618,8 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called...", req.Name), log.TraceLevel)()
+
 	if req.Network == nil {
 		panic("req.Network is nil!")
 	}
@@ -625,8 +628,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		gwname = "gw-" + req.Network.Name
 	}
 
-	log.Debugf(">>> huaweicloud.Stack::CreateGateway(%s)", gwname)
-	defer log.Debugf("<<< huaweicloud.Stack::CreateGateway(%s)", gwname)
+	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called", gwname), log.TraceLevel)()
 
 	userData := userdata.NewContent()
 	hostReq := resources.HostRequest{
@@ -640,10 +642,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest:
+		case utils.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+			return nil, userData, fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))
 		}
 	}
 	return host, userData, err

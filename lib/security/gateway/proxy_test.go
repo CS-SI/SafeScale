@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/security/model"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc"
 	"github.com/gorilla/websocket"
 	"golang.org/x/oauth2"
 

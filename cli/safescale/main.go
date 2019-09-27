@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	common "github.com/CS-SI/SafeScale/lib/utils"
 
 	// Autoload embedded provider drivers
 	_ "github.com/CS-SI/SafeScale/lib/server"
@@ -48,7 +49,7 @@ func cleanup() {
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
-		err = client.New().ProcessManager.Stop(utils.GetUUID(), client.DefaultExecutionTimeout)
+		err = client.New().ProcessManager.Stop(utils.GetUUID(), common.GetExecutionTimeout())
 		if err != nil {
 			fmt.Printf("Failed to stop the process %v\n", err)
 		}
@@ -104,7 +105,7 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			log.SetLevel(log.DebugLevel)
+			log.SetLevel(log.TraceLevel)
 			utils.Verbose = true
 		} else {
 			log.SetLevel(log.WarnLevel)

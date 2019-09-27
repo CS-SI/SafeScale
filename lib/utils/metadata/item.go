@@ -160,7 +160,7 @@ func (i *Item) Write(name string) error {
 	return i.WriteInto(".", name)
 }
 
-// BrowseInto walks through a subfolder ogf item folder and executes a callback for each entry
+// BrowseInto walks through a subfolder and item folder and executes a callback for each entry
 func (i *Item) BrowseInto(path string, callback func([]byte) error) error {
 	if callback == nil {
 		panic("callback is nil!")

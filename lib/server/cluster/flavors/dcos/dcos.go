@@ -344,7 +344,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	if err != nil {
 		return ClusterState.Error, err
 	}
-	retcode, _, stderr, err = safescaleClt.Ssh.Run(masterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, stderr, err = safescaleClt.Ssh.Run(masterID, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
 	if err != nil {
 		log.Errorf("failed to run remote command to get cluster state: %v\n%s", err, stderr)
 		return ClusterState.Error, err

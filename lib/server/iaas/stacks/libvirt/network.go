@@ -143,7 +143,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	libvirtNetwork, err := getNetworkFromRef(name, s.LibvirtService)
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); !ok {
+		if _, ok := err.(utils.ErrNotFound); !ok {
 			return nil, err
 		}
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	convert "github.com/CS-SI/SafeScale/lib/server/utils"
+	timing "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // ShareHandler ...
@@ -48,8 +49,7 @@ type ShareListener struct{}
 
 // Create calls share service creation
 func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb.ShareDefinition, error) {
-	log.Infof(">>> Listeners: share create '%v'", in)
-	defer log.Debugf("<<< Listeners: share create '%v'", in)
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: share create '%v' called", in), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -76,8 +76,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb
 // Delete call share service deletion
 func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	shareName := in.GetName()
-	log.Infof(">>> Listeners: share delete '%s'", shareName)
-	defer log.Debugf("<<< Listeners: share delete '%s'", shareName)
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: share delete '%s' called", shareName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -95,7 +94,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 	_, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
+		case timing.ErrNotFound:
 			return &google_protobuf.Empty{}, grpc.Errorf(codes.NotFound, err.Error())
 		default:
 			return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
@@ -111,8 +110,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 
 // List return the list of all available shares
 func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ShareList, error) {
-	log.Infof(">>> Listeners: share list '%v'", in)
-	defer log.Debugf("<<< Listeners: share list '%v'", in)
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: share list '%v' called", in), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -145,8 +143,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*p
 
 // Mount mounts share on a local directory of the given host
 func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) (*pb.ShareMountDefinition, error) {
-	log.Infof(">>> Listeners: share mount '%v'", in)
-	defer log.Debugf("<<< Listeners: share mount '%v'", in)
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: share mount '%v' called", in), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -173,8 +170,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 
 // Unmount unmounts share from the given host
 func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (*google_protobuf.Empty, error) {
-	log.Infof(">>> Listeners: share unmount '%v'", in)
-	defer log.Debugf("<<< Listeners: share unmount '%v'", in)
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: share unmount '%v' called", in), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -202,8 +198,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 // Inspect shows the detail of a share and all connected clients
 func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.ShareMountList, error) {
 	shareName := in.GetName()
-	log.Infof(">>> Listeners: share inspect '%s'", shareName)
-	defer log.Debugf("<<< Listeners: share inspect '%s'", shareName)
+	// defer timing.TimerWithLevel(fmt.Sprintf("Listeners: share inspect '%s' called", shareName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

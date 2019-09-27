@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	"github.com/urfave/cli"
 
@@ -58,7 +59,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	}
 
 	var err error
-	hostInstance, err = client.New().Host.Inspect(hostName, client.DefaultExecutionTimeout)
+	hostInstance, err = client.New().Host.Inspect(hostName, utils.GetExecutionTimeout())
 	if err != nil {
 		//fmt.Printf("%s\n", err.Error())
 		return clitools.ExitOnRPC(err.Error())

@@ -29,7 +29,6 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -57,14 +56,14 @@ import (
 
 // ListRegions ...
 func (s *Stack) ListRegions() ([]string, error) {
-	log.Debug(">>> openstack.Client.ListRegions()")
-	defer log.Debug("<<< openstack.Client.ListRegions()")
+	defer utils.TimerWithLevel(fmt.Sprintf("openstack.Client.ListRegions() called"), log.TraceLevel)()
+
+	var results []string
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	var results []string
 	listOpts := regions.ListOpts{
 		ParentRegionID: "RegionOne",
 	}
@@ -88,8 +87,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
-	log.Debug(">>> openstack.Client.ListAvailabilityZones()")
-	defer log.Debug("<<< openstack.Client.ListAvailabilityZones()")
+	defer utils.TimerWithLevel(fmt.Sprintf("openstack.Client.ListAvailabilityZones() called"), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -120,9 +118,8 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
-	log.Debug(">>> stacks.openstack::ListImages()")
-	defer log.Debug("<<< stacks.openstack::ListImages()")
+func (s *Stack) ListImages() (imgList []resources.Image, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::ListImages() called"), &err, log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -133,14 +130,11 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := images.List(s.ComputeClient, opts)
 
-	var imgList []resources.Image
-
 	// Define an anonymous function to be executed on each page's iteration
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+	err = pager.EachPage(func(page pagination.Page) (bool, error) {
 		imageList, err := images.ExtractImages(page)
 		if err != nil {
-			log.Debugf("Error listing images: %+v", err)
-			return false, errors.Wrap(err, fmt.Sprintf("Error listing images"))
+			return false, err
 		}
 
 		for _, img := range imageList {
@@ -151,18 +145,16 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 	})
 	if (len(imgList) == 0) || (err != nil) {
 		if err != nil {
-			log.Debugf("Error listing images: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
 		}
-		// log.Debugf("Image list empty !")
+		log.Debugf("Image list empty !")
 	}
 	return imgList, nil
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*resources.Image, error) {
-	log.Debugf(">>> stacks.openstack::GetImage(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetImage(%s)", id)
+func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::GetImage(%s) called", id), &err, log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -170,16 +162,14 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 
 	img, err := images.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		log.Debugf("Error getting image: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting image: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error getting image: %s", ProviderErrorToString(err)))
 	}
 	return &resources.Image{ID: img.ID, Name: img.Name}, nil
 }
 
 // GetTemplate returns the Template referenced by id
-func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
-	log.Debugf(">>> stacks.openstack::GetTemplate(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetTemplate(%s)", id)
+func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::GetTemplate(%s) called", id), &err, log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -187,7 +177,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
-	err := retry.WhileUnsuccessfulDelay1Second(
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			var err error
 			flv, err = flavors.Get(s.ComputeClient, id).Extract()
@@ -195,9 +185,8 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 		},
 		2*utils.GetDefaultDelay(),
 	)
-	if err != nil {
-		log.Debugf("Error getting template: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
+	if retryErr != nil {
+		return nil, utils.Wrap(retryErr, fmt.Sprintf("error getting template: %s", ProviderErrorToString(retryErr)))
 	}
 	return &resources.HostTemplate{
 		Cores:    flv.VCPUs,
@@ -211,8 +200,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
-	log.Debugf(">>> stacks.openstack::ListTemplates()")
-	defer log.Debugf("<<< stacks.openstack::ListTemplates()")
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListTemplates() called"), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -247,18 +235,16 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	})
 	if (len(flvList) == 0) || (err != nil) {
 		if err != nil {
-			log.Debugf("Error listing templates: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing templates"))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing templates"))
 		}
-		// log.Debugf("Template list empty !")
+		log.Debugf("Template list empty !")
 	}
 	return flvList, nil
 }
 
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	log.Debugf(">>> stacks.openstack::CreateKeyPair(%s)", name)
-	defer log.Debugf("<<< stacks.openstack::CreateKeyPair(%s)", name)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateKeyPair(%s) called", name), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -288,8 +274,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	log.Debugf(">>> stacks.openstack::GetKeyPair(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::GetKeyPair(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetKeyPair(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -297,8 +282,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		log.Debugf("Error getting keypair: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting keypair"))
+		return nil, utils.Wrap(err, fmt.Sprintf("Error getting keypair"))
 	}
 	return &resources.KeyPair{
 		ID:         kp.Name,
@@ -311,8 +295,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	log.Debug(">>> stacks.openstack::ListKeyPairs()")
-	defer log.Debug("<<< stacks.openstack::ListKeyPairs()")
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListKeyPairs() called"), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -342,8 +325,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 	})
 	if (len(kpList) == 0) || (err != nil) {
 		if err != nil {
-			log.Debugf("Error listing keypairs: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing keypairs"))
+			return nil, utils.Wrap(err, fmt.Sprintf("Error listing keypairs"))
 		}
 	}
 	return kpList, nil
@@ -351,8 +333,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	log.Debugf(">>> stacks.openstack::DeleteKeyPair(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::DeleteKeyPair(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteKeyPair(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		return utils.InvalidInstanceError()
@@ -360,8 +341,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		log.Debugf("Error deleting keypair: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting key pair: %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("Error deleting key pair: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -424,8 +404,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	if hostRef == "" {
 		hostRef = host.ID
 	}
-	log.Debugf(">>> stacks.openstack::InspectHost(%s)", hostRef)
-	defer log.Debugf("<<< stacks.openstack::InspectHost(%s)", hostRef)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::InspectHost(%s) called", hostRef), log.TraceLevel)()
 
 	server, err := s.queryServer(host.ID)
 	if err != nil {
@@ -463,11 +442,11 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 					return nil
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
-					log.Println("received 'Internal Server Error', retrying servers.Get...")
+					log.Warnf("received 'Internal Server Error', retrying servers.Get...")
 					return err
 				}
 				// Any other error stops the retry
-				err = fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
+				err = fmt.Errorf("error getting host '%s': %s", id, ProviderErrorToString(err))
 				return nil
 			}
 
@@ -479,18 +458,20 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 
 			lastState := toHostState(server.Status)
 			if lastState != HostState.ERROR && lastState != HostState.STARTING {
-				log.Infof("host status of '%s' is '%s'", id, server.Status)
+				if lastState != HostState.STARTED {
+					log.Warnf("unexpected: host status of '%s' is '%s'", id, server.Status)
+				}
 				err = nil
 				return nil
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		timeout,
 		utils.GetMinDelay(),
+		timeout,
 	)
 	if retryErr != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
-			return nil, fmt.Errorf("failed to get host '%s' information after %v: %s", id, timeout, retryErr.Error())
+			return nil, resources.TimeoutError(fmt.Sprintf("failed to get '%s' '%s' information after %s", "host", id, timeout), timeout)
 		}
 		return nil, retryErr
 	}
@@ -668,7 +649,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				net, err := s.GetNetwork(netid)
 				if err != nil {
 					switch err.(type) {
-					case resources.ErrResourceNotFound:
+					case utils.ErrNotFound:
 						log.Errorf(err.Error())
 					default:
 						log.Errorf("failed to get network '%s': %v", netid, err)
@@ -689,12 +670,12 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 // GetHostByName returns the host using the name passed as parameter
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
-	log.Debugf(">>> stacks.openstack::GetHostByName(%s)", name)
-	defer log.Debugf("<<< stacks.openstack::GetHostByName(%s)", name)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetHostByName(%s) called", name), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
 	if name == "" {
 		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
@@ -723,15 +704,14 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
-	log.Debugf(">>> stacks.openstack::CreateHost(%s)", request.ResourceName)
-	defer log.Debugf("<<< stacks.openstack::CreateHost(%s)", request.ResourceName)
+func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateHost(%s) called", request.ResourceName), log.TraceLevel)()
 
 	if s == nil {
 		return nil, nil, utils.InvalidInstanceError()
 	}
 
-	userData := userdata.NewContent()
+	userData = userdata.NewContent()
 
 	msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -744,19 +724,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
 	defaultGateway := request.DefaultGateway
-	isGateway := (defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName)
+	isGateway := defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName
 	defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		// err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
-		// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
-		// defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 		defaultGatewayID = defaultGateway.ID
-		// 	return nil
-		// })
-		// if err != nil {
-		// 	return nil, userData, errors.Wrap(err, "")
-		// }
 	}
 
 	var nets []servers.Network
@@ -802,7 +774,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	err := userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
+	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.Capitalize(msg))
@@ -838,7 +810,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 
 	// --- Initializes resources.Host ---
 
-	host := resources.NewHost()
+	host = resources.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
@@ -870,7 +842,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 
 	log.Debugf("requesting host resource creation...")
 	// Retry creation until success, for 10 minutes
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server, err := servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
@@ -913,19 +885,27 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		},
 		utils.GetLongOperationTimeout(),
 	)
-	if err != nil {
-		log.Debugf("Error creating host: timeout: %+v", err)
-		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
+	if retryErr != nil {
+		return nil, userData, utils.Wrap(retryErr, fmt.Sprintf("Error creating host: timeout"))
 	}
 	log.Debugf("host resource created.")
 
 	// Starting from here, delete host if exiting with error
+	newHost := host
 	defer func() {
 		if err != nil {
-			log.Infof("Cleanup, deleting host '%s'", host.Name)
-			derr := s.DeleteHost(host.ID)
+			log.Infof("Cleanup, deleting host '%s'", newHost.Name)
+			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
-				log.Warnf("Error deleting host: %v", derr)
+				switch derr.(type) {
+				case utils.ErrNotFound:
+					log.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
+				case utils.ErrTimeout:
+					log.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
+				default:
+					log.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
+				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -937,8 +917,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			Pool: s.authOpts.FloatingIPPool,
 		}).Extract()
 		if err != nil {
-			log.Debugf("Error creating host: floating ip: %+v", err)
-			return nil, userData, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
+			return nil, userData, utils.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -948,6 +927,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 				derr := floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
+					err = retry.AddConsequence(err, derr)
 				}
 			}
 		}()
@@ -958,8 +938,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		}).ExtractErr()
 		if err != nil {
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-			log.Debugf(msg)
-			return nil, userData, errors.Wrap(err, msg)
+			return nil, userData, utils.Wrap(err, msg)
 		}
 
 		err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
@@ -1046,8 +1025,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	default:
 		panic("hostParam must be a string or a *resources.Host!")
 	}
-	log.Debugf(">>> stacks.openstack::WaitHostReady(%s)", host.ID)
-	defer log.Debugf("<<< stacks.openstack::WaitHostReady(%s)", host.ID)
+
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::WaitHostReady(%s) called", host.ID), log.TraceLevel)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -1066,7 +1045,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return host, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.Name, timeout)
+			return host, resources.TimeoutError(fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.Name, timeout), timeout)
 		}
 		return host, retryErr
 	}
@@ -1076,8 +1055,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *resources.Host; any other type will panic
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
-	log.Debug(">>> stacks.openstack::GetHostState()")
-	defer log.Debug("<<< stacks.openstack::GetHostState()")
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetHostState() called"), log.TraceLevel)()
 
 	if s == nil {
 		return HostState.ERROR, utils.InvalidInstanceError()
@@ -1092,8 +1070,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 // ListHosts lists all hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	log.Debug(">>> stacks.openstack::ListHosts()")
-	defer log.Debug("<<< stacks.openstack::ListHosts()")
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListHosts() called"), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
@@ -1119,7 +1096,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	})
 	if len(hosts) == 0 || err != nil {
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("error listing hosts : %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing hosts : %s", ProviderErrorToString(err)))
 		}
 		log.Warnf("Hosts lists empty !")
 	}
@@ -1150,21 +1127,20 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 	})
 	if len(fips) == 0 {
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("No floating IP found for host '%s': %s", hostID, ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("No floating IP found for host '%s': %s", hostID, ProviderErrorToString(err)))
 		}
-		return nil, errors.Wrap(err, fmt.Sprintf("No floating IP found for host '%s'", hostID))
+		return nil, utils.Wrap(err, fmt.Sprintf("No floating IP found for host '%s'", hostID))
 
 	}
 	if len(fips) > 1 {
-		return nil, errors.Wrap(err, fmt.Sprintf("Configuration error, more than one Floating IP associated to host '%s'", hostID))
+		return nil, utils.Wrap(err, fmt.Sprintf("Configuration error, more than one Floating IP associated to host '%s'", hostID))
 	}
 	return &fips[0], nil
 }
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	log.Debugf(">>> stacks.openstack::DeleteHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::DeleteHost(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteHost(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		return utils.InvalidInstanceError()
@@ -1178,17 +1154,15 @@ func (s *Stack) DeleteHost(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					log.Debugf("Error deleting host: dissociate: %+v", err)
-					return errors.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+					return utils.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 				}
 				err = floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
 				if err != nil {
-					log.Debugf("Error deleting host: delete floating ip: %+v", err)
-					return errors.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+					return utils.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 				}
 			}
 		} else {
-			return errors.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
+			return utils.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
 		}
 	}
 
@@ -1232,7 +1206,7 @@ func (s *Stack) DeleteHost(id string) error {
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
-					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", id, innerRetryErr.Error())
+					return resources.TimeoutError(fmt.Sprintf("failed to acknowledge host '%s' deletion! %s", id, innerRetryErr.Error()), utils.GetContextTimeout())
 				}
 				return innerRetryErr
 			}
@@ -1243,19 +1217,17 @@ func (s *Stack) DeleteHost(id string) error {
 			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
 		},
 		0,
-		2*utils.GetContextTimeout(),
+		utils.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		log.Debugf("failed to remove host '%s': %s", id, outerRetryErr.Error())
-		return errors.Wrap(outerRetryErr, fmt.Sprintf("Error deleting host: retry error"))
+		return utils.Wrap(outerRetryErr, fmt.Sprintf("Error deleting host: retry error"))
 	}
 	return nil
 }
 
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
-	log.Debugf(">>> stacks.openstack::StopHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::StopHost(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::StopHost(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		return utils.InvalidInstanceError()
@@ -1263,16 +1235,14 @@ func (s *Stack) StopHost(id string) error {
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		log.Debugf("Error stopping host: stopping host: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("error stopping host : %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("error stopping host : %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
 
-// RebootHost reboots inconditionnaly the host identified by id
+// RebootHost reboots unconditionally the host identified by id
 func (s *Stack) RebootHost(id string) error {
-	log.Debugf(">>> stacks.openstack::Reboot(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::Reboot(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::Reboot(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		return utils.InvalidInstanceError()
@@ -1285,16 +1255,14 @@ func (s *Stack) RebootHost(id string) error {
 	}
 	if err != nil {
 		ftErr := fmt.Errorf("Error rebooting host [%s]: %s", id, ProviderErrorToString(err))
-		log.Debug(ftErr)
-		return errors.Wrap(err, ftErr.Error())
+		return utils.Wrap(err, ftErr.Error())
 	}
 	return nil
 }
 
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
-	log.Debugf(">>> stacks.openstack::StartHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::StartHost(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::StartHost(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		return utils.InvalidInstanceError()
@@ -1302,8 +1270,7 @@ func (s *Stack) StartHost(id string) error {
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		log.Debugf("Error starting host: starting host: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error starting host : %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("Error starting host : %s", ProviderErrorToString(err)))
 	}
 
 	return nil
@@ -1311,18 +1278,17 @@ func (s *Stack) StartHost(id string) error {
 
 // ResizeHost ...
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	log.Debugf(">>> stacks.openstack::ResizeHost(%s)", id)
-	defer log.Debugf("<<< stacks.openstack::ResizeHost(%s)", id)
+	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ResizeHost(%s) called", id), log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	// TODO RESIZE Stackement Resize Host HERE
+	// TODO RESIZE Resize Host HERE
 	log.Warn("Trying to resize a Host...")
 
 	// TODO RESIZE Call this
 	// servers.Resize()
 
-	return nil, errors.New("Not implemented yet")
+	return nil, fmt.Errorf("Not implemented yet")
 }
