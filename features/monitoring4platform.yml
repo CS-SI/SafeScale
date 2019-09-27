@@ -257,33 +257,50 @@ feature:
 
                             restart_host() {
                                 safescaled &
-                                safescale host reboot $hostname
+                                sleep 1
+
+                                tenant=$(cat /etc/safescale/tenants.json | jq -r .tenants[0].name)
+                                safescale tenant set $tenant
                                 retcode=$?
+                                if [ $retcode -eq 0 ]; then
+                                    result=$(safescale host reboot $1)
+                                    retcode=$?
+                                    if [ $retcode -eq 0 ]; then
+                                        status=$(echo $result | jq -r .status)
+                                        if [ "$status" != "success" ]; then
+                                            echo $result | jq -r .error.message
+                                            retcode=$(echo $result | jq -r .error.exitcode)
+                                        fi
+                                    fi
+                                fi
+
                                 killall safescaled
                                 return $retcode
                             }
 
                             for i in $(seq 1 "$AMX_ALERT_LEN"); do
-                                [ "${!AMX_ALERT_${i}_STATUS}" != "firing" ] && continue
+                                var="AMX_ALERT_${i}_STATUS"
+                                [ "${!var}" != "firing" ] && continue
 
-                                alert=${!AMX_ALERT_${i}_LABEL_alertname}
+                                var="AMX_ALERT_${i}_LABEL_alertname"
+                                alert=${!var}
                                 case $alert in
                                     gateway_down)
-                                        host=${!AMX_ALERT_${i}_LABEL_service}
-                                        echo "'gateway_down' received for host '$host' (but do nothing yet)."
-                                        # restart_host "$host"
-                                        exit $?
+                                        var="AMX_ALERT_${i}_LABEL_service"
+                                        host=${!var}
+                                        echo "Alert 'gateway_down' received for gateway '$host'. Restarting gateway '$host'..."
+                                        restart_host "$host"
+                                        [ $? -eq 0 ] && echo "Gateway '$host' restarted." || echo "Failed to restart gateway '$host'!"
                                         ;;
                                     *)
-                                        echo "Unknown command '$$alertvar' received."
-                                        exit 1
+                                        echo "Unknown alert '$alert' received."
                                         ;;
                                 esac
                             done
 
                             exit 0
                             EOF
-                            chown root:safescale ${SF_ETCDIR}/monitoring4platform/am-executor/scripts/execute.sh
+                            chown root:1000 ${SF_ETCDIR}/monitoring4platform/am-executor/scripts/execute.sh
                             chmod ug+rx,o-rwx ${SF_ETCDIR}/monitoring4platform/am-executor/scripts/execute.sh
 
                             cat >${SF_ETCDIR}/monitoring4platform/am-executor/promhttp.patch <<-'EOF'
@@ -319,11 +336,18 @@ feature:
                             RUN patch -l <./promhttp.patch \
                              && CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -a -installsuffix cgo -ldflags '-s -w -extld ld -extldflags -static'
 
-                            FROM alpine
+                            FROM debian:10-slim
                             WORKDIR /
-                            RUN apk --no-cache add bash \
-                             && mkdir -p /scripts /etc/safescale
-                            COPY --from=builder /go/src/github.com/imgix/prometheus-am-executor/prometheus-am-executor .
+                            COPY --from=builder /go/src/github.com/imgix/prometheus-am-executor/prometheus-am-executor /
+                            RUN apt update \
+                             && apt install -y jq psmisc
+                            RUN groupadd -g 1000 executor \
+                             && useradd -u 1000 -g 1000 -m executor \
+                             && mkdir -p /scripts /etc/safescale /home/executor/.safescale /etc/ssl \
+                             && chown executor:executor /home/executor/.safescale
+
+                            USER executor
+
                             ENTRYPOINT ["/prometheus-am-executor"]
                             EOF
 
@@ -431,6 +455,14 @@ feature:
                             #serve_from_sub_path = true
                             enable_gzip = true
                             router_logging = true
+
+                            [auth]
+                            disable_login_form = true
+
+                            [auth.anonymous]
+                            enabled = true
+                            org_name = {{ .ClusterName }}
+                            org_role = Viewer
                             EOF
 
                             # id=472 is the user used to run grafana in container
@@ -606,11 +638,14 @@ feature:
                                     image: am-executor:latest
                                     command:
                                         - /scripts/execute.sh
+                                    environment:
+                                        - SAFESCALE_METADATA_SUFFIX
                                     volumes:
                                         - /etc/safescale/tenants.json:/etc/safescale/tenants.json:ro
                                         - ${SF_ETCDIR}/monitoring4platform/am-executor/scripts:/scripts:ro
-                                        - /usr/local/bin/safescaled:/usr/local/bin/safescaled:ro
-                                        - /usr/local/bin/safescale:/usr/local/bin/safescale:ro
+                                        - /opt/safescale/bin/safescaled:/usr/local/bin/safescaled:ro
+                                        - /opt/safescale/bin/safescale:/usr/local/bin/safescale:ro
+                                        - /etc/ssl/certs:/etc/ssl/certs:ro
                                     networks:
                                         - net
                                     deploy:
