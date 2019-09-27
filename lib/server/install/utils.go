@@ -154,16 +154,16 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 	return master, privnode, pubnode, nil
 }
 
-// UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
-func UploadStringToRemoteFile(content string, host *pb.Host, filename string, owner, group, rights string) error {
-	if content == "" {
-		panic("content is empty!")
+// UploadFile uploads a file to remote host
+func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) error {
+	if localpath == "" {
+		return utils.InvalidParameterError("localpath", "can't be empty string")
 	}
 	if host == nil {
-		panic("host is nil!")
+		return utils.InvalidParameterError("host", "can't be nil")
 	}
-	if filename == "" {
-		panic("filename is empty!")
+	if remotepath == "" {
+		return utils.InvalidParameterError("remotepath", "can't be empty string")
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
@@ -203,16 +203,15 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 					return nil
 				}
 				if system.IsSCPRetryable(retcode) {
-					err = fmt.Errorf("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
+					err = fmt.Errorf("failed to copy file '%s' to '%s' (retcode: %d=%s)", localpath, to, retcode, system.SCPErrorString(retcode))
 				}
 				return nil
 			}
 			return nil
 		},
 		utils.GetDefaultDelay(),
-		2*utils.GetContextTimeout(),
+		utils.GetLongOperationTimeout(),
 	)
-	_ = os.Remove(f.Name())
 	if networkError {
 		return fmt.Errorf("an unrecoverable network error has occurred")
 	}
@@ -221,25 +220,26 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		case retry.ErrTimeout:
 			return fmt.Errorf("timeout trying to copy temporary file to '%s': %s", to, retryErr.Error())
 		}
-		return err
+		return retryErr
 	}
 
 	cmd := ""
 	if owner != "" {
-		cmd += "sudo chown " + owner + " " + filename
+		cmd += "sudo chown " + owner + " " + remotepath
 	}
 	if group != "" {
 		if cmd != "" {
 			cmd += " && "
 		}
-		cmd += "sudo chgrp " + group + " " + filename
+		cmd += "sudo chgrp " + group + " " + remotepath
 	}
 	if rights != "" {
 		if cmd != "" {
 			cmd += " && "
 		}
-		cmd += "sudo chmod " + rights + " " + filename
+		cmd += "sudo chmod " + rights + " " + remotepath
 	}
+	var err error
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
@@ -259,12 +259,45 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("timeout trying to change rights of file '%s' on host '%s': %s", filename, host.Name, err.Error())
+			return fmt.Errorf("timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error())
 		default:
-			return fmt.Errorf("failed to change rights of file '%s' on host '%s': %s", filename, host.Name, retryErr.Error())
+			return fmt.Errorf("failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error())
 		}
 	}
 	return nil
+}
+
+// UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
+func UploadStringToRemoteFile(content string, host *pb.Host, filename string, owner, group, rights string) error {
+	if content == "" {
+		return utils.InvalidParameterError("content", "can't be empty string")
+	}
+	if host == nil {
+		return utils.InvalidParameterError("host", "can't be nil")
+	}
+	if filename == "" {
+		return utils.InvalidParameterError("filename", "can't be empty string")
+	}
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
+		partials := strings.Split(filename, "/")
+		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
+
+		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
+		if err != nil {
+			logrus.Warnf("[TRACE] Forensics error creating %s", dumpName)
+		}
+	}
+
+	f, err := system.CreateTempFileFromString(content, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %s", err.Error())
+	}
+
+	err = UploadFile(f.Name(), host, filename, owner, group, rights)
+	_ = os.Remove(f.Name())
+	return err
 }
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
