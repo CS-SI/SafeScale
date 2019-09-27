@@ -18,9 +18,6 @@ package metadata
 
 import (
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -71,26 +68,41 @@ func (mh *Host) Get() *resources.Host {
 }
 
 // Write updates the metadata corresponding to the host in the Object Storage
-func (mh *Host) Write() error {
+func (mh *Host) Write() (err error) {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
-	err := mh.item.WriteInto(ByNameFolderName, *mh.name)
+	defer utils.TraceOnExitErr(fmt.Sprintf("Writing host metadata: %s", *mh.id), &err)()
+
+	err = mh.item.WriteInto(ByNameFolderName, *mh.name)
 	if err != nil {
 		return err
 	}
 	return mh.item.WriteInto(ByIDFolderName, *mh.id)
 }
 
+func (mh *Host) ReadByIDorName(id string) (err error) {
+	errId := mh.ReadByID(id)
+	if errId != nil {
+		errName := mh.ReadByName(id)
+		if errName != nil {
+			return errName
+		}
+	}
+	return nil
+}
+
 // ReadByID reads the metadata of a network identified by ID from Object Storage
-func (mh *Host) ReadByID(id string) error {
+func (mh *Host) ReadByID(id string) (err error) {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
+	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Reading host metadata: %s", id), &err)()
+
 	host := resources.NewHost()
-	err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err = mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -105,14 +117,16 @@ func (mh *Host) ReadByID(id string) error {
 	return nil
 }
 
-// ReadByName reads the metadata of a network identified by name
-func (mh *Host) ReadByName(name string) error {
+// ReadByName reads the metadata of a host identified by name
+func (mh *Host) ReadByName(name string) (err error) {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
+	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Reading host metadata by name: %s", name), &err)()
+
 	host := resources.NewHost()
-	err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err = mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -127,25 +141,32 @@ func (mh *Host) ReadByName(name string) error {
 	return nil
 }
 
-// Delete updates the metadata corresponding to the network
-func (mh *Host) Delete() error {
+// Delete updates the metadata corresponding to the host
+func (mh *Host) Delete() (err error) {
 	if mh.item == nil {
 		panic("mh.item is nil!")
 	}
 
-	err := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
-	if err != nil {
-		return err
+	defer utils.TraceOnExitErr(fmt.Sprintf("Deleting host metadata by name: %v", *mh), &err)()
+
+	// FIXME Merge errors
+	err1 := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
+	err2 := mh.item.DeleteFrom(ByNameFolderName, *mh.name)
+
+	if err1 != nil {
+		return err1
 	}
-	err = mh.item.DeleteFrom(ByNameFolderName, *mh.name)
 	if err != nil {
-		return err
+		return err2
 	}
+
 	return nil
 }
 
 // Browse walks through host folder and executes a callback for each entries
-func (mh *Host) Browse(callback func(*resources.Host) error) error {
+func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Browsing host metadata: %v", *mh), &err)()
+
 	return mh.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
 		host := resources.NewHost()
 		err := host.Deserialize(buf)
@@ -157,9 +178,11 @@ func (mh *Host) Browse(callback func(*resources.Host) error) error {
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc iaas.Service, host *resources.Host) (*Host, error) {
-	mh := NewHost(svc)
-	err := mh.Carry(host).Write()
+func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Saving host metadata: %v", host), &err)()
+
+	mh = NewHost(svc)
+	err = mh.Carry(host).Write()
 	if err != nil {
 		return nil, err
 	}
@@ -213,48 +236,35 @@ func RemoveHost(svc iaas.Service, host *resources.Host) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadHost(svc iaas.Service, ref string) (*Host, error) {
+func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("Load host metadata: %v", ref), &err)()
+
 	// We first try looking for host by ID from metadata
-	mh := NewHost(svc)
-	var innerErr error
-	err := retry.WhileUnsuccessfulDelay1Second(
+	mh = NewHost(svc)
+
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr = mh.ReadByID(ref)
+			innerErr := mh.ReadByIDorName(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
-					innerErr = mh.ReadByName(ref)
-					if innerErr != nil {
-						if _, ok := innerErr.(utils.ErrNotFound); ok {
-							log.Debugf("LoadHost(): %v", innerErr)
-							log.Debugf("LoadHost(): retrying in 1 second")
-							return innerErr
-						}
-					}
+					return retry.StopRetryError("no metadata found", innerErr)
 				}
+
+				return innerErr
 			}
-			// // In case of inconsistency in Object Storage (had happened in the past...)
-			// host := mh.Get()
-			// ip := host.GetAccessIP()
-			// if ip == "" {
-			// 	log.Warnf("Host metadata inconsistent, AccessIP is empty. Retrying")
-			// 	return fmt.Errorf("host metadata inconsistent, AccessIP is empty")
-			// }
 			return nil
 		},
 		2*utils.GetDefaultDelay(),
 	)
-	// If retry timed out, log it and return error ErrNotFound
-	if err != nil {
-		if _, ok := err.(retry.ErrTimeout); ok {
-			log.Debugf("timeout reading metadata of host '%s'", ref)
-			return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of host '%s'", ref))
+	if retryErr != nil {
+		// If it's not a timeout is something we don't know how to handle yet
+		if _, ok := retryErr.(utils.ErrTimeout); !ok {
+			return nil, utils.Cause(retryErr)
 		}
-		return nil, err
+
+		return nil, retryErr
 	}
-	// Returns the error different than ErrNotFound to caller
-	if innerErr != nil {
-		return nil, innerErr
-	}
+
 	return mh, nil
 }
 

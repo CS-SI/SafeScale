@@ -17,6 +17,8 @@
 package serialize
 
 import (
+	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"sync"
 )
 
@@ -51,7 +53,9 @@ type SyncedJSONProperty struct {
 // on 'apply' success.
 // If the extension is locked for read, no change will be encoded into the extension.
 // The lock applied on the extension is automatically released on exit.
-func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) error {
+func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("utils.serialize.SyncedJSONProperty::ThenUse() called..."), &err)()
+
 	if sp == nil {
 		panic("Calling utils.serialize.SyncedJSONProperty::ThenUse() from a nil pointer!")
 	}

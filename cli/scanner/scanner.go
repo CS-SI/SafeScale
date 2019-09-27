@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"io/ioutil"
 	"math"
 	"net"
@@ -31,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -288,6 +288,7 @@ func isTenantScannable(tenant map[string]interface{}) (isScannable bool, err err
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
+	// FIXME Add trace
 	if group != nil {
 		defer group.Done()
 	}
@@ -326,10 +327,10 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	// Prepare network
 
 	there := true
-	var net *resources.Network
+	var network *resources.Network
 
 	netName := "net-safescale" // FIXME Hardcoded string
-	if net, err = serviceProvider.GetNetwork(netName); net != nil && err == nil {
+	if network, err = serviceProvider.GetNetwork(netName); network != nil && err == nil {
 		there = true
 		log.Warnf("Network '%s' already there", netName)
 	} else {
@@ -337,28 +338,29 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	}
 
 	if !there {
-		net, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
+		network, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
 			IPVersion: IPVersion.IPv4,
 			Name:      netName,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "Error waiting for server ready: %v", err)
+			return err
 		}
-		if net == nil {
-			return errors.Errorf("Failure creating network")
+		if network == nil {
+			return fmt.Errorf("Failure creating network '%s'", netName)
 		}
 
 		defer func() {
-			delerr := serviceProvider.DeleteNetwork(net.ID)
+			delerr := serviceProvider.DeleteNetwork(network.ID)
 			if delerr != nil {
-				log.Warnf("Error deleting network '%s'", net.ID)
+				log.Warnf("Error deleting network '%s'", network.ID)
 			}
+			err = retry.AddConsequence(err, delerr)
 		}()
 
-		_, err = metadata.SaveNetwork(serviceProvider, net)
+		_, err = metadata.SaveNetwork(serviceProvider, network)
 		if err != nil {
-			return errors.Errorf("Failure saving network metadata")
+			return err
 		}
 	}
 
@@ -369,12 +371,12 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 	var wg sync.WaitGroup
 
-	concurrency := math.Min(4, float64(len(templates)/2)) // FIXME Enjoy safety
+	concurrency := math.Min(4, float64(len(templates)/2))
 	sem := make(chan bool, int(concurrency))
 
 	hostAnalysis := func(template resources.HostTemplate) error {
 		defer wg.Done()
-		if net != nil {
+		if network != nil {
 
 			// Limit scanner tests for integration test purposes
 			testSubset := ""
@@ -400,7 +402,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			hostName := "scanhost-" + template.Name
 			hostHandler := handlers.NewHostHandler(serviceProvider)
 
-			host, err := hostHandler.Create(context.Background(), hostName, net.Name, "Ubuntu 18.04", true, template.Name, false)
+			host, err := hostHandler.Create(context.Background(), hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
@@ -462,7 +464,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			}
 			log.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
 		} else {
-			return errors.New("no gateway network")
+			return fmt.Errorf("no gateway network")
 		}
 
 		return nil

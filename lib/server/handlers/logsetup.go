@@ -17,12 +17,9 @@
 package handlers
 
 import (
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -44,93 +41,4 @@ func init() {
 	}
 
 	log.SetOutput(io.MultiWriter(os.Stdout, file))
-}
-
-// throwErr throws error as-is, without change.
-// Used as a way to tell other developers not to alter the error.
-func throwErr(err error) error {
-	return err
-}
-
-func throwErrf(format string, a ...interface{}) error {
-	return fmt.Errorf(format, a...)
-}
-
-// infraErr throws error with stack trace
-func infraErr(err error) error {
-	if err == nil {
-		return nil
-	}
-	log.Errorf("%+v", err)
-
-	tbr := errors.WithStack(err)
-	return tbr
-}
-
-func isKnownErr(err error) bool {
-	known := true
-
-	switch err.(type) {
-	case resources.ErrResourceNotFound:
-		known = true
-	case resources.ErrResourceDuplicate:
-		known = true
-	case resources.ErrResourceAccessDenied:
-		known = true
-	case resources.ErrResourceInvalidRequest:
-		known = true
-	case resources.ErrResourceNotAvailable:
-		known = true
-	case resources.ErrTimeout:
-		known = true
-	default:
-		known = false
-	}
-
-	return known
-}
-
-// infraErrf throws error with stack trace and adds message
-func infraErrf(err error, message string, a ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-
-	if isKnownErr(errors.Cause(err)) {
-		log.Error(err)
-		// knownErr := errors.WithMessage(err, fmt.Sprintf(message, a...))
-		return err
-	}
-
-	tbr := errors.WithStack(err)
-	tbr = errors.WithMessage(tbr, fmt.Sprintf(message, a...))
-
-	log.Errorf("%+v", tbr)
-	return tbr
-}
-
-// logicErr ...
-func logicErr(err error) error {
-	if err == nil {
-		return nil
-	}
-	log.Errorf("%+v", err)
-	return err
-}
-
-// logicErrf ...
-func logicErrf(err error, message string, a ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-
-	if isKnownErr(errors.Cause(err)) {
-		log.Error(err)
-		// knownErr := errors.WithMessage(err, fmt.Sprintf(message, a...))
-		return err
-	}
-
-	tbr := errors.Wrap(err, fmt.Sprintf(message, a...))
-	log.Errorf("%+v", tbr)
-	return tbr
 }

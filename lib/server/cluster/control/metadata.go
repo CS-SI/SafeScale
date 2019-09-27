@@ -17,9 +17,6 @@
 package control
 
 import (
-	"fmt"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -29,7 +26,7 @@ import (
 )
 
 const (
-	//Path is the path to use to reach Cluster Definitions/Metadata
+	// Path is the path to use to reach Cluster Definitions/Metadata
 	clusterFolderName = "clusters"
 )
 
@@ -133,29 +130,25 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 	}
 
 	// Metadata had been written at least once, so try to reload (and propagate failure if it occurs)
-	var innerErr error
-	err := retry.WhileUnsuccessfulDelay1Second(
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr = m.Read(task, m.name)
+			innerErr := m.Read(task, m.name)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
-					return innerErr
+					return retry.StopRetryError("not found", innerErr)
 				}
+				return innerErr
 			}
 			return nil
 		},
 		utils.GetDefaultDelay(),
 	)
-	if err != nil {
-		if _, ok := err.(retry.ErrTimeout); ok && innerErr != nil {
-			if _, ok = innerErr.(utils.ErrNotFound); ok {
-				// On timeout and last error was NotFound, returns that last error
-				return innerErr
-			}
-			log.Debugf("timeout reading metadata of cluster '%s'", m.name)
-			return utils.NotFoundError(fmt.Sprintf("failed to reload metadata of cluster '%s'", m.name))
+	if retryErr != nil {
+		// If it's not a timeout is something we don't know how to handle yet
+		if _, ok := retryErr.(utils.ErrTimeout); !ok {
+			return utils.Cause(retryErr)
 		}
-		return err
+		return retryErr
 	}
 	return nil
 }

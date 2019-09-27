@@ -50,6 +50,8 @@ feature:
                             nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/edgeproxy4network/includes
+                            ln -s ${SF_ETCDIR}/edgeproxy4network ${SF_ETCDIR}/kong4gateway
+                            ln -s ${SF_ETCDIR}/edgeproxy4network ${SF_ETCDIR}/kong
 
                             KONG_PG_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
                             ADMIN_PG_PASSWORD="$(cat ${SF_ETCDIR}/postgres4gateway/password)"

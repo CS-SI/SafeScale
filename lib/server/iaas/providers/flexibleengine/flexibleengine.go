@@ -62,7 +62,7 @@ var gpuMap = map[string]gpuCfg{
 	},
 }
 
-// provider is the providerementation of FlexibleEngine provider
+// provider is the implementation of FlexibleEngine provider
 type provider struct {
 	*huaweicloud.Stack
 

@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/pengux/check"
@@ -254,15 +253,14 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 // CreateHost creates a new host
 // On success returns an instance of resources.Host, and a string containing the script to execute to finalize host installation
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
-	log.Debugf(">>> huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
-	defer log.Debugf("<<< huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
+func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateHost(%s) called", request.ResourceName), log.TraceLevel)()
 
 	if s == nil {
 		return nil, nil, utils.InvalidInstanceError()
 	}
 
-	userData := userdata.NewContent()
+	userData = userdata.NewContent()
 
 	//msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -328,7 +326,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	err := userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
+	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.Capitalize(msg))
@@ -395,7 +393,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 
 	// --- Initializes resources.Host ---
 
-	host := resources.NewHost()
+	host = resources.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
@@ -467,7 +465,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			host, err = s.WaitHostReady(host, utils.GetHostTimeout())
 			if err != nil {
 				switch err.(type) {
-				case resources.ErrResourceNotAvailable:
+				case utils.ErrNotAvailable:
 					return fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
 				default:
 					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
@@ -482,16 +480,24 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, err
 	}
 	if host == nil {
-		err = errors.New("unexpected problem creating host")
-		return nil, userData, err
+		return nil, userData, fmt.Errorf("unexpected problem creating host")
 	}
 
+	newHost := host
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			derr := s.DeleteHost(host.ID)
+			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
-				log.Errorf("Failed to delete host '%s': %v", host.Name, derr)
+				switch derr.(type) {
+				case utils.ErrNotFound:
+					log.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+				case utils.ErrTimeout:
+					log.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+				default:
+					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -503,6 +509,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			spew.Dump(err)
 			return nil, userData, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 		}
+		if fip == nil {
+			return nil, userData, fmt.Errorf("error attaching public IP for host: unknown error")
+		}
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
@@ -510,6 +519,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
+					err = retry.AddConsequence(err, derr)
 				}
 			}
 		}()
@@ -564,12 +574,16 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
+	var (
+		server   *servers.Server
+		notFound bool
+	)
+
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	var host *resources.Host
 	switch hostParam.(type) {
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
@@ -581,11 +595,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
-	var (
-		server   *servers.Server
-		err      error
-		notFound bool
-	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(s.Stack.ComputeClient, host.ID).Extract()
@@ -613,7 +622,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 				return err
 			}
 
-				host.LastState = toHostState(server.Status)
+			host.LastState = toHostState(server.Status)
 			if host.LastState != HostState.ERROR && host.LastState != HostState.STARTING {
 				log.Infof("host status of '%s' is '%s'", host.ID, server.Status)
 				err = nil
@@ -621,8 +630,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		utils.GetHostTimeout(),
 		utils.GetMinDelay(),
+		utils.GetHostTimeout(),
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
@@ -634,7 +643,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 			if err != nil {
 				msg += fmt.Sprintf(": %v", err)
 			}
-			return nil, fmt.Errorf(msg)
+			return nil, resources.TimeoutError(msg, utils.GetHostTimeout())
 		}
 		return nil, retryErr
 	}
@@ -912,7 +921,7 @@ func (s *Stack) DeleteHost(id string) error {
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
-					return fmt.Errorf("host '%s' not deleted after %v", id, utils.GetContextTimeout())
+					return resources.TimeoutError(fmt.Sprintf("host '%s' not deleted after %v", id, utils.GetContextTimeout()), utils.GetContextTimeout())
 				}
 				return innerRetryErr
 			}
@@ -1149,7 +1158,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			if err != nil {
 				msg += fmt.Sprintf(": %v", err)
 			}
-			return nil, fmt.Errorf(msg)
+			return nil, resources.TimeoutError(msg, timeout)
 		}
 		return nil, retryErr
 	}

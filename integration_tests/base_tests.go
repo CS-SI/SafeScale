@@ -120,7 +120,7 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 
 	host0 := HostInfo{}
-	json.Unmarshal([]byte(out), &host0)
+	_ = json.Unmarshal([]byte(out), &host0)
 
 	fmt.Println("Creating VM ", names.Hosts[1])
 
@@ -295,7 +295,7 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 
 	host0 := HostInfo{}
-	json.Unmarshal([]byte(out), &host0)
+	_ = json.Unmarshal([]byte(out), &host0)
 
 	fmt.Println("Creating VM ", names.Hosts[1])
 

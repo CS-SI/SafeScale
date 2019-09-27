@@ -22,7 +22,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io"
 )
@@ -98,7 +97,7 @@ func Decrypt(ciphertext []byte, key *Key) ([]byte, error) {
 	}
 
 	if len(ciphertext) < gcm.NonceSize() {
-		return nil, errors.New("malformed ciphertext")
+		return nil, fmt.Errorf("malformed ciphertext")
 	}
 
 	return gcm.Open(nil,

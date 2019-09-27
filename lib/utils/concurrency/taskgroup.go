@@ -141,10 +141,9 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 		return nil, fmt.Errorf("can't wait task group '%s': not running", tg.GetID())
 	}
 
-	var (
-		errs    map[string]string
-		results map[string]TaskResult
-	)
+	errs := make(map[string]string)
+	results := make(map[string]TaskResult)
+
 	tg.lock.Lock()
 	defer tg.lock.Unlock()
 
@@ -193,7 +192,7 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, utils.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tg.GetID()))
+			return false, nil, utils.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tg.GetID()), duration, nil)
 		default:
 			ok, result, err := tg.TryWait()
 			if ok {

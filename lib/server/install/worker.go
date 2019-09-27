@@ -58,6 +58,7 @@ type worker struct {
 	action    Action.Enum
 	variables Variables
 	settings  Settings
+	startTime time.Time
 
 	host    *pb.Host
 	node    bool
@@ -147,7 +148,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		w.availableMaster, err = client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+		w.availableMaster, err = client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +166,7 @@ func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		host, err := client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+		host, err := client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -241,7 +242,7 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 		w.allMasters = []*pb.Host{}
 		safescale := client.New().Host
 		for _, i := range w.cluster.ListMasterIDs(w.feature.task) {
-			host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
+			host, err := safescale.Inspect(i, utils.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
@@ -283,7 +284,7 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 		hostClt := client.New().Host
 		allHosts := []*pb.Host{}
 		for _, i := range w.cluster.ListNodeIDs(w.feature.task) {
-			host, err := hostClt.Inspect(i, client.DefaultExecutionTimeout)
+			host, err := hostClt.Inspect(i, utils.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
@@ -304,7 +305,7 @@ func (w *worker) identifyAvailableGateway() (*pb.Host, error) {
 	if w.availableGateway == nil {
 		var err error
 		netCfg := w.cluster.GetNetworkConfig(w.feature.task)
-		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
+		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -349,13 +350,13 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	)
 
 	netCfg := w.cluster.GetNetworkConfig(w.feature.task)
-	gw, err := client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
+	gw, err := client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
 	results = append(w.allGateways, gw)
 	if netCfg.SecondaryGatewayID != "" {
-		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, client.DefaultExecutionTimeout)
+		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, utils.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -388,7 +389,6 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
 	if w.action == Action.Add && !s.SkipProxy {
-		// FIXME REVIEW the nil check for w.cluster, if not there and a feature is added to a gateway, it panics
 		if w.cluster != nil {
 			err := w.setReverseProxy()
 			if err != nil {
@@ -506,21 +506,22 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			v["options"] = ""
 		}
 
-		wallTime := 0
+		wallTime := utils.GetLongOperationTimeout()
 		anon, ok = stepMap[yamlTimeoutKeyword]
 		if ok {
 			if _, ok := anon.(int); ok {
-				wallTime = anon.(int)
+				wallTime = time.Duration(anon.(int)) * time.Minute
 			} else {
-				wallTime, err = strconv.Atoi(anon.(string))
+				wallTimeConv, err := strconv.Atoi(anon.(string))
 				if err != nil {
 					log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+				} else {
+					wallTime = time.Duration(wallTimeConv) * time.Minute
 				}
 			}
 		}
-		if wallTime == 0 {
-			wallTime = 5
-		}
+
+		utils.GetLongOperationTimeout()
 
 		templateCommand, err := normalizeScript(Variables{
 			"reserved_Name":    w.feature.DisplayName(),
@@ -550,7 +551,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			Action:             w.action,
 			Targets:            stepT,
 			Script:             templateCommand,
-			WallTime:           time.Duration(wallTime) * time.Minute,
+			WallTime:           wallTime,
 			OptionsFileContent: optionsFileContent,
 			YamlKey:            stepKey,
 			Serial:             serial,

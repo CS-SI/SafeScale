@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"time"
 
@@ -226,17 +227,16 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
-	log.Debugf("running step '%s' on %d hosts...", is.Name, len(hosts))
-
-	var err error
-	results := stepResults{}
+func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResults, err error) {
+	results = stepResults{}
+	defer utils.TimerErrWithLevel(fmt.Sprintf("running step '%s' on %d hosts...", is.Name, len(hosts)), &err, log.DebugLevel)
 
 	if is.Serial || s.Serialize {
 		subtask := concurrency.NewTask(is.Worker.feature.task)
 
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
@@ -248,16 +248,23 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
 			results[h.Name] = result.(stepResult)
 			subtask.Reset()
-			// if !results[h.Name].Successful() {
-			// 	log.Infof("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-			// } else {
-			// 	log.Infof("%s(%s):step(%s)@%s: success", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-			// }
+
+			if !results[h.Name].Successful() {
+				if is.Worker.action == Action.Check { // Checks can fail and it's ok
+					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				} else { // other steps are expected to succeed
+					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				}
+			} else {
+				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name, utils.FmtDuration(time.Since(is.Worker.startTime)))
+			}
 		}
 	} else {
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			is.Worker.startTime = time.Now()
+
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
 			cloneV["Hostname"] = h.Name
@@ -274,15 +281,19 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 		for k, s := range subtasks {
 			result, err := s.Wait()
 			if err != nil {
-				log.Debugf("%s(%s):step(%s)@%s: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				log.Warnf("%s(%s):step(%s)@%s finished in [%s]: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)))
 				continue
 			}
 			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
-				log.Debugf("%s(%s):step(%s)@%s: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, results.ErrorMessages())
+				if is.Worker.action == Action.Check { // Checks can fail and it's ok
+					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				} else { // other steps are expected to succeed
+					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+				}
 			} else {
-				log.Debugf("%s(%s):step(%s)@%s: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FmtDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	}
@@ -292,7 +303,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
-func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Get parameters
 	p := params.(data.Map)
 	host := p["host"].(*pb.Host)
@@ -312,8 +323,6 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 		}
 	}
 
-	// FIXME Not so fast, validate first, save this elsewhere
-
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
@@ -325,7 +334,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	command = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
 
 	// Executes the script on the remote host
-	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, client.DefaultConnectionTimeout, is.WallTime)
+	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, utils.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{success: false, err: err}, nil
 	}

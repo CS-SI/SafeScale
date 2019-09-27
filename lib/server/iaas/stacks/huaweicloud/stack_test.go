@@ -17,7 +17,6 @@
 package huaweicloud_test
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -59,7 +58,7 @@ func getClient() (iaas.Service, error) {
 		var err error
 		service, err = iaas.UseService(tenant_name)
 		if err != nil || service == nil {
-			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
+			return nil, fmt.Errorf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name)
 		}
 	}
 	return service, nil

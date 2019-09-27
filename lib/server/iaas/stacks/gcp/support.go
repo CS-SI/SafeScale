@@ -54,7 +54,7 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 }
 
 func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, duration time.Duration) (err error) {
-	err = retry.WhileUnsuccessful(func() error {
+	retryErr := retry.WhileUnsuccessful(func() error {
 		r, anerr := RefreshResult(oco)
 		if anerr != nil {
 			return anerr
@@ -65,7 +65,7 @@ func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, 
 		return nil
 	}, poll, duration)
 
-	return err
+	return retryErr
 }
 
 // SelfLink ...

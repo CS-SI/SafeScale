@@ -101,7 +101,7 @@ func (n *Network) Serialize() ([]byte, error) {
 	return serialize.ToJSON(n)
 }
 
-// Deserialize reads json code and reinstanciates an Host
+// Deserialize reads json code and reinstantiates an Host
 func (n *Network) Deserialize(buf []byte) error {
 	if n.Properties == nil {
 		n.Properties = serialize.NewJSONProperties("resources.network")
@@ -116,7 +116,7 @@ func (n *Network) Deserialize(buf []byte) error {
 	return nil
 }
 
-// VIP is a structure containint information needed to manage VIP (virtual IP)
+// VIP is a structure containing information needed to manage VIP (virtual IP)
 type VIP struct {
 	ID        string
 	Name      string

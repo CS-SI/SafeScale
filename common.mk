@@ -29,7 +29,9 @@ BROWSER?=firefox
 
 ifeq ($(OS),Windows_NT)
 HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
+ifeq (, $(shell which rm))
 RM = del /Q
+endif
 endif
 
 GOPATH?=$(HOME)/go

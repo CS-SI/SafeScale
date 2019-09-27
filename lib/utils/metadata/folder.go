@@ -128,24 +128,33 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 			return err
 		}
 
-		return fmt.Errorf("failed to search in Metadata Storage: %v", err)
+		return err
 	}
 
 	var buffer bytes.Buffer
 	_, err = f.service.GetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
-		return utils.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return utils.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+		}
+		return err
 	}
 	data := buffer.Bytes()
 	if f.crypt {
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			return utils.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
+			if _, ok := err.(utils.ErrNotFound); ok {
+				return utils.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
+			}
+			return err
 		}
 	}
 	err = callback(data)
 	if err != nil {
-		return utils.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return utils.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
+		}
+		return err
 	}
 	return nil
 }

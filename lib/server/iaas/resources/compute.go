@@ -72,7 +72,7 @@ type StoredCPUInfo struct {
 	PricePerHour   float64 `json:"price_in_dollars_hour"`
 }
 
-// Image representes an OS image
+// Image represents an OS image
 type Image struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
@@ -213,7 +213,7 @@ func (h *Host) Serialize() ([]byte, error) {
 	return serialize.ToJSON(h)
 }
 
-// Deserialize reads json code and reinstanciates an Host
+// Deserialize reads json code and reinstantiates an Host
 func (h *Host) Deserialize(buf []byte) error {
 	if h.Properties == nil {
 		h.Properties = serialize.NewJSONProperties("resources.host")

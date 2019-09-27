@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -24,6 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
+
+var NetworkCmdName = "network"
 
 // NetworkCmd command
 var NetworkCmd = cli.Command{
@@ -47,7 +50,8 @@ var networkList = cli.Command{
 			Usage: "List all Networks on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", NetworkCmdName, c.Command.Name, c.Args())
+		networks, err := client.New().Network.List(c.Bool("all"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
 		}
@@ -61,6 +65,7 @@ var networkDelete = cli.Command{
 	Usage:     "delete Network",
 	ArgsUsage: "<Network_name> [<Network_name>...]",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", NetworkCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>."))
@@ -70,7 +75,7 @@ var networkDelete = cli.Command{
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		err := client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
+		err := client.New().Network.Delete(networkList, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
 		}
@@ -84,12 +89,13 @@ var networkInspect = cli.Command{
 	Usage:     "inspect NETWORK",
 	ArgsUsage: "<network_name>",
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", NetworkCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		network, err := client.New().Network.Inspect(c.Args().First(), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
 		}
@@ -159,6 +165,7 @@ var networkCreate = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", NetworkCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
@@ -178,7 +185,7 @@ var networkCreate = cli.Command{
 				Sizing:  def.Sizing,
 			},
 		}
-		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
+		network, err := client.New().Network.Create(netdef, utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 		}

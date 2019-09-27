@@ -32,11 +32,9 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	common "github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -123,19 +121,20 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 		if err != nil {
 			logrus.Warnf("Can't list public types...: %s", err)
 			break
-		}
+		} else {
 
-		for _, matype := range resp.Items {
-			ht := resources.HostTemplate{
-				Cores:   int(matype.GuestCpus),
-				RAMSize: float32(matype.MemoryMb / 1024),
-				//VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
-				//DiskSize: int(matype.ImageSpaceGb),
-				DiskSize: 0,
-				ID:       strconv.FormatUint(matype.Id, 10),
-				Name:     string(matype.Name),
+			for _, matype := range resp.Items {
+				ht := resources.HostTemplate{
+					Cores:   int(matype.GuestCpus),
+					RAMSize: float32(matype.MemoryMb / 1024),
+					//VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
+					//DiskSize: int(matype.ImageSpaceGb),
+					DiskSize: 0,
+					ID:       strconv.FormatUint(matype.Id, 10),
+					Name:     matype.Name,
+				}
+				templates = append(templates, ht)
 			}
-			templates = append(templates, ht)
 		}
 		token := resp.NextPageToken
 		paginate = token != ""
@@ -240,7 +239,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		id, err := uuid.NewV4()
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-			logrus.Debugf(common.Capitalize(msg))
+			logrus.Debugf(utils.Capitalize(msg))
 			return nil, userData, fmt.Errorf(msg)
 		}
 
@@ -248,12 +247,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			logrus.Debugf(common.Capitalize(msg))
+			logrus.Debugf(utils.Capitalize(msg))
 			return nil, userData, fmt.Errorf(msg)
 		}
 	}
 	if request.Password == "" {
-		password, err := common.GeneratePassword(16)
+		password, err := utils.GeneratePassword(16)
 		if err != nil {
 			return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
@@ -275,7 +274,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			return nil
 		})
 		if err != nil {
-			return nil, userData, errors.Wrap(err, "")
+			return nil, userData, err
 		}
 	}
 
@@ -300,7 +299,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	err = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		logrus.Debugf(common.Capitalize(msg))
+		logrus.Debugf(utils.Capitalize(msg))
 		return nil, userData, fmt.Errorf(msg)
 	}
 
@@ -385,16 +384,23 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	var desistError error
 
 	// Retry creation until success, for 10 minutes
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-
 			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
 			if err != nil {
 				if server != nil {
+					// try deleting server
 					killErr := s.DeleteHost(server.ID)
 					if killErr != nil {
-						return errors.Wrap(err, killErr.Error())
+						switch killErr.(type) {
+						case utils.ErrTimeout:
+							logrus.Error("Timeout cleaning up gcp instance")
+						default:
+							logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
+						}
+						err = retry.AddConsequence(err, killErr)
 					}
+					return err
 				}
 
 				if gerr, ok := err.(*googleapi.Error); ok {
@@ -417,20 +423,26 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			host.Name = server.Name
 
 			// Wait that Host is ready, not just that the build is started
-			_, err = s.WaitHostReady(host, common.GetLongOperationTimeout())
+			_, err = s.WaitHostReady(host, utils.GetLongOperationTimeout())
 			if err != nil {
 				killErr := s.DeleteHost(host.ID)
 				if killErr != nil {
-					return errors.Wrap(err, killErr.Error())
+					switch killErr.(type) {
+					case utils.ErrTimeout:
+						logrus.Error("Timeout cleaning up gcp instance")
+					default:
+						logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
+					}
+					err = retry.AddConsequence(err, killErr)
 				}
 				return err
 			}
 			return nil
 		},
-		common.GetLongOperationTimeout(),
+		utils.GetLongOperationTimeout(),
 	)
-	if err != nil {
-		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
+	if retryErr != nil {
+		return nil, userData, retryErr
 	}
 	if desistError != nil {
 		return nil, userData, resources.ResourceAccessDeniedError(request.ResourceName, fmt.Sprintf("Error creating host: %s", desistError.Error()))
@@ -438,13 +450,22 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	logrus.Debugf("host resource created.")
 
+	newHost := host
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			logrus.Infof("Cleanup, deleting host '%s'", host.Name)
-			derr := s.DeleteHost(host.ID)
+			logrus.Infof("Cleanup, deleting host '%s'", newHost.Name)
+			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
-				logrus.Warnf("Error deleting host: %v", derr)
+				switch derr.(type) {
+				case utils.ErrNotFound:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+				case utils.ErrTimeout:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+				default:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -454,7 +475,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	if !host.OK() {
-		logrus.Warnf("Missing data in host: %v", host)
+		logrus.Warnf("Missing data in host: %s", spew.Sdump(host))
 	}
 
 	return host, userData, nil
@@ -462,7 +483,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *resources.Host, err error) {
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
@@ -477,9 +498,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	default:
 		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
-
-	logrus.Debugf(">>> stacks.gcp::WaitHostReady(%s)", host.ID)
-	defer logrus.Debugf("<<< stacks.gcp::WaitHostReady(%s)", host.ID)
+	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.gcp::WaitHostReady(%s) called", host.ID), &err, logrus.TraceLevel)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -494,12 +513,12 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			}
 			return nil
 		},
-		common.GetDefaultDelay(),
+		utils.GetDefaultDelay(),
 		timeout,
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return host, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.Name, timeout)
+			return host, resources.TimeoutError(fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.Name, timeout), timeout)
 		}
 		return host, retryErr
 	}
@@ -589,7 +608,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -625,6 +644,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
 	}
+
 	if host == nil {
 		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
@@ -634,7 +654,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		hostRef = host.ID
 	}
 
-	if common.IsEmpty(host) {
+	if utils.IsEmpty(host) {
 		return nil, resources.ResourceNotFoundError("host", hostRef)
 	}
 
@@ -648,7 +668,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 
 	for _, nit := range gcpHost.NetworkInterfaces {
 		snet := genUrl(nit.Subnetwork)
-		if !common.IsEmpty(snet) {
+		if !utils.IsEmpty(snet) {
 			pubIp := ""
 			for _, aco := range nit.AccessConfigs {
 				if aco != nil {
@@ -792,7 +812,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(id string) error {
+func (s *Stack) DeleteHost(id string) (err error) {
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
@@ -805,7 +825,7 @@ func (s *Stack) DeleteHost(id string) error {
 	zone := s.GcpConfig.Zone
 	instanceName := id
 
-	_, err := service.Instances.Get(projectID, zone, instanceName).Do()
+	_, err = service.Instances.Get(projectID, zone, instanceName).Do()
 	if err != nil {
 		return err
 	}
@@ -822,7 +842,23 @@ func (s *Stack) DeleteHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	return waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostCleanupTimeout())
+
+	waitErr := retry.WhileUnsuccessfulDelay5Seconds(func() error {
+		_, recErr := service.Instances.Get(projectID, zone, instanceName).Do()
+		if gerr, ok := recErr.(*googleapi.Error); ok {
+			if gerr.Code == 404 {
+				return nil
+			}
+		}
+		return fmt.Errorf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr)
+	}, utils.GetContextTimeout())
+
+	if waitErr != nil {
+		logrus.Error(utils.Cause(waitErr))
+	}
+
+	return err
 }
 
 // ResizeHost change the template used by an host
@@ -885,7 +921,7 @@ func (s *Stack) StopHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
 	return err
 }
 
@@ -912,7 +948,7 @@ func (s *Stack) StartHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
 	return err
 }
 
@@ -939,7 +975,7 @@ func (s *Stack) RebootHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
 	if err != nil {
 		return err
 	}
@@ -956,7 +992,7 @@ func (s *Stack) RebootHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, common.GetMinDelay(), common.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
 	return err
 }
 
@@ -978,15 +1014,12 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+	zones := make(map[string]bool)
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	zones := make(map[string]bool)
-
-	compuService := s.ComputeService
-
-	resp, err := compuService.Zones.List(s.GcpConfig.ProjectId).Do()
+	resp, err := s.ComputeService.Zones.List(s.GcpConfig.ProjectId).Do()
 	if err != nil {
 		return zones, err
 	}

@@ -25,8 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -51,7 +49,7 @@ func DecorateError(err error, action string, timeout time.Duration) error {
 		if strings.Index(msg, " :") == 0 {
 			msg = msg[2:]
 		}
-		return errors.New(msg)
+		return fmt.Errorf(msg)
 	}
 	return err
 }
@@ -61,116 +59,294 @@ func IsTimeout(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }
 
-// errCore ...
-type errCore struct {
-	message string
+// ErrCore ...
+type ErrCore struct {
+	Message      string
+	cause        error
+	consequences []error
 }
 
-func (e errCore) Error() string {
-	return e.message
+func (e ErrCore) CauseFormatter() string {
+	msgFinal := ""
+
+	if e.Cause() != nil {
+		msgFinal += " ["
+		msgFinal += "caused by {"
+		msgFinal += e.Cause().Error()
+		msgFinal += "}]"
+	}
+
+	lenConseq := len(e.Consequences())
+	if lenConseq > 0 {
+		msgFinal += "[with consequences {"
+		for ind, con := range e.Consequences() {
+			msgFinal += con.Error()
+			if ind+1 < lenConseq {
+				msgFinal += ";"
+			}
+		}
+		msgFinal += "}]"
+	}
+
+	return msgFinal
+}
+
+func (e ErrCore) Reset(err error) ErrCore {
+	if err != nil {
+		if cerr, ok := err.(ErrCore); ok {
+			e.Message = cerr.Message
+			e.consequences = cerr.consequences
+			e.cause = cerr.cause
+		}
+	}
+	return e
+}
+
+func (e ErrCore) Cause() error {
+	return e.cause
+}
+
+func (e ErrCore) Consequences() []error {
+	return e.consequences
+}
+
+func Wrap(cause error, message string) ErrCore {
+	return NewErrCore(message, cause, []error{})
+}
+
+func NewErrCore(message string, cause error, consequences []error) ErrCore {
+	if consequences == nil {
+		return ErrCore{
+			Message:      message,
+			cause:        cause,
+			consequences: []error{},
+		}
+	}
+
+	return ErrCore{
+		Message:      message,
+		cause:        cause,
+		consequences: consequences,
+	}
+}
+
+func (e ErrCore) AddConsequence(err error) error {
+	if err != nil {
+		if e.consequences == nil {
+			e.consequences = []error{}
+		}
+		e.consequences = append(e.consequences, err)
+	}
+	return e
+}
+
+func (e ErrCore) Error() string {
+	msgFinal := e.Message
+
+	msgFinal += e.CauseFormatter()
+
+	return msgFinal
+}
+
+func Cause(err error) (resp error) {
+	type causer interface {
+		Cause() error
+	}
+
+	resp = err
+
+	for err != nil {
+		cause, ok := err.(causer)
+		if !ok {
+			break
+		}
+		err = cause.Cause()
+		if err != nil {
+			resp = err
+		}
+	}
+
+	return resp
 }
 
 // ErrTimeout defines a Timeout error
 type ErrTimeout struct {
-	errCore
+	ErrCore
+	dur time.Duration
+}
+
+func (e ErrTimeout) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // TimeoutError ...
-func TimeoutError(msg string) ErrTimeout {
+func TimeoutError(msg string, timeout time.Duration, cause error) ErrTimeout {
 	return ErrTimeout{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        cause,
+			consequences: []error{},
 		},
+		dur: timeout,
 	}
 }
 
 // ErrNotFound resource not found error
 type ErrNotFound struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrNotFound) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // NotFoundError creates a ResourceNotFound error
 func NotFoundError(msg string) ErrNotFound {
 	return ErrNotFound{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrNotAvailable resource not available error
 type ErrNotAvailable struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrNotAvailable) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // NotAvailableError creates a NotAvailable error
 func NotAvailableError(msg string) ErrNotAvailable {
 	return ErrNotAvailable{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrDuplicate already exists error
 type ErrDuplicate struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrDuplicate) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // DuplicateError creates a ErrDuplicate error
 func DuplicateError(msg string) ErrDuplicate {
 	return ErrDuplicate{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrInvalidRequest ...
 type ErrInvalidRequest struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrInvalidRequest) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // InvalidRequestError creates a ErrInvalidRequest error
 func InvalidRequestError(msg string) ErrInvalidRequest {
 	return ErrInvalidRequest{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
+// ErrInvalidRequest ...
+type ErrAccessDenied struct {
+	ErrCore
+}
+
+func (e ErrAccessDenied) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// AccessDeniedError creates a ErrAccessDenied error
+func AccessDeniedError(msg string) ErrAccessDenied {
+	return ErrAccessDenied{
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrAborted ...
 type ErrAborted struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrAborted) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // AbortedError creates a ErrAborted error
 func AbortedError() ErrAborted {
 	return ErrAborted{
-		errCore: errCore{
-			message: "aborted",
+		ErrCore: ErrCore{
+			Message:      "aborted",
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrOverflow ...
 type ErrOverflow struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrOverflow) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // OverflowError creates a ErrOverflow error
 func OverflowError(msg string) ErrOverflow {
 	return ErrOverflow{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrNotImplemented ...
 type ErrNotImplemented struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrNotImplemented) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // NotImplementedError creates a ErrNotImplemented error
@@ -188,15 +364,22 @@ func NotImplementedError(what string) ErrNotImplemented {
 
 	log.Error(Capitalize(msg))
 	return ErrNotImplemented{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrInvalidInstance ...
 type ErrInvalidInstance struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrInvalidInstance) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // InvalidInstanceError creates a ErrInvalidInstance error
@@ -214,15 +397,22 @@ func InvalidInstanceError() ErrInvalidInstance {
 
 	log.Error(Capitalize(msg))
 	return ErrInvalidInstance{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }
 
 // ErrInvalidParameter ...
 type ErrInvalidParameter struct {
-	errCore
+	ErrCore
+}
+
+func (e ErrInvalidParameter) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // InvalidParameterError creates a ErrInvalidParameter error
@@ -235,13 +425,15 @@ func InvalidParameterError(what, why string) ErrInvalidParameter {
 		}
 	}
 	if msg == "" {
-		msg = fmt.Sprintf("nvalid parameter '%s': %s", what, why)
+		msg = fmt.Sprintf("invalid parameter '%s': %s", what, why)
 	}
 
 	log.Error(Capitalize(msg))
 	return ErrInvalidParameter{
-		errCore: errCore{
-			message: msg,
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
 		},
 	}
 }

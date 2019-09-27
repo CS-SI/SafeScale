@@ -36,7 +36,7 @@ import (
 
 // Load ...
 func Load(task concurrency.Task, name string) (api.Cluster, error) {
-	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
+	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +84,8 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 }
 
 // Create creates a cluster following the parameters of the request
-func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
-	log.Debugf(">>> lib.server.cluster.factory::Create()")
-	defer log.Debugf("<<< safescale.cluster.factory::Create()")
+func Create(task concurrency.Task, req control.Request) (clu api.Cluster, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.factory::Create() called"), &err, log.TraceLevel)()
 
 	// Validates parameters
 	if req.Name == "" {
@@ -98,7 +97,7 @@ func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
 
 	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
+	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +155,7 @@ func Delete(task concurrency.Task, name string) error {
 
 // List lists the clusters already created
 func List() ([]api.Cluster, error) {
-	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
+	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}

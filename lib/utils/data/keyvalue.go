@@ -33,11 +33,11 @@ func (m Map) Clone() Map {
 // Replace replaces the content of the Map with content of another one
 // satisfies interface Clonable
 func (m Map) Replace(src Map) Map {
-	m = Map{}
+	nm := Map{}
 	for k, v := range src {
-		m[k] = v
+		nm[k] = v
 	}
-	return m
+	return nm
 }
 
 // Merge add missing keys from source

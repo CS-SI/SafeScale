@@ -89,7 +89,9 @@ func (c *Controller) Restore(task concurrency.Task, foreman *foreman) {
 }
 
 // Create creates the necessary infrastructure of the Cluster
-func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman) error {
+func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("Creating cluster infrastructure '%s'...", req.Name), &err, log.InfoLevel)()
+
 	if foreman == nil {
 		panic("Calling lib.server.cluster.control.Controller::Create() from nil pointer!")
 	}
@@ -99,8 +101,8 @@ func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman
 
 	c.Lock(task)
 
-	//VPL: For now, always disable addition of feature proxycache-client
-	err := c.Properties.LockForWrite(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	// VPL: For now, always disable addition of feature proxycache-client
+	err = c.Properties.LockForWrite(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		v.(*clusterpropsv1.Features).Disabled["proxycache"] = struct{}{}
 		return nil
 	})
@@ -108,7 +110,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman
 		log.Errorf("failed to disable feature 'proxycache': %v", err)
 		return err
 	}
-	//ENDVPL
+	// ENDVPL
 
 	c.foreman = foreman
 	c.Unlock(task)
@@ -259,7 +261,7 @@ func (c *Controller) ListMasterIDs(task concurrency.Task) []string {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of master IDs: %v", err)
+		log.Errorf("failed to get list of master IDs: %v", err) // FIXME Don't hide errors
 	}
 	return list
 }
@@ -375,7 +377,8 @@ func (c *Controller) ListNodeIPs(task concurrency.Task) []string {
 }
 
 // GetNode returns a node based on its ID
-func (c *Controller) GetNode(task concurrency.Task, hostID string) (*pb.Host, error) {
+func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Host, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::GetNode(%s) called", hostID), &err)()
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -383,7 +386,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (*pb.Host, er
 	defer c.RUnlock(task)
 
 	found := false
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		// found, _ := contains(nodesV1.PublicNodes, hostID)
 		// if !found {
@@ -397,7 +400,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (*pb.Host, er
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
 	}
-	return client.New().Host.Inspect(hostID, client.DefaultExecutionTimeout)
+	return client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 }
 
 // SearchNode tells if an host ID corresponds to a node of the Cluster
@@ -481,13 +484,12 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (string, error) {
 }
 
 // UpdateMetadata writes Cluster config in Object Storage
-func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error) error {
+func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error) (err error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 
-	log.Debugf(">>>{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.GetID())
-	defer log.Debugf("<<<{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.GetID())
+	defer utils.TimerErrWithLevel(fmt.Sprintf("{task %s} lib.server.cluster.control.Controller::UpdateMetadata() called", task.GetID()), &err, log.TraceLevel)()
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -495,7 +497,7 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 	c.metadata.Acquire()
 	defer c.metadata.Release()
 
-	err := c.metadata.Reload(task)
+	err = c.metadata.Reload(task)
 	if err != nil {
 		return err
 	}
@@ -515,12 +517,16 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 }
 
 // DeleteMetadata removes Cluster metadata from Object Storage
-func (c *Controller) DeleteMetadata(task concurrency.Task) error {
+func (c *Controller) DeleteMetadata(task concurrency.Task) (err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::DeleteMetadata() called"), &err)()
+
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.Lock(task)
 	defer c.Unlock(task)
+
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::DeleteMetadata() called"), &err, log.TraceLevel)() // FIXME Trace all public methods
 
 	c.metadata.Acquire()
 	defer c.metadata.Release()
@@ -546,13 +552,14 @@ func (c *Controller) Serialize() ([]byte, error) {
 	return serialize.ToJSON(c)
 }
 
-// Deserialize reads json code and reinstanciates cluster
+// Deserialize reads json code and reinstantiates cluster
 func (c *Controller) Deserialize(buf []byte) error {
 	return serialize.FromJSON(buf, c)
 }
 
 // AddNode adds one node
-func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (string, error) {
+func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (host string, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::AddNode(%s) called", req.Name), &err, log.DebugLevel)()
 	hosts, err := c.AddNodes(task, 1, req)
 	if err != nil {
 		return "", err
@@ -561,9 +568,8 @@ func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (str
 }
 
 // AddNodes adds <count> nodes
-func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) ([]string, error) {
-	log.Debugf(">>> lib.server.cluster.control.Controller::AddNodes(%d)", count)
-	defer log.Debugf("<<< lib.server.cluster.control.Controller::AddNodes(%d)", count)
+func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) (hosts []string, err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::AddNodes(%d) called", count), &err, log.DebugLevel)()
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -589,7 +595,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 			return nil, err
 		}
 	}
-	err := properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
+	err = properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
 		defaultsV2 := v.(*clusterpropsv2.Defaults)
 		sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
 		nodeDef.Sizing = &sizing
@@ -612,10 +618,9 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	nodeDef.Network = c.GetNetworkConfig(task).NetworkID
 
 	var (
-		hosts  []string
 		errors []string
 	)
-	timeout := client.DefaultExecutionTimeout + time.Duration(count)*time.Minute
+	timeout := utils.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
@@ -641,13 +646,15 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	hostClt := client.New().Host
 
 	// Starting from here, delete nodes if exiting with error
+	newHosts := hosts
 	defer func() {
 		if err != nil {
-			if len(hosts) > 0 {
-				derr := hostClt.Delete(hosts, client.DefaultExecutionTimeout)
+			if len(newHosts) > 0 {
+				derr := hostClt.Delete(newHosts, utils.GetExecutionTimeout())
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}
+				err = retry.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -693,7 +700,8 @@ func convertDefaultsV1ToDefaultsV2(defaultsV1 *clusterpropsv1.Defaults, defaults
 }
 
 // GetState returns the current state of the Cluster
-func (c *Controller) GetState(task concurrency.Task) (ClusterState.Enum, error) {
+func (c *Controller) GetState(task concurrency.Task) (state ClusterState.Enum, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::GetState() called"), &err)()
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -701,10 +709,9 @@ func (c *Controller) GetState(task concurrency.Task) (ClusterState.Enum, error) 
 	now := time.Now()
 	var (
 		collectInterval time.Duration
-		state           ClusterState.Enum
 	)
 	c.RLock(task)
-	err := c.Properties.LockForRead(Property.StateV1).ThenUse(func(v interface{}) error {
+	err = c.Properties.LockForRead(Property.StateV1).ThenUse(func(v interface{}) error {
 		stateV1 := v.(*clusterpropsv1.State)
 		collectInterval = stateV1.StateCollectInterval
 		state = stateV1.State
@@ -722,7 +729,8 @@ func (c *Controller) GetState(task concurrency.Task) (ClusterState.Enum, error) 
 
 // ForceGetState returns the current state of the Cluster
 // Uses the "maker" GetState from Foreman
-func (c *Controller) ForceGetState(task concurrency.Task) (ClusterState.Enum, error) {
+func (c *Controller) ForceGetState(task concurrency.Task) (state ClusterState.Enum, err error) {
+	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::ForceGetState() called"), &err)()
 	if c == nil {
 		panic("Calling c.ForceGetState with c==nil!")
 	}
@@ -730,7 +738,7 @@ func (c *Controller) ForceGetState(task concurrency.Task) (ClusterState.Enum, er
 		task = concurrency.RootTask()
 	}
 
-	state, err := c.foreman.getState(task)
+	state, err = c.foreman.getState(task)
 	if err != nil {
 		return ClusterState.Unknown, err
 	}
@@ -747,7 +755,9 @@ func (c *Controller) ForceGetState(task concurrency.Task) (ClusterState.Enum, er
 }
 
 // deleteMaster deletes the master specified by its ID
-func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
+func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::deleteMaster(%s) called", hostID), &err, log.TraceLevel)()
+
 	if hostID == "" {
 		panic("Invalid parameter 'hostID': can't be empty string!")
 	}
@@ -757,7 +767,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
 
 	// Removes master from cluster metadata
 	var master *clusterpropsv1.Node
-	err := c.UpdateMetadata(task, func() error {
+	err = c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			found, idx := contains(nodesV1.Masters, hostID)
@@ -790,6 +800,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
 			if derr != nil {
 				log.Errorf("failed to restore node ownership in cluster")
 			}
+			err = retry.AddConsequence(err, derr)
 		}
 	}()
 
@@ -803,10 +814,12 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
 }
 
 // DeleteLastNode deletes the last Agent node added
-func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string) error {
+func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string) (err error) {
 	if c == nil {
 		panic("Calling c.DeleteLastNode with c==nil!")
 	}
+
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::DeleteSpecificNode() called"), &err, log.TraceLevel)()
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -814,7 +827,6 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 
 	var (
 		node *clusterpropsv1.Node
-		err  error
 	)
 
 	// Removed reference of the node from cluster metadata
@@ -832,6 +844,9 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 	if selectedMaster == "" {
 		selectedMaster, err = c.FindAvailableMaster(task)
 		if err != nil {
+			// FIXME Try deletion anyway ?
+			errDelNode := c.deleteNode(task, node, "")
+			err = retry.AddConsequence(err, errDelNode)
 			return err
 		}
 	}
@@ -840,13 +855,15 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
-func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, selectedMaster string) error {
+func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, selectedMaster string) (err error) {
 	if c == nil {
 		panic("Calling c.DeleteSpecificNode with c==nil!")
 	}
 	if hostID == "" {
 		panic("hostID is empty!")
 	}
+
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::DeleteSpecificNode() called"), &err, log.TraceLevel)()
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -857,7 +874,7 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	)
 
 	c.RLock(task)
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		var (
 			idx   int
@@ -877,6 +894,9 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	if selectedMaster == "" {
 		selectedMaster, err = c.FindAvailableMaster(task)
 		if err != nil {
+			// FIXME Try deletion anyway ?
+			errDelNode := c.deleteNode(task, node, "")
+			err = retry.AddConsequence(err, errDelNode)
 			return err
 		}
 	}
@@ -885,9 +905,8 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 }
 
 // deleteNode deletes the node specified by its ID
-func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) error {
-	log.Debugf(">>> lib.server.cluster.control.Controller::deleteNode(%s)", node.Name)
-	defer log.Debugf("<<< lib.server.cluster.control.Controller::deleteNode(%s)", node.Name)
+func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::deleteNode(%s) called", node.Name), &err, log.TraceLevel)()
 
 	if c == nil {
 		panic("Calling lib.server.cluster.control.Controller::deleteNode() from nil pointer!")
@@ -901,7 +920,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	}
 
 	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
-	err := c.UpdateMetadata(task, func() error {
+	err = c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			length := len(nodesV1.PrivateNodes)
@@ -931,6 +950,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 			if derr != nil {
 				log.Errorf("failed to restore node ownership in cluster")
 			}
+			err = retry.AddConsequence(err, derr)
 		}
 	}()
 
@@ -951,7 +971,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	// Finally delete host
 	err = client.New().Host.Delete([]string{node.ID}, utils.GetLongOperationTimeout())
 	if err != nil {
-		if _, ok := err.(resources.ErrResourceNotFound); ok {
+		if _, ok := err.(utils.ErrNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
 			err = nil
 		}
@@ -962,17 +982,21 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 }
 
 // Delete destroys everything related to the infrastructure built for the Cluster
-func (c *Controller) Delete(task concurrency.Task) error {
+func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if c == nil {
 		panic("Calling lib.server.cluster.control.Controller::Delete from nil pointer!")
 	}
+
+	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Controller::Delete() called"), &err, log.TraceLevel)()
 
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 
+	// FIXME Introduce dirty states in metadata, and wait until the end to mark the operation as a success (Removed)
+
 	// Updates metadata
-	err := c.UpdateMetadata(task, func() error {
+	err = c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
 			v.(*clusterpropsv1.State).State = ClusterState.Removed
 			return nil
@@ -983,12 +1007,12 @@ func (c *Controller) Delete(task concurrency.Task) error {
 	}
 
 	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		_ = c.DeleteSpecificNode(t, params.(string), "")
-		return nil, nil
+		funcErr := c.DeleteSpecificNode(t, params.(string), "")
+		return nil, funcErr
 	}
 	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		_ = c.deleteMaster(t, params.(string))
-		return nil, nil
+		funcErr := c.deleteMaster(t, params.(string))
+		return nil, funcErr
 	}
 
 	// Deletes the nodes
@@ -1001,7 +1025,10 @@ func (c *Controller) Delete(task concurrency.Task) error {
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, _ = s.Wait()
+			_, subErr := s.Wait()
+			if subErr != nil {
+				log.Error(subErr) // FIXME Don't hide the errors, stack them
+			}
 		}
 	}
 
@@ -1015,7 +1042,10 @@ func (c *Controller) Delete(task concurrency.Task) error {
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, _ = s.Wait()
+			_, subErr := s.Wait()
+			if subErr != nil {
+				log.Error(subErr)
+			}
 		}
 	}
 
@@ -1037,15 +1067,16 @@ func (c *Controller) Delete(task concurrency.Task) error {
 	if err != nil {
 		return err
 	}
+
 	clientNetwork := client.New().Network
-	err = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
-			return clientNetwork.Delete([]string{networkID}, client.DefaultExecutionTimeout)
+			return clientNetwork.Delete([]string{networkID}, utils.GetExecutionTimeout())
 		},
 		utils.GetHostTimeout(),
 	)
-	if err != nil {
-		return err
+	if retryErr != nil {
+		return retryErr
 	}
 
 	// Deletes the metadata
@@ -1058,10 +1089,12 @@ func (c *Controller) Delete(task concurrency.Task) error {
 }
 
 // Stop stops the Cluster is its current state is compatible
-func (c *Controller) Stop(task concurrency.Task) error {
+func (c *Controller) Stop(task concurrency.Task) (err error) {
 	if c == nil {
 		panic("Calling c.Stop with c==nil!")
 	}
+
+	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::Stop() called"), &err)()
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -1078,10 +1111,12 @@ func (c *Controller) Stop(task concurrency.Task) error {
 }
 
 // Start starts the Cluster
-func (c *Controller) Start(task concurrency.Task) error {
+func (c *Controller) Start(task concurrency.Task) (err error) {
 	if c == nil {
 		panic("Calling c.Start with c==nil!")
 	}
+
+	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.cluster.control.Controller::Start() called"), &err)()
 
 	if task == nil {
 		task = concurrency.RootTask()

@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -27,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	timeouts "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -345,7 +345,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	if !theNetwork.OK() {
-		logrus.Warnf("Missing data in network: %v", theNetwork)
+		logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
 	}
 
 	compuService := s.ComputeService
@@ -366,9 +366,15 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 	if err != nil {
-		return err
+		switch err.(type) {
+		case utils.ErrTimeout:
+			logrus.Warnf("Timeout waiting for subnetwork deletion")
+			return err
+		default:
+			return err
+		}
 	}
 
 	// Delete routes and firewall
@@ -384,7 +390,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 		}
 	}
 
@@ -404,7 +410,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 		}
 	}
 
@@ -423,7 +429,6 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	if req.Network == nil {
 		return nil, nil, utils.InvalidParameterError("req.Network", "can't be nil")
 	}
-
 	gwname := req.Name
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
@@ -441,10 +446,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceInvalidRequest:
+		case utils.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("Error creating gateway : %s", err)
+			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
 		}
 	}
 
@@ -455,7 +460,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		return nil
 	})
 	if err != nil {
-		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", err))
+		return nil, userData, err
 	}
 
 	return host, userData, err

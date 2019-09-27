@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	timing "github.com/CS-SI/SafeScale/lib/utils"
 
 	"github.com/klauspost/reedsolomon"
 	log "github.com/sirupsen/logrus"
@@ -117,16 +118,19 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 }
 
 //Push ...
-func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) error {
-	log.Debugf(">>> lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::Push(%s)", fileLocalPath)
+func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) (err error) {
+	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Push(%s) called", fileLocalPath), &err, log.TraceLevel)()
+
 	//localFile inspection
 	file, err := os.Open(fileLocalPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open '%s' : %s", fileLocalPath, err.Error())
+		return fmt.Errorf("failed to open '%s' : %s", fileLocalPath, err.Error())
 	}
-	defer func() { // FIXME: Catch error later
-		_ = file.Close()
+	defer func() {
+		cleanErr := file.Close()
+		if cleanErr != nil {
+			log.Errorf("error closing file: %s", file.Name())
+		}
 	}()
 
 	fileStats, err := file.Stat()
@@ -275,26 +279,28 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 }
 
 //Get ...
-func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) error {
-	log.Debugf(">>> lib.server.handlers.DataHandler::Get(%s)", fileName)
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::Get(%s)", fileName)
+func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) (err error) {
+	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Get(%s) called", fileName), &err, log.TraceLevel)()
 
 	// Check if the local file is available
 	if _, err := os.Stat(fileLocalPath); err == nil {
-		return fmt.Errorf("File '%s' already exists", fileLocalPath)
+		return fmt.Errorf("file '%s' already exists", fileLocalPath)
 	}
 	file, err := os.Create(fileLocalPath)
 	if err != nil {
-		return fmt.Errorf("Failed to create the file '%s' : %s", fileLocalPath, err.Error())
+		return fmt.Errorf("failed to create the file '%s' : %s", fileLocalPath, err.Error())
 	}
 	defer func() {
-		// Suppres local file if Get didn't succeed
+		// Suppress local file if Get didn't succeed
 		if err != nil {
 			if derr := os.Remove(fileLocalPath); derr != nil {
 				log.Errorf("Failed to delete file '%s': %s", fileLocalPath, derr.Error())
 			}
 		} else {
-			_ = file.Close() // FIXME: Catch error later
+			cleanErr := file.Close()
+			if cleanErr != nil {
+				log.Errorf("error closing file: %s", file.Name())
+			}
 		}
 	}()
 
@@ -433,9 +439,8 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 }
 
 // Delete ...
-func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
-	log.Debugf(">>> lib.server.handlers.DataHandler::Delete(%s)", fileName)
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::Delete(%s)", fileName)
+func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err error) {
+	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Delete(%s) called", fileName), &err, log.TraceLevel)()
 
 	bucketMap, _, buckets := handler.getBuckets()
 	metadataFileName, keyFileName := getFileNames(fileName)
@@ -481,8 +486,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 
 // List returns []fileName []UploadDate []fileSize [][]buckets, error
 func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int64, [][]string, error) {
-	log.Debugf(">>> lib.server.handlers.DataHandler::List()")
-	defer log.Debugf("<<< lib.server.handlers.DataHandler::List()")
+	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::List() called"), log.TraceLevel)()
 
 	bucketMap, _, buckets := handler.getBuckets()
 
@@ -521,7 +525,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		buffer.Reset()
 		_, err = bucketMap[bucketNames[0]].ReadObject(chunkGroupFileName, &buffer, 0, 0)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("Failed to read the chunkGroup from the bucket '%s' : %s", bucketNames[0], err.Error())
+			return nil, nil, nil, nil, fmt.Errorf("failed to read the chunkGroup from the bucket '%s' : %s", bucketNames[0], err.Error())
 		}
 		chunkGroup, err := utils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
 		if err != nil {
@@ -531,7 +535,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		//Check if all needed buckets are known
 		ok := true
 		for _, cgBucketName := range chunkGroup.GetBucketNames() {
-			if _, ok := bucketMap[cgBucketName]; !ok {
+			if _, ok = bucketMap[cgBucketName]; !ok {
 				break
 			}
 		}

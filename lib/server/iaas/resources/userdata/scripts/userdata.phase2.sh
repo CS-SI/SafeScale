@@ -19,10 +19,12 @@
 print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+    {{.ExitOnError}}
 }
 trap print_error ERR
 
 fail() {
+    echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
     # For compatibility with previous user_data implementation (until v19.03.x)...
     ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
@@ -225,7 +227,7 @@ configure_network() {
             ;;
 
         *)
-            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
             fail 193
             ;;
     esac
@@ -655,7 +657,7 @@ install_drivers_nvidia() {
             rm -f NVIDIA-Linux-x86_64-410.78.run
             ;;
         *)
-            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
             fail 209
             ;;
     esac
@@ -731,7 +733,7 @@ install_packages() {
             yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             ;;
         *)
-            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
             fail 216
             ;;
      esac
@@ -798,7 +800,7 @@ lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 update_kernel_settings || fail 217
 
-echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 # For compatibility with previous user_data implementation (until v19.03.x)...
 ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
 
