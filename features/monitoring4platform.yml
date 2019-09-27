@@ -455,14 +455,6 @@ feature:
                             #serve_from_sub_path = true
                             enable_gzip = true
                             router_logging = true
-
-                            [auth]
-                            disable_login_form = true
-
-                            [auth.anonymous]
-                            enabled = true
-                            org_name = {{ .ClusterName }}
-                            org_role = Viewer
                             EOF
 
                             # id=472 is the user used to run grafana in container
@@ -674,9 +666,9 @@ feature:
                                           target: 3000
                                           mode: host
                                     environment:
-                                        - GF_SECURITY_ADMIN_USER=admin
-                                        - GF_SECURITY_ADMIN_PASSWORD=admin
-                                        #- GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/admin_password
+                                        - GF_SECURITY_ADMIN_USER={{ .ClusterUsername }}
+                                        - GF_SECURITY_ADMIN_PASSWORD={{ .ClusterPassword }}
+                                        #- GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/safescale.monitoring.grafana.password
                                         - GF_USERS_ALLOW_SIGN_UP=false
                                     volumes:
                                         - ${SF_ETCDIR}/monitoring4platform/grafana/config.ini:/etc/grafana/grafana.ini
