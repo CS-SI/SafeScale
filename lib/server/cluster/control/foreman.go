@@ -20,7 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	txttmpl "text/template"
@@ -1127,6 +1129,78 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 			return err
 		}
 		params["reserved_TenantJSON"] = string(jsoned)
+
+		// Finds the folder where the current binary resides
+		var (
+			exe       string
+			binaryDir string
+			path      string
+		)
+		exe, _ = os.Executable()
+		if exe != "" {
+			binaryDir = filepath.Dir(exe)
+		}
+
+		// Uploads safescale binary
+		if binaryDir != "" {
+			path = binaryDir + "/safescale"
+		}
+		if path == "" {
+			path, err = exec.LookPath("safescale")
+			if err != nil {
+				msg := "Failed to find local binary 'safescale', make sure its path is in environment variable PATH"
+				log.Errorf(utils.Capitalize(msg))
+				return fmt.Errorf(msg)
+			}
+		}
+		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescale", "root", "root", "0755")
+		if err != nil {
+			log.Errorf("Failed to upload 'safescale' binary")
+			return fmt.Errorf("failed to upload 'safescale' binary': %s", err.Error())
+		}
+
+		// Uploads safescaled binary
+		path = ""
+		if binaryDir != "" {
+			path = binaryDir + "/safescaled"
+		}
+		if path == "" {
+			path, err = exec.LookPath("safescaled")
+			if err != nil {
+				msg := "Failed to find local binary 'safescaled', make sure its path is in environment variable PATH"
+				log.Errorf(utils.Capitalize(msg))
+				return fmt.Errorf(msg)
+			}
+		}
+		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescaled", "root", "root", "0755")
+		if err != nil {
+			log.Errorf("Failed to upload 'safescaled' binary")
+			return fmt.Errorf("failed to upload 'safescaled' binary': %s", err.Error())
+		}
+
+		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
+		suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX")
+		if suffix != "" {
+			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
+			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
+			retcode, stdout, stderr, err := client.New().Ssh.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, 2*utils.GetLongOperationTimeout())
+			if err != nil {
+				msg := fmt.Sprintf("Failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error())
+				log.Errorf(utils.Capitalize(msg))
+				return fmt.Errorf(msg)
+			}
+			if retcode != 0 {
+				output := stdout
+				if output != "" && stderr != "" {
+					output += "\n" + stderr
+				} else if stderr != "" {
+					output = stderr
+				}
+				msg := fmt.Sprintf("Failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, output)
+				log.Errorf(utils.Capitalize(msg))
+				return fmt.Errorf(msg)
+			}
+		}
 	}
 
 	var dnsServers []string
@@ -1169,7 +1243,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	pbGateway := params.(*pb.Host)
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskInstallGateway(%s) called", pbGateway.Id), &err, log.TraceLevel)()
 
-	hostLabel := "gateway"
+	hostLabel := pbGateway.Name
 	log.Debugf("[%s] starting installation...", hostLabel)
 
 	sshCfg, err := client.New().Host.SSHConfig(pbGateway.Id)
