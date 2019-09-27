@@ -502,10 +502,11 @@ install_keepalived() {
 
     cat >/etc/keepalived/keepalived.conf <<-EOF
 vrrp_instance vrrp_group_gws_internal {
-    state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+    state BACKUP
     interface ${PR_IFs[0]}
     virtual_router_id 1
     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
+    nopreempt
     advert_int 2
     authentication {
         auth_type PASS
@@ -530,10 +531,11 @@ vrrp_instance vrrp_group_gws_internal {
 }
 
 # vrrp_instance vrrp_group_gws_external {
-#     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+#     state BACKUP
 #     interface ${PU_IF}
 #     virtual_router_id 2
 #     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
+#     nopreempt
 #     advert_int 2
 #     authentication {
 #         auth_type PASS
@@ -813,6 +815,8 @@ ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
 #insert_tag
 
 force_dbus_restart
+
+ls -lR /opt/safescale
 
 set +x
 exit 0
