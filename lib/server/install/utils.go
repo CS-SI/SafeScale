@@ -232,6 +232,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		}
 		cmd += "sudo chmod " + rights + " " + remotepath
 	}
+	var err error
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
