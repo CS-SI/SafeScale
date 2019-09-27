@@ -455,6 +455,14 @@ feature:
                             #serve_from_sub_path = true
                             enable_gzip = true
                             router_logging = true
+
+                            [auth]
+                            disable_login_form = true
+
+                            [auth.anonymous]
+                            enabled = true
+                            org_name = {{ .ClusterName }}
+                            org_role = Viewer
                             EOF
 
                             # id=472 is the user used to run grafana in container
