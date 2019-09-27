@@ -162,7 +162,7 @@ feature:
                   masters: any
               content: |
                   {
-                      "paths": [ "/monitoring/kibana/" ],
+                      "paths": [ "/kibana/" ],
                       "service": { "id": "{{.kibana_svc}}" }
                   }
 
