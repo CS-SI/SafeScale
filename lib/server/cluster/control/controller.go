@@ -429,15 +429,20 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (string, error) 
 	found := false
 	clientHost := client.New().Host
 	masterIDs := c.ListMasterIDs(task)
+
+	var lastError error
+
 	for _, masterID = range masterIDs {
 		sshCfg, err := clientHost.SSHConfig(masterID)
 		if err != nil {
+			lastError = err
 			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
 			continue
 		}
 		_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
+				lastError = err
 				continue
 			}
 			return "", err
@@ -446,7 +451,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (string, error) 
 		break
 	}
 	if !found {
-		return "", fmt.Errorf("failed to find available master")
+		return "", fmt.Errorf("failed to find available master: %v", lastError)
 	}
 	return masterID, nil
 }
@@ -960,12 +965,12 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 		if err != nil {
 			return err
 		}
-	}
 
-	// Unconfigure node
-	err = c.foreman.unconfigureNode(task, node.ID, selectedMaster)
-	if err != nil {
-		return err
+		// Unconfigure node
+		err = c.foreman.unconfigureNode(task, node.ID, selectedMaster)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Finally delete host
@@ -973,7 +978,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
-			err = nil
+			return nil
 		}
 		return err
 	}
