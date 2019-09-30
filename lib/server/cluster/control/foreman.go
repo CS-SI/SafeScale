@@ -651,10 +651,8 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 }
 
 // configureCluster ...
-func (b *foreman) configureCluster(task concurrency.Task) (err error) {
+func (b *foreman) configureCluster(task concurrency.Task, params data.Map) (err error) {
 	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), &err, log.TraceLevel)()
-
-	started := time.Now()
 
 	log.Infof("[cluster %s] configuring cluster...", b.cluster.Name)
 	defer func() {
@@ -665,7 +663,7 @@ func (b *foreman) configureCluster(task concurrency.Task) (err error) {
 		}
 	}()
 
-	err = b.createSwarm(task, params)
+	err = b.createSwarm(task, nil)
 	if err != nil {
 		return err
 	}
@@ -715,7 +713,7 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 
 	clientInstance := client.New()
 	clientHost := clientInstance.Host
-	clientSSH := clientInstance.Ssh
+	clientSSH := clientInstance.SSH
 
 	cluster := b.cluster
 
@@ -815,7 +813,7 @@ func (b *foreman) getSwarmJoinCommand(task concurrency.Task, selectedMaster *pb.
 		memberType = "manager"
 	}
 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-	retcode, token, stderr, err := clientInstance.Ssh.Run(selectedMaster.Id, tokenCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, token, stderr, err := clientInstance.SSH.Run(selectedMaster.Id, tokenCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
 	}
@@ -914,7 +912,7 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 
 	clientInstance := client.New()
 	clientHost := clientInstance.Host
-	clientSSH := clientInstance.Ssh
+	clientSSH := clientInstance.SSH
 
 	selectedMasterID, err := b.Cluster().FindAvailableMaster(task)
 	if err != nil {
@@ -1031,7 +1029,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 		}
 	}
 
-	clientSSH := client.New().Ssh
+	clientSSH := client.New().SSH
 
 	// Check worker is member of the Swarm
 	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
@@ -1183,7 +1181,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		if suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-			retcode, stdout, stderr, err := client.New().Ssh.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, 2*utils.GetLongOperationTimeout())
+			retcode, stdout, stderr, err := client.New().SSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, 2*utils.GetLongOperationTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("Failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error())
 				log.Errorf(utils.Capitalize(msg))
@@ -1519,7 +1517,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	log.Debugf("[%s] starting configuration...\n", hostLabel)
 
 	// install docker and docker-compose feature
-	err := b.installDocker(t, pbHost, hostLabel)
+	err = b.installDocker(t, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1749,7 +1747,7 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 	log.Debugf("[%s] starting configuration...", hostLabel)
 
 	// Docker and docker-compose installation is mandatory on all nodes
-	err := b.installDocker(t, pbHost, hostLabel)
+	err = b.installDocker(t, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1911,9 +1909,9 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 }
 
 // intallDocker installs docker and docker-compose
-func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) error {
-func (b *foreman) installDockerCompose(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'docker-compose'...", hostLabel), &err, log.DebugLevel)()
+func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
+	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'docker'...", hostLabel), &err, log.DebugLevel)()
+
 	feat, err := install.NewEmbeddedFeature(task, "docker")
 	if err != nil {
 		return err

@@ -333,7 +333,7 @@ func (k *KongController) buildSourceControlContent(rules map[string]interface{})
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := safescale.New().SSH.Run(k.primaryGateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
+	retcode, stdout, _, err := safescale.New().SSH.Run(k.gateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -375,7 +375,7 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 // put updates or creates a rule
 func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlPut, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.gateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}

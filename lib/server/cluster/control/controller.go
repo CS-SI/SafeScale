@@ -1115,7 +1115,7 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	}
 
 	// Updates metadata to mark the cluster as Stopping
-	err := c.UpdateMetadata(task, func() error {
+	err = c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
 			v.(*clusterpropsv1.State).State = ClusterState.Stopping
 			return nil
