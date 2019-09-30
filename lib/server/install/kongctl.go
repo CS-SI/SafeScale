@@ -346,7 +346,7 @@ func (k *KongController) buildSourceControlContent(rules map[string]interface{})
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
+	retcode, stdout, _, err := safescale.New().SSH.Run(k.primaryGateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -365,7 +365,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, Variables, error) {
 	propagated := Variables{}
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.primaryGateway.Name, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -389,7 +389,7 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, Variables, error) {
 	propagated := Variables{}
 	cmd := fmt.Sprintf(curlPut, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -413,7 +413,7 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 // patch updates an existing rule
 func (k *KongController) patch(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, Variables, error) {
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.primaryGateway.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, "", nil, err
 	}

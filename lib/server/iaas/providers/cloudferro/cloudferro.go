@@ -238,7 +238,7 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
-		PrivateVirtualIp: true,
+		PrivateVirtualIP: true,
 	}
 }
 

@@ -40,7 +40,7 @@ type Session struct {
 	Network        *network
 	ProcessManager *processManager
 	Share          *share
-	Ssh            *ssh
+	SSH            *ssh
 	Template       *template
 	Tenant         *tenant
 	Volume         *volume
@@ -84,7 +84,7 @@ func New() Client {
 	s.Network = &network{session: s}
 	s.ProcessManager = &processManager{session: s}
 	s.Share = &share{session: s}
-	s.Ssh = &ssh{session: s}
+	s.SSH = &ssh{session: s}
 	s.Template = &template{session: s}
 	s.Tenant = &tenant{session: s}
 	s.Volume = &volume{session: s}

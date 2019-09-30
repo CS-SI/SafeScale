@@ -854,16 +854,16 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
+			}
+
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
+			if zoneErr != nil {
+				log.Tracef("Host successfully created: {%s} with some warnings {%s}", spew.Sdump(server), zoneErr)
 			} else {
-				creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
-				if zoneErr != nil {
-					log.Tracef("Host successfully created: {%s} with some warnings {%s}", spew.Sdump(server), zoneErr)
-				} else {
-					log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
-					if creationZone != srvOpts.AvailabilityZone {
-						if srvOpts.AvailabilityZone != "" {
-							log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
-						}
+				log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
+				if creationZone != srvOpts.AvailabilityZone {
+					if srvOpts.AvailabilityZone != "" {
+						log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
 					}
 				}
 			}
@@ -960,6 +960,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	return host, userData, nil
 }
 
+// GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
 func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, error) {
 	type ServerWithAZ struct {
 		servers.Server

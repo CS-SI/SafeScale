@@ -25,7 +25,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
-var TenantCmdName = "tenant"
+var tenantCmdName = "tenant"
 
 // TenantCmd command
 var TenantCmd = cli.Command{
@@ -46,7 +46,7 @@ var tenantList = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", TenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 		tenants, err := client.New().Tenant.List(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
@@ -59,7 +59,7 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", TenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 		tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
@@ -77,7 +77,7 @@ var tenantSet = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", TenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 		err := client.New().Tenant.Set(c.Args().First(), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
@@ -91,7 +91,7 @@ var tenantStorageList = cli.Command{
 	Aliases: []string{"storage-ls"},
 	Usage:   "List available storage tenants",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", TenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 		tenants, err := client.New().Tenant.StorageList(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
@@ -104,7 +104,7 @@ var tenantStorageGet = cli.Command{
 	Name:  "storage-get",
 	Usage: "Get current storage tenants",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", TenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 		tenants, err := client.New().Tenant.StorageGet(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
@@ -122,7 +122,7 @@ var tenantStorageSet = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
 		}
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", TenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 		tenantNames := []string{c.Args().First()}
 		tenantNames = append(tenantNames, c.Args().Tail()...)
 		err := client.New().Tenant.StorageSet(tenantNames, utils.GetExecutionTimeout())

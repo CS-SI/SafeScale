@@ -18,10 +18,10 @@ package providers
 
 // Capabilities represents key/value configuration.
 type Capabilities struct {
-	// PublicVirtualIp indicates if the provider has the capability to provide a Virtual IP with public IP address
-	PublicVirtualIp bool
-	// PrivateVirtualIp indicates if the provider has the capability to provide a Virtual IP with private IP address
-	PrivateVirtualIp bool
+	// PublicVirtualIP indicates if the provider has the capability to provide a Virtual IP with public IP address
+	PublicVirtualIP bool
+	// PrivateVirtualIP indicates if the provider has the capability to provide a Virtual IP with private IP address
+	PrivateVirtualIP bool
 	// Layer3Networking indicates if the provider uses Layer3 networking
 	Layer3Networking bool
 }

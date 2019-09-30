@@ -39,9 +39,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, utils.InvalidInstanceError()
 	}
 
-	selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectId, s.GcpConfig.Zone)
+	selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
 	if request.Speed == VolumeSpeed.SSD {
-		selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectId, s.GcpConfig.Zone)
+		selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
 	}
 
 	newDisk := &compute.Disk{
@@ -54,14 +54,14 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 
 	service := s.ComputeService
 
-	op, err := s.ComputeService.Disks.Insert(s.GcpConfig.ProjectId, s.GcpConfig.Zone, newDisk).Do()
+	op, err := s.ComputeService.Disks.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, newDisk).Do()
 	if err != nil {
 		return nil, err
 	}
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -71,7 +71,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, err
 	}
 
-	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, request.Name).Do()
+	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.Name).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, ref).Do()
+	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 
 	token := ""
 	for paginate := true; paginate; {
-		resp, err := compuService.Disks.List(s.GcpConfig.ProjectId, s.GcpConfig.Zone).PageToken(token).Do()
+		resp, err := compuService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 		if err != nil {
 			return volumes, fmt.Errorf("cannot list volumes: %v", err)
 		}
@@ -175,14 +175,14 @@ func (s *Stack) DeleteVolume(ref string) error {
 	}
 
 	service := s.ComputeService
-	op, err := s.ComputeService.Disks.Delete(s.GcpConfig.ProjectId, s.GcpConfig.Zone, ref).Do()
+	op, err := s.ComputeService.Disks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 	if err != nil {
 		return err
 	}
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -202,12 +202,12 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 	service := s.ComputeService
 
-	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, request.HostID).Do()
+	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.HostID).Do()
 	if err != nil {
 		return "", err
 	}
 
-	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, request.VolumeID).Do()
+	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.VolumeID).Do()
 	if err != nil {
 		return "", err
 	}
@@ -217,14 +217,14 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		Source:     gcpDisk.SelfLink,
 	}
 
-	op, err := s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectId, s.GcpConfig.Zone, gcpInstance.Name, cad).Do()
+	op, err := s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, cad).Do()
 	if err != nil {
 		return "", err
 	}
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -234,7 +234,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		return "", err
 	}
 
-	return newGcpDiskAttachment(gcpInstance.Name, gcpDisk.Name).attachmentId, nil
+	return newGcpDiskAttachment(gcpInstance.Name, gcpDisk.Name).attachmentID, nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
@@ -243,9 +243,9 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 		return nil, utils.InvalidInstanceError()
 	}
 
-	dat := NewGcpDiskAttachmentFromId(id)
+	dat := newGcpDiskAttachmentFromID(id)
 
-	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, dat.hostName).Do()
+	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, dat.hostName).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -277,25 +277,25 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 
 	service := s.ComputeService
 
-	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, serverID).Do()
+	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverID).Do()
 	if err != nil {
 		return err
 	}
 
-	diskName := NewGcpDiskAttachmentFromId(id).diskName
-	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, diskName).Do()
+	diskName := newGcpDiskAttachmentFromID(id).diskName
+	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, diskName).Do()
 	if err != nil {
 		return err
 	}
 
-	op, err := s.ComputeService.Instances.DetachDisk(s.GcpConfig.ProjectId, s.GcpConfig.Zone, gcpInstance.Name, gcpDisk.Name).Do()
+	op, err := s.ComputeService.Instances.DetachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, gcpDisk.Name).Do()
 	if err != nil {
 		return err
 	}
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -316,7 +316,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 	var vats []resources.VolumeAttachment
 
-	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, serverID).Do()
+	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverID).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +324,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	for _, disk := range gcpInstance.Disks {
 		if disk != nil {
 			vat := resources.VolumeAttachment{
-				ID:       newGcpDiskAttachment(gcpInstance.Name, disk.DeviceName).attachmentId,
+				ID:       newGcpDiskAttachment(gcpInstance.Name, disk.DeviceName).attachmentID,
 				Name:     disk.DeviceName,
 				VolumeID: disk.DeviceName,
 				ServerID: serverID,
@@ -337,20 +337,20 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 }
 
 type gcpDiskAttachment struct {
-	attachmentId string
+	attachmentID string
 	hostName     string
 	diskName     string
 }
 
 func newGcpDiskAttachment(hostName string, diskName string) *gcpDiskAttachment {
-	return &gcpDiskAttachment{hostName: hostName, diskName: diskName, attachmentId: fmt.Sprintf("%s---%s", hostName, diskName)}
+	return &gcpDiskAttachment{hostName: hostName, diskName: diskName, attachmentID: fmt.Sprintf("%s---%s", hostName, diskName)}
 }
 
-func NewGcpDiskAttachmentFromId(theId string) *gcpDiskAttachment {
+func newGcpDiskAttachmentFromID(theID string) *gcpDiskAttachment {
 	sep := "---"
-	if strings.Contains(theId, sep) {
-		host := strings.Split(theId, sep)[0]
-		drive := strings.Split(theId, sep)[1]
+	if strings.Contains(theID, sep) {
+		host := strings.Split(theID, sep)[0]
+		drive := strings.Split(theID, sep)[1]
 		return newGcpDiskAttachment(host, drive)
 	}
 	return nil

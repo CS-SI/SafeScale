@@ -17,7 +17,7 @@ import (
 
 // StoredCPUInfo ...
 type StoredCPUInfo struct {
-	Id string `bow:"key"`
+	ID string `bow:"key"`
 	CPUInfo
 }
 
@@ -73,7 +73,7 @@ func collect(tenantName string) error {
 				log.Fatal(err)
 			}
 
-			acpu.Id = acpu.ImageID
+			acpu.ID = acpu.ImageID
 
 			err = db.Write(folder, acpu.TemplateName, acpu)
 			if err != nil {

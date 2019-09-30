@@ -113,9 +113,10 @@ func (ms *Share) Write() error {
 	return ms.item.WriteInto(ByNameFolderName, *ms.name)
 }
 
+// ReadByIDorName reads share metadata either by ID or by name
 func (ms *Share) ReadByIDorName(id string) (err error) {
-	errId := ms.ReadByID(id)
-	if errId != nil {
+	errID := ms.ReadByID(id)
+	if errID != nil {
 		errName := ms.ReadByName(id)
 		if errName != nil {
 			return errName

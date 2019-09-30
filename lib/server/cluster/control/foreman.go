@@ -144,7 +144,7 @@ func (b *foreman) ExecuteScript(
 	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
 	cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
 
-	return client.New().Ssh.Run(hostID, cmd, utils.GetConnectionTimeout(), 2*utils.GetLongOperationTimeout())
+	return client.New().SSH.Run(hostID, cmd, utils.GetConnectionTimeout(), 2*utils.GetLongOperationTimeout())
 }
 
 // construct ...
@@ -316,7 +316,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return err
 	}
 	primaryGateway = primaryGatewayMetadata.Get()
-	err = clientInstance.Ssh.WaitReady(primaryGateway.ID, utils.GetExecutionTimeout())
+	err = clientInstance.SSH.WaitReady(primaryGateway.ID, utils.GetExecutionTimeout())
 	if err != nil {
 		return client.DecorateError(err, "wait for remote ssh service to be ready", false)
 	}
@@ -333,7 +333,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			return err
 		}
 		secondaryGateway = secondaryGatewayMetadata.Get()
-		err = clientInstance.Ssh.WaitReady(primaryGateway.ID, utils.GetExecutionTimeout())
+		err = clientInstance.SSH.WaitReady(primaryGateway.ID, utils.GetExecutionTimeout())
 		if err != nil {
 			return client.DecorateError(err, "wait for remote ssh service to be ready", false)
 		}
@@ -1479,7 +1479,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s\n", clusterName, feat.DisplayName(), msg)
+			return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
 		}
 		log.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	}
@@ -1523,7 +1523,7 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s\n", clusterName, feat.DisplayName(), msg)
+			return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
 		}
 		log.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	}

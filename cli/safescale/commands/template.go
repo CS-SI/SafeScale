@@ -25,7 +25,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
-var TemplateCmdName = "template"
+var templateCmdName = "template"
 
 // TemplateCmd command
 var TemplateCmd = cli.Command{
@@ -46,7 +46,7 @@ var templateList = cli.Command{
 			Usage: "List all available templates in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", TemplateCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
 		templates, err := client.New().Template.List(c.Bool("all"), utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error())))

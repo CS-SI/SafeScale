@@ -55,13 +55,13 @@ func GetUUID() string {
 func generateUUID(store bool) string {
 	mutexContextManager.Lock()
 	defer mutexContextManager.Unlock()
-	newUuid, err := uuid.NewV4()
+	newUUID, err := uuid.NewV4()
 	if err != nil {
 		panic("Failed to generate UUID")
 	}
 	if store {
 		uuidSet = true
-		clientRPCUUID = newUuid
+		clientRPCUUID = newUUID
 	}
-	return newUuid.String()
+	return newUUID.String()
 }

@@ -104,18 +104,22 @@ func (e ErrCore) Reset(err error) ErrCore {
 	return e
 }
 
+// Cause returns an error's cause
 func (e ErrCore) Cause() error {
 	return e.cause
 }
 
+// Consequences returns the consequences of current error (detected teardown problems)
 func (e ErrCore) Consequences() []error {
 	return e.consequences
 }
 
+// Wrap creates a new error with a message 'message' and a cause error 'cause'
 func Wrap(cause error, message string) ErrCore {
 	return NewErrCore(message, cause, []error{})
 }
 
+// NewErrCore creates a new error with a message 'message', a cause error 'cause' and a list of teardown problems 'consequences'
 func NewErrCore(message string, cause error, consequences []error) ErrCore {
 	if consequences == nil {
 		return ErrCore{
@@ -132,6 +136,7 @@ func NewErrCore(message string, cause error, consequences []error) ErrCore {
 	}
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrCore) AddConsequence(err error) error {
 	if err != nil {
 		if e.consequences == nil {
@@ -142,6 +147,7 @@ func (e ErrCore) AddConsequence(err error) error {
 	return e
 }
 
+// Error returns a human-friendly error explanation
 func (e ErrCore) Error() string {
 	msgFinal := e.Message
 
@@ -178,6 +184,7 @@ type ErrTimeout struct {
 	dur time.Duration
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrTimeout) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -200,6 +207,7 @@ type ErrNotFound struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrNotFound) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -221,6 +229,7 @@ type ErrNotAvailable struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrNotAvailable) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -242,6 +251,7 @@ type ErrDuplicate struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrDuplicate) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -263,6 +273,7 @@ type ErrInvalidRequest struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrInvalidRequest) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -279,11 +290,12 @@ func InvalidRequestError(msg string) ErrInvalidRequest {
 	}
 }
 
-// ErrInvalidRequest ...
+// ErrAccessDenied ...
 type ErrAccessDenied struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrAccessDenied) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -305,6 +317,7 @@ type ErrAborted struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrAborted) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -326,6 +339,7 @@ type ErrOverflow struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrOverflow) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -347,6 +361,7 @@ type ErrNotImplemented struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrNotImplemented) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -380,6 +395,7 @@ type ErrInvalidInstance struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrInvalidInstance) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -413,6 +429,7 @@ type ErrInvalidParameter struct {
 	ErrCore
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrInvalidParameter) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e

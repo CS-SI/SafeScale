@@ -271,7 +271,7 @@ func ToPBImage(in *resources.Image) *pb.Image {
 func ToPBNetwork(in *resources.Network) *pb.Network {
 	var pbVIP pb.VirtualIp
 	if in.VIP != nil {
-		pbVIP = ToPBVirtualIp(*in.VIP)
+		pbVIP = ToPBVirtualIP(*in.VIP)
 	}
 	return &pb.Network{
 		Id:                 in.ID,
@@ -320,8 +320,8 @@ func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
 	}
 }
 
-// ToPBVirtualIp converts a resources.VIP to a pb.VirtualIp
-func ToPBVirtualIp(src resources.VIP) pb.VirtualIp {
+// ToPBVirtualIP converts a resources.VIP to a pb.VirtualIp
+func ToPBVirtualIP(src resources.VIP) pb.VirtualIp {
 	dest := pb.VirtualIp{
 		Id:        src.ID,
 		NetworkId: src.NetworkID,
