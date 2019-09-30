@@ -80,10 +80,6 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "=v1.20.0"
 
 [[constraint]]
-  name = "github.com/pkg/errors"
-  version = "=v0.8.1"
-
-[[constraint]]
   name = "github.com/sirupsen/logrus"
   version = "=v1.3.0"
 

@@ -19,8 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
-
-	"github.com/pkg/errors"
+	errors "github.com/CS-SI/SafeScale/lib/utils"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"

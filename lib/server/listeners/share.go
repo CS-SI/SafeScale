@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	errors "github.com/CS-SI/SafeScale/lib/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
