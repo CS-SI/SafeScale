@@ -367,11 +367,11 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
+func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 	w.variables = v
 	w.settings = s
 
-	results := Results{}
+	results = Results{}
 
 	// 'pace' tells the order of execution
 	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
@@ -398,171 +398,189 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	}
 
 	// Now enumerate steps and execute each of them
-	var err error
 	for _, k := range order {
-		log.Debugf("executing step '%s::%s'...\n", w.action.String(), k)
+		_, stepErr, continuation, breaking := func() (res Results, inner error, cont bool, brea bool) {
+			defer utils.TimerErrWithLevel(fmt.Sprintf("executing step '%s::%s'...\n", w.action.String(), k), &inner, log.DebugLevel)()
 
-		stepKey := stepsKey + "." + k
-		var (
-			runContent string
-			stepT      = stepTargets{}
-			options    = map[string]string{}
-			ok         bool
-			anon       interface{}
-			err        error
-		)
-		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
-		if !ok {
-			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey)
-		}
+			stepKey := stepsKey + "." + k
+			var (
+				runContent string
+				stepT      = stepTargets{}
+				options    = map[string]string{}
+				ok         bool
+				anon       interface{}
+			)
+			stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
+			if !ok {
+				msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
+				return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey), false, false
+			}
 
-		// Determine list of hosts concerned by the step
-		var hostsList []*pb.Host
-		if w.target.Type() == "node" {
-			hostsList, err = w.identifyHosts(map[string]string{"hosts": "1"})
-		} else {
-			anon, ok = stepMap[yamlTargetsKeyword]
-			if ok {
-				for i, j := range anon.(map[string]interface{}) {
-					switch j.(type) {
-					case bool:
-						if j.(bool) {
-							stepT[i] = "true"
-						} else {
-							stepT[i] = "false"
+			// Determine list of hosts concerned by the step
+			var hostsList []*pb.Host
+			if w.target.Type() == "node" {
+				hostsList, inner = w.identifyHosts(map[string]string{"hosts": "1"})
+			} else {
+				anon, ok = stepMap[yamlTargetsKeyword]
+				if ok {
+					for i, j := range anon.(map[string]interface{}) {
+						switch j.(type) {
+						case bool:
+							if j.(bool) {
+								stepT[i] = "true"
+							} else {
+								stepT[i] = "false"
+							}
+						case string:
+							stepT[i] = j.(string)
 						}
-					case string:
-						stepT[i] = j.(string)
 					}
+				} else {
+					msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
+					return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword), false, false
+				}
+
+				hostsList, inner = w.identifyHosts(stepT)
+			}
+			if inner != nil {
+				return nil, inner, false, false
+			}
+			if len(hostsList) == 0 {
+				return nil, nil, true, false
+			}
+
+			// Get the content of the action based on method
+			keyword := yamlRunKeyword
+			switch w.method {
+			case Method.Apt:
+				fallthrough
+			case Method.Yum:
+				fallthrough
+			case Method.Dnf:
+				keyword = yamlPackageKeyword
+			}
+			anon, ok = stepMap[keyword]
+			if ok {
+				runContent = anon.(string)
+				// If 'run' content has to be altered, do it
+				if w.commandCB != nil {
+					runContent = w.commandCB(runContent)
 				}
 			} else {
 				msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-				return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
+				return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlRunKeyword), false, false
 			}
 
-			hostsList, err = w.identifyHosts(stepT)
-		}
-		if err != nil {
-			return nil, err
-		}
-		if len(hostsList) == 0 {
-			continue
-		}
-
-		// Get the content of the action based on method
-		keyword := yamlRunKeyword
-		switch w.method {
-		case Method.Apt:
-			fallthrough
-		case Method.Yum:
-			fallthrough
-		case Method.Dnf:
-			keyword = yamlPackageKeyword
-		}
-		anon, ok = stepMap[keyword]
-		if ok {
-			runContent = anon.(string)
-			// If 'run' content has to be altered, do it
-			if w.commandCB != nil {
-				runContent = w.commandCB(runContent)
-			}
-		} else {
-			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlRunKeyword)
-		}
-
-		// If there is an options file (for now specific to DCOS), upload it to the remote host
-		optionsFileContent := ""
-		anon, ok = stepMap[yamlOptionsKeyword]
-		if ok {
-			for i, j := range anon.(map[string]interface{}) {
-				options[i] = j.(string)
-			}
-			var (
-				avails  = map[string]interface{}{}
-				ok      bool
-				content interface{}
-			)
-			complexity := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
-			for k, anon := range options {
-				avails[strings.ToLower(k)] = anon
-			}
-			if content, ok = avails[complexity]; !ok {
-				if complexity == strings.ToLower(Complexity.Large.String()) {
-					complexity = Complexity.Normal.String()
+			// If there is an options file (for now specific to DCOS), upload it to the remote host
+			optionsFileContent := ""
+			anon, ok = stepMap[yamlOptionsKeyword]
+			if ok {
+				for i, j := range anon.(map[string]interface{}) {
+					options[i] = j.(string)
 				}
-				if complexity == strings.ToLower(Complexity.Normal.String()) {
-					if content, ok = avails[complexity]; !ok {
-						content, ok = avails[Complexity.Small.String()]
+				var (
+					avails  = map[string]interface{}{}
+					ok      bool
+					content interface{}
+				)
+				complexity := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
+				for k, anon := range options {
+					avails[strings.ToLower(k)] = anon
+				}
+				if content, ok = avails[complexity]; !ok {
+					if complexity == strings.ToLower(Complexity.Large.String()) {
+						complexity = Complexity.Normal.String()
+					}
+					if complexity == strings.ToLower(Complexity.Normal.String()) {
+						if content, ok = avails[complexity]; !ok {
+							content, ok = avails[Complexity.Small.String()]
+						}
+					}
+				}
+				if ok {
+					optionsFileContent = content.(string)
+					v["options"] = fmt.Sprintf("--options=%s/options.json", srvutils.TempFolder)
+				}
+			} else {
+				v["options"] = ""
+			}
+
+			wallTime := utils.GetLongOperationTimeout()
+			anon, ok = stepMap[yamlTimeoutKeyword]
+			if ok {
+				if _, ok := anon.(int); ok {
+					wallTime = time.Duration(anon.(int)) * time.Minute
+				} else {
+					wallTimeConv, inner := strconv.Atoi(anon.(string))
+					if inner != nil {
+						log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+					} else {
+						wallTime = time.Duration(wallTimeConv) * time.Minute
 					}
 				}
 			}
-			if ok {
-				optionsFileContent = content.(string)
-				v["options"] = fmt.Sprintf("--options=%s/options.json", srvutils.TempFolder)
-			}
-		} else {
-			v["options"] = ""
-		}
 
-		wallTime := utils.GetLongOperationTimeout()
-		anon, ok = stepMap[yamlTimeoutKeyword]
-		if ok {
-			if _, ok := anon.(int); ok {
-				wallTime = time.Duration(anon.(int)) * time.Minute
-			} else {
-				wallTimeConv, err := strconv.Atoi(anon.(string))
-				if err != nil {
-					log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
-				} else {
-					wallTime = time.Duration(wallTimeConv) * time.Minute
+			templateCommand, inner := normalizeScript(Variables{
+				"reserved_Name":    w.feature.DisplayName(),
+				"reserved_Content": runContent,
+				"reserved_Action":  strings.ToLower(w.action.String()),
+				"reserved_Step":    k,
+			})
+			if inner != nil {
+				return nil, inner, false, false
+			}
+
+			// Checks if step can be performed in parallel on selected hosts
+			serial := false
+			anon, ok = stepMap[yamlSerialKeyword]
+			if ok {
+				value, ok := anon.(string)
+				if ok {
+					if strings.ToLower(value) == "yes" || strings.ToLower(value) != "true" {
+						serial = true
+					}
 				}
 			}
-		}
 
-		utils.GetLongOperationTimeout()
-
-		templateCommand, err := normalizeScript(Variables{
-			"reserved_Name":    w.feature.DisplayName(),
-			"reserved_Content": runContent,
-			"reserved_Action":  strings.ToLower(w.action.String()),
-			"reserved_Step":    k,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		// Checks if step can be performed in parallel on selected hosts
-		serial := false
-		anon, ok = stepMap[yamlSerialKeyword]
-		if ok {
-			value, ok := anon.(string)
-			if ok {
-				if strings.ToLower(value) == "yes" || strings.ToLower(value) != "true" {
-					serial = true
-				}
+			step := step{
+				Worker:             w,
+				Name:               k,
+				Action:             w.action,
+				Targets:            stepT,
+				Script:             templateCommand,
+				WallTime:           wallTime,
+				OptionsFileContent: optionsFileContent,
+				YamlKey:            stepKey,
+				Serial:             serial,
 			}
+			results[k], inner = step.Run(hostsList, w.variables, w.settings)
+
+			// If an error occurred, don't do the remaining steps, fail immediately
+			if inner != nil {
+				return nil, inner, false, true
+			}
+
+			if !results[k].Successful() {
+				if strings.Contains(w.action.String(), "Check") {
+					log.Warnf(fmt.Sprintf("executing step '%s::%s'... was a failure, not installed yet ?", w.action.String(), k))
+					return nil, nil, false, true
+				}
+				return nil, fmt.Errorf(results[k].ErrorMessages()), false, true
+			}
+
+			return results, nil, false, false
+		}()
+
+		if breaking {
+			break
 		}
 
-		step := step{
-			Worker:             w,
-			Name:               k,
-			Action:             w.action,
-			Targets:            stepT,
-			Script:             templateCommand,
-			WallTime:           wallTime,
-			OptionsFileContent: optionsFileContent,
-			YamlKey:            stepKey,
-			Serial:             serial,
+		if continuation {
+			continue
 		}
-		results[k], err = step.Run(hostsList, w.variables, w.settings)
-		// If an error occurred, don't do the remaining steps, fail immediately
-		if err != nil {
-			break
-		}
-		if !results[k].Successful() {
-			break
+
+		if stepErr != nil {
+			return results, stepErr
 		}
 	}
 	return results, err
