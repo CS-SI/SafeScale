@@ -78,7 +78,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 	case Flavor.SWARM:
 		controller.Restore(task, control.NewForeman(controller, swarm.Makers))
 	default:
-		return fmt.Errorf("cluster Flavor '%s' not yet implemented", flavor.String())
+		return utils.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", flavor.String()))
 	}
 	return nil
 }
@@ -135,7 +135,7 @@ func Create(task concurrency.Task, req control.Request) (clu api.Cluster, err er
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", req.Flavor.String())
+		return nil, utils.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", req.Flavor.String()))
 	}
 
 	log.Infof("Cluster '%s' created and initialized successfully", req.Name)

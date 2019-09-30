@@ -213,7 +213,7 @@ func (e ErrNotFound) AddConsequence(err error) error {
 	return e
 }
 
-// NotFoundError creates a ResourceNotFound error
+// NotFoundError creates a ErrNotFound error
 func NotFoundError(msg string) ErrNotFound {
 	return ErrNotFound{
 		ErrCore: ErrCore{
@@ -373,11 +373,19 @@ func NotImplementedError(what string) ErrNotImplemented {
 	if pc, file, line, ok := runtime.Caller(1); ok {
 		if f := runtime.FuncForPC(pc); f != nil {
 			filename := strings.Replace(file, getPartToRemove(), "", 1)
-			msg = fmt.Sprintf("not implemented yet: %s [%s:%d]", filepath.Base(f.Name()), filename, line)
+			if len(what) > 0 {
+				msg = fmt.Sprintf("not implemented yet: %s : %s [%s:%d]", what, filepath.Base(f.Name()), filename, line)
+			} else {
+				msg = fmt.Sprintf("not implemented yet: %s [%s:%d]", filepath.Base(f.Name()), filename, line)
+			}
 		}
 	}
-	if msg == "" {
+
+	if len(msg) == 0 {
 		msg = "not implemented yet!"
+		if what != "" {
+			msg += ": " + what
+		}
 	}
 
 	log.Error(Capitalize(msg))
