@@ -16,4 +16,5 @@
 
 package stacks
 
+// DefaultSecurityGroupName is the name of the default security group used by SafeScale
 const DefaultSecurityGroupName = "sg-safescale"

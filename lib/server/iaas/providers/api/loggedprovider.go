@@ -17,36 +17,43 @@ type LoggedProvider WrappedProvider
 
 // Provider specific functions
 
+// Build ...
 func (w LoggedProvider) Build(something map[string]interface{}) (Provider, error) {
 	defer w.prepare(w.trace("Build"))
 	return w.InnerProvider.Build(something)
 }
 
+// ListImages ...
 func (w LoggedProvider) ListImages(all bool) ([]resources.Image, error) {
 	defer w.prepare(w.trace("ListImages"))
 	return w.InnerProvider.ListImages(all)
 }
 
+// ListTemplates ...
 func (w LoggedProvider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	defer w.prepare(w.trace("ListTemplates"))
 	return w.InnerProvider.ListTemplates(all)
 }
 
+// GetAuthenticationOptions ...
 func (w LoggedProvider) GetAuthenticationOptions() (providers.Config, error) {
 	defer w.prepare(w.trace("GetAuthenticationOptions"))
 	return w.InnerProvider.GetAuthenticationOptions()
 }
 
+// GetConfigurationOptions ...
 func (w LoggedProvider) GetConfigurationOptions() (providers.Config, error) {
 	defer w.prepare(w.trace("GetConfigurationOptions"))
 	return w.InnerProvider.GetConfigurationOptions()
 }
 
+// GetName ...
 func (w LoggedProvider) GetName() string {
 	defer w.prepare(w.trace("GetName"))
 	return w.InnerProvider.GetName()
 }
 
+// GetTenantParameters ...
 func (w LoggedProvider) GetTenantParameters() map[string]interface{} {
 	defer w.prepare(w.trace("GetTenantParameters"))
 	return w.InnerProvider.GetTenantParameters()

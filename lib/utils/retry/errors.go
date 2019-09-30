@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
+// ErrTimeout is an alias for utils.ErrTimeout
 type ErrTimeout = utils.ErrTimeout
 
+// AddConsequence adds an error 'err' to the list of consequences
 func AddConsequence(err error, cons error) error {
 	type consequencer interface {
 		Consequences() []error
@@ -24,13 +26,13 @@ func AddConsequence(err error, cons error) error {
 				return nerr
 			}
 			return conseq
-		} else {
-			logrus.Error(err)
 		}
+		logrus.Error(err)
 	}
 	return err
 }
 
+// Consequences returns the list of consequences
 func Consequences(err error) []error {
 	type consequencer interface {
 		Consequences() []error
@@ -60,14 +62,17 @@ type ErrLimit struct {
 	limit uint
 }
 
+// Cause returns the error cause
 func (e ErrLimit) Cause() error {
 	return e.ErrCore.Cause()
 }
 
+// Consequences returns the list of consequences
 func (e ErrLimit) Consequences() []error {
 	return e.ErrCore.Consequences()
 }
 
+// AddConsequence adds an error 'err' to the list of consequences
 func (e ErrLimit) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
@@ -101,14 +106,17 @@ type ErrStopRetry struct {
 	utils.ErrCore
 }
 
+// Cause returns the error cause
 func (e ErrStopRetry) Cause() error {
 	return e.ErrCore.Cause()
 }
 
+// Consequences returns the list of consequences
 func (e ErrStopRetry) Consequences() []error {
 	return e.ErrCore.Consequences()
 }
 
+// AddConsequence adds a consequence err to the list of consequences
 func (e ErrStopRetry) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e

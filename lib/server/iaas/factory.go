@@ -353,19 +353,19 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 
 	// FIXME Remove google custom code
 	if config.Type == "google" {
-		if config.ProjectId, ok = identity["project_id"].(string); !ok {
+		if config.ProjectID, ok = identity["project_id"].(string); !ok {
 			return config, fmt.Errorf("problem parsing project_id")
 		}
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
-			ProjectId:    identity["project_id"].(string),
-			PrivateKeyId: identity["private_key_id"].(string),
+			ProjectID:    identity["project_id"].(string),
+			PrivateKeyID: identity["private_key_id"].(string),
 			PrivateKey:   identity["private_key"].(string),
 			ClientEmail:  identity["client_email"].(string),
-			ClientId:     identity["client_id"].(string),
-			AuthUri:      identity["auth_uri"].(string),
-			TokenUri:     identity["token_uri"].(string),
+			ClientID:     identity["client_id"].(string),
+			AuthURI:      identity["auth_uri"].(string),
+			TokenURI:     identity["token_uri"].(string),
 			AuthProvider: identity["auth_provider_x509_cert_url"].(string),
 			ClientCert:   identity["client_x509_cert_url"].(string),
 		}
@@ -501,19 +501,19 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 
 	// FIXME Remove google custom code
 	if config.Type == "google" {
-		if config.ProjectId, ok = identity["project_id"].(string); !ok {
+		if config.ProjectID, ok = identity["project_id"].(string); !ok {
 			return config, fmt.Errorf("problem parsing project_id")
 		}
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
-			ProjectId:    identity["project_id"].(string),
-			PrivateKeyId: identity["private_key_id"].(string),
+			ProjectID:    identity["project_id"].(string),
+			PrivateKeyID: identity["private_key_id"].(string),
 			PrivateKey:   identity["private_key"].(string),
 			ClientEmail:  identity["client_email"].(string),
-			ClientId:     identity["client_id"].(string),
-			AuthUri:      identity["auth_uri"].(string),
-			TokenUri:     identity["token_uri"].(string),
+			ClientID:     identity["client_id"].(string),
+			AuthURI:      identity["auth_uri"].(string),
+			TokenURI:     identity["token_uri"].(string),
 			AuthProvider: identity["auth_provider_x509_cert_url"].(string),
 			ClientCert:   identity["client_x509_cert_url"].(string),
 		}

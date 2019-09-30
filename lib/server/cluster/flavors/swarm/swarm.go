@@ -133,7 +133,7 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	clientInstance := client.New()
 	clientHost := clientInstance.Host
-	clientSSH := clientInstance.Ssh
+	clientSSH := clientInstance.SSH
 
 	cluster := foreman.Cluster()
 
@@ -190,7 +190,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 
 // joinMaster is the code to use to join a new master to the cluster
 func joinMaster(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
-	clientSSH := client.New().Ssh
+	clientSSH := client.New().SSH
 
 	joinCmd, err := getSwarmJoinCommand(task, foreman, false)
 	if err != nil {
@@ -207,7 +207,7 @@ func joinMaster(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host)
 
 // joinNode is the code to use join a new node to the cluster
 func joinNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
-	clientSSH := client.New().Ssh
+	clientSSH := client.New().SSH
 
 	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
 	if err != nil {
@@ -237,7 +237,7 @@ func getSwarmJoinCommand(task concurrency.Task, foreman control.Foreman, worker 
 		memberType = "worker"
 	}
 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-	retcode, token, stderr, err := clientInstance.Ssh.Run(masterID, tokenCmd,
+	retcode, token, stderr, err := clientInstance.SSH.Run(masterID, tokenCmd,
 		utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
 		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
@@ -317,7 +317,7 @@ func unconfigureNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.
 		}
 	}
 
-	clientSSH := client.New().Ssh
+	clientSSH := client.New().SSH
 
 	// Check worker is member of the Swarm
 	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)

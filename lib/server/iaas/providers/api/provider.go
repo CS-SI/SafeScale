@@ -38,8 +38,9 @@ type Provider interface {
 	// Host templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates(all bool) ([]resources.HostTemplate, error)
 
-	// GetAuthenticationOptions returns authentification options as a Config
+	// GetAuthenticationOptions returns authentication options as a Config
 	GetAuthenticationOptions() (providers.Config, error)
+
 	// GetConfigurationfgOpts returns configuration options as a Config
 	GetConfigurationOptions() (providers.Config, error)
 

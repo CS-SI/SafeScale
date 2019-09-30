@@ -32,11 +32,13 @@ func ResourceNotFoundError(resource, name string) utils.ErrNotFound {
 	return utils.NotFoundError(msgFinal)
 }
 
+// ResourceTimeoutError creates a ErrTimeout error
 func ResourceTimeoutError(resource, name string, dur time.Duration) utils.ErrTimeout {
 	msgFinal := fmt.Sprintf("timeout of '%s' waiting for '%s' '%s'", dur, resource, name)
 	return utils.TimeoutError(msgFinal, dur, nil)
 }
 
+// TimeoutError creates a ErrTimeout error
 func TimeoutError(message string, dur time.Duration) utils.ErrTimeout {
 	return utils.TimeoutError(message, dur, nil)
 }

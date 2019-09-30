@@ -27,7 +27,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
-var DataCmdName = "data"
+var dataCmdName = "data"
 
 // DataCmd command
 var DataCmd = cli.Command{
@@ -54,7 +54,7 @@ var dataPush = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", dataCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <local_file_path>."))
@@ -86,7 +86,7 @@ var dataGet = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", dataCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
@@ -113,7 +113,7 @@ var dataDelete = cli.Command{
 	Usage:     "delete a file of the storage",
 	ArgsUsage: "<file_name>",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", dataCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
@@ -133,7 +133,7 @@ var dataList = cli.Command{
 	Usage:     "list all files in the storage",
 	ArgsUsage: "<local_file_path>",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", DataCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", dataCmdName, c.Command.Name, c.Args())
 		filesList, err := client.New().Data.List(utils.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))

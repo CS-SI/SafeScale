@@ -446,19 +446,20 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				}
 				return fmt.Errorf("query to create host '%s' failed: %s%s",
 					request.ResourceName, openstack.ProviderErrorToString(err), codeStr)
+			}
+
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
+			if zoneErr != nil {
+				log.Tracef("Host successfully created: {%s}, with some warnings {%s}", spew.Sdump(server), zoneErr)
 			} else {
-				creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
-				if zoneErr != nil {
-					log.Tracef("Host successfully created: {%s}, with some warnings {%s}", spew.Sdump(server), zoneErr)
-				} else {
-					log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
-					if creationZone != srvOpts.AvailabilityZone {
-						if srvOpts.AvailabilityZone != "" {
-							log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
-						}
+				log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
+				if creationZone != srvOpts.AvailabilityZone {
+					if srvOpts.AvailabilityZone != "" {
+						log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
 					}
 				}
 			}
+
 			host.ID = server.ID
 
 			// Wait that host is ready, not just that the build is started

@@ -101,9 +101,10 @@ func (mv *Volume) Reload() error {
 	return nil
 }
 
+// ReadByIDorName reads the metadata of a volume identified either by ID or by Name
 func (mv *Volume) ReadByIDorName(id string) (err error) {
-	errId := mv.ReadByID(id)
-	if errId != nil {
+	errID := mv.ReadByID(id)
+	if errID != nil {
 		errName := mv.ReadByName(id)
 		if errName != nil {
 			return errName

@@ -51,7 +51,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	compuService := s.ComputeService
 
 	recreateSafescaleNetwork := true
-	recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectId, ne.Name).Do()
+	recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
 	if recnet != nil && err == nil {
 		recreateSafescaleNetwork = false
 	} else {
@@ -67,14 +67,14 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	}
 
 	if recreateSafescaleNetwork {
-		opp, err := compuService.Networks.Insert(s.GcpConfig.ProjectId, &ne).Context(context.Background()).Do()
+		opp, err := compuService.Networks.Insert(s.GcpConfig.ProjectID, &ne).Context(context.Background()).Do()
 		if err != nil {
 			return nil, err
 		}
 
 		oco := OpContext{
 			Operation:    opp,
-			ProjectId:    s.GcpConfig.ProjectId,
+			ProjectID:    s.GcpConfig.ProjectID,
 			Service:      compuService,
 			DesiredState: "DONE",
 		}
@@ -85,7 +85,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		}
 	}
 
-	necreated, err := compuService.Networks.Get(s.GcpConfig.ProjectId, ne.Name).Do()
+	necreated, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -101,18 +101,18 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	subnetReq := compute.Subnetwork{
 		IpCidrRange: req.CIDR,
 		Name:        req.Name,
-		Network:     fmt.Sprintf("projects/%s/global/networks/%s", s.GcpConfig.ProjectId, s.GcpConfig.NetworkName),
+		Network:     fmt.Sprintf("projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
 		Region:      theRegion,
 	}
 
-	opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectId, theRegion, &subnetReq).Context(context.Background()).Do()
+	opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectID, theRegion, &subnetReq).Context(context.Background()).Do()
 	if err != nil {
 		return nil, err
 	}
 
 	oco := OpContext{
 		Operation:    opp,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      compuService,
 		DesiredState: "DONE",
 	}
@@ -122,7 +122,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, err
 	}
 
-	gcpSubNet, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectId, theRegion, req.Name).Do()
+	gcpSubNet, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, theRegion, req.Name).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	buildNewRule := true
 	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, gcpSubNet.Name)
 
-	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectId, firewallRuleName).Do()
+	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
 	if fws != nil && err == nil {
 		buildNewRule = false
 	} else {
@@ -162,18 +162,18 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 			Direction:    "INGRESS",
 			Disabled:     false,
 			Name:         firewallRuleName,
-			Network:      fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectId, s.GcpConfig.NetworkName),
+			Network:      fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
 			Priority:     999,
 			SourceRanges: []string{"0.0.0.0/0"},
 		}
 
-		opp, err = compuService.Firewalls.Insert(s.GcpConfig.ProjectId, &fiw).Do()
+		opp, err = compuService.Firewalls.Insert(s.GcpConfig.ProjectID, &fiw).Do()
 		if err != nil {
 			return nil, err
 		}
 		oco = OpContext{
 			Operation:    opp,
-			ProjectId:    s.GcpConfig.ProjectId,
+			ProjectID:    s.GcpConfig.ProjectID,
 			Service:      compuService,
 			DesiredState: "DONE",
 		}
@@ -188,7 +188,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	buildNewNATRule := true
 	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, gcpSubNet.Name)
 
-	rfs, err := compuService.Routes.Get(s.GcpConfig.ProjectId, natRuleName).Do()
+	rfs, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
 	if rfs != nil && err == nil {
 		buildNewNATRule = false
 	} else {
@@ -207,18 +207,18 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		route := &compute.Route{
 			DestRange:       "0.0.0.0/0",
 			Name:            natRuleName,
-			Network:         fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectId, s.GcpConfig.NetworkName),
-			NextHopInstance: fmt.Sprintf("projects/%s/zones/%s/instances/gw-%s", s.GcpConfig.ProjectId, s.GcpConfig.Zone, req.Name),
+			Network:         fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
+			NextHopInstance: fmt.Sprintf("projects/%s/zones/%s/instances/gw-%s", s.GcpConfig.ProjectID, s.GcpConfig.Zone, req.Name),
 			Priority:        800,
 			Tags:            []string{fmt.Sprintf("no-ip-%s", gcpSubNet.Name)},
 		}
-		opp, err := compuService.Routes.Insert(s.GcpConfig.ProjectId, route).Do()
+		opp, err := compuService.Routes.Insert(s.GcpConfig.ProjectID, route).Do()
 		if err != nil {
 			return nil, err
 		}
 		oco = OpContext{
 			Operation:    opp,
-			ProjectId:    s.GcpConfig.ProjectId,
+			ProjectID:    s.GcpConfig.ProjectID,
 			Service:      compuService,
 			DesiredState: "DONE",
 		}
@@ -284,7 +284,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 	token := ""
 	for paginate := true; paginate; {
-		resp, err := compuService.Networks.List(s.GcpConfig.ProjectId).PageToken(token).Do()
+		resp, err := compuService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 		if err != nil {
 			return networks, fmt.Errorf("can't list networks ...: %s", err)
 		}
@@ -303,7 +303,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 	token = ""
 	for paginate := true; paginate; {
-		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectId, s.GcpConfig.Region).PageToken(token).Do()
+		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).PageToken(token).Do()
 		if err != nil {
 			return networks, fmt.Errorf("can't list subnetworks ...: %s", err)
 		}
@@ -349,19 +349,19 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	compuService := s.ComputeService
-	subnetwork, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectId, s.GcpConfig.Region, theNetwork.Name).Do()
+	subnetwork, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, theNetwork.Name).Do()
 	if err != nil {
 		return err
 	}
 
-	opp, err := compuService.Subnetworks.Delete(s.GcpConfig.ProjectId, s.GcpConfig.Region, subnetwork.Name).Do()
+	opp, err := compuService.Subnetworks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, subnetwork.Name).Do()
 	if err != nil {
 		return err
 	}
 
 	oco := OpContext{
 		Operation:    opp,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      compuService,
 		DesiredState: "DONE",
 	}
@@ -379,13 +379,13 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 
 	// Delete routes and firewall
 	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, subnetwork.Name)
-	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectId, firewallRuleName).Do()
+	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
 	if fws != nil && err == nil {
-		opp, err := compuService.Firewalls.Delete(s.GcpConfig.ProjectId, firewallRuleName).Do()
+		opp, err := compuService.Firewalls.Delete(s.GcpConfig.ProjectID, firewallRuleName).Do()
 		if err == nil {
 			oco := OpContext{
 				Operation:    opp,
-				ProjectId:    s.GcpConfig.ProjectId,
+				ProjectID:    s.GcpConfig.ProjectID,
 				Service:      compuService,
 				DesiredState: "DONE",
 			}
@@ -399,13 +399,13 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
-	nws, err := compuService.Routes.Get(s.GcpConfig.ProjectId, natRuleName).Do()
+	nws, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
 	if nws != nil && err == nil {
-		opp, err := compuService.Routes.Delete(s.GcpConfig.ProjectId, natRuleName).Do()
+		opp, err := compuService.Routes.Delete(s.GcpConfig.ProjectID, natRuleName).Do()
 		if err == nil {
 			oco := OpContext{
 				Operation:    opp,
-				ProjectId:    s.GcpConfig.ProjectId,
+				ProjectID:    s.GcpConfig.ProjectID,
 				Service:      compuService,
 				DesiredState: "DONE",
 			}

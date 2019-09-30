@@ -117,7 +117,7 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 
 	token := ""
 	for paginate := true; paginate; {
-		resp, err := compuService.MachineTypes.List(s.GcpConfig.ProjectId, s.GcpConfig.Zone).PageToken(token).Do()
+		resp, err := compuService.MachineTypes.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 		if err != nil {
 			logrus.Warnf("Can't list public types...: %s", err)
 			break
@@ -386,7 +386,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
+			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
 			if err != nil {
 				if server != nil {
 					// try deleting server
@@ -539,10 +539,10 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 }
 
 // buildGcpMachine ...
-func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageId string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate) (*resources.Host, error) {
+func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate) (*resources.Host, error) {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
-	imageURL := imageId
+	imageURL := imageID
 
 	tag := "nat"
 	if !isPublic {
@@ -603,7 +603,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 	etag := op.Header.Get("Etag")
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    projectID,
+		ProjectID:    projectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -658,46 +658,46 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, resources.ResourceNotFoundError("host", hostRef)
 	}
 
-	gcpHost, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectId, s.GcpConfig.Zone, hostRef).Do()
+	gcpHost, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostRef).Do()
 	if err != nil {
 		return nil, err
 	}
 
 	host.LastState = stateConvert(gcpHost.Status)
-	var subnets []IpInSubnet
+	var subnets []IPInSubnet
 
 	for _, nit := range gcpHost.NetworkInterfaces {
-		snet := genUrl(nit.Subnetwork)
+		snet := genURL(nit.Subnetwork)
 		if !utils.IsEmpty(snet) {
-			pubIp := ""
+			pubIP := ""
 			for _, aco := range nit.AccessConfigs {
 				if aco != nil {
 					if aco.NatIP != "" {
-						pubIp = aco.NatIP
+						pubIP = aco.NatIP
 					}
 				}
 			}
 
-			subnets = append(subnets, IpInSubnet{
+			subnets = append(subnets, IPInSubnet{
 				Subnet:   snet,
 				IP:       nit.NetworkIP,
-				PublicIP: pubIp,
+				PublicIP: pubIP,
 			})
 		}
 	}
 
-	var resouceNetworks []IpInSubnet
+	var resouceNetworks []IPInSubnet
 	for _, sn := range subnets {
-		region, err := GetRegionFromSelfLink(sn.Subnet)
+		region, err := getRegionFromSelfLink(sn.Subnet)
 		if err != nil {
 			continue
 		}
-		psg, err := s.ComputeService.Subnetworks.Get(s.GcpConfig.ProjectId, region, GetResourceNameFromSelfLink(sn.Subnet)).Do()
+		psg, err := s.ComputeService.Subnetworks.Get(s.GcpConfig.ProjectID, region, getResourceNameFromSelfLink(sn.Subnet)).Do()
 		if err != nil {
 			continue
 		}
 
-		resouceNetworks = append(resouceNetworks, IpInSubnet{
+		resouceNetworks = append(resouceNetworks, IPInSubnet{
 			Subnet:   sn.Subnet,
 			Name:     psg.Name,
 			ID:       strconv.FormatUint(psg.Id, 10),
@@ -821,7 +821,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 	}
 
 	service := s.ComputeService
-	projectID := s.GcpConfig.ProjectId
+	projectID := s.GcpConfig.ProjectID
 	zone := s.GcpConfig.Zone
 	instanceName := id
 
@@ -837,7 +837,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    projectID,
+		ProjectID:    projectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -878,7 +878,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 
 	token := ""
 	for paginate := true; paginate; {
-		resp, err := compuService.Instances.List(s.GcpConfig.ProjectId, s.GcpConfig.Zone).PageToken(token).Do()
+		resp, err := compuService.Instances.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 		if err != nil {
 			return hostList, fmt.Errorf("cannot list hosts: %v", err)
 		}
@@ -909,14 +909,14 @@ func (s *Stack) StopHost(id string) error {
 
 	service := s.ComputeService
 
-	op, err := service.Instances.Stop(s.GcpConfig.ProjectId, s.GcpConfig.Zone, id).Do()
+	op, err := service.Instances.Stop(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
 	if err != nil {
 		return err
 	}
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -936,14 +936,14 @@ func (s *Stack) StartHost(id string) error {
 
 	service := s.ComputeService
 
-	op, err := service.Instances.Start(s.GcpConfig.ProjectId, s.GcpConfig.Zone, id).Do()
+	op, err := service.Instances.Start(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
 	if err != nil {
 		return err
 	}
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -963,14 +963,14 @@ func (s *Stack) RebootHost(id string) error {
 
 	service := s.ComputeService
 
-	op, err := service.Instances.Stop(s.GcpConfig.ProjectId, s.GcpConfig.Zone, id).Do()
+	op, err := service.Instances.Stop(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
 	if err != nil {
 		return err
 	}
 
 	oco := OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -980,14 +980,14 @@ func (s *Stack) RebootHost(id string) error {
 		return err
 	}
 
-	op, err = service.Instances.Start(s.GcpConfig.ProjectId, s.GcpConfig.Zone, id).Do()
+	op, err = service.Instances.Start(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
 	if err != nil {
 		return err
 	}
 
 	oco = OpContext{
 		Operation:    op,
-		ProjectId:    s.GcpConfig.ProjectId,
+		ProjectID:    s.GcpConfig.ProjectID,
 		Service:      service,
 		DesiredState: "DONE",
 	}
@@ -1019,7 +1019,7 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	resp, err := s.ComputeService.Zones.List(s.GcpConfig.ProjectId).Do()
+	resp, err := s.ComputeService.Zones.List(s.GcpConfig.ProjectID).Do()
 	if err != nil {
 		return zones, err
 	}
@@ -1040,7 +1040,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 
 	compuService := s.ComputeService
 
-	resp, err := compuService.Regions.List(s.GcpConfig.ProjectId).Do()
+	resp, err := compuService.Regions.List(s.GcpConfig.ProjectID).Do()
 	if err != nil {
 		return regions, err
 	}

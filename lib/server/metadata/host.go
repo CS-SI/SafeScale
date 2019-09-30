@@ -82,9 +82,10 @@ func (mh *Host) Write() (err error) {
 	return mh.item.WriteInto(ByIDFolderName, *mh.id)
 }
 
+// ReadByIDorName reads the metadata of a network either by ID or by Name
 func (mh *Host) ReadByIDorName(id string) (err error) {
-	errId := mh.ReadByID(id)
-	if errId != nil {
+	errID := mh.ReadByID(id)
+	if errID != nil {
 		errName := mh.ReadByName(id)
 		if errName != nil {
 			return errName

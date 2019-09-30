@@ -45,7 +45,7 @@ type SizingRequirements struct {
 
 // StoredCPUInfo ...
 type StoredCPUInfo struct {
-	Id           string `bow:"key"`
+	ID           string `bow:"key"`
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`

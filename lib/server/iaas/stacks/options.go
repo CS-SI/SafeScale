@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 )
 
+// AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
 const AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
 
 // AuthenticationOptions fields are the union of those recognized by each identity implementation and provider

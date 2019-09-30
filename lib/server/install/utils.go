@@ -182,7 +182,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
 	to := fmt.Sprintf("%s:%s", host.Name, filename)
-	sshClt := client.New().Ssh
+	sshClt := client.New().SSH
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

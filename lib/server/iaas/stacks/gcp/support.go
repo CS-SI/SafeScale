@@ -14,7 +14,7 @@ import (
 // OpContext ...
 type OpContext struct {
 	Operation    *compute.Operation
-	ProjectId    string
+	ProjectID    string
 	Service      *compute.Service
 	DesiredState string
 }
@@ -32,15 +32,15 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 
 	if oco.Operation != nil {
 		if oco.Operation.Zone != "" {
-			zoneUrl, _ := url.Parse(oco.Operation.Zone)
-			zone := GetResourceNameFromSelfLink(*zoneUrl)
-			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectId, zone, oco.Operation.Name).Do()
+			zoneURL, _ := url.Parse(oco.Operation.Zone)
+			zone := getResourceNameFromSelfLink(*zoneURL)
+			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 		} else if oco.Operation.Region != "" {
-			regionUrl, _ := url.Parse(oco.Operation.Region)
-			region := GetResourceNameFromSelfLink(*regionUrl)
-			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectId, region, oco.Operation.Name).Do()
+			regionURL, _ := url.Parse(oco.Operation.Region)
+			region := getResourceNameFromSelfLink(*regionURL)
+			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
 		} else {
-			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectId, oco.Operation.Name).Do()
+			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
 		}
 
 		res.State = oco.Operation.Status
@@ -71,8 +71,8 @@ func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, 
 // SelfLink ...
 type SelfLink = url.URL
 
-// IpInSubnet ...
-type IpInSubnet struct {
+// IPInSubnet ...
+type IPInSubnet struct {
 	Subnet   SelfLink
 	Name     string
 	ID       string
@@ -80,15 +80,15 @@ type IpInSubnet struct {
 	PublicIP string
 }
 
-func genUrl(urlCand string) SelfLink {
-	theUrl, err := url.Parse(urlCand)
+func genURL(urlCand string) SelfLink {
+	theURL, err := url.Parse(urlCand)
 	if err != nil {
 		return url.URL{}
 	}
-	return *theUrl
+	return *theURL
 }
 
-func GetResourceNameFromSelfLink(link SelfLink) string {
+func getResourceNameFromSelfLink(link SelfLink) string {
 	stringRepr := link.String()
 	parts := strings.Split(stringRepr, "/")
 	return parts[len(parts)-1]
@@ -103,7 +103,7 @@ func indexOf(element string, data []string) int {
 	return -1 //not found.
 }
 
-func GetRegionFromSelfLink(link SelfLink) (string, error) {
+func getRegionFromSelfLink(link SelfLink) (string, error) {
 	stringRepr := link.String()
 	if strings.Contains(stringRepr, "regions") {
 		parts := strings.Split(stringRepr, "/")
@@ -114,9 +114,8 @@ func GetRegionFromSelfLink(link SelfLink) (string, error) {
 			}
 		}
 		return "", fmt.Errorf("not a region link")
-	} else {
-		return "", fmt.Errorf("not a region link")
 	}
+	return "", fmt.Errorf("not a region link")
 }
 
 func assertEq(exp, got interface{}) error {

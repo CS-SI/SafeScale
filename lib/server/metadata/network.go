@@ -125,9 +125,10 @@ func (m *Network) Reload() (err error) {
 	return nil
 }
 
+// ReadByIDorName reads network metadata either by ID or by name
 func (m *Network) ReadByIDorName(id string) (err error) {
-	errId := m.ReadByID(id)
-	if errId != nil {
+	errID := m.ReadByID(id)
+	if errID != nil {
 		errName := m.ReadByName(id)
 		if errName != nil {
 			return errName

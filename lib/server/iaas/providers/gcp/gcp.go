@@ -69,29 +69,29 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		}
 	}
 
-	projectId, _ := identityCfg["project_id"].(string)
-	privateKeyId, _ := identityCfg["private_key_id"].(string)
+	gcpprojectID, _ := identityCfg["project_id"].(string)
+	privateKeyID, _ := identityCfg["private_key_id"].(string)
 	privateKey, _ := identityCfg["private_key"].(string)
 	clientEmail, _ := identityCfg["client_email"].(string)
-	clientId, _ := identityCfg["client_id"].(string)
-	authUri, _ := identityCfg["auth_uri"].(string)
-	tokenUri, _ := identityCfg["token_uri"].(string)
+	clientID, _ := identityCfg["client_id"].(string)
+	authURI, _ := identityCfg["auth_uri"].(string)
+	tokenURI, _ := identityCfg["token_uri"].(string)
 	authProvider, _ := identityCfg["auth_provider_x509_cert_url"].(string)
-	clientCertUrl, _ := identityCfg["client_x509_cert_url"].(string)
+	clientCertURL, _ := identityCfg["client_x509_cert_url"].(string)
 	region, _ := computeCfg["Region"].(string)
 	zone, _ := computeCfg["Zone"].(string)
 
 	gcpConf := stacks.GCPConfiguration{
 		Type:         "service_account",
-		ProjectId:    projectId,
-		PrivateKeyId: privateKeyId,
+		ProjectID:    gcpprojectID,
+		PrivateKeyID: privateKeyID,
 		PrivateKey:   privateKey,
 		ClientEmail:  clientEmail,
-		ClientId:     clientId,
-		AuthUri:      authUri,
-		TokenUri:     tokenUri,
+		ClientID:     clientID,
+		AuthURI:      authURI,
+		TokenURI:     tokenURI,
 		AuthProvider: authProvider,
-		ClientCert:   clientCertUrl,
+		ClientCert:   clientCertURL,
 		Region:       region,
 		Zone:         zone,
 		NetworkName:  networkName,

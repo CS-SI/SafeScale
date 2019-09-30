@@ -20,6 +20,7 @@ type MyFormatter struct {
 	pid string
 }
 
+// GetDefaultFormatter returns the default formatter used by all Safescale modules
 func GetDefaultFormatter() *MyFormatter {
 	return &MyFormatter{
 		TextFormatter: logrus.TextFormatter{

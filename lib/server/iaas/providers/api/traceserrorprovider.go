@@ -14,6 +14,7 @@ type ErrorTraceProvider WrappedProvider
 
 // Provider specific functions
 
+// Build ...
 func (w ErrorTraceProvider) Build(something map[string]interface{}) (p Provider, err error) {
 	defer func(prefix string) {
 		if err != nil {
@@ -23,6 +24,7 @@ func (w ErrorTraceProvider) Build(something map[string]interface{}) (p Provider,
 	return w.InnerProvider.Build(something)
 }
 
+// ListImages ...
 func (w ErrorTraceProvider) ListImages(all bool) (images []resources.Image, err error) {
 	defer func(prefix string) {
 		if err != nil {
@@ -32,6 +34,7 @@ func (w ErrorTraceProvider) ListImages(all bool) (images []resources.Image, err 
 	return w.InnerProvider.ListImages(all)
 }
 
+// ListTemplates ...
 func (w ErrorTraceProvider) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
 	defer func(prefix string) {
 		if err != nil {
@@ -41,6 +44,7 @@ func (w ErrorTraceProvider) ListTemplates(all bool) (templates []resources.HostT
 	return w.InnerProvider.ListTemplates(all)
 }
 
+// GetAuthenticationOptions ...
 func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg providers.Config, err error) {
 	defer func(prefix string) {
 		if err != nil {
@@ -51,6 +55,7 @@ func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg providers.Config, er
 	return w.InnerProvider.GetAuthenticationOptions()
 }
 
+// GetConfigurationOptions ...
 func (w ErrorTraceProvider) GetConfigurationOptions() (cfg providers.Config, err error) {
 	defer func(prefix string) {
 		if err != nil {
@@ -60,10 +65,12 @@ func (w ErrorTraceProvider) GetConfigurationOptions() (cfg providers.Config, err
 	return w.InnerProvider.GetConfigurationOptions()
 }
 
+// GetName ...
 func (w ErrorTraceProvider) GetName() string {
 	return w.InnerProvider.GetName()
 }
 
+// GetTenantParameters ...
 func (w ErrorTraceProvider) GetTenantParameters() map[string]interface{} {
 	return w.InnerProvider.GetTenantParameters()
 }

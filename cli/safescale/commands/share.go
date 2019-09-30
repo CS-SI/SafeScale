@@ -30,7 +30,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
-var ShareCmdName = "share"
+var shareCmdName = "share"
 
 // ShareCmd ssh command
 var ShareCmd = cli.Command{
@@ -92,7 +92,7 @@ var shareCreate = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ShareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
@@ -128,7 +128,7 @@ var shareDelete = cli.Command{
 	Usage:     "Delete a share",
 	ArgsUsage: "<Share_name> [<Share_name>...]",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ShareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
@@ -171,7 +171,7 @@ var shareList = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List all created shared",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ShareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		list, err := client.New().Share.List(0)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error()))
@@ -196,7 +196,7 @@ var shareMount = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ShareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
@@ -226,7 +226,7 @@ var shareUnmount = cli.Command{
 	Usage:     "Unmount a share from an host",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ShareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
@@ -252,7 +252,7 @@ var shareInspect = cli.Command{
 	Usage:     "List the share information and clients connected to it",
 	ArgsUsage: "<Share_name>",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", ShareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))

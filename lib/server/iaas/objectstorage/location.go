@@ -70,7 +70,7 @@ func (l *location) connect() error {
 	if l.config.Type == "google" {
 		config = stow.ConfigMap{
 			"json":       l.config.Credentials,
-			"project_id": l.config.ProjectId,
+			"project_id": l.config.ProjectID,
 		}
 	} else {
 		config = stow.ConfigMap{
