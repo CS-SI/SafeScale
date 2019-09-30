@@ -76,7 +76,7 @@ func (s *ProcessManagerListener) List(ctx context.Context, in *google_protobuf.E
 	handler := ProcessManagerHandler(tenant.Service)
 	processMap, err := handler.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list Process %s", err.Error())
+		return nil, fmt.Errorf("failed to list Process %s", err.Error())
 	}
 	var pbProcessList []*pb.ProcessDefinition
 	for uuid, info := range processMap {

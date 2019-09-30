@@ -56,7 +56,7 @@ func getService() (iaas.Service, error) {
 		}
 		service, err := iaas.UseService(tenant_name)
 		if err != nil || service == nil {
-			return nil, fmt.Errorf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name)
+			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name)
 		}
 		tester = &tests.ServiceTester{
 			Service: service,

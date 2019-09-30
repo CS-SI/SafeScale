@@ -127,7 +127,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_pr
 
 	service, err := iaas.UseService(in.GetName())
 	if err != nil {
-		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
+		return &google_protobuf.Empty{}, fmt.Errorf("unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}
 	currentTenant = &Tenant{name: in.GetName(), Service: service}
 	log.Infof("Current tenant is now '%s'", in.GetName())
@@ -228,7 +228,7 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 
 	storageServices, err := iaas.UseStorages(in.GetNames())
 	if err != nil {
-		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenants '%v': %s", in.GetNames(), err.Error())
+		return &google_protobuf.Empty{}, fmt.Errorf("unable to set tenants '%v': %s", in.GetNames(), err.Error())
 	}
 
 	currentStorageTenants = &StorageTenants{names: in.GetNames(), StorageServices: storageServices}

@@ -102,7 +102,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 	vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume : %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("error creating volume : %s", openstack.ProviderErrorToString(err))
 	}
 	v := resources.Volume{
 		ID:    vol.ID,
@@ -123,7 +123,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		if _, ok := err.(gc.ErrDefault404); ok {
 			return nil, resources.ResourceNotFoundError("volume", id)
 		}
-		return nil, utils.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}
 
 	av := resources.Volume{
@@ -159,7 +159,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	})
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error listing volume types: %s", openstack.ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)))
 		}
 		log.Warnf("Complete volume list empty")
 	}

@@ -48,7 +48,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
 		name += "." + suffix
 		if len(name) > maxBucketNameLength {
-			return "", fmt.Errorf("Suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
+			return "", fmt.Errorf("suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
 		}
 	}
 

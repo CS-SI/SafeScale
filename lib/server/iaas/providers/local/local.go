@@ -86,7 +86,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	config.UseLayer3Networking = false
 	bucketName, err := objectstorage.BuildMetadataBucketName("local", "", "", "")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to build metadata bucket name %v", err)
+		return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
 	}
 	config.MetadataBucket = bucketName
 
@@ -129,7 +129,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	libvirtStack, err := libStack.New(authOptions, localConfig, config)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create a new libvirt Stack : %v", err)
+		return nil, fmt.Errorf("failed to create a new libvirt Stack : %v", err)
 	}
 
 	localProvider := &provider{

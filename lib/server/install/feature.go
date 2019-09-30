@@ -136,7 +136,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 				}
 			}
 		default:
-			return nil, fmt.Errorf("Unknown parameter value : %s \n (should be host or cluster)", suitableFor)
+			return nil, fmt.Errorf("unknown parameter value : %s \n (should be host or cluster)", suitableFor)
 		}
 
 	}

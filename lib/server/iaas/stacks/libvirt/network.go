@@ -40,7 +40,7 @@ import (
 func infoFromCidr(cidr string) (string, string, string, string, error) {
 	IP, IPNet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return "", "", "", "", fmt.Errorf("Failed to parse cidr : %s", err.Error())
+		return "", "", "", "", fmt.Errorf("failed to parse cidr : %s", err.Error())
 	} else if IPNet.Mask[3] >= 63 {
 		return "", "", "", "", fmt.Errorf("Please use a wider network range")
 	}
@@ -97,7 +97,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 			value, err := strconv.Atoi(netmaskBloc[i])
 			ipBloc[i], err = strconv.Atoi(ipBlocstring[i])
 			if err != nil {
-				return nil, fmt.Errorf("Failed to convert x.x.x.x nemask to [0-32] netmask")
+				return nil, fmt.Errorf("failed to convert x.x.x.x nemask to [0-32] netmask")
 			}
 			nbBits := 0
 			if value != 0 {
@@ -169,7 +169,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	libvirtNetwork, err = s.LibvirtService.NetworkDefineXML(requestXML)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create network : %s", err.Error())
+		return nil, fmt.Errorf("failed to create network : %s", err.Error())
 	}
 	defer func(*libvirt.Network) {
 		if err != nil {
@@ -184,16 +184,16 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	err = libvirtNetwork.SetAutostart(true)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to enable network autostart : %s", err.Error())
+		return nil, fmt.Errorf("failed to enable network autostart : %s", err.Error())
 	}
 	err = libvirtNetwork.Create()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to start network : %s", err.Error())
+		return nil, fmt.Errorf("failed to start network : %s", err.Error())
 	}
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to convert a libvirt network into a network : %s", err.Error())
+		return nil, fmt.Errorf("failed to convert a libvirt network into a network : %s", err.Error())
 	}
 
 	return network, nil
@@ -210,18 +210,18 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 	}
 	active, err := libvirtNetwork.IsActive()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to check if the network is active : %s", err.Error())
+		return nil, fmt.Errorf("failed to check if the network is active : %s", err.Error())
 	}
 	if !active {
 		err = libvirtNetwork.Create()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to start network : %s", err.Error())
+			return nil, fmt.Errorf("failed to start network : %s", err.Error())
 		}
 	}
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to convert a libvirt network into a network : %s", err.Error())
+		return nil, fmt.Errorf("failed to convert a libvirt network into a network : %s", err.Error())
 	}
 
 	return network, nil
@@ -243,7 +243,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 	libvirtNetworks, err := s.LibvirtService.ListAllNetworks(3)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Error listing networks : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("error listing networks : %s", err.Error()))
 	}
 	for _, libvirtNetwork := range libvirtNetworks {
 		network, err := getNetworkFromLibvirtNetwork(&libvirtNetwork)
@@ -269,18 +269,18 @@ func (s *Stack) DeleteNetwork(ref string) error {
 
 	isActive, err := libvirtNetwork.IsActive()
 	if err != nil {
-		return fmt.Errorf("Failed to check if the network is active : %s", err.Error())
+		return fmt.Errorf("failed to check if the network is active : %s", err.Error())
 	}
 	if isActive {
 		err = libvirtNetwork.Destroy()
 		if err != nil {
-			return fmt.Errorf("Failed to destroy network : %s", err.Error())
+			return fmt.Errorf("failed to destroy network : %s", err.Error())
 		}
 	}
 
 	err = libvirtNetwork.Undefine()
 	if err != nil {
-		return fmt.Errorf("Failed to undefine network : %s", err.Error())
+		return fmt.Errorf("failed to undefine network : %s", err.Error())
 	}
 
 	return nil
@@ -304,7 +304,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	if gwName == "" {
 		name, err := networkLibvirt.GetName()
 		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to get network name : %s", err.Error())
+			return nil, nil, fmt.Errorf("failed to get network name : %s", err.Error())
 		}
 		gwName = "gw-" + name
 	}
@@ -320,7 +320,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create gateway host : %s", err.Error())
+		return nil, nil, fmt.Errorf("failed to create gateway host : %s", err.Error())
 	}
 
 	return host, userData, nil

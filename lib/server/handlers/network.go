@@ -894,7 +894,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	// 		return nil
 	// 	})
 	// 	if err != nil {
-	// 		return fmt.Errorf("Failed to get gateway sizingV1")
+	// 		return fmt.Errorf("failed to get gateway sizingV1")
 	// 	}
 
 	// 	//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
@@ -909,7 +909,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	// 	}
 	// 	networkBis, err := handler.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, sizing, "Ubuntu 18.04", metadataHost.Name)
 	// 	if err != nil {
-	// 		return fmt.Errorf("Failed to stop network deletion")
+	// 		return fmt.Errorf("failed to stop network deletion")
 	// 	}
 	// 	buf, err := networkBis.Serialize()
 	// 	if err != nil {

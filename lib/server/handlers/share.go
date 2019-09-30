@@ -66,7 +66,7 @@ func NewShareHandler(svc iaas.Service) ShareAPI {
 func sanitize(in string) (string, error) {
 	sanitized := path.Clean(in)
 	if !path.IsAbs(sanitized) {
-		return "", fmt.Errorf("Exposed path must be absolute")
+		return "", fmt.Errorf("exposed path must be absolute")
 	}
 	return sanitized, nil
 }

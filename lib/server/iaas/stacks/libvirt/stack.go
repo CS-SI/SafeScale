@@ -26,7 +26,7 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, 
 
 	libvirtConnection, err := libvirt.NewConnect(stack.LibvirtConfig.URI)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to libvirt : %s", err.Error())
+		return nil, fmt.Errorf("failed to connect to libvirt : %s", err.Error())
 	}
 	stack.LibvirtService = libvirtConnection
 

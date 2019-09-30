@@ -357,9 +357,9 @@ func unconfigureNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, utils.GetHostTimeout())
+			return fmt.Errorf("swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, utils.GetHostTimeout())
 		default:
-			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
+			return fmt.Errorf("swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
 		}
 	}
 

@@ -172,21 +172,21 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); !ok {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error getting network '%s': %s", id, ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error getting network '%s': %s", id, ProviderErrorToString(err)))
 		}
 	}
 	if network != nil && network.ID != "" {
 		sns, err := s.listSubnets(id)
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error getting network: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error getting network: %s", ProviderErrorToString(err)))
 		}
 		if len(sns) != 1 {
-			return nil, fmt.Errorf("Bad configuration, each network should have exactly one subnet")
+			return nil, fmt.Errorf("bad configuration, each network should have exactly one subnet")
 		}
 		sn := sns[0]
 		// gwID, _ := client.getGateway(id)
 		// if err != nil {
-		// 	return nil, fmt.Errorf("Bad configuration, no gateway associated to this network")
+		// 	return nil, fmt.Errorf("bad configuration, no gateway associated to this network")
 		// }
 		newNet := resources.NewNetwork()
 		newNet.ID = network.ID
@@ -224,7 +224,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 			for _, n := range networkList {
 				sns, err := s.listSubnets(n.ID)
 				if err != nil {
-					return false, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
+					return false, fmt.Errorf("error getting network: %s", ProviderErrorToString(err))
 				}
 				if len(sns) != 1 {
 					continue
@@ -247,7 +247,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	)
 	if len(netList) == 0 || err != nil {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error listing networks: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing networks: %s", ProviderErrorToString(err)))
 		}
 		log.Debugf("Listing all networks: Empty network list !")
 	}
@@ -337,7 +337,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	}
 	host, userData, err = s.CreateHost(hostReq)
 	if err != nil {
-		return nil, userData, utils.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
+		return nil, userData, utils.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
 	}
 
 	// delete the host when found problem starting from here
@@ -366,7 +366,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 		return nil
 	})
 	if err != nil {
-		return nil, userData, utils.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
+		return nil, userData, utils.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
 	}
 	return host, userData, nil
 }
@@ -463,11 +463,11 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		case gophercloud.ErrDefault400:
 			neutronError := ParseNeutronError(r.Err.Error())
 			if neutronError != nil {
-				msg := fmt.Sprintf("Error creating subnet: bad request: %s\n", neutronError["message"])
+				msg := fmt.Sprintf("error creating subnet: bad request: %s\n", neutronError["message"])
 				return nil, fmt.Errorf(msg)
 			}
 		}
-		return nil, utils.Wrap(err, fmt.Sprintf("Error creating subnet: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
 	}
 
 	// Starting from here, delete subnet if exit with error
@@ -487,7 +487,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 			NetworkID: s.ProviderNetworkID,
 		})
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error creating subnet: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
 		}
 
 		// Starting from here, delete router if exit with error
@@ -503,7 +503,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 
 		err = s.addSubnetToRouter(router.ID, subnet.ID)
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error creating subnet: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
 		}
 	}
 
@@ -521,7 +521,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 func calcDhcpAllocationPool(cidr string) (string, string, error) {
 	_, _, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return "", "", fmt.Errorf("Invalid cidr '%s'", cidr)
+		return "", "", fmt.Errorf("invalid cidr '%s'", cidr)
 	}
 
 	start, end, err := utils.CIDRToLongRange(cidr)
@@ -544,7 +544,7 @@ func (s *Stack) getSubnet(id string) (*Subnet, error) {
 	// Execute the operation and get back a subnets.Subnet struct
 	subnet, err := subnets.Get(s.NetworkClient, id).Extract()
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error getting subnet: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting subnet: %s", ProviderErrorToString(err)))
 	}
 	return &Subnet{
 		ID:        subnet.ID,
@@ -564,7 +564,7 @@ func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
 	paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
-			return false, fmt.Errorf("Error listing subnets: %s", ProviderErrorToString(err))
+			return false, fmt.Errorf("error listing subnets: %s", ProviderErrorToString(err))
 		}
 
 		for _, subnet := range list {
@@ -680,7 +680,7 @@ func (s *Stack) createRouter(req RouterRequest) (*Router, error) {
 func (s *Stack) getRouter(id string) (*Router, error) {
 	r, err := routers.Get(s.NetworkClient, id).Extract()
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error getting Router: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting Router: %s", ProviderErrorToString(err)))
 	}
 	return &Router{
 		ID:        r.ID,
@@ -714,7 +714,7 @@ func (s *Stack) ListRouters() ([]Router, error) {
 		},
 	)
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 	}
 	return ns, nil
 }
@@ -734,7 +734,7 @@ func (s *Stack) addSubnetToRouter(routerID string, subnetID string) error {
 		SubnetID: subnetID,
 	}).Extract()
 	if err != nil {
-		return utils.Wrap(err, fmt.Sprintf("Error addinter subnet: %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("error addinter subnet: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }

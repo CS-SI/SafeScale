@@ -140,7 +140,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Can't inspect network: neither name nor id given as reference")
+		return nil, fmt.Errorf("can't inspect network: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()

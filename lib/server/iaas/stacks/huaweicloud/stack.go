@@ -120,7 +120,7 @@ func (s *Stack) initVPC() error {
 		CIDR: s.authOpts.VPCCIDR,
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to initialize VPC '%s': %s", s.authOpts.VPCName, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("failed to initialize VPC '%s': %s", s.authOpts.VPCName, openstack.ProviderErrorToString(err))
 	}
 	s.vpc = vpc
 	return nil
@@ -132,7 +132,7 @@ func (s *Stack) findVPCID() (*string, error) {
 	found := false
 	routers, err := s.Stack.ListRouters()
 	if err != nil {
-		return nil, fmt.Errorf("Error listing routers: %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("error listing routers: %s", openstack.ProviderErrorToString(err))
 	}
 	for _, r := range routers {
 		if r.Name == s.authOpts.VPCName {

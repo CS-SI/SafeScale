@@ -182,7 +182,7 @@ func (svc *service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 		select {
 		case res := <-cout:
 			if res == 0 {
-				return nil, fmt.Errorf("Error getting host state")
+				return nil, fmt.Errorf("error getting host state")
 			}
 			if res == 1 {
 				return <-vc, nil
@@ -314,7 +314,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			}
 			region, ok := authOpts.Get("Region")
 			if !ok {
-				return nil, fmt.Errorf("Region value unset")
+				return nil, fmt.Errorf("region value unset")
 			}
 			folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
 
@@ -337,7 +337,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				for _, f := range imageList {
 					imageFound := resources.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-						log.Error(fmt.Sprintf("Error unmarsalling image %s : %v", f, err))
+						log.Error(fmt.Sprintf("error unmarsalling image %s : %v", f, err))
 					}
 
 					// if the user asked explicitly no gpu

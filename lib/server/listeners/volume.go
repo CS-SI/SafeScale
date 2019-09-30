@@ -101,7 +101,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -137,7 +137,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	ctx, cancelFunc := context.WithCancel(ctx)
 	err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Attach "+volumeName+" to host "+hostName)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
 
 	tenant := GetCurrentTenant()

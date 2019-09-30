@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
-var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
+var errorStr = "libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
 
 // provider is the implementation of the local driver regarding to the api.Provider
 type provider struct {

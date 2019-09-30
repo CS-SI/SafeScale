@@ -113,15 +113,15 @@ func GetRegionFromSelfLink(link SelfLink) (string, error) {
 				return parts[regionPos+1], nil
 			}
 		}
-		return "", fmt.Errorf("Not a region link")
+		return "", fmt.Errorf("not a region link")
 	} else {
-		return "", fmt.Errorf("Not a region link")
+		return "", fmt.Errorf("not a region link")
 	}
 }
 
 func assertEq(exp, got interface{}) error {
 	if !reflect.DeepEqual(exp, got) {
-		return fmt.Errorf("Wanted %v; Got %v", exp, got)
+		return fmt.Errorf("wanted %v; Got %v", exp, got)
 	}
 	return nil
 }

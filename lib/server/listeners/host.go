@@ -73,7 +73,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -283,7 +283,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Can't get host status: neither name nor id given as reference")
+		return nil, fmt.Errorf("can't get host status: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()

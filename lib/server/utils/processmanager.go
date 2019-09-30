@@ -46,7 +46,7 @@ func ProcessRegister(ctx context.Context, cancelFunc func(), command string) err
 	}
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return fmt.Errorf("No uuid in grpc metadata")
+		return fmt.Errorf("no uuid in grpc metadata")
 	}
 	mutexProcessManager.Lock()
 	processMap[md.Get("uuid")[0]] = processInfo{

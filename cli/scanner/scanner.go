@@ -119,20 +119,20 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	var err error
 	info.NumberOfCPU, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
+		return nil, fmt.Errorf("parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
 	}
 	info.NumberOfCore, err = strconv.Atoi(tokens[1])
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
+		return nil, fmt.Errorf("parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
 	}
 	info.NumberOfSocket, err = strconv.Atoi(tokens[2])
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
+		return nil, fmt.Errorf("parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
 	}
 	info.NumberOfCore = info.NumberOfCore * info.NumberOfSocket
 	info.CPUFrequency, err = strconv.ParseFloat(tokens[3], 64)
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
+		return nil, fmt.Errorf("parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
 	}
 	info.CPUFrequency = math.Floor(info.CPUFrequency*100) / 100000
 
@@ -141,7 +141,7 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	info.CPUModel = tokens[6]
 	info.RAMSize, err = strconv.ParseFloat(tokens[7], 64)
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
+		return nil, fmt.Errorf("parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
 	}
 
 	memInGb := info.RAMSize / 1024 / 1024
@@ -347,7 +347,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			return err
 		}
 		if network == nil {
-			return fmt.Errorf("Failure creating network '%s'", netName)
+			return fmt.Errorf("failure creating network '%s'", netName)
 		}
 
 		defer func() {
