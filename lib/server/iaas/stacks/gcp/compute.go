@@ -205,17 +205,17 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, utils.NotImplementedError("GetKeyPair() not implemented yet")
 }
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, utils.NotImplementedError("ListKeyPairs() not implemented yet")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return fmt.Errorf("not implemented")
+	return utils.NotImplementedError("DeleteKeyPair() not implemented yet")
 }
 
 // CreateHost creates an host satisfying request
@@ -863,7 +863,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 
 // ResizeHost change the template used by an host
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	return nil, utils.NotImplementedError("ResizeHost() not implemented yet")
 }
 
 // ListHosts lists available hosts

@@ -134,11 +134,11 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	if ipVersion != IPVersion.IPv4 {
 		// TODO implement IPV6 networks
-		panic("only ipv4 networks are implemented")
+		return nil, utils.NotImplementedError("only ipv4 networks are implemented")
 	}
 	if len(dns) != 0 {
 		// TODO implement DNS for networks
-		panic("DNS not implemented yet in networks creation")
+		return nil, utils.NotImplementedError("DNS not implemented yet in networks creation")
 	}
 
 	libvirtNetwork, err := getNetworkFromRef(name, s.LibvirtService)

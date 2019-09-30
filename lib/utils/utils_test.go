@@ -23,7 +23,6 @@ import (
 	"testing"
 )
 
-// TODO Remove this later
 func OriginalAbsPathify(inPath string) string {
 	if strings.HasPrefix(inPath, "$HOME") {
 		inPath = userHomeDir() + inPath[5:]

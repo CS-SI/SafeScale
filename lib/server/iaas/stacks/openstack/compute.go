@@ -1291,5 +1291,5 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 	// TODO RESIZE Call this
 	// servers.Resize()
 
-	return nil, fmt.Errorf("not implemented yet")
+	return nil, utils.NotImplementedError("ResizeHost() not implemented yet")
 }
