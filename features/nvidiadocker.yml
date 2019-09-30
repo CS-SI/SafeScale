@@ -22,7 +22,7 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
+
     install:
         bash:
             check:
@@ -43,7 +43,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    exit 192
                                     ;;
                             esac
 
@@ -59,37 +59,64 @@ feature:
                         run: |
                             lspci | grep -i nvidia &>/dev/null || {
                                 echo "No nVidia GPU detected. Aborting."
-                                exit 10
+                                exit 192
                             }
 
-                            NVIDIA_URL=http://developer.download.nvidia.com/compute/cuda/repos
+                            DOCKER_VERSION=$(sfGetFact "docker_version")
+                            NVIDIA_DEV_URL=https://developer.download.nvidia.com/compute/cuda/repos
+                            NVIDIA_DOCKER_URL=https://nvidia.github.io/nvidia-docker
+
+                            cat >/etc/modprobe.d/black-list-nouveau.conf <<-'EOF'
+                            blacklist nouveau
+                            options nouveau modeset=0
+                            EOF
+
                             case $LINUX_KIND in
                                 ubuntu)
-                                    version=${VERSION_ID/./}
-                                    wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu$version/x86_64/cuda-repo-ubuntu${version}_9.2.148-1_amd64.deb || \
-                                    wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || exit $?
-                                    dpkg -i cuda-repo.deb || exit $?
-                                    apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu${version}/x86_64/7fa2af80.pub
-                                    rm -f cuda-repo.deb
-                                    sfWaitForApt && apt install -y gcc linux-headers jq
-                                    curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
-                                    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-                                    curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-                                    tee /etc/apt/sources.list.d/nvidia-docker.list
-                                    sfWaitForApt && apt update
-                                    sfWaitForApt && apt install -y cuda || exit $?
-                                    sfWaitForApt && yes | apt install -y nvidia-docker2 || exit $?
+                                    update-initramfs -u || true
+
+                                    dpkg --compare-versions $(sfGetFact "version_id") ge 18.04 && DIST=ubuntu18.04 || DIST=ubuntu16.04
+                                    sfWaitForApt && apt install -y gcc linux-headers-$(uname -r) || exit $?
+                                    if dpkg --compare-versions $DOCKER_VERSION ge 19.03; then
+                                        # first install cuda-drivers
+                                        apt-get install linux-headers-$(uname -r)
+                                        wget -O /etc/apt/preferences.d/cuda-repository-pin-600 ${NVIDIA_URL}/${DIST/.//}/x86_64/cuda-${DIST/.//}.pin
+                                        apt-key adv --fetch-keys ${NVIDIA_DEV_URL}/${DIST/.//}/x86_64/7fa2af80.pub
+                                        echo "deb ${NVIDIA_DEV_URL}/${DIST/.//}/x86_64/ /" >/etc/apt/sources.list.d/nvidia-cuda.list
+                                        apt-get update
+                                        apt-get -y install cuda-drivers
+
+                                        # Second install nvidia-docker
+                                        curl -s -L ${NVIDIA_DOCKER_URL}/gpgkey | apt-key add -
+                                        curl -s -L ${NVIDIA_DOCKER_URL}/${DIST}/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
+                                        sfApt update
+                                        sfApt install -y nvidia-container-toolkit
+                                        systemctl restart docker
+                                    else
+                                        wget -O cuda-repo.deb ${NVIDIA_URL}/${DIST}/x86_64/cuda-repo-${DIST}_9.2.148-1_amd64.deb || exit $?
+                                        dpkg -i cuda-repo.deb || exit $?
+                                        apt-key adv --fetch-keys ${NVIDIA_URL}/${DIST}/x86_64/7fa2af80.pub
+                                        rm -f cuda-repo.deb
+
+                                        curl -s -L ${NVIDIA_DOCKER_URL}/gpgkey | apt-key add -
+                                        curl -s -L ${NVIDIA_DOCKER_URL}/${DIST}/nvidia-docker.list | \
+                                            tee /etc/apt/sources.list.d/nvidia-docker.list
+                                        sfWaitForApt && apt update
+                                        sfWaitForApt && apt install -y cuda || exit $?
+                                        sfWaitForApt && yes | apt install -y nvidia-docker2 || exit $?
+                                    fi
                                     ;;
+
                                 debian)
                                     wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || exit $?
                                     dpkg -i cuda-repo.deb || exit $?
-                                    sfWaitForApt && apt install -y dirmngr jq gcc linux-headers-$(uname -r) || exit $?
+                                    sfWaitForApt && apt install -y dirmngr gcc linux-headers-$(uname -r) || exit $?
                                     apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1710/x86_64/7fa2af80.pub
                                     rm -f cuda-repo.deb
                                     curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
-                                    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+                                    DIST=$(. /etc/os-release; echo $ID$VERSION_ID)
                                     curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-                                    tee /etc/apt/sources.list.d/nvidia-docker.list
+                                        tee /etc/apt/sources.list.d/nvidia-docker.list
                                     wget -O screen-resolution-extra.deb http://security.ubuntu.com/ubuntu/pool/main/s/screen-resolution-extra/screen-resolution-extra_0.17.1.1_all.deb || exit $?
                                     wget -O python3-xkit.deb http://archive.ubuntu.com/ubuntu/pool/main/x/x-kit/python3-xkit_0.5.0ubuntu2_all.deb || exit $?
                                     apt -y install libgtk-3-0 policykit-1-gnome || exit $?
@@ -98,14 +125,22 @@ feature:
                                     sfWaitForApt && apt install -y cuda || exit $?
                                     sfWaitForApt && yes | apt install -y nvidia-docker2 || exit $?
                                     ;;
+
                                 centos|rhel)
                                     yum install -y epel-release
-                                    yum install -y gcc yum kernel-devel kernel-headers jq
-                                    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-                                    curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | \
-                                    tee /etc/yum.repos.d/nvidia-docker.repo || exit $?
-                                    yum clean expire-cache
-                                    yum install -y cuda nvidia-docker2 || exit $?
+                                    yum install -y gcc yum kernel-devel kernel-headers
+                                    DIST=$(. /etc/os-release;echo $ID$VERSION_ID)
+                                    if docker_version >= 19.03; then
+                                        curl -s -L https://nvidia.github.io/nvidia-docker/${DIST}/nvidia-docker.repo | \
+                                            tee /etc/yum.repos.d/nvidia-docker.repo
+                                        yum install -y nvidia-container-toolkit
+                                        sfSystem restart docker
+                                    else
+                                        curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | \
+                                            tee /etc/yum.repos.d/nvidia-docker.repo || exit $?
+                                        yum clean expire-cache
+                                        yum install -y cuda nvidia-docker2 || exit $?
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

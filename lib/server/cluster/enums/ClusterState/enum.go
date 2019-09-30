@@ -40,6 +40,11 @@ const (
 	Error
 	// Removed tells the struct still exist but the underlying cluster has been totally wiped out
 	Removed
+	// Stopping the cluster is stopping
+	Stopping
+	// Starting the cluster is starting
+	Starting
+
 	// Unknown ...
 	Unknown
 )

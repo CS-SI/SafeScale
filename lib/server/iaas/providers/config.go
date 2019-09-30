@@ -31,7 +31,7 @@ type Config interface {
 	GetString(name string) string
 	//GetSliceOfStrings returns a slice of strings corresponding to the key, empty string slice if it doesn't exist
 	GetSliceOfStrings(name string) []string
-	//GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
+	//GetMapOfStrings returns a string map of strings corresponding to the key, empty map if it doesn't exist
 	GetMapOfStrings(name string) map[string]string
 	//GetInteger returns an integer corresponding to the key, 0 if it doesn't exist
 	GetInteger(name string) int
@@ -71,7 +71,7 @@ func (c ConfigMap) GetSliceOfStrings(name string) []string {
 	return []string{}
 }
 
-// GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
+// GetMapOfStrings returns a string map of strings corresponding to the key, empty map if it doesn't exist
 func (c ConfigMap) GetMapOfStrings(name string) map[string]string {
 	val, ok := c.Get(name)
 	if ok {

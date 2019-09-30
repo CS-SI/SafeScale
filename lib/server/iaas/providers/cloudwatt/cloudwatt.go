@@ -39,7 +39,7 @@ var (
 	identityEndpointTemplate = "https://identity.%s.cloudwatt.com/v2.0"
 )
 
-// provider is the providerementation of the Cloudwatt provider
+// provider is the implementation of the Cloudwatt provider
 type provider struct {
 	*openstack.Stack
 

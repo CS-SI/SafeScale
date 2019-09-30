@@ -163,14 +163,14 @@ func NewShard(bucket objectstorage.Bucket) *Shard {
 
 	for i := 0; ; i++ {
 		if i > 10 {
-			panic(fmt.Sprintf("Issue on random shard name generations (or extremly++ unlucky)  : %v", err))
+			panic(fmt.Sprintf("Issue on random shard name generations (or extremely++ unlucky)  : %v", err))
 		}
 		// To be accepted by a maximum of objects storages, passwords should be generated without symbols
 		if name, err = generateAesPassword(false); err != nil {
 			continue
 		}
 		name += ".bin"
-		//TODO-AJ is it usefull, as it could take up to 25 sec to check all the shards? (+- 0.10 sec / shard with 100ms ping)
+		//TODO-AJ is it useful, as it could take up to 25 sec to check all the shards? (+- 0.10 sec / shard with 100ms ping)
 		if obj, err := bucket.GetObject(name); err != nil && obj == nil {
 			break
 		}

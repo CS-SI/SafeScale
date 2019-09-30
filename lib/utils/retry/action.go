@@ -174,7 +174,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 }
 
 // WhileUnsuccessfulWhereRetcode255WithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
-// and this error has 255 as exit status code), waiting 'delay' after each try, expiting after 'timeout'
+// and this error has 255 as exit status code), waiting 'delay' after each try, expiring after 'timeout'
 func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)

@@ -110,7 +110,7 @@ func (s *Session) Disconnect() {
 }
 
 // DecorateError changes the error to something more comprehensible when
-// timeout occured
+// timeout occurred
 func DecorateError(err error, action string, maySucceed bool) error {
 	if IsTimeoutError(err) {
 		msg := "%s took too long (> %v) to respond"

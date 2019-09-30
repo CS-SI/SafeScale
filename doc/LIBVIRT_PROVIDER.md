@@ -149,7 +149,7 @@ The Folder that will be used by libvirt to store disk images and block storages 
 
 ## Images
 
-To create a host we need a disk image with the os and usefull functionalities pre-installed, available images are registered in a JSON file.
+To create a host we need a disk image with the os and useful functionalities pre-installed, available images are registered in a JSON file.
 
 ### Structure of JSON file
 

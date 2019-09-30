@@ -15,6 +15,7 @@
 
 export SF_BASEDIR=/opt/safescale
 export SF_ETCDIR=${SF_BASEDIR}/etc
+export SF_BINDIR=${SF_BASEDIR}/bin
 export SF_VARDIR=${SF_BASEDIR}/var
 export SF_TMPDIR=${SF_VARDIR}/tmp
 export SF_LOGDIR=${SF_VARDIR}/log
@@ -202,6 +203,12 @@ export -f sfRetry
 sfFirewall() {
 	[ $# -eq 0 ] && return 0
 	which firewall-cmd &>/dev/null || return 1
+	# Restart firewalld if failed
+	if [ "$(sfGetFact "use_systemd")" = "1" ]; then
+		if sudo systemctl is-failed firewalld; then
+			sudo systemctl restart firewalld || return $?
+		fi
+	fi
 	# sudo may be superfluous if executed as root, but won't harm
 	sudo firewall-cmd "$@"
 }
@@ -439,13 +446,13 @@ sfDoesDockerRunContainer() {
 	[ $# -eq 0 ] && return 1
 	local IMAGE=$1
 	shift
-	local NAME=
-	[ $# -ge 1 ] && NAME=$1
+	local INSTANCE=
+	[ $# -ge 1 ] && INSTANCE=$1
 
 	local LIST=$(docker container ls {{ "--format '{{.Image}}|{{.Names}}|{{.Status}}'" }})
 	[ -z "$LIST" ] && return 1
 	[ "$IMAGE" != "$(echo "$LIST" | cut -d'|' -f1 | grep "$IMAGE" | uniq)" ] && return 1
-	[ ! -z "$NAME" -a "$NAME" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$NAME" | uniq)" ] && return 1
+	[ ! -z "$INSTANCE" -a "$INSTANCE" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ] && return 1
 	echo $LIST | cut -d'|' -f3 | grep -i "^up" &>/dev/null || return 1
 	return 0
 }
@@ -461,11 +468,11 @@ sfDoesDockerRunService() {
 	if [ -z "$LIST" ]; then
 		return 1
 	fi
-	local RIMAGE=$(echo "$LIST" | cut -d'|' -f1)
+	local RIMAGE=$(echo "$LIST" | cut -d'|' -f1 | sort | uniq)
 	if [ "$IMAGE" != "$RIMAGE" ]; then
 		return 1
 	fi
-	local RNAME=$(echo "$LIST" | cut -d'|' -f2)
+	local RNAME=$(echo "$LIST" | cut -d'|' -f2 | sort | uniq)
 	if ! expr match "$RNAME" "^${NAME}\." &>/dev/null; then
 		return 1
 	fi
@@ -481,11 +488,9 @@ sfDoesDockerRunStack() {
 	[  $# -ne 1 ] && return 1
 	local NAME=$1
 
-	local LIST=$(docker stack ps $NAME {{ "--format '{{.CurrentState}}'" }} | grep -i running)
-	[ -z "$LIST" ] && return 1
-	return 0
+	docker stack ps $NAME {{ "--filter 'desired-state=running'" }} &>/dev/null
 }
-export -f sfDoesDockerRunService
+export -f sfDoesDockerRunStack
 
 sfRemoveDockerImage() {
 	local list=$(docker image ls {{ "--format '{{.Repository}}:{{.Tag}}|{{.ID}}'" }} | grep "^$1")
@@ -575,10 +580,12 @@ sfDetectFacts() {
 		redhat|centos)
 			FACTS["redhat_like"]=1
 			FACTS["debian_like"]=0
+			FACTS["docker_version"]=$(yum info docker-ce)
 			;;
 		debian|ubuntu)
 			FACTS["redhat_like"]=0
 			FACTS["debian_like"]=1
+			FACTS["docker_version"]=$(apt info docker-ce 2>/dev/null | grep "^Version" | cut -d: -f2 | cut -d~ -f1)
 			;;
 	esac
 	if systemctl | grep '\-.mount' &>/dev/null; then
@@ -600,6 +607,7 @@ sfDetectFacts() {
 	[ $val -le 0 ] && val=1
 	FACTS["2/3_of_threads"]=$val
 
+	FACTS["docker_version"]=
 	sfProbeGPU
 
 	declare -p FACTS >"${SERIALIZED_FACTS}"

@@ -28,11 +28,9 @@ fail() {
 	exit $1
 }
 
-mkdir -p /opt/safescale/etc &>/dev/null
+mkdir -p /opt/safescale/etc /opt/safescale/bin &>/dev/null
 mkdir -p /opt/safescale/var/log &>/dev/null
 mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
-chmod -R 0640 /opt/safescale
-find /opt/safescale -type d -exec chmod ug+x {} \;
 
 exec 1<&-
 exec 2<&-
@@ -106,17 +104,22 @@ pathappend() {
 		export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
 }
 pathprepend $HOME/.local/bin
+pathappend /opt/safescale/bin
 EOF
 
-	chown -R {{.User}}:{{.User}} /home/{{.User}}
-	chown -R root:{{.User}} /opt/safescale
+	chown -R safescale:safescale /opt/safescale
+	chmod -R 0640 /opt/safescale
+	find /opt/safescale -type d -exec chmod a+x {} \;
 	chmod 1777 /opt/safescale/var/tmp
+
+	chown -R {{.User}}:{{.User}} /home/{{.User}}
 
 	for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.cloud-warnings.skip; do
 		touch $i
 		chown root:{{.User}} $i
 		chmod ug+r-wx,o-rwx $i
 	done
+
 
 	echo done
 }

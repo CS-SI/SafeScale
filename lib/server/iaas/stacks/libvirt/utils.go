@@ -25,7 +25,7 @@ import (
 	"sync"
 )
 
-// VMInfo represents the usefull informations package send from each new local vm
+// VMInfo represents the useful informations package send from each new local vm
 type VMInfo struct {
 	publicIP string
 }
@@ -42,14 +42,14 @@ var vmInfoWaiter = VMInfoWaiterStruct{
 	chansByName: map[string](chan VMInfo){},
 }
 
-// Register will register a vmCreator who wants to be notified if the listner recieve informations of the vm he created
+// Register will register a vmCreator who wants to be notified if the listener receives information of the vm he created
 func (iw *VMInfoWaiterStruct) Register(name string) chan VMInfo {
 	channel := make(chan VMInfo)
 
 	iw.mutex.Lock()
 	iw.chansByName[name] = channel
 	iw.mutex.Unlock()
-	fmt.Println("Registerd : ", name)
+	fmt.Println("Registered : ", name)
 
 	return channel
 }
@@ -121,7 +121,7 @@ func infoHandler() {
 			channel, found := vmInfoWaiter.chansByName[hostName]
 			vmInfoWaiter.mutex.Unlock()
 			if !found {
-				panic(fmt.Sprintf("Info handler, Recived info from an unregistered host: \n%s", message))
+				panic(fmt.Sprintf("Info handler, Received info from an unregistered host: \n%s", message))
 			}
 			channel <- info
 			err = vmInfoWaiter.deregister(hostName)
