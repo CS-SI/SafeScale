@@ -1044,7 +1044,7 @@ var clusterAddFeatureCommand = cli.Command{
 		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			msg := fmt.Sprintf("Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
@@ -1104,7 +1104,7 @@ var clusterCheckFeatureCommand = cli.Command{
 		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
-			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -1168,7 +1168,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
 		results, err := feature.Remove(target, values, settings)
 		if err != nil {
-			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {

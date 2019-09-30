@@ -33,7 +33,7 @@ import (
 var removePart atomic.Value
 
 // DecorateError changes the error to something more comprehensible when
-// timeout occured
+// timeout occurred
 func DecorateError(err error, action string, timeout time.Duration) error {
 	if IsTimeout(err) {
 		if timeout > 0 {

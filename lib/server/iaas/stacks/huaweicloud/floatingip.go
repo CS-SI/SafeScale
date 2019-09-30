@@ -148,7 +148,7 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, error) {
 	r.Err = err
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get information for Floating IP id '%s': %s", id, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to get information for Floating IP id '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	return fip, nil
 }
@@ -173,7 +173,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err))
 	}
 	if found {
 		return &fip, nil
@@ -188,7 +188,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bi, err := ipOpts.toFloatingIPCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
 	}
 	bandwidthOpts := bandwidthCreateOpts{
 		Name:      "bandwidth-" + s.vpc.Name,
@@ -197,7 +197,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bb, err := bandwidthOpts.toBandwidthCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
 	}
 	// Merger bi in bb
 	for k, v := range bi {

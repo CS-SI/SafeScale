@@ -14,7 +14,7 @@ func chaos() (err error) {
 	defer TimerErrWithLevel("Here it begins", &err, logrus.InfoLevel)()
 
 	// return nil
-	return fmt.Errorf("It failed")
+	return fmt.Errorf("it failed")
 }
 
 func success() (err error) {

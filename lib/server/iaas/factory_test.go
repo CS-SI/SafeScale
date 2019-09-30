@@ -171,7 +171,7 @@ func TestViper(t *testing.T) {
 	viper.SetConfigName("tenants")
 	err := viper.ReadInConfig() // Find and read the config file
 	if err != nil {             // Handle errors reading the config file
-		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+		panic(fmt.Errorf("fatal error config file: %s \n", err))
 	}
 	fmt.Println(viper.ConfigFileUsed())
 	settings := viper.AllSettings()

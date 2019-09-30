@@ -114,7 +114,7 @@ func TestCreate(t *testing.T) {
 func TestCreate_Err(t *testing.T) {
 	// ARRANGE
 	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
-	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("Fake Error"))
+	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("fake Error"))
 	//Mock VolumeServiceCreator
 	old := listeners.VolumeHandler
 	defer func() { listeners.VolumeHandler = old }()

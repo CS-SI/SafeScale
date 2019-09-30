@@ -65,5 +65,5 @@ func ExtractRetCode(err error) (string, int, error) {
 		msg = ee.Error()
 		return msg, retCode, nil
 	}
-	return msg, retCode, fmt.Errorf("Error is not an 'ExitError'")
+	return msg, retCode, fmt.Errorf("error is not an 'ExitError'")
 }

@@ -49,12 +49,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("section identity not found in tenants.toml !!")
+		return &provider{}, fmt.Errorf("section identity not found in tenants.toml")
 	}
 
 	computeCfg, ok := params["compute"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("section compute not found in tenants.toml !!")
+		return &provider{}, fmt.Errorf("section compute not found in tenants.toml")
 	}
 
 	networkName := "safescale"

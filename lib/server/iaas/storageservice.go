@@ -49,7 +49,7 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 		}
 	}
 	if tenant == nil {
-		return fmt.Errorf("Tenant %s not found, or is not matching requirements", tenantName)
+		return fmt.Errorf("tenant %s not found, or is not matching requirements", tenantName)
 	}
 
 	objectStorageConfig, err := initObjectStorageLocationConfig(tenant)
@@ -58,28 +58,28 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 	}
 	objectStorageLocation, err := objectstorage.NewLocation(objectStorageConfig)
 	if err != nil {
-		return fmt.Errorf("Error connecting to Object Storage Location: %s", err.Error())
+		return fmt.Errorf("error connecting to Object Storage Location: %s", err.Error())
 	}
 
 	bucketName, err := objectstorage.BuildStorageBucketName(objectStorageConfig.Type, objectStorageConfig.Region, objectStorageConfig.Domain, objectStorageConfig.Tenant)
 	if err != nil {
-		return fmt.Errorf("Error building the bucketName : %s", err.Error())
+		return fmt.Errorf("error building the bucketName : %s", err.Error())
 	}
 
 	exists, err := objectStorageLocation.FindBucket(bucketName)
 	if err != nil {
-		return fmt.Errorf("Error finding bucket '%s' : %s", bucketName, err.Error())
+		return fmt.Errorf("error finding bucket '%s' : %s", bucketName, err.Error())
 	}
 	var bucket objectstorage.Bucket
 	if !exists {
 		bucket, err = objectStorageLocation.CreateBucket(bucketName)
 		if err != nil {
-			return fmt.Errorf("Error creating bucket '%s' : %s", bucketName, err.Error())
+			return fmt.Errorf("error creating bucket '%s' : %s", bucketName, err.Error())
 		}
 	} else {
 		bucket, err = objectStorageLocation.GetBucket(bucketName)
 		if err != nil {
-			return fmt.Errorf("Error getting bucket '%s' : %s", bucketName, err.Error())
+			return fmt.Errorf("error getting bucket '%s' : %s", bucketName, err.Error())
 		}
 	}
 

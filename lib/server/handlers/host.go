@@ -245,7 +245,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 		}
 	}
 	if newHost == nil {
-		return nil, fmt.Errorf("Unknown error resizing host '%s'", ref)
+		return nil, fmt.Errorf("unknown error resizing host '%s'", ref)
 	}
 
 	return newHost, err
@@ -440,10 +440,10 @@ func (handler *HostHandler) Create(
 
 	// Updates property propsv1.HostSizing
 	if host == nil {
-		return nil, fmt.Errorf("unexpected error creating host instance: host is nil !")
+		return nil, fmt.Errorf("unexpected error creating host instance: host is nil")
 	}
 	if host.Properties == nil {
-		return nil, fmt.Errorf("error populating host properties: host.Properties is nil !")
+		return nil, fmt.Errorf("error populating host properties: host.Properties is nil")
 	}
 
 	// Updates host metadata

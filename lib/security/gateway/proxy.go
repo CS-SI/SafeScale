@@ -106,7 +106,7 @@ func getServiceURL(service, resource string) (*url.URL, error) {
 	da := model.NewDataAccess(cfg.DatabaseDialect, cfg.DatabaseDSN)
 	srv := da.GetServiceByName(service)
 	if srv == nil {
-		return nil, fmt.Errorf("No route define to serve resource %s from service %s", service, resource)
+		return nil, fmt.Errorf("no route define to serve resource %s from service %s", service, resource)
 	}
 	surl := strings.Join([]string{srv.BaseURL, resource}, "/")
 	return url.Parse(surl)
@@ -257,7 +257,7 @@ func loadConfig() (cfg *proxyConfig, err error) {
 	viper.AddConfigPath(".")                // optionally look for config in the working directory
 	err = viper.ReadInConfig()              // Find and read the config file
 	if err != nil {                         // Handle errors reading the config file
-		return nil, fmt.Errorf("Fatal error reading config file: %s", err)
+		return nil, fmt.Errorf("fatal error reading config file: %s", err)
 	}
 
 	cfg = &proxyConfig{

@@ -157,7 +157,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 		err = fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error creating volume : %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
 	}
 
 	return &v, nil
@@ -177,7 +177,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		if _, ok := err.(gc.ErrDefault404); ok {
 			return nil, resources.ResourceNotFoundError("volume", id)
 		}
-		return nil, utils.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(err)))
 	}
 
 	av := resources.Volume{
@@ -219,7 +219,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	})
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 		}
 		log.Warnf("Complete volume list empty")
 	}
@@ -286,7 +286,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		// }
 		// message := extractMessageFromBadRequest(r.Err)
 		// if message != ""
-		return "", utils.Wrap(err, fmt.Sprintf("Error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
+		return "", utils.Wrap(err, fmt.Sprintf("error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
 	}
 
 	return va.ID, nil
@@ -302,7 +302,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
 	}
 	return &resources.VolumeAttachment{
 		ID:       va.ID,
@@ -338,7 +338,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 		return true, nil
 	})
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 	}
 	return vs, nil
 }
@@ -354,7 +354,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {
-		return utils.Wrap(err, fmt.Sprintf("Error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
 	}
 	return nil
 }

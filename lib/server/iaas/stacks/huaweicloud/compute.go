@@ -336,7 +336,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("Failed to get image: %s", openstack.ProviderErrorToString(err))
+		return nil, userData, fmt.Errorf("failed to get image: %s", openstack.ProviderErrorToString(err))
 	}
 
 	// Determines appropriate disk size
@@ -966,7 +966,7 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, err
 
 	}
 	if len(fips) > 1 {
-		return nil, fmt.Errorf("Configuration error, more than one Floating IP associated to host '%s'", hostID)
+		return nil, fmt.Errorf("configuration error, more than one Floating IP associated to host '%s'", hostID)
 	}
 	return &fips[0], nil
 }
@@ -1022,7 +1022,7 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
 	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -1031,16 +1031,16 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 func (s *Stack) disableHostRouterMode(host *resources.Host) error {
 	portID, err := s.getOpenstackPortID(host)
 	if err != nil {
-		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 	if portID == nil {
-		return fmt.Errorf("Failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name)
+		return fmt.Errorf("failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name)
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }

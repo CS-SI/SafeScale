@@ -33,9 +33,9 @@ func ExtractRetCode(err error) (string, int, error) {
 		} else {
 			return msg, retCode, fmt.Errorf("ExitError.Sys is not a 'syscall.WaitStatus'")
 		}
-		//Retrive error message
+		//Retrieve error message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}
-	return msg, retCode, fmt.Errorf("Error is not an 'ExitError'")
+	return msg, retCode, fmt.Errorf("error is not an 'ExitError'")
 }

@@ -621,7 +621,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 		// Check the volume is effectively attached
 		attachment, found := hostVolumesV1.VolumesByID[volume.ID]
 		if !found {
-			return fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name)
+			return fmt.Errorf("can't detach volume '%s': not attached to host '%s'", volumeName, host.Name)
 		}
 
 		// Obtain mounts information

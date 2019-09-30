@@ -145,7 +145,7 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 	})
 	if (len(imgList) == 0) || (err != nil) {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing images: %s", ProviderErrorToString(err)))
 		}
 		log.Debugf("Image list empty !")
 	}
@@ -162,7 +162,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 
 	img, err := images.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error getting image: %s", ProviderErrorToString(err)))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting image: %s", ProviderErrorToString(err)))
 	}
 	return &resources.Image{ID: img.ID, Name: img.Name}, nil
 }
@@ -235,7 +235,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	})
 	if (len(flvList) == 0) || (err != nil) {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error listing templates"))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing templates"))
 		}
 		log.Debugf("Template list empty !")
 	}
@@ -282,7 +282,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("Error getting keypair"))
+		return nil, utils.Wrap(err, fmt.Sprintf("error getting keypair"))
 	}
 	return &resources.KeyPair{
 		ID:         kp.Name,
@@ -325,7 +325,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 	})
 	if (len(kpList) == 0) || (err != nil) {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("Error listing keypairs"))
+			return nil, utils.Wrap(err, fmt.Sprintf("error listing keypairs"))
 		}
 	}
 	return kpList, nil
@@ -341,7 +341,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		return utils.Wrap(err, fmt.Sprintf("Error deleting key pair: %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("error deleting key pair: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -886,7 +886,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		utils.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, userData, utils.Wrap(retryErr, fmt.Sprintf("Error creating host: timeout"))
+		return nil, userData, utils.Wrap(retryErr, fmt.Sprintf("error creating host: timeout"))
 	}
 	log.Debugf("host resource created.")
 
@@ -1220,7 +1220,7 @@ func (s *Stack) DeleteHost(id string) error {
 		utils.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		return utils.Wrap(outerRetryErr, fmt.Sprintf("Error deleting host: retry error"))
+		return utils.Wrap(outerRetryErr, fmt.Sprintf("error deleting host: retry error"))
 	}
 	return nil
 }
@@ -1254,7 +1254,7 @@ func (s *Stack) RebootHost(id string) error {
 		err = servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
 	}
 	if err != nil {
-		ftErr := fmt.Errorf("Error rebooting host [%s]: %s", id, ProviderErrorToString(err))
+		ftErr := fmt.Errorf("error rebooting host [%s]: %s", id, ProviderErrorToString(err))
 		return utils.Wrap(err, ftErr.Error())
 	}
 	return nil
@@ -1270,7 +1270,7 @@ func (s *Stack) StartHost(id string) error {
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		return utils.Wrap(err, fmt.Sprintf("Error starting host : %s", ProviderErrorToString(err)))
+		return utils.Wrap(err, fmt.Sprintf("error starting host : %s", ProviderErrorToString(err)))
 	}
 
 	return nil
@@ -1290,5 +1290,5 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 	// TODO RESIZE Call this
 	// servers.Resize()
 
-	return nil, fmt.Errorf("Not implemented yet")
+	return nil, fmt.Errorf("not implemented yet")
 }

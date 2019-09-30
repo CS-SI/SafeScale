@@ -40,13 +40,13 @@ func sleepy() error {
 func sleepy_failure() error {
 	fmt.Println("Slow fail")
 	time.Sleep(1 * time.Minute)
-	return fmt.Errorf("Always fails...")
+	return fmt.Errorf("always fails")
 }
 
 func quick_sleepy_failure() error {
 	fmt.Println("Quick fail")
 	time.Sleep(1 * time.Second)
-	return fmt.Errorf("Always fails...")
+	return fmt.Errorf("always fails")
 }
 
 func complex_sleepy_failure() error {
@@ -59,7 +59,7 @@ func CreateErrorWithNConsequences(n uint) (err error) {
 	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
-			nerr := fmt.Errorf("Random cleanup problem")
+			nerr := fmt.Errorf("random cleanup problem")
 			err = AddConsequence(err, nerr)
 		}
 	}
@@ -78,7 +78,7 @@ func CreateComplexErrorWithNConsequences(n uint) (err error) {
 	err = WhileUnsuccessfulDelay1Second(complex_sleepy_failure, time.Duration(5)*time.Second)
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
-			nerr := fmt.Errorf("Random cleanup problem")
+			nerr := fmt.Errorf("random cleanup problem")
 			err = AddConsequence(err, nerr)
 		}
 	}
@@ -86,7 +86,7 @@ func CreateComplexErrorWithNConsequences(n uint) (err error) {
 }
 
 func JustThrowBasicError() (err error) {
-	return fmt.Errorf("Something happened")
+	return fmt.Errorf("something happened")
 }
 
 func JustThrowError() (err error) {
@@ -95,7 +95,7 @@ func JustThrowError() (err error) {
 
 func JustThrowComplexError() (err error) {
 	err = resources.ResourceDuplicateError("host", "booboo")
-	err = AddConsequence(err, fmt.Errorf("Ouch!"))
+	err = AddConsequence(err, fmt.Errorf("cleanup error"))
 	return err
 }
 
@@ -103,7 +103,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (err error) {
 	defer func() {
 		if err != nil {
 			for loop := uint(0); loop < n; loop++ {
-				nerr := fmt.Errorf("Random cleanup problem")
+				nerr := fmt.Errorf("random cleanup problem")
 				err = AddConsequence(err, nerr)
 			}
 		}
@@ -117,7 +117,7 @@ func CreateWrappedDeferredErrorWithNConsequences(n uint) (err error) {
 	defer func() {
 		if err != nil {
 			for loop := uint(0); loop < n; loop++ {
-				nerr := fmt.Errorf("Random cleanup problem")
+				nerr := fmt.Errorf("random cleanup problem")
 				err = AddConsequence(err, nerr)
 			}
 		}
@@ -203,7 +203,7 @@ func TestConsequence(t *testing.T) {
 
 	recovered = JustThrowError()
 	if recovered != nil {
-		recovered = AddConsequence(recovered, fmt.Errorf("Another disgrace"))
+		recovered = AddConsequence(recovered, fmt.Errorf("another disgrace"))
 		cons := Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
@@ -312,7 +312,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 			}
 			delta := time.Since(testStart)
 			if delta.Seconds() >= tt.args.timeout.Seconds()+2 && !tt.wantTOErr {
-				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v", fmt.Errorf("It's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
+				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
 			}
 		})
 	}
@@ -350,7 +350,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 			}
 			delta := time.Since(testStart)
 			if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 { // 0.5 seconds tolerance
-				t.Errorf("WhileUnsuccessfulDelay5SecondsTimeout() error = %v", fmt.Errorf("It's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
+				t.Errorf("WhileUnsuccessfulDelay5SecondsTimeout() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
 			}
 		})
 	}

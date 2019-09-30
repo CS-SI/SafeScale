@@ -17,7 +17,7 @@ func LazyRemove(path string) error {
 			// File not found, that's ok because we wanted to remove it...
 		default:
 			logrus.Errorf("LazyRemove(): err is type '%s'\n", reflect.TypeOf(err).String())
-			return fmt.Errorf("Error removing file '%s': %v", path, err)
+			return fmt.Errorf("error removing file '%s': %v", path, err)
 		}
 	}
 	return nil

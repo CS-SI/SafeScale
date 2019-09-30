@@ -445,7 +445,7 @@ var hostAddFeatureCommand = cli.Command{
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
+			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
@@ -537,7 +537,7 @@ var hostCheckFeatureCommand = cli.Command{
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
-			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
+			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
@@ -605,7 +605,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
-			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
+			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {

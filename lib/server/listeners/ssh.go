@@ -91,7 +91,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshR
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 	if retcode != 0 {
-		return nil, fmt.Errorf("Can't copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
+		return nil, fmt.Errorf("can't copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
 	}
 
 	return &pb.SshResponse{

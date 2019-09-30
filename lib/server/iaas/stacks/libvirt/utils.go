@@ -64,7 +64,7 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	iw.mutex.Unlock()
 
 	if !found {
-		return fmt.Errorf("Nothing registered with the name %s", name)
+		return fmt.Errorf("nothing registered with the name %s", name)
 	}
 	fmt.Println("Deregistered : ", name)
 	return nil
@@ -75,7 +75,7 @@ func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 	if vmInfoWaiter.listner == nil {
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			return nil, fmt.Errorf("Failed to open a tcp connection : %s", err.Error())
+			return nil, fmt.Errorf("failed to open a tcp connection : %s", err.Error())
 		}
 		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
 		vmInfoWaiter.listner = &listener

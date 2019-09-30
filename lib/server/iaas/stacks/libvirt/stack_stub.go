@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
-var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
+var errorStr = "libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
 
 // Stack is the implementation of the local driver regarding to the api.ClientAPI
 type Stack struct {

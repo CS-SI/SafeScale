@@ -71,7 +71,7 @@ func UseStorages(tenantNames []string) (*StorageServices, error) {
 	for _, tenantName := range tenantNames {
 		err := storageServices.RegisterStorage(tenantName)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to register storage tenant %s : %s", tenantName, err.Error())
+			return nil, fmt.Errorf("failed to register storage tenant %s : %s", tenantName, err.Error())
 		}
 	}
 
@@ -157,7 +157,7 @@ func UseService(tenantName string) (Service, error) {
 		// Initializes Provider
 		providerInstance, err := svc.Build( /*tenantClient*/ tenant)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
+			return nil, fmt.Errorf("error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
 		serviceCfg, err := providerInstance.GetConfigurationOptions()
 		if err != nil {
@@ -173,7 +173,7 @@ func UseService(tenantName string) (Service, error) {
 			}
 			objectStorageLocation, err = objectstorage.NewLocation(objectStorageConfig)
 			if err != nil {
-				return nil, fmt.Errorf("Error connecting to Object Storage Location: %s", err.Error())
+				return nil, fmt.Errorf("error connecting to Object Storage Location: %s", err.Error())
 			}
 		} else {
 			log.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
@@ -232,7 +232,7 @@ func UseService(tenantName string) (Service, error) {
 	}
 
 	if !tenantInCfg {
-		return nil, fmt.Errorf("Tenant '%s' not found in configuration", tenantName)
+		return nil, fmt.Errorf("tenant '%s' not found in configuration", tenantName)
 	}
 	return nil, resources.ResourceNotFoundError("provider builder for", svcProvider)
 }
@@ -354,7 +354,7 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 	// FIXME Remove google custom code
 	if config.Type == "google" {
 		if config.ProjectId, ok = identity["project_id"].(string); !ok {
-			return config, fmt.Errorf("Problem parsing project_id")
+			return config, fmt.Errorf("problem parsing project_id")
 		}
 
 		googleCfg := stacks.GCPConfiguration{
@@ -502,7 +502,7 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 	// FIXME Remove google custom code
 	if config.Type == "google" {
 		if config.ProjectId, ok = identity["project_id"].(string); !ok {
-			return config, fmt.Errorf("Problem parsing project_id")
+			return config, fmt.Errorf("problem parsing project_id")
 		}
 
 		googleCfg := stacks.GCPConfiguration{
@@ -540,10 +540,10 @@ func loadConfig() error {
 			if provider, ok := tenant["client"].(string); ok {
 				allTenants[name] = provider
 			} else {
-				return fmt.Errorf("Invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
+				return fmt.Errorf("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}
 		} else {
-			return fmt.Errorf("Invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
+			return fmt.Errorf("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
 		}
 	}
 	return nil
@@ -560,7 +560,7 @@ func getTenantsFromCfg() ([]interface{}, error) {
 	v.SetConfigName("tenants")
 
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
-		msg := fmt.Sprintf("Error reading configuration file: %s", err.Error())
+		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
 		log.Errorf(msg)
 		return nil, fmt.Errorf(msg)
 	}

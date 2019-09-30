@@ -37,7 +37,7 @@ func collect(tenantName string) error {
 	}
 	region, ok := authOpts.Get("Region")
 	if !ok {
-		return fmt.Errorf("Region value unset")
+		return fmt.Errorf("region value unset")
 	}
 
 	folder := fmt.Sprintf("images/%s/%s", serviceProvider.GetName(), region)
