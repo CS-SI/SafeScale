@@ -66,6 +66,7 @@ type ErrCore struct {
 	consequences []error
 }
 
+// CauseFormatter generates a string containing information about the causing error and the derived errors while trying to clean up
 func (e ErrCore) CauseFormatter() string {
 	msgFinal := ""
 
@@ -91,6 +92,7 @@ func (e ErrCore) CauseFormatter() string {
 	return msgFinal
 }
 
+// Reset imports content of error err to receiving error e
 func (e ErrCore) Reset(err error) ErrCore {
 	if err != nil {
 		if cerr, ok := err.(ErrCore); ok {
@@ -148,6 +150,7 @@ func (e ErrCore) Error() string {
 	return msgFinal
 }
 
+// Cause returns the cause of an error if it implements the causer interface
 func Cause(err error) (resp error) {
 	type causer interface {
 		Cause() error
