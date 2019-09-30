@@ -19,12 +19,13 @@ package install
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/sirupsen/logrus"
 
 	// log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -166,27 +167,12 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		return utils.InvalidParameterError("remotepath", "can't be empty string")
 	}
 
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
-		partials := strings.Split(filename, "/")
-		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
-
-		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
-		if err != nil {
-			logrus.Warnf("[TRACE] Forensics error creating %s", dumpName)
-		}
-	}
-
-	f, err := system.CreateTempFileFromString(content, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %s", err.Error())
-	}
-	to := fmt.Sprintf("%s:%s", host.Name, filename)
+	to := fmt.Sprintf("%s:%s", host.Name, localpath)
 	sshClt := client.New().SSH
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(f.Name(), to, utils.GetDefaultDelay(), utils.GetExecutionTimeout()) // FIXME File operations
+			retcode, _, _, err := sshClt.Copy(localpath, to, utils.GetDefaultDelay(), utils.GetExecutionTimeout()) // FIXME File operations
 			if err != nil {
 				return err
 			}
@@ -194,7 +180,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), utils.GetBigDelay(), utils.GetExecutionTimeout())
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", localpath), utils.GetBigDelay(), utils.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
