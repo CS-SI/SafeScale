@@ -56,7 +56,7 @@ func (i *bashInstaller) Add(f *Feature, t Target, v Variables, s Settings) (Resu
 		log.Println(err.Error())
 		return nil, err
 	}
-	if !worker.ConcernCluster() {
+	if !worker.ConcernsCluster() {
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "safescale"
 		}

@@ -23,22 +23,17 @@ package swarm
 import (
 	"bytes"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	txttmpl "text/template"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
 
 	rice "github.com/GeertJohan/go.rice"
 	// log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 //go:generate rice embed-go
@@ -55,14 +50,14 @@ var (
 
 	// Makers initializes a control.Makers struct to construct a Docker Swarm Cluster
 	Makers = control.Makers{
-		MinimumRequiredServers:      minimumRequiredServers,
-		DefaultGatewaySizing:        gatewaySizing,
-		DefaultNodeSizing:           nodeSizing,
-		DefaultImage:                defaultImage,
-		UnconfigureNode:             unconfigureNode,
-		ConfigureCluster:            configureCluster,
-		JoinNodeToCluster:           joinNode,
-		JoinMasterToCluster:         joinMaster,
+		MinimumRequiredServers: minimumRequiredServers,
+		DefaultGatewaySizing:   gatewaySizing,
+		DefaultNodeSizing:      nodeSizing,
+		DefaultImage:           defaultImage,
+		// UnconfigureNode:        unconfigureNode,
+		// ConfigureCluster: configureCluster,
+		// JoinNodeToCluster:           joinNode,
+		// JoinMasterToCluster:         joinMaster,
 		GetTemplateBox:              getTemplateBox,
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
@@ -129,122 +124,122 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return "Ubuntu 18.04"
 }
 
-// configureCluster configures cluster
-func configureCluster(task concurrency.Task, foreman control.Foreman) error {
-	clientInstance := client.New()
-	clientHost := clientInstance.Host
-	clientSSH := clientInstance.SSH
+// // configureCluster configures cluster
+// func configureCluster(task concurrency.Task, foreman control.Foreman) error {
+// 	clientInstance := client.New()
+// 	clientHost := clientInstance.Host
+// 	clientSSH := clientInstance.Ssh
 
-	cluster := foreman.Cluster()
+// 	cluster := foreman.Cluster()
 
-	// Join masters in Docker Swarm as managers
-	joinCmd := ""
-	for _, hostID := range cluster.ListMasterIDs(task) {
-		host, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
-		if err != nil {
-			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
-		}
-		if joinCmd == "" {
-			retcode, _, _, err := clientSSH.Run(hostID, "docker swarm init",
-				utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to init docker swarm")
-			}
-			retcode, token, stderr, err := clientSSH.Run(hostID, "docker swarm join-token manager -q",
-				utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
-			}
-			token = strings.Trim(token, "\n")
-			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, host.PrivateIp)
-		} else {
-			retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd,
-				utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
-			}
-		}
-	}
+// 	// Join masters in Docker Swarm as managers
+// 	joinCmd := ""
+// 	for _, hostID := range cluster.ListMasterIDs(task) {
+// 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+// 		}
+// 		if joinCmd == "" {
+// 			retcode, _, _, err := clientSSH.Run(hostID, "docker swarm init",
+// 				client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 			if err != nil || retcode != 0 {
+// 				return fmt.Errorf("failed to init docker swarm")
+// 			}
+// 			retcode, token, stderr, err := clientSSH.Run(hostID, "docker swarm join-token manager -q",
+// 				client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 			if err != nil || retcode != 0 {
+// 				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
+// 			}
+// 			token = strings.Trim(token, "\n")
+// 			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, host.PrivateIp)
+// 		} else {
+// 			retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd,
+// 				client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 			if err != nil || retcode != 0 {
+// 				return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
+// 			}
+// 		}
+// 	}
 
-	// build command to join Docker Swarm as workers
-	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
-	if err != nil {
-		return err
-	}
+// 	// build command to join Docker Swarm as workers
+// 	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	// Join private node in Docker Swarm as workers
-	for _, hostID := range cluster.ListNodeIDs(task) {
-		host, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
-		if err != nil {
-			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
-		}
-		retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd,
-			utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
-		}
-	}
+// 	// Join private node in Docker Swarm as workers
+// 	for _, hostID := range cluster.ListNodeIDs(task) {
+// 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+// 		}
+// 		retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd,
+// 			client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 		if err != nil || retcode != 0 {
+// 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-// joinMaster is the code to use to join a new master to the cluster
-func joinMaster(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
-	clientSSH := client.New().SSH
+// // joinMaster is the code to use to join a new master to the cluster
+// func joinMaster(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
+// 	clientSSH := client.New().Ssh
 
-	joinCmd, err := getSwarmJoinCommand(task, foreman, false)
-	if err != nil {
-		return err
-	}
-	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd,
-		utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", pbHost.Name, stderr)
-	}
+// 	joinCmd, err := getSwarmJoinCommand(task, foreman, false)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd,
+// 		client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 	if err != nil || retcode != 0 {
+// 		return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", pbHost.Name, stderr)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-// joinNode is the code to use join a new node to the cluster
-func joinNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
-	clientSSH := client.New().SSH
+// // joinNode is the code to use join a new node to the cluster
+// func joinNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
+// 	clientSSH := client.New().Ssh
 
-	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
-	if err != nil {
-		return err
-	}
-	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd,
-		utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
-	}
-	return nil
-}
+// 	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd,
+// 		client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 	if err != nil || retcode != 0 {
+// 		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
+// 	}
+// 	return nil
+// }
 
-// getSwarmToken obtains token to join Docker Swarm as workers
-func getSwarmJoinCommand(task concurrency.Task, foreman control.Foreman, worker bool) (string, error) {
-	masterID, err := foreman.Cluster().FindAvailableMaster(task)
-	if err != nil {
-		return "", fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
-	}
-	clientInstance := client.New()
-	master, err := clientInstance.Host.Inspect(masterID, utils.GetExecutionTimeout())
-	if err != nil {
-		return "", fmt.Errorf("failed to get metadata of master: %s", err.Error())
-	}
-	memberType := "manager"
-	if worker {
-		memberType = "worker"
-	}
-	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-	retcode, token, stderr, err := clientInstance.SSH.Run(masterID, tokenCmd,
-		utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-	if err != nil || retcode != 0 {
-		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
-	}
-	token = strings.Trim(token, "\n")
-	return fmt.Sprintf("docker swarm join --token %s %s", token, master.PrivateIp), nil
-}
+// // getSwarmToken obtains token to join Docker Swarm as workers
+// func getSwarmJoinCommand(task concurrency.Task, foreman control.Foreman, worker bool) (string, error) {
+// 	masterID, err := foreman.Cluster().FindAvailableMaster(task)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
+// 	}
+// 	clientInstance := client.New()
+// 	master, err := clientInstance.Host.Inspect(masterID, client.DefaultExecutionTimeout)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to get metadata of master: %s", err.Error())
+// 	}
+// 	memberType := "manager"
+// 	if worker {
+// 		memberType = "worker"
+// 	}
+// 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
+// 	retcode, token, stderr, err := clientInstance.Ssh.Run(masterID, tokenCmd,
+// 		client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 	if err != nil || retcode != 0 {
+// 		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
+// 	}
+// 	token = strings.Trim(token, "\n")
+// 	return fmt.Sprintf("docker swarm join --token %s %s", token, master.PrivateIp), nil
+// }
 
 // getTemplateBox
 func getTemplateBox() (*rice.Box, error) {
@@ -302,78 +297,78 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 	return anon.(string), nil
 }
 
-func unconfigureNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host, selectedMaster string) error {
-	if foreman == nil {
-		panic("c is nil!")
-	}
-	if pbHost == nil {
-		panic("pbHost is nil!")
-	}
-	if selectedMaster == "" {
-		var err error
-		selectedMaster, err = foreman.Cluster().FindAvailableMaster(task)
-		if err != nil {
-			return err
-		}
-	}
+// func unconfigureNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host, selectedMaster string) error {
+// 	if foreman == nil {
+// 		panic("c is nil!")
+// 	}
+// 	if pbHost == nil {
+// 		panic("pbHost is nil!")
+// 	}
+// 	if selectedMaster == "" {
+// 		var err error
+// 		selectedMaster, err = foreman.Cluster().FindAvailableMaster(task)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
 
-	clientSSH := client.New().SSH
+// 	clientSSH := client.New().Ssh
 
-	// Check worker is member of the Swarm
-	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
-	retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		// node is already expelled from Docker Swarm
-		return nil
-	}
-	// node is a worker in the Swarm: 1st ask worker to leave Swarm
-	cmd = "docker swarm leave"
-	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fmt.Errorf("failed to make node '%s' leave swarm: %s", pbHost.Name, stderr)
-	}
+// 	// Check worker is member of the Swarm
+// 	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
+// 	retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if retcode != 0 {
+// 		// node is already expelled from Docker Swarm
+// 		return nil
+// 	}
+// 	// node is a worker in the Swarm: 1st ask worker to leave Swarm
+// 	cmd = "docker swarm leave"
+// 	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if retcode != 0 {
+// 		return fmt.Errorf("failed to make node '%s' leave swarm: %s", pbHost.Name, stderr)
+// 	}
 
-	// 2nd: wait the Swarm worker to appear as down from Swarm master
-	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-		func() error {
-			retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-			if err != nil {
-				return err
-			}
-			if retcode != 0 {
-				return fmt.Errorf("'%s' not in Down state", pbHost.Name)
-			}
-			return nil
-		},
-		utils.GetHostTimeout(),
-	)
-	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
-			return fmt.Errorf("swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, utils.GetHostTimeout())
-		default:
-			return fmt.Errorf("swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
-		}
-	}
+// 	// 2nd: wait the Swarm worker to appear as down from Swarm master
+// 	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
+// 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+// 		func() error {
+// 			retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			if retcode != 0 {
+// 				return fmt.Errorf("'%s' not in Down state", pbHost.Name)
+// 			}
+// 			return nil
+// 		},
+// 		utils.GetHostTimeout(),
+// 	)
+// 	if retryErr != nil {
+// 		switch retryErr.(type) {
+// 		case retry.ErrTimeout:
+// 			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, utils.GetHostTimeout())
+// 		default:
+// 			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
+// 		}
+// 	}
 
-	// 3rd, ask master to remove node from Swarm
-	cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
-	retcode, _, stderr, err = clientSSH.Run(selectedMaster, cmd, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr)
-	}
-	return nil
-}
+// 	// 3rd, ask master to remove node from Swarm
+// 	cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
+// 	retcode, _, stderr, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if retcode != 0 {
+// 		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr)
+// 	}
+// 	return nil
+// }
 
 func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
 	script := ""

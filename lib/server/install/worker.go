@@ -25,6 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 
 	log "github.com/sirupsen/logrus"
 
@@ -114,8 +116,8 @@ func newWorker(f *Feature, t Target, m Method.Enum, a Action.Enum, cb alterComma
 	return &w, nil
 }
 
-// ConcernCluster returns true if the target of the worker is a cluster
-func (w *worker) ConcernCluster() bool {
+// ConcernsCluster returns true if the target of the worker is a cluster
+func (w *worker) ConcernsCluster() bool {
 	return w.cluster != nil
 }
 
@@ -688,12 +690,24 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 
 	network := mn.Get()
-	kc, err := NewKongController(svc, network)
+	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
 		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
 	}
+	var secondaryKongController *KongController
+	if network.SecondaryGatewayID != "" {
+		secondaryKongController, err = NewKongController(svc, network, false)
+		if err != nil {
+			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+		}
+	}
 
 	// Now submits all the rules to reverse proxy
+	primaryGatewayVariables := w.variables.Clone()
+	var secondaryGatewayVariables Variables
+	if secondaryKongController != nil {
+		secondaryGatewayVariables = w.variables.Clone()
+	}
 	for _, r := range rules {
 		targets := stepTargets{}
 		rule := r.(map[interface{}]interface{})
@@ -722,28 +736,62 @@ func (w *worker) setReverseProxy() (err error) {
 		if err != nil {
 			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 		}
-		log.Debugf("successfully applied proxy rule: %v", rule)
 
 		for _, h := range hosts {
-			cloneV := w.variables.Clone()
-			cloneV["HostIP"] = h.PrivateIp
-			cloneV["Hostname"] = h.Name
-			propagated, err := kc.Apply(rule, &cloneV)
+			tP := w.feature.task.New()
+			primaryGatewayVariables["HostIP"] = h.PrivateIp
+			primaryGatewayVariables["Hostname"] = h.Name
+			tP.Start(asyncApplyProxyRule, data.Map{
+				"ctrl": primaryKongController,
+				"rule": rule,
+				"vars": &primaryGatewayVariables,
+			})
 
-			// FIXME Check this later
-			if err != nil {
-				log.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
-				// return fmt.Errorf("failed to apply proxy rules: host %s : %s", h.Name, err.Error())
-			} else {
-				log.Debugf("successfully applied proxy rule: %v", rule)
-				// Propagated contain k/v that have to be added to w.variables
-				for k, v := range propagated {
-					w.variables[k] = v
-				}
+			var errS error
+			if secondaryKongController != nil {
+				tS := w.feature.task.New()
+				secondaryGatewayVariables["HostIP"] = h.PrivateIp
+				secondaryGatewayVariables["Hostname"] = h.Name
+				tS.Start(asyncApplyProxyRule, data.Map{
+					"ctrl": secondaryKongController,
+					"rule": rule,
+					"vars": &secondaryGatewayVariables,
+				})
+				_, errS = tS.Wait()
+			}
+
+			_, errP := tP.Wait()
+			if errP != nil {
+				return errP
+			}
+			if errS != nil {
+				return errS
 			}
 		}
 	}
 	return nil
+}
+
+func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	ctrl := params.(data.Map)["ctrl"].(*KongController)
+	rule := params.(data.Map)["rule"].(map[interface{}]interface{})
+	vars := params.(data.Map)["vars"].(*Variables)
+
+	hostName := (*vars)["Hostname"].(string)
+	ruleName, err := ctrl.Apply(rule, vars)
+
+	// FIXME Check this later
+	if err != nil {
+		msg := "failed to apply proxy rule"
+		if ruleName != "" {
+			msg += " '" + ruleName + "'"
+		}
+		msg += " for host '" + hostName + "': " + err.Error()
+		log.Error(msg)
+		return nil, fmt.Errorf(msg)
+	}
+	log.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
+	return nil, nil
 }
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts

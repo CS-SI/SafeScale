@@ -22,7 +22,7 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
+
     parameters:
         - PurgeOnRemoval=no
 

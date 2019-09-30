@@ -192,7 +192,7 @@ var shareMount = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "ac",
-			Usage: "Disable chache coherence to improve performences",
+			Usage: "Disable cache coherence to improve performances",
 		},
 	},
 	Action: func(c *cli.Context) error {

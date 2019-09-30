@@ -26,6 +26,6 @@ const (
 	Done Enum = iota
 	// Retry tells the arbiter decided to execute the next retry
 	Retry
-	// Abort tells the arbiter decided something wrong occured; the Action must stop with error
+	// Abort tells the arbiter decided something wrong occurred; the Action must stop with error
 	Abort
 )

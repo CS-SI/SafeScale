@@ -22,7 +22,7 @@ package ExitCode
 type Enum int
 
 const (
-	// OK (=0) is returned when evrything is ok
+	// OK (=0) is returned when everything is ok
 	OK Enum = iota
 	// Run ...
 	Run
@@ -43,6 +43,6 @@ const (
 	// NotImplemented is returned when a function is not yet implemented
 	NotImplemented
 
-	// NextExitCode is the next error code useable
+	// NextExitCode is the next error code usable
 	NextExitCode
 )

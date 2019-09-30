@@ -358,7 +358,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 
 func TestErrorHierarchy(t *testing.T) {
 	var nerr error
-	nerr = resources.ResourceNotFoundError("host", "whateva")
+	nerr = resources.ResourceNotFoundError("host", "whatever")
 
 	if _, ok := nerr.(utils.ErrNotFound); !ok {
 		t.Errorf("Is not a resourceNotFound")

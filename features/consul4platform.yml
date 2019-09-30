@@ -1,0 +1,409 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: all
+
+    parameters:
+        - Version=1.5
+
+    install:
+        bash:
+            check:
+                pace: stack
+                steps:
+                    stack:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfDoesDockerRunStack consul4platform || exit 192
+                            exit 0
+
+            add:
+                pace: config-masters,config-nodes,config-gws,stack,start,ready
+                steps:
+                    config-all:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: all
+                            nodes: all
+                        run: |
+                            exit 0
+
+                    config-masters:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "{{ .Hostname }}",
+                                    "tags": [ "master", "monitoring" ],
+                                    "port": 63001,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/cadvisor.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "cadvisor@{{ .Hostname }}",
+                                    "tags": [ "master", "monitoring" ],
+                                    "port": 63000,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
+                            {
+                                "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
+                                "client_addr": "0.0.0.0",
+                                "data_dir": "/consul/data",
+                                "datacenter": "{{ .ClusterName }}",
+                                "leave_on_terminate": false,
+                                "node_name": "{{ .Hostname }}",
+                                "server_name": "server.{{ .Hostname }}.consul",
+                                "skip_leave_on_interrupt": true,
+                            {{ if gt (len .MasterIPs) 1 }}
+                                "bootstrap_expect": {{ len .MasterIPs }},
+                                "retry_join": [
+                                    "consul4platform_server"
+                                ],
+                            {{ else }}
+                                "bootstrap": true,
+                            {{ end }}
+                                "server": true,
+                                "ui": true,
+                                "autopilot": {
+                                    "cleanup_dead_servers": true
+                                },
+                                "disable_update_check": true,
+                                "log_level": "warn",
+                                "telemetry": {
+                                    "prometheus_retention_time": "24h"
+                                }
+                            }
+                            EOF
+                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
+                            exit 0
+
+                    config-nodes:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: no
+                            nodes: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "{{ .Hostname }}",
+                                    "tags": [ "node", "monitoring" ],
+                                    "port": 63001,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/cadvisor.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "cadvisor@{{ .Hostname }}",
+                                    "tags": [ "node", "monitoring" ],
+                                    "port": 63000,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
+                            {
+                                "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
+                                "client_addr": "0.0.0.0",
+                                "data_dir": "/consul/data",
+                                "datacenter": "{{ .ClusterName }}",
+                                "retry_join": [
+                                    "consul4platform_server"
+                                ],
+                                "node_name": "{{ .Hostname }}",
+                                "leave_on_terminate" : false,
+                                "skip_leave_on_interrupt" : false,
+                                "server" : false,
+                                "ui" : false,
+                                "disable_update_check": true,
+                                "log_level": "warn",
+                                "telemetry": {
+                                    "prometheus_retention_time": "24h"
+                                }
+                            }
+                            EOF
+                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
+                            exit 0
+
+                    config-gws:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/node-exporter.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "{{ .Hostname }}",
+                                    "tags": [ "gateway", "monitoring" ],
+                                    "port": 63001,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/consul.d/cadvisor.json <<-EOF
+                            {
+                                "service": {
+                                    "name": "cadvisor@{{ .Hostname }}",
+                                    "tags": [ "gateway", "monitoring" ],
+                                    "port": 63000,
+                                    "address": "{{ .HostIP }}"
+                                }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/consul4platform/config.json <<-EOF
+                            {
+                                "bind_addr": "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
+                                "client_addr": "0.0.0.0",
+                                "data_dir": "/consul/data",
+                                "datacenter": "{{ .ClusterName }}",
+                                "retry_join": [
+                                    "consul4platform_server"
+                                ],
+                                "node_name": "{{ .Hostname }}",
+                                "leave_on_terminate" : false,
+                                "skip_leave_on_interrupt" : false,
+                                "server" : false,
+                                "ui" : false,
+                                "disable_update_check": true,
+                                "log_level": "warn",
+                                "telemetry": {
+                                    "prometheus_retention_time": "24h"
+                                }
+                            }
+                            EOF
+                            chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
+                            exit 0
+
+                    stack:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/consul4platform/stack.yml <<-EOF
+                            version: '3.3'
+
+                            networks:
+                                net:
+                                    driver: overlay
+                                    attachable: true
+
+                            services:
+                                server:
+                                    image: consul:{{ .Version }}
+                                    command: "agent -server -ui-content-path /_platform/registry/consul/ui/ -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
+                                    volumes:
+                                        - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
+                                        - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
+                                        - ${SF_VARDIR}/consul4platform:/consul/data
+                                    networks:
+                                        - net
+                                    ports:
+                                        - published: 8500
+                                          target: 8500
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: udp
+                                          mode: host
+                                    deploy:
+                                        mode: global
+                                        # endpoint_mode: dnsrr
+                                        update_config:
+                                            parallelism: 1
+                                            failure_action: rollback
+                                            delay: 30s
+                                        restart_policy:
+                                            condition: any
+                                            delay: 5s
+                                            window: 120s
+                                        placement:
+                                            constraints:
+                                                - node.labels.safescale.host.role == master
+
+                                agent:
+                                    image: consul:{{ .Version }}
+                                    command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
+                                    networks:
+                                        - net
+                                    ports:
+                                        - published: 8500
+                                          target: 8500
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: tcp
+                                          mode: host
+                                        - published: 8600
+                                          target: 8600
+                                          protocol: udp
+                                          mode: host
+                                    volumes:
+                                        - ${SF_ETCDIR}/consul4platform/config.json:/consul/config/config.json:ro
+                                        - ${SF_ETCDIR}/consul4platform/consul.d:/consul/config/consul.d
+                                        - ${SF_VARDIR}/consul4platform:/consul/data
+                                    deploy:
+                                        mode: global
+                                        # endpoint_mode: dnsrr
+                                        update_config:
+                                            parallelism: 1
+                                            failure_action: rollback
+                                            delay: 30s
+                                        restart_policy:
+                                            condition: any
+                                            delay: 5s
+                                            window: 120s
+                                        placement:
+                                            constraints:
+                                                - node.labels.safescale.host.role != master
+                            EOF
+                            chown safescale:safescale ${SF_ETCDIR}/consul4platform/stack.yml
+                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul4platform/stack.yml
+                            exit 0
+
+                    start:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            # if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul4platform_net"; then
+                            #     docker network create -d overlay consul4platform_net || exit 194
+                            # fi
+                            docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || exit 195
+                            exit 0
+
+                    ready:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || exit 197
+                            exit 0
+
+            remove:
+                pace: stop,cleanup
+                steps:
+                    stop:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker stack rm consul4platform || exit 200
+                            exit 0
+
+                    cleanup:
+                        targets:
+                            gateways: all
+                            hosts: no
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfRemoveDockerImage consul || exit 202
+                            rm -rf ${SF_ETCDIR}/consul4platform ${SF_VARDIR}/consul4platform
+                            exit 0
+
+    proxy:
+        rules:
+            - name: consul_http_backend
+              type: upstream
+              targets:
+                  hosts: no
+                  masters: all
+              content: |
+                  {
+                      "target": "{{ .HostIP }}:8500",
+                      "weight": 100
+                  }
+
+            - name: consul_http_svc
+              type: service
+              targets:
+                  hosts: no
+                  masters: one
+              content: |
+                  {
+                      "protocol": "http",
+                      "host": "consul_http_backend"
+                  }
+
+            - name: consul_http_route
+              type: route
+              targets:
+                  hosts: no
+                  masters: one
+              content: |
+                  {
+                      "paths": [
+                          "/_platform/registry/consul/"
+                      ],
+                      "service": {
+                          "id": "{{ .consul_http_svc }}"
+                      },
+                      "source-control": {
+                          "whitelist": [ "{{ .CIDR }}", "127.0.0.1" ]
+                      }
+                  }
+...

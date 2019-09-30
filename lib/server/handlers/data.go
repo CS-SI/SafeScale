@@ -377,7 +377,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		default:
 		}
 
-		//Check the encypted shards integrity with the check sum and remove corrupted ones
+		//Check the encrypted shards integrity with the check sum and remove corrupted ones
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
 			if encryptedShards[j].Len() != 0 {
 				checkSum := chunkGroup.GetCheckSum(chunkGroup.GetShardNum(i, j))
@@ -389,7 +389,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 			}
 		}
 
-		//Decryp the encrypted shards
+		//Decrypt the encrypted shards
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
 			if encryptedShards[j].Len() != 0 {
 				nonce := chunkGroup.GetNonce(chunkGroup.GetShardNum(i, j))

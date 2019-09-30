@@ -18,9 +18,10 @@ package install
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	log "github.com/sirupsen/logrus"
 

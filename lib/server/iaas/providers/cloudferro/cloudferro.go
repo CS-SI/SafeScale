@@ -38,7 +38,7 @@ var (
 	cloudferroDNSServers       = []string{"185.48.234.234", "185.48.234.238"}
 )
 
-// provider is the providerementation of the CloudFerro provider
+// provider is the implementation of the CloudFerro provider
 type provider struct {
 	*openstack.Stack
 

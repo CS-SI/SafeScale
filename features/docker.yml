@@ -45,7 +45,7 @@ feature:
                             esac
 
             add:
-                pace: docker-ce,config,firewall,ready
+                pace: docker-ce,docker-compose,config,firewall,ready
                 steps:
                     docker-ce:
                         targets:
@@ -57,18 +57,13 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 7m 3 "sfApt update"
-                                    sfRetry 7m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
-                                    sfRetry 7m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || exit 192
-                                    sfRetry 7m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 193
-                                    # Currently, no stable release of docker-ce for Ubuntu 19.04
-                                    if dpkg --compare-versions $(sfGetFact "linux_version") gt 18.10; then
-                                        echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) test" >/etc/apt/sources.list.d/docker.list
-                                    else
-                                        echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    fi
-                                    sfRetry 7m 3 "sfApt update"
-                                    sfRetry 7m 3 "sfApt install -qqy docker-ce" || exit 194
+                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
+                                    sfRetry 5m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || exit 192
+                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 193
+                                    echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
+                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 3 "sfApt install -qqy docker-ce" || exit 194
                                     ;;
                                 centos|rhel)
                                     sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
@@ -80,6 +75,20 @@ feature:
                                     exit 195
                                     ;;
                             esac
+                            exit 0
+
+                    docker-compose:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
+                            [ $? -ne 0 ] && exit 192
+                            URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+                            sfDownload "$URL" docker-compose 3m 5 || exit 193
+                            chmod +x docker-compose && mv docker-compose /usr/bin
                             exit 0
 
                     config:
@@ -155,7 +164,7 @@ feature:
                             exit 0
 
             remove:
-                pace: docker-ce
+                pace: cleanup
                 steps:
                     docker-ce:
                         targets:
@@ -178,5 +187,7 @@ feature:
                                     exit 1
                                     ;;
                             esac
+                            rm -f /usr/bin/docker-compose || true
+                            exit 0
 
 ...

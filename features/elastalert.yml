@@ -23,7 +23,6 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
             - elasticsearch
             - kibana
 

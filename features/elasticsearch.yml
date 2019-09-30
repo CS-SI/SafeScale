@@ -22,7 +22,7 @@ feature:
     requirements:
         features:
             - docker
-            - docker-compose
+
     parameters:
         - Version=7.2.0
         - PurgeOnRemoval=no
@@ -245,7 +245,7 @@ feature:
                   masters: one
               content: |
                   {
-                      "paths": [ "/monitoring/elasticsearch/" ],
+                      "paths": [ "/_platform/monitoring/elasticsearch/" ],
                       "service": { "id": "{{ .elasticsearch_http_svc }}" }
                   }
 

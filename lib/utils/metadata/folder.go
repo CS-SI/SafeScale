@@ -118,7 +118,7 @@ func (f *Folder) Delete(path string, name string) error {
 
 // Read loads the content of the object stored in metadata bucket
 // returns false, nil if the object is not found
-// returns false, err if an error occured
+// returns false, err if an error occurred
 // returns true, nil if the object has been found
 // The callback function has to know how to decode it and where to store the result
 func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) error {

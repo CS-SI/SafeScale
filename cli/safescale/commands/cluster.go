@@ -220,9 +220,16 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	netCfg := c.GetNetworkConfig(concurrency.RootTask())
 	result["network_id"] = netCfg.NetworkID
 	result["cidr"] = netCfg.CIDR
-	result["gateway_ip"] = netCfg.DefaultRouteIP
-	result["public_ip"] = netCfg.EndpointIP
-
+	result["default_route_ip"] = netCfg.DefaultRouteIP
+	result["gateway_ip"] = netCfg.DefaultRouteIP // legacy ...
+	result["primary_gateway_ip"] = netCfg.GatewayIP
+	result["endpoint_ip"] = netCfg.EndpointIP
+	result["primary_public_ip"] = netCfg.EndpointIP
+	if netCfg.SecondaryGatewayIP != "" {
+		result["secondary_gateway_ip"] = netCfg.SecondaryGatewayIP
+		result["secondary_public_ip"] = netCfg.SecondaryPublicIP
+		result["public_ip"] = netCfg.EndpointIP // legacy ...
+	}
 	if !properties.Lookup(Property.DefaultsV2) {
 		err = properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
 			defaultsV1 := v.(*clusterpropsv1.Defaults)
@@ -282,19 +289,25 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	// Add information not directly in cluster GetConfig()
 	//TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
 	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
-		remoteDesktops := []string{}
+		remoteDesktops := map[string][]string{}
 		clientHost := client.New().Host
-		endpointIP := netCfg.EndpointIP
 		for _, id := range c.ListMasterIDs(concurrency.RootTask()) {
 			host, err := clientHost.Inspect(id, utils.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
-			remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", endpointIP, host.Name))
+			urlFmt := "https://%s/_platform/remotedesktop/%s/"
+			urls := []string{fmt.Sprintf(urlFmt, netCfg.EndpointIP, host.Name)}
+			if netCfg.SecondaryPublicIP != "" {
+				// VPL: no public VIP IP yet, so don't repeat primary gateway public IP
+				// urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
+				urls = append(urls, fmt.Sprintf(urlFmt, netCfg.SecondaryPublicIP, host.Name))
+			}
+			remoteDesktops[host.Name] = urls
 		}
 		result["remote_desktop"] = remoteDesktops
 	} else {
-		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'deploy cluster %s feature remotedesktop add'.", clusterName)
+		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale deploy platform add-feature %s remotedesktop'.", clusterName)
 	}
 
 	return result, nil
@@ -350,7 +363,7 @@ var clusterCreateCommand = cli.Command{
 		- <cpu> is expecting an int as number of cpu cores, or an interval with minimum and maximum number of cpu cores
 		- <cpufreq> is expecting an int as minimum cpu frequency in MHz
 		- <gpu> is expecting an int as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
-		- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum mmory size
+		- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size
 		- <disk> is expecting an int as system disk size in GB
 	examples:
 		--sizing "cpu <= 4, ram <= 10, disk = 100"
