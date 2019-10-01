@@ -30,6 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 
@@ -51,23 +52,28 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 // ListRegions ...
 func (s *Stack) ListRegions() ([]string, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("openstack.Client.ListRegions() called"), log.TraceLevel)()
-
-	var results []string
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"", "",
+		concurrency.NewTracer(nil, "").Enable(true),
+		log.TraceLevel,
+	)()
 
 	listOpts := regions.ListOpts{
 		ParentRegionID: "RegionOne",
 	}
 
+	var results []string
 	allPages, err := regions.List(s.ComputeClient, listOpts).AllPages()
 	if err != nil {
 		return results, err
@@ -87,11 +93,11 @@ func (s *Stack) ListRegions() ([]string, error) {
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("openstack.Client.ListAvailabilityZones() called"), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback("", concurrency.NewTracer(nil, "").Enable(true), logrus.TraceLevel)()
 
 	allPages, err := az.List(s.ComputeClient).AllPages()
 	if err != nil {
@@ -119,11 +125,16 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 
 // ListImages lists available OS images
 func (s *Stack) ListImages() (imgList []resources.Image, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::ListImages() called"), &err, log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"",
+		concurrency.NewTracer(nil, "").Enable(true),
+		&err,
+		log.TraceLevel,
+	)()
 
 	opts := images.ListOpts{}
 
@@ -154,11 +165,17 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::GetImage(%s) called", id), &err, log.TraceLevel)()
 
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
+		&err,
+		log.TraceLevel,
+	)()
 
 	img, err := images.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -169,11 +186,16 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 
 // GetTemplate returns the Template referenced by id
 func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::GetTemplate(%s) called", id), &err, log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%d)", id)),
+		&err,
+		log.TraceLevel,
+	)()
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
@@ -200,11 +222,11 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListTemplates() called"), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback("", concurrency.NewTracer(nil, "").Enable(true), log.TraceLevel)()
 
 	opts := flavors.ListOpts{}
 
@@ -244,11 +266,18 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateKeyPair(%s) called", name), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if name == "" {
+		return nil, utils.InvalidParameterError("name", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)).Enable(true),
+		log.TraceLevel,
+	)()
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
@@ -274,11 +303,18 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetKeyPair(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be nil")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
+		log.TraceLevel,
+	)()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -295,11 +331,15 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListKeyPairs() called"), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, "").Enable(true),
+		log.TraceLevel,
+	)()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := keypairs.List(s.ComputeClient)
@@ -333,11 +373,18 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteKeyPair(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
+		log.TraceLevel,
+	)()
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -404,7 +451,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	if hostRef == "" {
 		hostRef = host.ID
 	}
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::InspectHost(%s) called", hostRef), log.TraceLevel)()
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef)).Enable(true),
+		log.TraceLevel,
+	)()
 
 	server, err := s.queryServer(host.ID)
 	if err != nil {
@@ -670,16 +722,18 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 // GetHostByName returns the host using the name passed as parameter
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetHostByName(%s) called", name), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
-
 	if name == "" {
 		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
 
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)).Enable(true),
+		log.TraceLevel,
+	)()
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
 	_, r.Err = s.ComputeClient.Get(s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gc.RequestOpts{
@@ -705,11 +759,15 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateHost(%s) called", request.ResourceName), log.TraceLevel)()
-
 	if s == nil {
 		return nil, nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName)).Enable(true),
+		log.TraceLevel,
+	)()
 
 	userData = userdata.NewContent()
 
@@ -1027,7 +1085,11 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 		panic("hostParam must be a string or a *resources.Host!")
 	}
 
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::WaitHostReady(%s) called", host.ID), log.TraceLevel)()
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID)),
+		log.TraceLevel,
+	)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -1056,11 +1118,15 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *resources.Host; any other type will panic
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetHostState() called"), log.TraceLevel)()
-
 	if s == nil {
 		return HostState.ERROR, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, ""),
+		log.TraceLevel,
+	)()
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
@@ -1071,11 +1137,15 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 // ListHosts lists all hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListHosts() called"), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, ""),
+		log.TraceLevel,
+	)()
 
 	pager := servers.List(s.ComputeClient, servers.ListOpts{})
 	var hosts []*resources.Host
@@ -1141,11 +1211,18 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteHost(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s", id)).Enable(true),
+		log.TraceLevel,
+	)()
 
 	if s.cfgOpts.UseFloatingIP {
 		fip, err := s.getFloatingIP(id)
@@ -1228,11 +1305,18 @@ func (s *Stack) DeleteHost(id string) error {
 
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::StopHost(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1243,11 +1327,18 @@ func (s *Stack) StopHost(id string) error {
 
 // RebootHost reboots unconditionally the host identified by id
 func (s *Stack) RebootHost(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::Reboot(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	err := servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
@@ -1263,11 +1354,18 @@ func (s *Stack) RebootHost(id string) error {
 
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::StartHost(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1279,11 +1377,18 @@ func (s *Stack) StartHost(id string) error {
 
 // ResizeHost ...
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ResizeHost(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	// TODO RESIZE Resize Host HERE
 	log.Warn("Trying to resize a Host...")

@@ -34,6 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -156,7 +158,7 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 }
 
 // UploadFile uploads a file to remote host
-func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) error {
+func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) (err error) {
 	if localpath == "" {
 		return utils.InvalidParameterError("localpath", "can't be empty string")
 	}
@@ -167,12 +169,21 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		return utils.InvalidParameterError("remotepath", "can't be empty string")
 	}
 
-	to := fmt.Sprintf("%s:%s", host.Name, localpath)
-	sshClt := client.New().SSH
+	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
+
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		fmt.Sprintf("Starting copy of file '%s' to '%s'...", localpath, to),
+		fmt.Sprintf("Ending copy file '%s' to '%s'", localpath, to),
+		concurrency.NewTracer(nil, ""),
+		&err,
+		logrus.TraceLevel,
+	)()
+
+	sshClt := client.New().Ssh
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(localpath, to, utils.GetDefaultDelay(), utils.GetExecutionTimeout()) // FIXME File operations
+			retcode, _, _, err := sshClt.Copy(localpath, to, utils.GetDefaultDelay(), utils.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -225,7 +236,6 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		}
 		cmd += "sudo chmod " + rights + " " + remotepath
 	}
-	var err error
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int

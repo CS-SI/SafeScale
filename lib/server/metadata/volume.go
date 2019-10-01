@@ -22,6 +22,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -101,11 +103,11 @@ func (mv *Volume) Reload() error {
 	return nil
 }
 
-// ReadByIDorName reads the metadata of a volume identified either by ID or by Name
-func (mv *Volume) ReadByIDorName(id string) (err error) {
-	errID := mv.ReadByID(id)
+// ReadByReference tries to read with 'ref' as id, then if not found as name
+func (mv *Volume) ReadByReference(ref string) (err error) {
+	errID := mv.ReadByID(ref)
 	if errID != nil {
-		errName := mv.ReadByName(id)
+		errName := mv.ReadByName(ref)
 		if errName != nil {
 			return errName
 		}
@@ -197,13 +199,20 @@ func RemoveVolume(svc iaas.Service, volumeID string) error {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Loading volume metadata: %s", ref), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "("+ref+")"), &err)()
+
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if ref == "" {
+		return nil, utils.InvalidParameterError("ref", "can't be empty string")
+	}
 
 	mv = NewVolume(svc)
 
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr := mv.ReadByIDorName(ref)
+			innerErr := mv.ReadByReference(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
 					return retry.StopRetryError("no metadata found", innerErr)

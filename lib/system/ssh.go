@@ -40,6 +40,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"golang.org/x/crypto/ssh"
 )
@@ -454,7 +455,12 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
 	if strings.Contains(sc.Display(), "ENDSSH") {
-		defer utils.TimerWithLevel(fmt.Sprintf("Running command with timeout of %s: [%s]", timeout, sc.Display()), log.DebugLevel)()
+		defer loghelpers.LogStopwatchWithLevelCallback(
+			fmt.Sprintf("Running command with timeout of %s: [%s]", timeout, sc.Display()),
+			fmt.Sprintf("Command run: [%s]", sc.Display()),
+			nil,
+			log.DebugLevel,
+		)()
 	}
 
 	// Set up the outputs (std and err)
@@ -650,8 +656,12 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		panic("SSHConfig.Host is empty!")
 	}
 
-	log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
-	defer utils.TraceOnExitErr(fmt.Sprintf("Waiting for remote SSH phase '%s' of host '%s', timeout of %d minutes", phase, ssh.Host, int(timeout.Minutes())), &err)()
+	// log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
+	defer loghelpers.LogTraceErrorCallback(
+		fmt.Sprintf("Waiting for remote SSH phase '%s' of host '%s', timeout of %d minutes", phase, ssh.Host, int(timeout.Minutes())),
+		nil,
+		&err,
+	)()
 
 	originalPhase := phase
 	if phase == "ready" {
@@ -685,10 +695,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		timeout,
 	)
 	if retryErr != nil {
-		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, utils.FmtDuration(time.Since(begins)), retryErr)
+		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, loghelpers.FormatDuration(time.Since(begins)), retryErr)
 		return stdout, retryErr
 	}
-	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, utils.FmtDuration(time.Since(begins)), stdout)
+	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, loghelpers.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 

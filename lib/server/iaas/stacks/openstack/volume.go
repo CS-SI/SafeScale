@@ -32,6 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -86,11 +88,18 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources.Volume, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::CreateVolume(%s) called", request.Name), &err, log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if request.Name == "" {
+		return nil, utils.InvalidParameterError("request.Name", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.Name)),
+		log.TraceLevel,
+	)()
 
 	volume, err = s.GetVolume(request.Name)
 	if err != nil {
@@ -165,11 +174,17 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetVolume(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be empty string")
+	}
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	r := volumesv2.Get(s.VolumeClient, id)
 	volume, err := r.Extract()
@@ -192,11 +207,14 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 
 // ListVolumes returns the list of all volumes known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListVolumes() called"), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, ""),
+		log.TraceLevel,
+	)()
 
 	var vs []resources.Volume
 	err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -228,11 +246,18 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.openstack::DeleteVolume(%s) called", id), &err, log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	var (
 		timeout = utils.GetBigDelay()
@@ -268,11 +293,18 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateVolumeAttachment(%s) called", request.Name), log.TraceLevel)()
-
 	if s == nil {
 		return "", utils.InvalidInstanceError()
 	}
+	if request.Name == "" {
+		return "", utils.InvalidParameterError("request.Name", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.Name)),
+		log.TraceLevel,
+	)()
 
 	// Creates the attachment
 	r := volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
@@ -294,11 +326,21 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetVolumeAttachment(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if serverID == "" {
+		return nil, utils.InvalidParameterError("serverID", "can't be empty string")
+	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s)", serverID, id)),
+		log.TraceLevel,
+	)()
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 	if err != nil {
@@ -314,11 +356,18 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListVolumeAttachments(%s) called", serverID), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if serverID == "" {
+		return nil, utils.InvalidParameterError("serverID", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, "("+serverID+")"),
+		log.TraceLevel,
+	)()
 
 	var vs []resources.VolumeAttachment
 	err := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
@@ -345,12 +394,21 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteVolumeAttachment(%s) called", serverID), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if serverID == "" {
+		return utils.InvalidParameterError("serverID", "can't be empty string")
+	}
+	if vaID == "" {
+		return utils.InvalidParameterError("vaID", "can't be empty string")
+	}
 
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s)", serverID, vaID)),
+		log.TraceLevel,
+	)()
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {

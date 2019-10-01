@@ -36,6 +36,8 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -68,11 +70,15 @@ type Subnet struct {
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.Network, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateNetwork(%s) called", req.Name), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name)),
+		log.TraceLevel,
+	)()
 
 	// Checks if CIDR is valid...
 	_, _, err = net.ParseCIDR(req.CIDR)
@@ -130,14 +136,18 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 
 // GetNetworkByName ...
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetNetworkByName(%s) called", name), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 	if name == "" {
 		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)),
+		log.TraceLevel,
+	)()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
@@ -161,11 +171,18 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 // GetNetwork returns the network identified by id
 func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::GetNetwork(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	// If not found, we look for any network from provider
 	// 1st try with id
@@ -205,11 +222,15 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::ListNetworks() called"), log.TraceLevel)()
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, ""),
+		log.TraceLevel,
+	)()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*resources.Network
@@ -256,11 +277,15 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteNetwork(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
@@ -306,10 +331,15 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Host, userData *userdata.Content, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::CreateGateway(%s) called...", req.Name), log.TraceLevel)()
 	if s == nil {
 		return nil, nil, utils.InvalidInstanceError()
 	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name)),
+		log.TraceLevel,
+	)()
 
 	userData = userdata.NewContent()
 
@@ -373,11 +403,18 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 
 // DeleteGateway delete the public gateway of a private network
 func (s *Stack) DeleteGateway(id string) error {
-	defer utils.TimerWithLevel(fmt.Sprintf("stacks.openstack::DeleteGateway(%s) called", id), log.TraceLevel)()
-
 	if s == nil {
 		return utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return utils.InvalidParameterError("id", "can't be empty string")
+	}
+
+	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
+		log.TraceLevel,
+	)()
 
 	return s.DeleteHost(id)
 }
