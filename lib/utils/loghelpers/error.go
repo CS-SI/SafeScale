@@ -2,6 +2,8 @@ package loghelpers
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
 
 	"github.com/sirupsen/logrus"
 
@@ -28,6 +30,15 @@ func LogErrorCallback(in string, tracer *concurrency.Tracer, err *error) func() 
 		tracer.In()
 	}
 
+	// in the meantime if 'in' is empty, recover function name from caller
+	if len(in) == 0 {
+		if pc, _, _, ok := runtime.Caller(1); ok {
+			if f := runtime.FuncForPC(pc); f != nil {
+				in = filepath.Base(f.Name())
+			}
+		}
+	}
+
 	return func() {
 		if err != nil && *err != nil {
 			logrus.Error(fmt.Sprintf(outputErrorTemplate, in, *err))
@@ -52,6 +63,15 @@ func LogErrorWithLevelCallback(in string, tracer *concurrency.Tracer, err *error
 
 	if tracer != nil {
 		tracer.In()
+	}
+
+	// in the meantime if 'in' is empty, recover function name from caller
+	if len(in) == 0 {
+		if pc, _, _, ok := runtime.Caller(1); ok {
+			if f := runtime.FuncForPC(pc); f != nil {
+				in = filepath.Base(f.Name())
+			}
+		}
 	}
 
 	return func() {
