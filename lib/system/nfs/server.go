@@ -18,10 +18,12 @@ package nfs
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 )
 
 // Server structure
@@ -31,10 +33,10 @@ type Server struct {
 
 // NewServer instantiates a new nfs.Server struct
 func NewServer(sshconfig *system.SSHConfig) (srv *Server, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("NFS create new server called"), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
 
 	if sshconfig == nil {
-		return nil, fmt.Errorf("invalid parameter: 'sshconfig' can't be nil")
+		return nil, utils.InvalidParameterError("sshconfig", "can't be nil")
 	}
 
 	server := Server{

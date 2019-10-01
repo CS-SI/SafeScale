@@ -29,6 +29,7 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -49,6 +50,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -111,8 +113,8 @@ type foreman struct {
 	makers  Makers
 }
 
-// NewForeman creates a new Foreman
-func NewForeman(c *Controller, makers Makers) *foreman {
+// NewForeman creates a new *foreman to build a cluster
+func NewForeman(c *Controller, makers Makers) Foreman {
 	return &foreman{
 		cluster: c,
 		makers:  makers,
@@ -129,7 +131,12 @@ func (b *foreman) ExecuteScript(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string,
 ) (errCode int, stdOut string, stdErr string, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("Executing Script in '%s'...", hostID), &err, log.DebugLevel)()
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"", "",
+		concurrency.NewTracer(nil, "("+hostID+")").Enable(true),
+		&err,
+		logrus.TraceLevel,
+	)()
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, err := system.GetBashLibrary()
@@ -152,7 +159,19 @@ func (b *foreman) ExecuteScript(
 
 // construct ...
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("Constructing cluster '%s'...", req.Name), &err, log.InfoLevel)()
+	// First defer to log in case of error and trace call
+	defer loghelpers.LogErrorCallback(
+		"",
+		concurrency.NewTracer(task, "").Enable(true),
+		&err,
+	)()
+
+	// Second defer to 'Info' the cluster construction time
+	defer loghelpers.LogInfoStopwatchCallback(
+		fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
+		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
+		nil,
+	)()
 
 	state := ClusterState.Unknown
 
@@ -651,8 +670,14 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 }
 
 // configureCluster ...
-func (b *foreman) configureCluster(task concurrency.Task, params data.Map) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.foreman::configureCluster() called"), &err, log.TraceLevel)()
+// params contains a data.Map with primary and secondary Gateway hosts
+func (b *foreman) configureCluster(task concurrency.Task, params concurrency.TaskParameters) (err error) {
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"", "",
+		concurrency.NewTracer(task, "").Enable(true),
+		&err,
+		log.TraceLevel,
+	)()
 
 	log.Infof("[cluster %s] configuring cluster...", b.cluster.Name)
 	defer func() {
@@ -860,7 +885,12 @@ func uploadTemplateToFile(
 
 // configureNodesFromList configures nodes from a list
 func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("Configuring nodes..."), &err, log.DebugLevel)()
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"", "",
+		concurrency.NewTracer(task, "").Enable(true),
+		&err,
+		log.TraceLevel,
+	)()
 
 	var (
 		host   *pb.Host
@@ -1096,7 +1126,13 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	}
 
 	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] installing system requirements...", hostLabel), &err, log.DebugLevel)()
-
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		fmt.Sprintf("[%s] starting installation of systemrequirements...", hostLabel),
+		fmt.Sprintf("[%s] ending installation of systemrequirements", hostLabel),
+		concurrency.NewTracer(task, "").Enable(true),
+		&err,
+		log.DebugLevel,
+	)()
 	if b.makers.GetTemplateBox == nil {
 		return fmt.Errorf("missing callback GetTemplateBox")
 	}
@@ -1910,7 +1946,7 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 // intallDocker installs docker and docker-compose
 func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'docker'...", hostLabel), &err, log.DebugLevel)()
+	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'docker'...", hostLabel), &err, log.TraceLevel)()
 
 	feat, err := install.NewEmbeddedFeature(task, "docker")
 	if err != nil {

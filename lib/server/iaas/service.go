@@ -40,7 +40,9 @@ import (
 	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 )
 
 //go:generate mockgen -destination=mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas Service
@@ -277,7 +279,11 @@ func filterBlacklistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
 func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (selectedTpls []*resources.HostTemplate, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Service::SelectTemplatesBySize() called"), &err)()
+	defer loghelpers.LogTraceErrorCallback(
+		"",
+		concurrency.NewTracer(nil, ""),
+		&err,
+	)()
 
 	if svc == nil {
 		return nil, utils.InvalidInstanceError()

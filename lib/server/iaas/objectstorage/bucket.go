@@ -48,16 +48,14 @@ func newBucket(location stow.Location, bucketName string) (*bucket, error) {
 
 // CreateObject ...
 func (b *bucket) CreateObject(objectName string) (Object, error) {
-	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s)", objectName)).In()
-	defer tracer.Out()
+	defer concurrency.NewTracer(concurrency.VoidTask(), fmt.Sprintf("(%s)", objectName)).Enable(false /*Trace.Controller*/).In().Out()
 
 	return newObject(b, objectName)
 }
 
 // GetObject ...
 func (b *bucket) GetObject(objectName string) (Object, error) {
-	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s)", objectName)).In()
-	defer tracer.Out()
+	defer concurrency.NewTracer(concurrency.VoidTask(), fmt.Sprintf("(%s)", objectName)).Enable(false /*Trace.Controller*/).In().Out()
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -71,8 +69,7 @@ func (b *bucket) GetObject(objectName string) (Object, error) {
 
 // ListObjects list objects of a Bucket
 func (b *bucket) List(path, prefix string) ([]string, error) {
-	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s, %s)", path, prefix)).In()
-	defer tracer.Out()
+	defer concurrency.NewTracer(concurrency.VoidTask(), fmt.Sprintf("(%s, %s)", path, prefix)).Enable(false /*Trace.Controller*/).In().Out()
 
 	list := []string{}
 
@@ -102,8 +99,7 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 		return utils.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%s, '%s')", path, prefix)).In()
-	defer tracer.Out()
+	defer concurrency.NewTracer(concurrency.VoidTask(), fmt.Sprintf("(%s, '%s')", path, prefix)).Enable(false /*Trace.Controller*/).In().Out()
 
 	fullPath := buildFullPath(path, prefix)
 
