@@ -58,7 +58,7 @@ func NewTaskedLock() TaskedLock {
 // 2. registers the lock for read AND effectively lock for read otherwise
 func (tm *taskedLock) RLock(task Task) {
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
+	defer NewTracer(task, Trace.Locks, "").OnExitLog()
 
 	tm.lock.Lock()
 
@@ -86,7 +86,7 @@ func (tm *taskedLock) RLock(task Task) {
 // only if no lock for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) {
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
+	defer NewTracer(task, Trace.Locks, "").GoingIn().OnExitLog()
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -111,10 +111,10 @@ func (tm *taskedLock) RUnlock(task Task) {
 	}
 }
 
-// Lock ...
+// Lock acquires a write lock.
 func (tm *taskedLock) Lock(task Task) {
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
+	defer NewTracer(task, Trace.Locks, "").GoingIn().OnExitLog()
 
 	tm.lock.Lock()
 
@@ -134,10 +134,10 @@ func (tm *taskedLock) Lock(task Task) {
 	tm.rwmutex.Lock()
 }
 
-// Unlock ...
+// Unlock releases a write lock
 func (tm *taskedLock) Unlock(task Task) {
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
+	defer NewTracer(task, Trace.Locks, "").GoingIn().OnExitLog()
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -157,13 +157,13 @@ func (tm *taskedLock) Unlock(task Task) {
 	}
 }
 
-// IsRLocked tells of the facet locks for read
+// IsRLocked tells if the task is owning a read lock
 func (tm *taskedLock) IsRLocked(task Task) bool {
 	_, ok := tm.readLocks[task.GetID()]
 	return ok
 }
 
-// IsLocked tells if the facet locks for write
+// IsLocked tells if the task is owning a write lock
 func (tm *taskedLock) IsLocked(task Task) bool {
 	_, ok := tm.writeLocks[task.GetID()]
 	return ok

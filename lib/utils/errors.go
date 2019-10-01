@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,7 +36,7 @@ var removePart atomic.Value
 // DecorateError changes the error to something more comprehensible when
 // timeout occurred
 func DecorateError(err error, action string, timeout time.Duration) error {
-	if IsTimeout(err) {
+	if IsGRPCTimeout(err) {
 		if timeout > 0 {
 			return fmt.Errorf("%s took too long (> %v) to respond", action, timeout)
 		}
@@ -54,8 +55,8 @@ func DecorateError(err error, action string, timeout time.Duration) error {
 	return err
 }
 
-// IsTimeout tells if the err is a timeout kind
-func IsTimeout(err error) bool {
+// IsGRPCTimeout tells if the err is a timeout kind
+func IsGRPCTimeout(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }
 
@@ -471,6 +472,49 @@ func getPartToRemove() string {
 		return anon.(string)
 	}
 	return "github.com/CS-SI/SafeScale/"
+}
+
+// ----------- log helpers ---------------
+
+const (
+	outputErrorTemplate = "%s WITH ERROR [%+v]"
+)
+
+var (
+	logLevelFnMap = map[logrus.Level]func(args ...interface{}){
+		logrus.TraceLevel: logrus.Trace,
+		logrus.DebugLevel: logrus.Debug,
+		logrus.InfoLevel:  logrus.Info,
+		logrus.WarnLevel:  logrus.Warn,
+		logrus.ErrorLevel: logrus.Error,
+	}
+)
+
+// OnExitLogErrorWithLevel returns a function that will log error with the log level wanted
+// Intended to be used with defer for example.
+func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
+	logLevelFn, ok := logLevelFnMap[level]
+	if !ok {
+		logLevelFn = logrus.Error
+	}
+
+	return func() {
+		if err != nil && *err != nil {
+			logLevelFn(fmt.Sprintf(outputErrorTemplate, in, *err))
+		}
+	}
+}
+
+// OnExitLogError returns a function that will log error with level logrus.ErrorLevel.
+// Intended to be used with defer for example
+func OnExitLogError(in string, err *error) func() {
+	return OnExitLogErrorWithLevel(in, err, logrus.ErrorLevel)
+}
+
+// OnExitTraceError returns a function that will log error with level logrus.TraceLevel.
+// Intended to be used with defer for example.
+func OnExitTraceError(in string, err *error) func() {
+	return OnExitLogErrorWithLevel(in, err, logrus.TraceLevel)
 }
 
 func init() {
