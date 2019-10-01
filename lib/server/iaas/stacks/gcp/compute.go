@@ -32,6 +32,8 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -498,7 +500,13 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 	default:
 		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
-	defer utils.TimerErrWithLevel(fmt.Sprintf("stacks.gcp::WaitHostReady(%s) called", host.ID), &err, logrus.TraceLevel)()
+
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID)),
+		&err,
+		logrus.TraceLevel,
+	)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

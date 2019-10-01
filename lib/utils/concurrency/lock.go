@@ -18,10 +18,9 @@ package concurrency
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
@@ -59,9 +58,7 @@ func NewTaskedLock() TaskedLock {
 // 2. registers the lock for read AND effectively lock for read otherwise
 func (tm *taskedLock) RLock(task Task) {
 	tid := task.GetID()
-	if Trace.Locks {
-		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::RLock() called", tid), log.TraceLevel)()
-	}
+	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 
@@ -73,7 +70,7 @@ func (tm *taskedLock) RLock(task Task) {
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
 		if Trace.Locks {
-			log.Debugf("RLock(%s): really RLocking...", tid)
+			logrus.Debugf("RLock(%s): really RLocking...", tid)
 		}
 		tm.lock.Unlock()
 		tm.rwmutex.RLock()
@@ -81,7 +78,7 @@ func (tm *taskedLock) RLock(task Task) {
 	}
 	tm.lock.Unlock()
 	if Trace.Locks {
-		log.Debugf("RLock(%s): using running write lock...", tid)
+		logrus.Debugf("RLock(%s): using running write lock...", tid)
 	}
 }
 
@@ -89,9 +86,7 @@ func (tm *taskedLock) RLock(task Task) {
 // only if no lock for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) {
 	tid := task.GetID()
-	if Trace.Locks {
-		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::RUnlock() called", tid), log.TraceLevel)()
-	}
+	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -105,11 +100,11 @@ func (tm *taskedLock) RUnlock(task Task) {
 		// If not locked for write, actively unlock for read the RWMutex
 		if _, ok := tm.writeLocks[tid]; ok {
 			if Trace.Locks {
-				log.Debugf("RUnlock(%s): in running write lock, doing nothing", tid)
+				logrus.Debugf("RUnlock(%s): in running write lock, doing nothing", tid)
 			}
 		} else {
 			if Trace.Locks {
-				log.Debugf("RUnlock(%s): really RUnlocking...", tid)
+				logrus.Debugf("RUnlock(%s): really RUnlocking...", tid)
 			}
 			tm.rwmutex.RUnlock()
 		}
@@ -119,9 +114,7 @@ func (tm *taskedLock) RUnlock(task Task) {
 // Lock ...
 func (tm *taskedLock) Lock(task Task) {
 	tid := task.GetID()
-	if Trace.Locks {
-		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::Lock() called", tid), log.TraceLevel)()
-	}
+	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 
@@ -144,9 +137,7 @@ func (tm *taskedLock) Lock(task Task) {
 // Unlock ...
 func (tm *taskedLock) Unlock(task Task) {
 	tid := task.GetID()
-	if Trace.Locks {
-		defer utils.TimerWithLevel(fmt.Sprintf("{task %s} utils.concurrency.TaskedLock::Unlock() called", tid), log.TraceLevel)()
-	}
+	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Tracer ...
@@ -36,19 +36,17 @@ type Tracer struct {
 }
 
 // NewTracer creates a new Tracer instance
-func NewTracer(enable bool, t Task, message string) *Tracer {
-	tracer := Tracer{
-		enabled: enable,
-	}
+func NewTracer(t Task, message string) *Tracer {
+	tracer := Tracer{}
 	if t != nil {
 		tracer.taskSig = t.GetSignature()
 		tracer.generation = t.(*task).generation
 	}
 
-	// If message == "", make it be "()"
 	if message == "" {
 		message = "()"
 	}
+
 	// Build the message to trace
 	if pc, file, line, ok := runtime.Caller(1); ok {
 		if f := runtime.FuncForPC(pc); f != nil {
@@ -57,33 +55,56 @@ func NewTracer(enable bool, t Task, message string) *Tracer {
 			tracer.inOutMessage = fmt.Sprintf("%s %s%s [%s:%d]", tracer.taskSig, filepath.Base(tracer.funcName), message, filename, line)
 		}
 	}
-	// If there is nothing to trace, disable the tracer
-	if tracer.inOutMessage == "" {
-		tracer.enabled = false
-	}
 
 	return &tracer
+}
+
+// Enable enables the traces (if there is something to trace...)
+func (t *Tracer) Enable(flag bool) *Tracer {
+	if t.inOutMessage == "" {
+		// If there is nothing to trace, disable the tracer
+		t.enabled = false
+	} else {
+		t.enabled = flag
+	}
+	return t
+}
+
+// InputMessage returns the content of the message when entering the function
+func (t *Tracer) InputMessage() string {
+	if t.enabled {
+		return blockquoteGeneration(t.generation) + ">>>" + t.inOutMessage
+	}
+	return ""
 }
 
 // In signifies we are going in
 func (t *Tracer) In() *Tracer {
 	if t.enabled {
-		log.Debugf(blockquoteGeneration(t.generation) + ">>>" + t.inOutMessage)
+		logrus.Tracef(t.InputMessage())
 	}
 	return t
+}
+
+// OutputMessage returns the content of the message when exiting the function
+func (t *Tracer) OutputMessage() string {
+	if t.enabled {
+		return blockquoteGeneration(t.generation) + "<<<" + t.inOutMessage
+	}
+	return ""
 }
 
 // Out signifies we are going out
 func (t *Tracer) Out() {
 	if t.enabled {
-		log.Debugf(blockquoteGeneration(t.generation) + "<<<" + t.inOutMessage)
+		logrus.Tracef(t.OutputMessage())
 	}
 }
 
 // Trace traces a message
 func (t *Tracer) Trace(message string) {
 	if t.enabled {
-		log.Debugf(blockquoteGeneration(t.generation)+"---%s %s", t.taskSig, t.inOutMessage)
+		logrus.Tracef(blockquoteGeneration(t.generation)+"---%s %s %s", t.taskSig, t.inOutMessage, message)
 	}
 }
 

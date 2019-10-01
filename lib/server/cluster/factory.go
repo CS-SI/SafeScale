@@ -68,19 +68,18 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 	flavor := controller.GetIdentity(task).Flavor
 	switch flavor {
 	case Flavor.DCOS:
-		controller.Restore(task, control.NewForeman(controller, dcos.Makers))
+		return controller.Restore(task, control.NewForeman(controller, dcos.Makers))
 	case Flavor.BOH:
-		controller.Restore(task, control.NewForeman(controller, boh.Makers))
+		return controller.Restore(task, control.NewForeman(controller, boh.Makers))
 	// case Flavor.OHPC:
 	// 	controller.Restore(task, control.NewForeman(controller, ohpc.Makers))
 	case Flavor.K8S:
-		controller.Restore(task, control.NewForeman(controller, k8s.Makers))
+		return controller.Restore(task, control.NewForeman(controller, k8s.Makers))
 	case Flavor.SWARM:
-		controller.Restore(task, control.NewForeman(controller, swarm.Makers))
+		return controller.Restore(task, control.NewForeman(controller, swarm.Makers))
 	default:
 		return utils.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", flavor.String()))
 	}
-	return nil
 }
 
 // Create creates a cluster following the parameters of the request
