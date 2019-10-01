@@ -262,7 +262,6 @@ var hostCreate = cli.Command{
 		}
 		askedGpus := int32(c.Int("gpu"))
 		if askedGpus <= -1 {
-			askedGpus = -1
 			logrus.Debug("No GPU parameters used")
 		} else {
 			if askedGpus == 0 {

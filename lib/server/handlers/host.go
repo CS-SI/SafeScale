@@ -276,11 +276,11 @@ func (handler *HostHandler) Create(
 		sizing       *resources.SizingRequirements
 		templateName string
 	)
-	switch sizingParam.(type) {
+	switch sizingParam := sizingParam.(type) {
 	case *resources.SizingRequirements:
-		sizing = sizingParam.(*resources.SizingRequirements)
+		sizing = sizingParam
 	case string:
-		templateName = sizingParam.(string)
+		templateName = sizingParam
 	default:
 		return nil, utils.InvalidParameterError("sizing", "must be *resources.SizingRequirements or string")
 	}

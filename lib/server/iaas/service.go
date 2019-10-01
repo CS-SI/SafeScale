@@ -347,11 +347,11 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					}
 
 					// if the user asked explicitly no gpu
-					if int(sizing.MinGPU) == 0 && imageFound.GPU != 0 {
+					if sizing.MinGPU == 0 && imageFound.GPU != 0 {
 						continue
 					}
 
-					if imageFound.GPU < int(sizing.MinGPU) {
+					if imageFound.GPU < sizing.MinGPU {
 						continue
 					}
 
@@ -413,7 +413,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 
 	for _, t := range allTpls {
 		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
-		msg = msg + " %s"
+		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
 			log.Debugf(msg, "not enough cores")
 			continue

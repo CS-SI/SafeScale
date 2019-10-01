@@ -1101,6 +1101,8 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		return nil, funcErr
 	}
 
+	var cleaningErrors []error
+
 	// Deletes the nodes
 	list := c.ListNodeIDs(task)
 	length := len(list)
@@ -1113,7 +1115,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		for _, s := range subtasks {
 			_, subErr := s.Wait()
 			if subErr != nil {
-				log.Error(subErr) // FIXME Don't hide the errors, stack them
+				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
 	}
@@ -1130,12 +1132,12 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		for _, s := range subtasks {
 			_, subErr := s.Wait()
 			if subErr != nil {
-				log.Error(subErr)
+				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
 	}
 
-	// Deletes the network and gateway
+	// get access to metadata
 	c.RLock(task)
 	networkID := ""
 	if c.Properties.Lookup(Property.NetworkV2) {
@@ -1151,9 +1153,11 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	}
 	c.RUnlock(task)
 	if err != nil {
-		return err
+		cleaningErrors = append(cleaningErrors, err)
+		return utils.ErrListError(cleaningErrors)
 	}
 
+	// Deletes the network
 	clientNetwork := client.New().Network
 	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
@@ -1162,16 +1166,19 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		utils.GetHostTimeout(),
 	)
 	if retryErr != nil {
-		return retryErr
+		cleaningErrors = append(cleaningErrors, retryErr)
+		return utils.ErrListError(cleaningErrors)
 	}
 
 	// Deletes the metadata
 	err = c.DeleteMetadata(task)
 	if err != nil {
-		return nil
+		cleaningErrors = append(cleaningErrors, err)
+		return utils.ErrListError(cleaningErrors)
 	}
 	c.service = nil
-	return nil
+
+	return utils.ErrListError(cleaningErrors)
 }
 
 // Stop stops the Cluster is its current state is compatible

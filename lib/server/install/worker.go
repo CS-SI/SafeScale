@@ -356,7 +356,10 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	results = append(w.allGateways, gw)
+
+	results = append(results, w.allGateways...)
+	results = append(results, gw)
+
 	if netCfg.SecondaryGatewayID != "" {
 		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, utils.GetExecutionTimeout())
 		if err != nil {
@@ -384,7 +387,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 	// 'steps' describes the steps of the action
 	stepsKey := w.rootKey + "." + yamlStepsKeyword
 	steps := w.feature.specs.GetStringMap(stepsKey)
-	if len(steps) <= 0 {
+	if len(steps) == 0 {
 		return nil, fmt.Errorf("nothing to do")
 	}
 	order := strings.Split(pace, ",")
@@ -670,7 +673,7 @@ func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, e
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy() (err error) {
 	rules, ok := w.feature.specs.Get("feature.proxy.rules").([]interface{})
-	if !ok || len(rules) <= 0 {
+	if !ok || len(rules) == 0 {
 		return nil
 	}
 

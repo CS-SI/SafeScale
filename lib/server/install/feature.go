@@ -132,9 +132,9 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 						FeatureName    string   `json:"feature"`
 						ClusterFlavors []string `json:"available-cluster-flavors"`
 					}{feature.displayName, []string{}}
-					for _, flavor := range values {
-						cfg.ClusterFlavors = append(cfg.ClusterFlavors, flavor)
-					}
+
+					cfg.ClusterFlavors = append(cfg.ClusterFlavors, values...)
+
 					cfgFiles = append(cfgFiles, cfg)
 				}
 			}
@@ -381,7 +381,9 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	results, err := installer.Add(f, t, myV, s)
 	if err == nil {
 		// _ = checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
+		return nil, err
 	}
+
 	return results, err
 }
 

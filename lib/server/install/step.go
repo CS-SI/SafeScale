@@ -61,10 +61,11 @@ func (sr stepResult) ErrorMessage() string {
 	return ""
 }
 
-// stepResults contains the errors of the step for each host target
-type stepResults map[string]stepResult
+// StepResults contains the errors of the step for each host target
+type StepResults map[string]stepResult
 
-func (s stepResults) ErrorMessages() string {
+// ErrorMessages concatenates the error message of each step and returns the concatenated string
+func (s StepResults) ErrorMessages() string {
 	output := ""
 	for h, k := range s {
 		val := k.ErrorMessage()
@@ -75,7 +76,8 @@ func (s stepResults) ErrorMessages() string {
 	return output
 }
 
-func (s stepResults) Successful() bool {
+// Successful returns true if all steps ended with Success, false otherwise
+func (s StepResults) Successful() bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -229,8 +231,8 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResults, err error) {
-	results = stepResults{}
+func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResults, err error) {
+	results = StepResults{}
 	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
 		fmt.Sprintf("Starting step '%s' on %d hosts...", is.Name, len(hosts)),
 		fmt.Sprintf("Ending step '%s' on %d hosts", is.Name, len(hosts)),

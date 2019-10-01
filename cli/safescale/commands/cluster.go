@@ -950,7 +950,7 @@ var clusterRunCommand = cli.Command{
 
 func executeCommand(command string) error {
 	masters := clusterInstance.ListMasterIDs(concurrency.RootTask())
-	if len(masters) <= 0 {
+	if len(masters) == 0 {
 		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity(concurrency.RootTask()).Name)
 		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}

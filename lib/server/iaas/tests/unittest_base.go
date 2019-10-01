@@ -81,10 +81,12 @@ func (tester *ServiceTester) ListImages(t *testing.T) {
 		assert.NotEqual(t, i.Name, "")
 	}
 	imgs, err := tester.Service.FilterImages("ubuntu 18.04")
+	require.NotNil(t, err)
 	for _, img := range imgs {
 		fmt.Println(">>", img.Name)
 	}
 	imgs, err = tester.Service.FilterImages("ubuntu xenial")
+	require.NotNil(t, err)
 	for _, img := range imgs {
 		fmt.Println(">>", img.Name)
 	}

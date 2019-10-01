@@ -43,7 +43,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	// disable subnetwork auto-creation
 	ne := compute.Network{
-		Name: s.GcpConfig.NetworkName,
+		Name:                  s.GcpConfig.NetworkName,
 		AutoCreateSubnetworks: false,
 		ForceSendFields:       []string{"AutoCreateSubnetworks"},
 	}
@@ -381,8 +381,8 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, subnetwork.Name)
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
 	if fws != nil && err == nil {
-		opp, err := compuService.Firewalls.Delete(s.GcpConfig.ProjectID, firewallRuleName).Do()
-		if err == nil {
+		opp, operr := compuService.Firewalls.Delete(s.GcpConfig.ProjectID, firewallRuleName).Do()
+		if operr == nil {
 			oco := OpContext{
 				Operation:    opp,
 				ProjectID:    s.GcpConfig.ProjectID,
@@ -390,10 +390,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
+			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
+			if operr != nil {
+				logrus.Warn(operr)
+			}
 		}
 	}
-
 	if err != nil {
 		logrus.Warn(err)
 	}
@@ -401,8 +403,8 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
 	nws, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
 	if nws != nil && err == nil {
-		opp, err := compuService.Routes.Delete(s.GcpConfig.ProjectID, natRuleName).Do()
-		if err == nil {
+		opp, operr := compuService.Routes.Delete(s.GcpConfig.ProjectID, natRuleName).Do()
+		if operr == nil {
 			oco := OpContext{
 				Operation:    opp,
 				ProjectID:    s.GcpConfig.ProjectID,
@@ -410,10 +412,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
+			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
+			if operr != nil {
+				logrus.Warn(operr)
+			}
 		}
 	}
-
 	if err != nil {
 		logrus.Warn(err)
 	}

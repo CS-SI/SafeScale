@@ -69,7 +69,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 	if !v.IsSet("feature.install") {
 		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'install'", name)
 	}
-	if len(v.GetStringMap("feature.install")) <= 0 {
+	if len(v.GetStringMap("feature.install")) == 0 {
 		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': 'install' defines no method", name)
 	}
 	return name, v, nil

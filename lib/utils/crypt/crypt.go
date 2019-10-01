@@ -39,7 +39,7 @@ type Key [32]byte
 func NewEncryptionKey(text []byte) *Key {
 	key := Key{}
 	nBytes := len(text)
-	if text == nil || len(text) == 0 {
+	if len(text) == 0 {
 		_, err := io.ReadFull(rand.Reader, key[:])
 		if err != nil {
 			panic(fmt.Sprintf("can't read enough random bytes (you should consider to stop using this computer): %v", err))

@@ -129,7 +129,7 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
 	}
-	info.NumberOfCore = info.NumberOfCore * info.NumberOfSocket
+	info.NumberOfCore *= info.NumberOfSocket
 	info.CPUFrequency, err = strconv.ParseFloat(tokens[3], 64)
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
@@ -208,7 +208,7 @@ func RunScanner(targetedTenant string) {
 	for _, tenant := range theProviders {
 		isScannable, err := isTenantScannable(tenant.(map[string]interface{}))
 		if err != nil {
-			panic(fmt.Sprintf(err.Error()))
+			panic(fmt.Sprint(err.Error()))
 		}
 		if isScannable {
 			tenantName, found := tenant.(map[string]interface{})["name"].(string)
@@ -331,7 +331,6 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 	netName := "net-safescale" // FIXME Hardcoded string
 	if network, err = serviceProvider.GetNetwork(netName); network != nil && err == nil {
-		there = true
 		log.Warnf("Network '%s' already there", netName)
 	} else {
 		there = false
