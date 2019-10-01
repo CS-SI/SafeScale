@@ -356,9 +356,12 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 	}
 }
 
+func genErr() error {
+	return resources.ResourceNotFoundError("host", "whatever")
+}
+
 func TestErrorHierarchy(t *testing.T) {
-	var nerr error
-	nerr = resources.ResourceNotFoundError("host", "whatever")
+	nerr := genErr()
 
 	if _, ok := nerr.(utils.ErrNotFound); !ok {
 		t.Errorf("Is not a resourceNotFound")

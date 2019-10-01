@@ -120,7 +120,7 @@ func DecorateError(err error, action string, maySucceed bool) error {
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
 	}
 	msg := err.Error()
-	if strings.Index(msg, "desc = ") != -1 {
+	if strings.Contains(msg, "desc = ") {
 		pos := strings.Index(msg, "desc = ") + 7
 		msg = msg[pos:]
 

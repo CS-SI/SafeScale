@@ -735,6 +735,9 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		return utils.InvalidParameterError("params", "key 'PrimaryGateway' must be defined and can't be nil")
 	}
 	secondaryGateway, ok = p["SecondaryGateway"].(*resources.Host)
+	if !ok {
+		log.Debugf("secondary gateway not configured")
+	}
 
 	clientInstance := client.New()
 	clientHost := clientInstance.Host

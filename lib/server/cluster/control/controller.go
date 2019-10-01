@@ -335,8 +335,7 @@ func (c *Controller) ListNodeNames(task concurrency.Task) []string {
 
 	var list []string
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		var nodesV1 []*clusterpropsv1.Node
-		nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
+		nodesV1 := v.(*clusterpropsv1.Nodes).PrivateNodes
 		for _, v := range nodesV1 {
 			list = append(list, v.Name)
 		}
@@ -358,8 +357,7 @@ func (c *Controller) ListNodeIDs(task concurrency.Task) []string {
 
 	var list []string
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		var nodesV1 []*clusterpropsv1.Node
-		nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
+		nodesV1 := v.(*clusterpropsv1.Nodes).PrivateNodes
 		for _, v := range nodesV1 {
 			list = append(list, v.ID)
 		}
@@ -381,8 +379,7 @@ func (c *Controller) ListNodeIPs(task concurrency.Task) []string {
 
 	var list []string
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		var nodesV1 []*clusterpropsv1.Node
-		nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
+		nodesV1 := v.(*clusterpropsv1.Nodes).PrivateNodes
 		for _, v := range nodesV1 {
 			list = append(list, v.PrivateIP)
 		}

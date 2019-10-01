@@ -42,7 +42,7 @@ func DecorateError(err error, action string, timeout time.Duration) error {
 		return fmt.Errorf("%s took too long to respond", action)
 	}
 	msg := err.Error()
-	if strings.Index(msg, "desc = ") != -1 {
+	if strings.Contains(msg, "desc = ") {
 		pos := strings.Index(msg, "desc = ") + 7
 		msg = msg[pos:]
 
