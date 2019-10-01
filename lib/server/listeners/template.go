@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -25,7 +26,6 @@ import (
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
@@ -50,7 +50,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list templates: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list templates: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list templates: no tenant set")
 	}
 
 	handler := TemplateHandler(tenant.Service)

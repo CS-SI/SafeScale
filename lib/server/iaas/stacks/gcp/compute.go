@@ -503,6 +503,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 
 	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID)),
 		&err,
 		logrus.TraceLevel,

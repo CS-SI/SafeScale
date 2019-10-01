@@ -20,8 +20,8 @@ import (
 	"context"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -48,13 +48,13 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
 	fileNames, uploadDates, fileSizes, fileBuckets, err := handler.List(ctx)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	return conv.ToPBFileList(fileNames, uploadDates, fileSizes, fileBuckets), nil
@@ -73,13 +73,13 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (*google_protobuf.
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
 	err := handler.Push(ctx, in.GetLocalPath(), in.GetName())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	return &google_protobuf.Empty{}, nil
@@ -98,13 +98,13 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.E
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
 	err := handler.Get(ctx, in.GetLocalPath(), in.GetName())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	return &google_protobuf.Empty{}, nil
@@ -123,13 +123,13 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (*google_protobu
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
 	err := handler.Delete(ctx, in.GetName())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	return &google_protobuf.Empty{}, nil

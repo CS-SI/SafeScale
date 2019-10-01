@@ -19,13 +19,13 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
@@ -48,7 +48,7 @@ func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinit
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't stop process: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "Can't stop process: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "Can't stop process: no tenant set")
 	}
 
 	handler := ProcessManagerHandler(tenant.Service)
@@ -70,7 +70,7 @@ func (s *ProcessManagerListener) List(ctx context.Context, in *google_protobuf.E
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list process : no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "Can't list process: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "Can't list process: no tenant set")
 	}
 
 	handler := ProcessManagerHandler(tenant.Service)

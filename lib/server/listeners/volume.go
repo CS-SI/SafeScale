@@ -19,9 +19,9 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/status"
 
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -69,13 +69,13 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list volumes: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list volumes: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list volumes: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
 	volumes, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	// Map resources.Volume to pb.Volume
@@ -107,13 +107,13 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create volumes: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create volume: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't create volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
 	volume, err := handler.Create(ctx, volumeName, int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	log.Infof("Volume '%s' created: %v", in.GetName(), volume.Name)
@@ -143,13 +143,13 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't attach volumes: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't attach volume: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't attach volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
 	err = handler.Attach(ctx, volumeName, hostName, in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	return &google_protobuf.Empty{}, nil
@@ -177,13 +177,13 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't detach volumes: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't detach volume: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't detach volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
 	err := handler.Detach(ctx, volumeName, hostName)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", volumeName, hostName))
@@ -209,19 +209,19 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
+		return nil, status.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't delete volumes: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete volume: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't delete volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
 	err := handler.Delete(ctx, ref)
 	if err != nil {
-		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, fmt.Sprintf("can't delete volume '%s': %s", ref, err.Error()))
+		return &google_protobuf.Empty{}, status.Errorf(codes.Internal, fmt.Sprintf("can't delete volume '%s': %s", ref, err.Error()))
 	}
 	log.Infof("Volume '%s' successfully deleted.", ref)
 	return &google_protobuf.Empty{}, nil
@@ -244,7 +244,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
+		return nil, status.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
 	}
 
 	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Inspect(%s) called", ref), log.TraceLevel)()
@@ -252,16 +252,16 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't inspect volumes: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect volume: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
 	volume, mounts, err := handler.Inspect(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if volume == nil {
-		return nil, grpc.Errorf(codes.NotFound, fmt.Sprintf("can't inspect volume '%s': volume not found", ref))
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("can't inspect volume '%s': volume not found", ref))
 	}
 
 	return conv.ToPBVolumeInfo(volume, mounts), nil

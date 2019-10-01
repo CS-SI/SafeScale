@@ -19,10 +19,10 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/status"
 
 	log "github.com/sirupsen/logrus"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -60,7 +60,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create network: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create network: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't create network: no tenant set")
 	}
 
 	var sizing *resources.SizingRequirements
@@ -90,7 +90,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		in.FailOver,
 	)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	log.Infof("Network '%s' successfuly created.", network.Name)
@@ -110,13 +110,13 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list network: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list networks: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list networks: no tenant set")
 	}
 
 	handler := NetworkHandler(tenant.Service)
 	networks, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	// Map resources.Network to pb.Network
@@ -146,16 +146,16 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't inspect network: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect network: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect network: no tenant set")
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
 	network, err := handler.Inspect(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if network == nil {
-		return nil, grpc.Errorf(codes.NotFound, fmt.Sprintf("can't inspect network '%s': not found", ref))
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("can't inspect network '%s': not found", ref))
 	}
 
 	return conv.ToPBNetwork(network), nil
@@ -179,13 +179,13 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't delete network: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete network: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't delete network: no tenant set")
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	log.Infof("Network '%s' successfully deleted.", ref)

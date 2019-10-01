@@ -97,6 +97,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.Name)),
 		log.TraceLevel,
 	)()
@@ -182,6 +183,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	}
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,
 	)()
@@ -211,6 +213,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, ""),
 		log.TraceLevel,
@@ -254,6 +257,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,
@@ -302,6 +306,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.Name)),
 		log.TraceLevel,
 	)()
@@ -338,6 +343,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s)", serverID, id)),
 		log.TraceLevel,
 	)()
@@ -364,6 +370,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, "("+serverID+")"),
 		log.TraceLevel,
@@ -405,6 +412,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s)", serverID, vaID)),
 		log.TraceLevel,

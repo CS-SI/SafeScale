@@ -97,7 +97,7 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback("", concurrency.NewTracer(nil, "").Enable(true), logrus.TraceLevel)()
+	defer loghelpers.LogStopwatchWithLevelCallback("", "", concurrency.NewTracer(nil, "").Enable(true), logrus.TraceLevel)()
 
 	allPages, err := az.List(s.ComputeClient).AllPages()
 	if err != nil {
@@ -130,6 +130,7 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, "").Enable(true),
 		&err,
@@ -172,6 +173,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 
 	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
 		&err,
 		log.TraceLevel,
@@ -192,7 +194,8 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 
 	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
 		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%d)", id)),
+		"",
+		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		&err,
 		log.TraceLevel,
 	)()
@@ -226,7 +229,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback("", concurrency.NewTracer(nil, "").Enable(true), log.TraceLevel)()
+	defer loghelpers.LogStopwatchWithLevelCallback("", "", concurrency.NewTracer(nil, "").Enable(true), log.TraceLevel)()
 
 	opts := flavors.ListOpts{}
 
@@ -275,6 +278,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)).Enable(true),
 		log.TraceLevel,
 	)()
@@ -312,6 +316,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
 		log.TraceLevel,
 	)()
@@ -336,6 +341,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, "").Enable(true),
 		log.TraceLevel,
@@ -381,6 +387,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
 		log.TraceLevel,
@@ -453,6 +460,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef)).Enable(true),
 		log.TraceLevel,
@@ -731,6 +739,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)).Enable(true),
 		log.TraceLevel,
 	)()
@@ -764,6 +773,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName)).Enable(true),
 		log.TraceLevel,
@@ -1087,6 +1097,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID)),
 		log.TraceLevel,
 	)()
@@ -1124,6 +1135,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, ""),
 		log.TraceLevel,
 	)()
@@ -1142,6 +1154,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, ""),
 		log.TraceLevel,
@@ -1219,6 +1232,7 @@ func (s *Stack) DeleteHost(id string) error {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s", id)).Enable(true),
 		log.TraceLevel,
@@ -1314,6 +1328,7 @@ func (s *Stack) StopHost(id string) error {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,
 	)()
@@ -1335,6 +1350,7 @@ func (s *Stack) RebootHost(id string) error {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,
@@ -1363,6 +1379,7 @@ func (s *Stack) StartHost(id string) error {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,
 	)()
@@ -1385,6 +1402,7 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,

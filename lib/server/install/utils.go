@@ -179,7 +179,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		logrus.TraceLevel,
 	)()
 
-	sshClt := client.New().Ssh
+	sshClt := client.New().SSH
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
