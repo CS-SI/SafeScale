@@ -19,8 +19,6 @@ package concurrency
 import (
 	"fmt"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
@@ -57,8 +55,14 @@ func NewTaskedLock() TaskedLock {
 // 1. registers the lock for read only if a lock for write is already registered in the context
 // 2. registers the lock for read AND effectively lock for read otherwise
 func (tm *taskedLock) RLock(task Task) {
+	if task == nil {
+		return
+	}
+
+	tracer := NewTracer(task, "", Trace.Locks)
+	defer tracer.GoingIn().OnExitTrace()
+
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 
@@ -69,29 +73,28 @@ func (tm *taskedLock) RLock(task Task) {
 	}
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
-		if Trace.Locks {
-			logrus.Debugf("RLock(%s): really RLocking...", tid)
-		}
+		tracer.Trace("really RLocking...")
 		tm.lock.Unlock()
 		tm.rwmutex.RLock()
 		return
 	}
+	tracer.Trace("using running write lock...")
 	tm.lock.Unlock()
-	if Trace.Locks {
-		logrus.Debugf("RLock(%s): using running write lock...", tid)
-	}
 }
 
 // RUnlock unregisters the lock for read for the context and unlock for read
 // only if no lock for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) {
+	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	defer tracer.OnExitTrace()
+
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 
 	if _, ok := tm.readLocks[tid]; !ok {
+		tracer.Trace("Can't RUnlock, not RLocked")
 		panic(fmt.Sprintf("Can't RUnlock task %s: not RLocked", tid))
 	}
 	tm.readLocks[tid]--
@@ -99,22 +102,20 @@ func (tm *taskedLock) RUnlock(task Task) {
 		delete(tm.readLocks, tid)
 		// If not locked for write, actively unlock for read the RWMutex
 		if _, ok := tm.writeLocks[tid]; ok {
-			if Trace.Locks {
-				logrus.Debugf("RUnlock(%s): in running write lock, doing nothing", tid)
-			}
+			tracer.Trace("in running write lock, doing nothing")
 		} else {
-			if Trace.Locks {
-				logrus.Debugf("RUnlock(%s): really RUnlocking...", tid)
-			}
+			tracer.Trace("really RUnlocking...")
 			tm.rwmutex.RUnlock()
 		}
 	}
 }
 
-// Lock ...
+// Lock acquires a write lock.
 func (tm *taskedLock) Lock(task Task) {
+	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	defer tracer.OnExitTrace()
+
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 
@@ -126,6 +127,7 @@ func (tm *taskedLock) Lock(task Task) {
 	}
 	// If already lock for read, panic
 	if _, ok := tm.readLocks[tid]; ok {
+		tracer.Trace("Can't Lock, already RLocked")
 		panic(fmt.Sprintf("can't Lock task '%s': already RLocked", task.GetID()))
 	}
 	// registers lock for read for the task and actively lock the RWMutex
@@ -134,10 +136,12 @@ func (tm *taskedLock) Lock(task Task) {
 	tm.rwmutex.Lock()
 }
 
-// Unlock ...
+// Unlock releases a write lock
 func (tm *taskedLock) Unlock(task Task) {
+	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	defer tracer.OnExitTrace()
+
 	tid := task.GetID()
-	defer NewTracer(task, "").Enable(Trace.Locks).In().Out()
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -145,10 +149,12 @@ func (tm *taskedLock) Unlock(task Task) {
 	// a TaskedLock can be Locked then RLocked without problem,
 	// but RUnlocks must have been done before Unlock.
 	if _, ok := tm.readLocks[tid]; ok {
+		tracer.Trace(fmt.Sprintf("Can't Unlock, %d remaining RLock inside", tm.readLocks[tid]))
 		panic(fmt.Sprintf("Can't Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid]))
 	}
 	if _, ok := tm.writeLocks[tid]; !ok {
-		panic(fmt.Sprintf("Can't Unlock task '%s': not Locked", task.GetID()))
+		tracer.Trace("Can't Unlock, not Locked")
+		panic(fmt.Sprintf("Can't Unlock task '%s': not Locked", tid))
 	}
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {
@@ -157,13 +163,13 @@ func (tm *taskedLock) Unlock(task Task) {
 	}
 }
 
-// IsRLocked tells of the facet locks for read
+// IsRLocked tells if the task is owning a read lock
 func (tm *taskedLock) IsRLocked(task Task) bool {
 	_, ok := tm.readLocks[task.GetID()]
 	return ok
 }
 
-// IsLocked tells if the facet locks for write
+// IsLocked tells if the task is owning a write lock
 func (tm *taskedLock) IsLocked(task Task) bool {
 	_, ok := tm.writeLocks[task.GetID()]
 	return ok

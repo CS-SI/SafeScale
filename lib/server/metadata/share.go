@@ -20,7 +20,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -263,18 +262,16 @@ func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) 
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadShare(svc iaas.Service, ref string) (share string, err error) {
-	defer loghelpers.LogErrorCallback(
-		"",
-		concurrency.NewTracer(nil, "").Enable(true),
-		&err,
-	)()
-
 	if svc == nil {
 		return "", utils.InvalidParameterError("svc", "can't be nil")
 	}
 	if ref == "" {
 		return "", utils.InvalidParameterError("ref", "can't be empty string")
 	}
+
+	tracer := concurrency.NewTracer(nil, "(<svc>, '"+ref+"')", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ms := NewShare(svc)
 

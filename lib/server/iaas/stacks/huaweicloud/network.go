@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 )
@@ -184,7 +185,8 @@ func (s *Stack) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.Network, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateNetwork(%s) called", req.Name), log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
@@ -617,17 +619,20 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called...", req.Name), log.TraceLevel)()
-
-	if req.Network == nil {
-		panic("req.Network is nil!")
+	if s == nil {
+		return nil, nil, utils.InvalidInstanceError()
 	}
+	if req.Network == nil {
+		return nil, nil, utils.InvalidParameterError("req.Network", "can't be nil")
+	}
+
 	gwname := req.Name
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
 	}
 
-	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called", gwname), log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called", gwname), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
 
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,

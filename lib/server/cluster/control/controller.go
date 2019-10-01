@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -38,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -109,13 +107,13 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
-		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'...", req.Name),
-		concurrency.NewTracer(nil, "").Enable(true),
-		&err,
-		log.InfoLevel,
-	)()
+		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
+	)
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	c.Lock(task)
 
@@ -403,11 +401,9 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogErrorCallback(
-		"",
-		concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID)).Enable(true),
-		&err,
-	)()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true)
+	defer tracer.GoingIn().OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	c.RLock(task)
 	defer c.RUnlock(task)
@@ -447,10 +443,14 @@ func (c *Controller) SearchNode(task concurrency.Task, hostID string) bool {
 }
 
 // FindAvailableMaster returns the ID of the first master available for execution
-func (c *Controller) FindAvailableMaster(task concurrency.Task) (string, error) {
+func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, err error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
+
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	masterID := ""
 	found := false
@@ -484,10 +484,14 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (string, error) 
 }
 
 // FindAvailableNode returns the ID of a node available
-func (c *Controller) FindAvailableNode(task concurrency.Task) (string, error) {
+func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
+
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostID := ""
 	found := false
@@ -524,12 +528,9 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -565,12 +566,9 @@ func (c *Controller) DeleteMetadata(task concurrency.Task) (err error) {
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-		logrus.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -627,12 +625,9 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, fmt.Sprintf("(%d)", count)).Enable(true),
-		&err,
-		log.DebugLevel,
-	)()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%d)", count), true)
+	defer tracer.GoingIn().OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	c.RLock(task)
 	nodeDef := complementHostDefinition(req, pb.HostDefinition{})
@@ -767,12 +762,13 @@ func (c *Controller) GetState(task concurrency.Task) (state ClusterState.Enum, e
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(task, "").Enable(true), &err)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	now := time.Now()
-	var (
-		collectInterval time.Duration
-	)
+	var collectInterval time.Duration
+
 	c.RLock(task)
 	err = c.Properties.LockForRead(Property.StateV1).ThenUse(func(v interface{}) error {
 		stateV1 := v.(*clusterpropsv1.State)
@@ -800,7 +796,9 @@ func (c *Controller) ForceGetState(task concurrency.Task) (state ClusterState.En
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(task, "").Enable(true), &err)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	state, err = c.foreman.getState(task)
 	if err != nil {
@@ -827,12 +825,9 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 		return utils.InvalidParameterError("hostID", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID)).Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -895,12 +890,9 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", selectedMaster), true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var node *clusterpropsv1.Node
 
@@ -937,17 +929,13 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	if hostID == "" {
 		return utils.InvalidParameterError("hostID", "can't be empty string")
 	}
-
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID)).Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
-
 	if task == nil {
 		task = concurrency.RootTask()
 	}
+
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var (
 		node *clusterpropsv1.Node
@@ -996,12 +984,9 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, fmt.Sprintf("(%s)", node.Name)).Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, '%s')", node.Name, selectedMaster), true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
 	err = c.UpdateMetadata(task, func() error {
@@ -1074,12 +1059,9 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Updates metadata
 	err = c.UpdateMetadata(task, func() error {
@@ -1190,7 +1172,9 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(task, "").Enable(true), &err)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	state, _ := c.ForceGetState(task)
 	if state == ClusterState.Stopped {
@@ -1288,7 +1272,9 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(task, "").Enable(true), &err)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	state, err := c.ForceGetState(task)
 	if err != nil {

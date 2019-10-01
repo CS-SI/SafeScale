@@ -49,6 +49,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -254,11 +255,13 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 // CreateHost creates a new host
 // On success returns an instance of resources.Host, and a string containing the script to execute to finalize host installation
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
-	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateHost(%s) called", request.ResourceName), log.TraceLevel)()
-
 	if s == nil {
 		return nil, nil, utils.InvalidInstanceError()
 	}
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	userData = userdata.NewContent()
 

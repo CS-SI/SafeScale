@@ -87,7 +87,7 @@ func (o *object) Reload() error {
 		return utils.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(concurrency.VoidTask(), "").Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	item, err := o.bucket.container.Item(o.Name)
 	if err != nil {
@@ -116,7 +116,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return utils.InvalidParameterError("from", "can't be greater than 'to'")
 	}
 
-	defer concurrency.NewTracer(concurrency.VoidTask(), fmt.Sprintf("(%d, %d)", from, to)).Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", from, to), false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	var seekTo int64
 	var length int64
@@ -191,7 +191,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 		return utils.InvalidParameterError("o.bucket", "can't be nil")
 	}
 
-	defer concurrency.NewTracer(concurrency.VoidTask(), fmt.Sprintf("(%d)", sourceSize)).Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	item, err := o.bucket.container.Put(o.Name, source, sourceSize, o.GetMetadata())
 	if err != nil {
@@ -207,7 +207,7 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 		return utils.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(concurrency.VoidTask(), fmt.Sprintf("(%d, %d)", sourceSize, chunkSize)).Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", sourceSize, chunkSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	metadataCopy := o.GetMetadata().Clone()
 
@@ -263,7 +263,7 @@ func (o *object) Delete() error {
 		return utils.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(concurrency.VoidTask(), "").Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	err := o.bucket.container.RemoveItem(o.Name)
 	if err != nil {
@@ -275,7 +275,7 @@ func (o *object) Delete() error {
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
 func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(concurrency.VoidTask(), "").Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	for k, v := range newMetadata {
 		o.Metadata[k] = v
@@ -284,7 +284,7 @@ func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) {
 
 // AddMetadata adds missing entries in object metadata
 func (o *object) AddMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(concurrency.VoidTask(), "").Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	for k, v := range newMetadata {
 		_, found := o.Metadata[k]
@@ -296,7 +296,7 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) {
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
 func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(concurrency.VoidTask(), "").Enable(false /*Trace.Controller*/).In().Out()
+	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()
 
 	o.Metadata = newMetadata
 }

@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -74,12 +73,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	// Checks if CIDR is valid...
 	_, _, err = net.ParseCIDR(req.CIDR)
@@ -144,12 +138,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
@@ -180,12 +169,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 		return nil, utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	// If not found, we look for any network from provider
 	// 1st try with id
@@ -229,12 +213,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, ""),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*resources.Network
@@ -285,12 +264,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
@@ -340,12 +314,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 		return nil, nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	userData = userdata.NewContent()
 
@@ -416,12 +385,7 @@ func (s *Stack) DeleteGateway(id string) error {
 		return utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	return s.DeleteHost(id)
 }

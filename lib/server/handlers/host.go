@@ -40,6 +40,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -75,7 +76,9 @@ func NewHostHandler(svc iaas.Service) HostAPI {
 
 // Start starts a host
 func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Start(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -110,7 +113,9 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 
 // Stop stops a host
 func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Stop(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -144,7 +149,9 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 
 // Reboot reboots a host
 func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Reboot(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -185,7 +192,9 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 
 // Resize ...
 func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Resize(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -260,7 +269,10 @@ func (handler *HostHandler) Create(
 	ctx context.Context,
 	name string, net string, los string, public bool, sizingParam interface{}, force bool,
 ) (newHost *resources.Host, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Create(%s) called", name), &err, log.TraceLevel)()
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if handler == nil {
 		return nil, utils.InvalidInstanceError()
@@ -747,7 +759,9 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 
 // List returns the host list
 func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resources.Host, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::List(%v) called", all), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if all {
 		return handler.service.ListHosts()
@@ -767,7 +781,9 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 // ForceInspect ...
 // If not found, return (nil, err)
 func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host *resources.Host, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::ForceInspect(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	host, err = handler.Inspect(ctx, ref)
 	if err != nil {
@@ -780,7 +796,9 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
 func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Inspect(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -810,7 +828,9 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 
 // Delete deletes host referenced by ref
 func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::Delete(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -1013,7 +1033,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 // SSH returns ssh parameters to access the host referenced by ref
 func (handler *HostHandler) SSH(ctx context.Context, ref string) (sshConfig *system.SSHConfig, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.HostHandler::SSH(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	sshHandler := NewSSHHandler(handler.service)
 	sshConfig, err = sshHandler.GetConfig(ctx, ref)

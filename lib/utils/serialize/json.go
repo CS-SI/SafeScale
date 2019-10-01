@@ -21,7 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
@@ -56,9 +55,6 @@ type SyncedJSONProperty struct {
 // If the extension is locked for read, no change will be encoded into the extension.
 // The lock applied on the extension is automatically released on exit.
 func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error) {
-
-	defer loghelpers.LogTraceErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
-
 	if sp == nil {
 		return utils.InvalidInstanceError()
 	}
@@ -68,6 +64,10 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 	if apply == nil {
 		return utils.InvalidParameterError("apply", "can't be nil")
 	}
+
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitTraceError(tracer.TraceMessage(""), &err)
 	defer sp.unlock()
 
 	if data, ok := sp.jsonProperty.Data.(Property); ok {
