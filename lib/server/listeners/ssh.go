@@ -19,10 +19,10 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -54,13 +54,13 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't execute ssh command: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't execute ssh command: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't execute ssh command: no tenant set")
 	}
 
 	handler := SSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Run(ctx, in.GetHost().GetName(), in.GetCommand())
 	if err != nil {
-		err = grpc.Errorf(codes.Internal, err.Error())
+		err = status.Errorf(codes.Internal, err.Error())
 	}
 	return &pb.SshResponse{
 		Status:    int32(retcode),
@@ -82,13 +82,13 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshR
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't copy by ssh command: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't copy by ssh: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't copy by ssh: no tenant set")
 	}
 
 	handler := SSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Copy(ctx, in.GetSource(), in.GetDestination())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if retcode != 0 {
 		return nil, fmt.Errorf("can't copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)

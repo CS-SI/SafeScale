@@ -18,6 +18,8 @@ package loghelpers
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -33,6 +35,16 @@ func LogStopwatchWithLevelCallback(in, out string, tracer *concurrency.Tracer, l
 	logLevelFn, ok := logLevelFnMap[level]
 	if !ok {
 		logLevelFn = logrus.Info
+	}
+
+	// In the meantime, if both 'in' and 'out' are empty, recover function name from caller...
+	if len(in) == 0 && len(out) == 0 {
+		if pc, _, _, ok := runtime.Caller(1); ok {
+			if f := runtime.FuncForPC(pc); f != nil {
+				in = filepath.Base(f.Name())
+				out = filepath.Base(f.Name()) + " called"
+			}
+		}
 	}
 
 	if tracer != nil {

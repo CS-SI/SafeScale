@@ -19,11 +19,11 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/status"
 
 	log "github.com/sirupsen/logrus"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -106,7 +106,7 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*p
 	getCurrentTenant()
 	if currentTenant == nil {
 		log.Info("Can't get tenant: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get tenant: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't get tenant: no tenant set")
 	}
 	return &pb.TenantName{Name: currentTenant.name}, nil
 }
@@ -211,7 +211,7 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 	getCurrentStorageTenants()
 	if currentStorageTenants == nil {
 		log.Info("Can't get storage tenants: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get storage tenants: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't get storage tenants: no tenant set")
 	}
 
 	return &pb.TenantNameList{Names: currentStorageTenants.names}, nil

@@ -19,9 +19,9 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/status"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	log "github.com/sirupsen/logrus"
@@ -79,14 +79,14 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't start host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "Can't start host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't start host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
 	err := handler.Start(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	log.Infof("Host '%s' successfully started", ref)
@@ -106,14 +106,14 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't stop host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't stop host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't stop host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
 	err := handler.Stop(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	log.Infof("Host '%s' stopped", ref)
@@ -133,14 +133,14 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't reboot host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't reboot host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't reboot host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
 	err := handler.Reboot(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	log.Infof("Host '%s' successfully rebooted.", ref)
@@ -160,13 +160,13 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list hosts: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list hosts: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	hosts, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	// Map resources.Host to pb.Host
@@ -191,7 +191,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't create host: no tenant set")
 	}
 
 	var sizing *resources.SizingRequirements
@@ -232,7 +232,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	// 	in.Force,
 	// )
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	log.Infof("Host '%s' created", in.GetName())
 	return srvutils.ToPBHost(host), nil
@@ -252,7 +252,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't resize host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't resize host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't resize host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -265,7 +265,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 		float32(in.GetCpuFreq()),
 	)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	log.Infof("Host '%s' resized", in.GetName())
 	return srvutils.ToPBHost(host), nil
@@ -289,13 +289,13 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't get host status: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get host status: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't get host status: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	return srvutils.ToHostStatus(host), nil
 }
@@ -312,19 +312,19 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "can't inspect host: neither name nor id given as reference")
+		return nil, status.Errorf(codes.InvalidArgument, "can't inspect host: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't inspect host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, fmt.Sprintf("can't inspect host: %v", err))
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("can't inspect host: %v", err))
 	}
 	return srvutils.ToPBHost(host), nil
 }
@@ -347,13 +347,13 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't delete host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't delete host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	err := handler.Delete(ctx, ref)
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	log.Infof("Host '%s' successfully deleted.", ref)
 	return &google_protobuf.Empty{}, nil
@@ -377,7 +377,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("can't delete host: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't ssh host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't ssh host: no tenant set")
 	}
 
 	handler := HostHandler(currentTenant.Service)

@@ -76,6 +76,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name)),
 		log.TraceLevel,
 	)()
@@ -145,6 +146,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)),
 		log.TraceLevel,
 	)()
@@ -179,6 +181,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,
@@ -227,6 +230,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, ""),
 		log.TraceLevel,
@@ -283,6 +287,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
 		"",
+		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,
 	)()
@@ -336,6 +341,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name)),
 		log.TraceLevel,
@@ -411,6 +417,7 @@ func (s *Stack) DeleteGateway(id string) error {
 	}
 
 	defer loghelpers.LogStopwatchWithLevelCallback(
+		"",
 		"",
 		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
 		log.TraceLevel,

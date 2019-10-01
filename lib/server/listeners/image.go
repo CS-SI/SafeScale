@@ -18,8 +18,8 @@ package listeners
 
 import (
 	"context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -49,13 +49,13 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list images: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list images: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't list images: no tenant set")
 	}
 
 	handler := ImageHandler(currentTenant.Service)
 	images, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		return nil, grpc.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	// Map resources.Image to pb.Image
