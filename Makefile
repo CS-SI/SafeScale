@@ -214,7 +214,11 @@ vet: begin
 
 lint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running lint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@golint ./... | grep -v vendor | grep -v test | grep -v Test | grep -v enum\. | grep -v version\.go
+	@golint ./... | grep -v vendor | grep -v test | grep -v Test | grep -v enum\. | grep -v version\.go || true
+
+metalint: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@golangci-lint --color never --disable-all --enable=deadcode --enable=gocyclo --enable=varcheck --enable=structcheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic run ./... || true
 
 coverage: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -261,6 +265,7 @@ help: with_git
 	@printf "%b" "$(OK_COLOR)TESTING TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";
 	@echo '  lint         - Runs linter'
+	@echo '  metalint     - Runs golangci-lint'
 	@echo '  vet          - Runs all checks'
 	@echo '  vet-light    - Runs all checks (with restrictions)'
 	@echo '  err          - Looks for unhandled errors'
