@@ -224,11 +224,6 @@ show-cov: begin
 	@if [ -s ./cover.out ]; then $(GO) tool cover -html=cover.out -o cover.html || true;fi
 	@if [ -s ./cover.html ]; then $(BROWSER) ./cover.html || true;fi
 
-report: begin
-	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Running in background, it takes time... when finished opens report in firefox , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) You should keep in mind that results are pretty useless until we reach a reasonable amount of unit-tested code... ;) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@goreporter -p . -c 1 -e vendor > report_results.log 2>&1
-
 logclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning logs... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) test_results.log || true
@@ -273,7 +268,6 @@ help: with_git
 	@echo '  convey       - Runs goconvey in lib dir'
 	@echo '  coverage     - Collects coverage info from unit tests'
 	@echo '  show-cov     - Displays coverage info in firefox'
-	@echo '  report       - Generates and displays a report'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)DEV TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";
