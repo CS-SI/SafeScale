@@ -18,6 +18,8 @@ package utils
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -63,6 +65,17 @@ func (sw Stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func(
 	if !ok {
 		logLevelFn = logrus.Info
 	}
+
+	// In the meantime, if both 'in' and 'out' are empty, recover function name from caller...
+	if len(in) == 0 && len(out) == 0 {
+		if pc, _, _, ok := runtime.Caller(1); ok {
+			if f := runtime.FuncForPC(pc); f != nil {
+				in = filepath.Base(f.Name())
+				out = filepath.Base(f.Name()) + " called"
+			}
+		}
+	}
+
 	logLevelFn(in)
 
 	sw.Start()

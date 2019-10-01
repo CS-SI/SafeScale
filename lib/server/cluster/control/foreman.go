@@ -676,7 +676,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 		}
 	}()
 
-	err = b.createSwarm(task, nil) // FIXME nil is not allowed as a parameter
+	err = b.createSwarm(task, params)
 	if err != nil {
 		return err
 	}

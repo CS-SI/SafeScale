@@ -336,26 +336,26 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*VIP, error) {
-	return utils.NotImplementedError("CreateVIP() not implemented yet")
+func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+	return nil, utils.NotImplementedError("CreateVIP() not implemented yet")
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
 	return utils.NotImplementedError("AddPublicIPToVIP() not implemented yet")
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *VIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
 	return utils.NotImplementedError("BindHostToVIP() not implemented yet")
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *VIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
 	return utils.NotImplementedError("UnbindHostFromVIP() not implemented yet")
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *VIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VIP) error {
 	return utils.NotImplementedError("DeleteVIP() not implemented yet")
 }
