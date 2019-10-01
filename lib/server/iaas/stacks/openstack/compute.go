@@ -31,7 +31,6 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -53,7 +52,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -63,11 +61,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"", "",
-		concurrency.NewTracer(nil, "").Enable(true),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()
 
 	listOpts := regions.ListOpts{
 		ParentRegionID: "RegionOne",
@@ -92,12 +86,14 @@ func (s *Stack) ListRegions() ([]string, error) {
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback("", "", concurrency.NewTracer(nil, "").Enable(true), logrus.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	allPages, err := az.List(s.ComputeClient).AllPages()
 	if err != nil {
@@ -117,7 +113,7 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	}
 
 	if len(azList) == 0 {
-		log.Warnf("no Availability Zones detected !")
+		logrus.Warnf("no Availability Zones detected !")
 	}
 
 	return azList, nil
@@ -129,13 +125,9 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, "").Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	opts := images.ListOpts{}
 
@@ -159,25 +151,23 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 		if err != nil {
 			return nil, utils.Wrap(err, fmt.Sprintf("error listing images: %s", ProviderErrorToString(err)))
 		}
-		log.Debugf("Image list empty !")
+		logrus.Debugf("Image list empty !")
 	}
 	return imgList, nil
 }
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
-
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be empty string")
+	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	img, err := images.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -191,14 +181,13 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 	if s == nil {
 		return nil, utils.InvalidInstanceError()
 	}
+	if id == "" {
+		return nil, utils.InvalidParameterError("id", "can't be empty string")
+	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
@@ -229,7 +218,8 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback("", "", concurrency.NewTracer(nil, "").Enable(true), log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
 
 	opts := flavors.ListOpts{}
 
@@ -262,7 +252,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 		if err != nil {
 			return nil, utils.Wrap(err, fmt.Sprintf("error listing templates"))
 		}
-		log.Debugf("Template list empty !")
+		logrus.Debugf("Template list empty !")
 	}
 	return flvList, nil
 }
@@ -276,12 +266,8 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)).Enable(true),
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
@@ -314,12 +300,8 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 		return nil, utils.InvalidParameterError("id", "can't be nil")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -340,12 +322,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, "").Enable(true),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := keypairs.List(s.ComputeClient)
@@ -386,12 +363,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 		return utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)).Enable(true),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -442,29 +414,22 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	}
 
 	var host *resources.Host
-	switch hostParam := hostParam.(type) {
+	switch hostParam.(type) {
 	case string:
 		host := resources.NewHost()
-		host.ID = hostParam
+		host.ID = hostParam.(string)
 	case *resources.Host:
-		host = hostParam
-	default:
-		panic("openstack.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
+		host = hostParam.(*resources.Host)
 	}
 	if host == nil {
-		panic("openstack.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
+		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 	hostRef := host.Name
 	if hostRef == "" {
 		hostRef = host.ID
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef)).Enable(true),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	server, err := s.queryServer(host.ID)
 	if err != nil {
@@ -476,7 +441,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	}
 
 	if !host.OK() {
-		log.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
 	return host, nil
@@ -502,7 +467,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 					return nil
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
-					log.Warnf("received 'Internal Server Error', retrying servers.Get...")
+					logrus.Warnf("received 'Internal Server Error', retrying servers.Get...")
 					return err
 				}
 				// Any other error stops the retry
@@ -512,14 +477,14 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 
 			if server == nil {
 				err = fmt.Errorf("error getting host, nil response from gophercloud")
-				log.Debug(err)
+				logrus.Debug(err)
 				return err
 			}
 
 			lastState := toHostState(server.Status)
 			if lastState != HostState.ERROR && lastState != HostState.STARTING {
 				if lastState != HostState.STARTED {
-					log.Warnf("unexpected: host status of '%s' is '%s'", id, server.Status)
+					logrus.Warnf("unexpected: host status of '%s' is '%s'", id, server.Status)
 				}
 				err = nil
 				return nil
@@ -610,7 +575,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 	host.LastState = toHostState(server.Status)
 	if host.LastState == HostState.ERROR || host.LastState == HostState.STARTING {
-		log.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
+		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
 	}
 
 	// Updates Host Property propsv1.HostDescription
@@ -679,7 +644,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 				net, err := s.GetNetworkByName(netname)
 				if err != nil {
-					log.Debugf("Failed to get data for network '%s'", netname)
+					logrus.Debugf("Failed to get data for network '%s'", netname)
 					continue
 				}
 				networksByID[net.ID] = ""
@@ -710,9 +675,9 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				if err != nil {
 					switch err.(type) {
 					case utils.ErrNotFound:
-						log.Errorf(err.Error())
+						logrus.Errorf(err.Error())
 					default:
-						log.Errorf("failed to get network '%s': %v", netid, err)
+						logrus.Errorf("failed to get network '%s': %v", netid, err)
 					}
 					continue
 				}
@@ -737,12 +702,8 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name)).Enable(true),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()
+
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
 	_, r.Err = s.ComputeClient.Get(s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gc.RequestOpts{
@@ -772,12 +733,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName)).Enable(true),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	userData = userdata.NewContent()
 
@@ -819,7 +775,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		id, err := uuid.NewV4()
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-			log.Debugf(utils.Capitalize(msg))
+			logrus.Debugf(utils.Capitalize(msg))
 			return nil, userData, fmt.Errorf(msg)
 		}
 
@@ -827,7 +783,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			log.Debugf(utils.Capitalize(msg))
+			logrus.Debugf(utils.Capitalize(msg))
 			return nil, userData, fmt.Errorf(msg)
 		}
 	}
@@ -845,7 +801,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		log.Debugf(utils.Capitalize(msg))
+		logrus.Debugf(utils.Capitalize(msg))
 		return nil, userData, fmt.Errorf(msg)
 	}
 
@@ -908,7 +864,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	// --- query provider for host creation ---
 
-	log.Debugf("requesting host resource creation...")
+	logrus.Debugf("requesting host resource creation...")
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
@@ -920,18 +876,18 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					servers.Delete(s.ComputeClient, server.ID)
 				}
 				msg := ProviderErrorToString(err)
-				log.Warnf(msg)
+				logrus.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
 			if zoneErr != nil {
-				log.Tracef("Host successfully created: {%s} with some warnings {%s}", spew.Sdump(server), zoneErr)
+				logrus.Tracef("Host successfully created: {%s} with some warnings {%s}", spew.Sdump(server), zoneErr)
 			} else {
-				log.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
+				logrus.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
 				if creationZone != srvOpts.AvailabilityZone {
 					if srvOpts.AvailabilityZone != "" {
-						log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
+						logrus.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
 					}
 				}
 			}
@@ -946,7 +902,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			if err != nil {
 				servers.Delete(s.ComputeClient, server.ID)
 				msg := ProviderErrorToString(err)
-				log.Warnf(msg)
+				logrus.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
 			return nil
@@ -956,22 +912,22 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if retryErr != nil {
 		return nil, userData, utils.Wrap(retryErr, fmt.Sprintf("error creating host: timeout"))
 	}
-	log.Debugf("host resource created.")
+	logrus.Debugf("host resource created.")
 
 	// Starting from here, delete host if exiting with error
 	newHost := host
 	defer func() {
 		if err != nil {
-			log.Infof("Cleanup, deleting host '%s'", newHost.Name)
+			logrus.Infof("Cleanup, deleting host '%s'", newHost.Name)
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case utils.ErrNotFound:
-					log.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
 				case utils.ErrTimeout:
-					log.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
 				default:
-					log.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 				}
 				err = retry.AddConsequence(err, derr)
 			}
@@ -991,10 +947,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			if err != nil {
-				log.Debugf("Cleanup, deleting floating ip '%s'", ip.ID)
+				logrus.Debugf("Cleanup, deleting floating ip '%s'", ip.ID)
 				derr := floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
 				if derr != nil {
-					log.Errorf("Error deleting Floating IP: %v", derr)
+					logrus.Errorf("Error deleting Floating IP: %v", derr)
 					err = retry.AddConsequence(err, derr)
 				}
 			}
@@ -1024,7 +980,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}
 
-	log.Infoln(msgSuccess)
+	logrus.Infoln(msgSuccess)
 	return host, userData, nil
 }
 
@@ -1071,7 +1027,7 @@ func (s *Stack) SelectedAvailabilityZone() (string, error) {
 			}
 			s.selectedAvailabilityZone = azone
 		}
-		log.Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
+		logrus.Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
 	}
 	return s.selectedAvailabilityZone, nil
 }
@@ -1085,22 +1041,22 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 	var host *resources.Host
 
-	switch hostParam := hostParam.(type) {
+	switch hostParam.(type) {
 	case string:
 		host = resources.NewHost()
-		host.ID = hostParam
+		host.ID = hostParam.(string)
 	case *resources.Host:
-		host = hostParam
-	default:
-		panic("hostParam must be a string or a *resources.Host!")
+		host = hostParam.(*resources.Host)
+	}
+	if host == nil {
+		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")
+	}
+	hostRef := host.Name
+	if hostRef == "" {
+		hostRef = host.ID
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -1133,12 +1089,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 		return HostState.ERROR, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, ""),
-		log.TraceLevel,
-	)()
+	// defer concurrency.NewTracer(nil, "(<host>)", true).WithStopwatch().GoingIn().OnExitTrace()
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
@@ -1153,12 +1104,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 		return nil, utils.InvalidInstanceError()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, ""),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()
 
 	pager := servers.List(s.ComputeClient, servers.ListOpts{})
 	var hosts []*resources.Host
@@ -1182,7 +1128,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 		if err != nil {
 			return nil, utils.Wrap(err, fmt.Sprintf("error listing hosts : %s", ProviderErrorToString(err)))
 		}
-		log.Warnf("Hosts lists empty !")
+		logrus.Warnf("Hosts lists empty !")
 	}
 	return hosts, nil
 }
@@ -1231,12 +1177,7 @@ func (s *Stack) DeleteHost(id string) error {
 		return utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s", id)).Enable(true),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	if s.cfgOpts.UseFloatingIP {
 		fip, err := s.getFloatingIP(id)
@@ -1268,7 +1209,7 @@ func (s *Stack) DeleteHost(id string) error {
 				switch err.(type) {
 				case gc.ErrDefault404:
 					// Resource not found, consider deletion successful
-					log.Debugf("Host '%s' not found, deletion considered successful", id)
+					logrus.Debugf("Host '%s' not found, deletion considered successful", id)
 					return nil
 				default:
 					return fmt.Errorf("failed to submit host '%s' deletion: %s", id, ProviderErrorToString(err))
@@ -1303,7 +1244,7 @@ func (s *Stack) DeleteHost(id string) error {
 				return innerRetryErr
 			}
 			if !resourcePresent {
-				log.Debugf("Host '%s' not found, deletion considered successful after a few retries", id)
+				logrus.Debugf("Host '%s' not found, deletion considered successful after a few retries", id)
 				return nil
 			}
 			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
@@ -1326,12 +1267,7 @@ func (s *Stack) StopHost(id string) error {
 		return utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1349,12 +1285,7 @@ func (s *Stack) RebootHost(id string) error {
 		return utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	err := servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
@@ -1377,12 +1308,7 @@ func (s *Stack) StartHost(id string) error {
 		return utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1401,15 +1327,10 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 		return nil, utils.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id)),
-		log.TraceLevel,
-	)()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	// TODO RESIZE Resize Host HERE
-	log.Warn("Trying to resize a Host...")
+	logrus.Warn("Trying to resize a Host...")
 
 	// TODO RESIZE Call this
 	// servers.Resize()

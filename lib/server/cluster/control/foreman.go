@@ -29,7 +29,6 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -50,7 +49,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -131,12 +129,10 @@ func (b *foreman) ExecuteScript(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string,
 ) (errCode int, stdOut string, stdErr string, err error) {
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(nil, "("+hostID+")").Enable(true),
-		&err,
-		logrus.TraceLevel,
-	)()
+
+	tracer := concurrency.NewTracer(nil, "("+hostID+")", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, err := system.GetBashLibrary()
@@ -158,19 +154,15 @@ func (b *foreman) ExecuteScript(
 
 // construct ...
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
-	// First defer to log in case of error and trace call
-	defer loghelpers.LogErrorCallback(
-		"",
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-	)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
-	// Second defer to 'Info' the cluster construction time
-	defer loghelpers.LogInfoStopwatchCallback(
+	// Wants to inform about the duration of the operation
+	defer utils.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
-		nil,
-	)()
+	)
 
 	state := ClusterState.Unknown
 
@@ -671,12 +663,9 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 // configureCluster ...
 // params contains a data.Map with primary and secondary Gateway hosts
 func (b *foreman) configureCluster(task concurrency.Task, params concurrency.TaskParameters) (err error) {
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	log.Infof("[cluster %s] configuring cluster...", b.cluster.Name)
 	defer func() {
@@ -887,12 +876,9 @@ func uploadTemplateToFile(
 
 // configureNodesFromList configures nodes from a list
 func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) (err error) {
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"", "",
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-		log.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var (
 		host   *pb.Host
@@ -1121,23 +1107,20 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 
 // installNodeRequirements ...
 func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeType.Enum, pbHost *pb.Host, hostLabel string) (err error) {
+	if b.makers.GetTemplateBox == nil {
+		return utils.InvalidParameterError("b.makers.GetTemplateBox", "can't be nil")
+	}
+
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	// Get installation script based on node type; if == "", do nothing
 	script, params := b.getNodeInstallationScript(task, nodeType)
 	if script == "" {
 		return nil
 	}
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] installing system requirements...", hostLabel), &err, log.DebugLevel)()
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		fmt.Sprintf("[%s] starting installation of systemrequirements...", hostLabel),
-		fmt.Sprintf("[%s] ending installation of systemrequirements", hostLabel),
-		concurrency.NewTracer(task, "").Enable(true),
-		&err,
-		log.DebugLevel,
-	)()
-	if b.makers.GetTemplateBox == nil {
-		return fmt.Errorf("missing callback GetTemplateBox")
-	}
 	box, err := b.makers.GetTemplateBox()
 	if err != nil {
 		return err
@@ -1276,8 +1259,20 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
 func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	pbGateway := params.(*pb.Host)
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskInstallGateway(%s) called", pbGateway.Id), &err, log.TraceLevel)()
+	if t == nil {
+		t = concurrency.VoidTask()
+	}
+	pbGateway, ok := params.(*pb.Host)
+	if !ok {
+		return result, utils.InvalidParameterError("params", "must contain a *pb.Host")
+	}
+	if pbGateway == nil {
+		return result, utils.InvalidParameterError("params", "can't be nil")
+	}
+
+	tracer := concurrency.NewTracer(t, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostLabel := pbGateway.Name
 	log.Debugf("[%s] starting installation...", hostLabel)
@@ -1297,12 +1292,6 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 		return nil, err
 	}
 
-	// Configure docker in Swarm mode
-	//	err = b.configureDockerSwarm(tr.Task(), pbGateway, hostLabel)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-
 	// Installs proxycache server on gateway (if not disabled)
 	err = b.installProxyCacheServer(t, pbGateway, hostLabel)
 	if err != nil {
@@ -1319,28 +1308,21 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	return nil, nil
 }
 
-// configureDockerSwarm
-// func (b *foreman) configureDockerSwarm(task concurrency.Task, gw *pb.Host, hostLabel string) error {
-//	cmd := fmt.Sprintf("docker swarm init --advertise-addr %s", gw.GetPrivateIp())
-//	retcode, _, _, err := client.New().Ssh.Run(gw.Id, cmd, utils.GetConnectionTimeout(), 2*utils.GetLongOperationTimeout())
-//	if err != nil {
-//		return err
-//	}
-//	if retcode != 0 {
-//		return fmt.Errorf("failed to initialize docker swarm on '%s'", hostLabel)
-//	}
-//	return nil
-// }
-
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
-	gw := params.(*pb.Host)
+	gw, ok := params.(*pb.Host)
+	if !ok {
+		return result, utils.InvalidParameterError("params", "must contain a *pb.Host")
+	}
+	if gw == nil {
+		return result, utils.InvalidParameterError("params", "can't be nil")
+	}
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskConfigureGateway(%s) called", gw.Name), &err, log.TraceLevel)()
-
-	started := time.Now()
+	tracer := concurrency.NewTracer(t, "("+gw.Name+")", false).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	log.Debugf("[%s] starting configuration...", gw.Name)
 
@@ -1351,7 +1333,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 		}
 	}
 
-	log.Debugf("[%s] configuration successful in [%s].", gw.Name, utils.FmtDuration(time.Since(started)))
+	log.Debugf("[%s] configuration successful in [%s].", gw.Name, tracer.Stopwatch().String())
 	return nil, nil
 }
 
@@ -1364,11 +1346,11 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	def := p["masterDef"].(*pb.HostDefinition)
 	nokeep := p["nokeep"].(bool)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.foreman::taskCreateMasters(%d) called", count), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	clusterName := b.cluster.GetIdentity(t).Name
-
-	defer utils.Timer(fmt.Sprintf("[cluster %s] 'taskCreateMasters' called", clusterName))()
 
 	if count <= 0 {
 		log.Debugf("[cluster %s] no masters to create.", clusterName)
@@ -1414,7 +1396,9 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	timeout := p["timeout"].(time.Duration)
 	nokeep := p["nokeep"].(bool)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", t.GetID(), index), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, utils.FormatDuration(timeout), nokeep), true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1499,7 +1483,9 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMasters() called"), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	list := b.cluster.ListMasterIDs(t)
 	if len(list) == 0 {
@@ -1535,7 +1521,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 		return nil, fmt.Errorf(strings.Join(errs, "\n"))
 	}
 
-	log.Debugf("[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, utils.FmtDuration(time.Since(started)))
+	log.Debugf("[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, utils.FormatDuration(time.Since(started)))
 	return nil, nil
 }
 
@@ -1546,8 +1532,11 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	p := params.(data.Map)
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
+	// FIXME: validate parameters
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMaster(%d, %s) called", index, pbHost.Name), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	started := time.Now()
 
@@ -1565,7 +1554,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 		return nil, err
 	}
 
-	log.Debugf("[%s] configuration successful in [%s].", hostLabel, utils.FmtDuration(time.Since(started)))
+	log.Debugf("[%s] configuration successful in [%s].", hostLabel, utils.FormatDuration(time.Since(started)))
 	return nil, nil
 }
 
@@ -1579,11 +1568,11 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	def := p["nodeDef"].(*pb.HostDefinition)
 	nokeep := p["nokeep"].(bool)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	clusterName := b.cluster.GetIdentity(t).Name
-
-	defer utils.TimerErr(fmt.Sprintf("[cluster %s] 'taskCreateNodes' called", clusterName), &err)()
 
 	if count <= 0 {
 		log.Debugf("[cluster %s] no nodes to create.", clusterName)
@@ -1623,13 +1612,22 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
-	p := params.(data.Map)
+	p, ok := params.(data.Map)
+	if !ok {
+		return nil, utils.InvalidParameterError("params", "must be a data.Map")
+	}
+	if p == nil {
+		return nil, utils.InvalidParameterError("params", "can't be nil")
+	}
+	// FIME: validate parameters
 	index := p["index"].(int)
 	def := p["nodeDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 	nokeep := p["nokeep"].(bool)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskCreateNode(%d) called", index), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostLabel := fmt.Sprintf("node #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1722,7 +1720,9 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (task concurrency.TaskResult, err error) {
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[cluster %s] nodes configuration called", clusterName), &err, log.DebugLevel)()
+	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	list := b.cluster.ListNodeIDs(t)
 	if len(list) == 0 {
@@ -1779,7 +1779,9 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("safescale.cluster.controller.Foreman::taskConfigureNode(%d, %s) called...", index, pbHost.Name), &err, log.TraceLevel)
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %s)", index, pbHost.Name), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...", hostLabel)
@@ -1805,7 +1807,9 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
 
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[cluster %s] installing 'reverseproxy' called", clusterName), &err, log.DebugLevel)()
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
@@ -1842,7 +1846,10 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[cluster %s] installing 'remotedesktop' called", clusterName), &err, log.DebugLevel)()
+
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
@@ -1884,7 +1891,9 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 
 // install proxycache-client feature if not disabled
 func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'proxycache-client' ...", hostLabel), &err, log.DebugLevel)()
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	b.cluster.RLock(task)
@@ -1916,7 +1925,9 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 
 // install proxycache-server feature if not disabled
 func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'proxycache-server' ...", hostLabel), &err, log.DebugLevel)()
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	b.cluster.RLock(task)
@@ -1948,7 +1959,9 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 // intallDocker installs docker and docker-compose
 func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("[%s] adding feature 'docker'...", hostLabel), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	feat, err := install.NewEmbeddedFeature(task, "docker")
 	if err != nil {

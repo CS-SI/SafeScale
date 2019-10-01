@@ -19,9 +19,10 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/sirupsen/logrus"
 	"regexp"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -52,7 +53,13 @@ func NewBucketHandler(svc iaas.Service) BucketAPI {
 
 // List retrieves all available buckets
 func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::List() called"), &err, logrus.TraceLevel)()
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	rv, err = handler.service.ListBuckets(objectstorage.RootPath)
 	return rv, err
@@ -60,7 +67,17 @@ func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error)
 
 // Create a bucket
 func (handler *BucketHandler) Create(ctx context.Context, name string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::Create() called"), &err, logrus.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	if name == "" {
+		return utils.InvalidParameterError("name", "can't be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
@@ -79,7 +96,10 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 
 // Delete a bucket
 func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::Create() called"), &err, logrus.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	err = handler.service.DeleteBucket(name)
 	if err != nil {
 		return err
@@ -89,7 +109,9 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 
 // Inspect a bucket
 func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::Inspect() called"), &err, logrus.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	b, err := handler.service.GetBucket(name)
 	if err != nil {
@@ -106,7 +128,9 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 
 // Mount a bucket on an host on the given mount point
 func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::Mount() called"), &err, logrus.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Check bucket existence
 	_, err = handler.service.GetBucket(bucketName)
@@ -171,7 +195,10 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 
 // Unmount a bucket
 func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.BucketHandler::Unmount() called"), &err, logrus.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	// Check bucket existence
 	_, err = handler.Inspect(ctx, bucketName)
 	if err != nil {

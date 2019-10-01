@@ -33,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -501,13 +500,9 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		"",
-		"",
-		concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID)),
-		&err,
-		logrus.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

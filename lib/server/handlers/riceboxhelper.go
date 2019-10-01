@@ -19,9 +19,10 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"text/template"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	rice "github.com/GeertJohan/go.rice"
@@ -31,7 +32,8 @@ import (
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("RiceboxHelper::getBoxContent() called"), &err)()
+	defer utils.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)
+
 	box, err := rice.FindBox("../handlers/scripts")
 	if err != nil {
 		return "", err

@@ -19,10 +19,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 //go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageAPI
@@ -50,19 +51,19 @@ func NewImageHandler(svc iaas.Service) ImageAPI {
 
 // List returns the image list
 func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ImageHandler::List(%v) called", all), &err, logrus.TraceLevel)()
-	images, err = handler.service.ListImages(all)
-	return images, err
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
+	return handler.service.ListImages(all)
 }
 
 // Select selects the image that best fits osname
 func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *resources.Image, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ImageHandler::Select(%s) called", osname), &err, logrus.TraceLevel)()
 	return nil, nil
 }
 
 // Filter filters the images that do not fit osname
 func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []resources.Image, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ImageHandler::Filter(%s) called", osname), &err, logrus.TraceLevel)()
 	return nil, nil
 }

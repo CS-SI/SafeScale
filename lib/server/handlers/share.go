@@ -19,9 +19,11 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"path"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 
 	log "github.com/sirupsen/logrus"
 
@@ -77,7 +79,14 @@ func (handler *ShareHandler) Create(
 	shareName, hostName, path string, securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
 ) (share *propsv1.HostShare, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Create(%s) called", shareName), &err, log.TraceLevel)()
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Check if a share already exists with the same name
 	server, _, _, err := handler.Inspect(ctx, shareName)
@@ -233,7 +242,15 @@ func (handler *ShareHandler) Create(
 
 // Delete a share from host
 func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Delete(%s) called", name), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	// Retrieve info about the share
 	server, share, _, err := handler.ForceInspect(ctx, name)
 	if err != nil {
@@ -307,7 +324,15 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 
 // List return the list of all shares from all servers
 func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[string]*propsv1.HostShare, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::List() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	//FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	shares := map[string]map[string]*propsv1.HostShare{}
 
 	var servers []string
@@ -345,8 +370,21 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 }
 
 // Mount a share on a local directory of an host
-func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string, withCache bool) (mount *propsv1.HostRemoteMount, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Mount(%s,%s) called", shareName, hostName), &err, log.TraceLevel)()
+func (handler *ShareHandler) Mount(
+	ctx context.Context,
+	shareName, hostName, path string,
+	withCache bool,
+) (mount *propsv1.HostRemoteMount, err error) {
+
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	// Retrieve info about the share
 	server, share, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
@@ -566,7 +604,15 @@ func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, pat
 
 // Unmount a share from local directory of an host
 func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Unmount(%s,%s) called", shareName, hostName), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	server, share, _, err := handler.ForceInspect(ctx, shareName)
 	if err != nil {
 		return err
@@ -674,7 +720,16 @@ func (handler *ShareHandler) ForceInspect(
 	ctx context.Context,
 	shareName string,
 ) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::ForceInspect() called"), &err, log.TraceLevel)()
+
+	if handler == nil {
+		return nil, nil, nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	host, share, mounts, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		return nil, nil, nil, err
@@ -691,7 +746,15 @@ func (handler *ShareHandler) Inspect(
 	ctx context.Context,
 	shareName string,
 ) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.ShareHandler::Inspect() called"), &err, log.TraceLevel)()
+
+	if handler == nil {
+		return nil, nil, nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostName, err := metadata.LoadShare(handler.service, shareName)
 	if err != nil {
