@@ -41,7 +41,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"golang.org/x/crypto/ssh"
 )
@@ -659,7 +658,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		return "", utils.InvalidParameterError("ssh.Host", "can't be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s,%s"), phase, utils.FormatDuration(timeout)).Enable(true).In()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, utils.FormatDuration(timeout)), true).GoingIn().OnExitTrace()
 
 	// log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
 	defer utils.OnExitTraceError(
@@ -699,10 +698,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		timeout,
 	)
 	if retryErr != nil {
-		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, loghelpers.FormatDuration(time.Since(begins)), retryErr)
+		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, utils.FormatDuration(time.Since(begins)), retryErr)
 		return stdout, retryErr
 	}
-	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, loghelpers.FormatDuration(time.Since(begins)), stdout)
+	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, utils.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 

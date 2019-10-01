@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -199,14 +198,16 @@ func RemoveVolume(svc iaas.Service, volumeID string) error {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
-	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "("+ref+")"), &err)()
-
 	if svc == nil {
 		return nil, utils.InvalidParameterError("svc", "can't be nil")
 	}
 	if ref == "" {
 		return nil, utils.InvalidParameterError("ref", "can't be empty string")
 	}
+
+	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mv = NewVolume(svc)
 

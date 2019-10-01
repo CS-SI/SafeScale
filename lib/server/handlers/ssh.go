@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 
@@ -66,21 +67,38 @@ func NewSSHHandler(svc iaas.Service) *SSHHandler {
 
 // GetConfig creates SSHConfig to connect to an host
 func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (sshConfig *system.SSHConfig, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::GetConfig() called"), &err, log.TraceLevel)()
-	host := resources.NewHost()
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
 
+	var hostRef string
+	host := resources.NewHost()
 	switch hostParam.(type) {
 	case string:
-		mh, err := metadata.LoadHost(handler.service, hostParam.(string))
+		hostRef = hostParam.(string)
+		mh, err := metadata.LoadHost(handler.service, hostRef)
 		if err != nil {
 			return nil, err
 		}
 		host = mh.Get()
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
+		if host.Name != "" {
+			hostRef = host.Name
+		} else {
+			hostRef = host.ID
+		}
 	default:
 		panic("param must be a string or a *resources.Host!")
 	}
+	if host == nil {
+		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+	}
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	cfg, err := handler.service.GetConfigurationOptions()
 	if err != nil {
@@ -131,7 +149,15 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
 func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::WaitServerReady() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
 	if err != nil {
@@ -143,7 +169,15 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 
 // Run tries to execute command 'cmd' on the host
 func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::Run() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return -1, "", "", utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>", hostName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
@@ -232,7 +266,14 @@ func extractPath(in string) (string, error) {
 
 // Copy copy file/directory
 func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::Copy() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return -1, "", "", utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostName := ""
 	var upload bool

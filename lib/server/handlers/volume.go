@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -62,7 +63,14 @@ func NewVolumeHandler(svc iaas.Service) VolumeAPI {
 
 // List returns the network list
 func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::List() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	//FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if all {
 		volumes, err := handler.service.ListVolumes()
@@ -84,7 +92,14 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 
 // Delete deletes volume referenced by ref
 func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Delete() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
@@ -153,7 +168,16 @@ func (handler *VolumeHandler) Inspect(
 	ctx context.Context,
 	ref string,
 ) (volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Inspect() called"), &err, log.TraceLevel)()
+
+	if handler == nil {
+		return nil, nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
@@ -207,7 +231,15 @@ func (handler *VolumeHandler) Inspect(
 
 // Create a volume
 func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (volume *resources.Volume, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Inspect() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	volume, err = handler.service.CreateVolume(resources.VolumeRequest{
 		Name:  name,
 		Size:  size,
@@ -271,7 +303,13 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 
 // Attach a volume to an host
 func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Attach() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
+	defer tracer.WithStopwatch().GoingIn().OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
@@ -559,7 +597,13 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 }
 
 func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (set mapset.Set, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("lib.server.handlers.VolumeHandler::listAttachedDevices() called"), &err)()
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	defer utils.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)
+
 	var (
 		retcode        int
 		stdout, stderr string
@@ -595,7 +639,14 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 
 // Detach detach the volume identified by ref, ref can be the name or the id
 func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.VolumeHandler::Detach() called"), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeName, hostName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Load volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)

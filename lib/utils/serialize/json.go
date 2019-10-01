@@ -65,8 +65,8 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 		return utils.InvalidParameterError("apply", "can't be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, true, "").WithStopwatch()
-	defer tracer.GoingIn().OnExitLog()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
 	defer utils.OnExitTraceError(tracer.TraceMessage(""), &err)
 	defer sp.unlock()
 
