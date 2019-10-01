@@ -35,7 +35,6 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -171,13 +170,9 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 
 	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
-		fmt.Sprintf("Starting copy of file '%s' to '%s'...", localpath, to),
-		fmt.Sprintf("Ending copy file '%s' to '%s'", localpath, to),
-		concurrency.NewTracer(nil, ""),
-		&err,
-		logrus.TraceLevel,
-	)()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	sshClt := client.New().SSH
 	networkError := false

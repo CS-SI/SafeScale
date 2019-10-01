@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -402,7 +403,12 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
 		_, stepErr, continuation, breaking := func() (res Results, inner error, cont bool, brea bool) {
-			defer utils.TimerErrWithLevel(fmt.Sprintf("executing step '%s::%s'...\n", w.action.String(), k), &inner, log.DebugLevel)()
+			defer utils.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), k), &inner)
+			defer utils.Stopwatch{}.OnExitLogWithLevel(
+				fmt.Sprintf("Starting executiion of step '%s::%s'...", w.action.String(), k),
+				fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), k),
+				logrus.DebugLevel,
+			)
 
 			stepKey := stepsKey + "." + k
 			var (

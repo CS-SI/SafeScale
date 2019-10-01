@@ -24,13 +24,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-	timing "github.com/CS-SI/SafeScale/lib/utils"
-
 	"github.com/klauspost/reedsolomon"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 //Default chunk sizes that will used to spit files (in Bytes)
@@ -65,7 +66,7 @@ func NewDataHandler(svc *iaas.StorageServices) DataAPI {
 
 // Return the formated (and considered unique) keyFileName and metadataFileName linked to a fileName
 func getFileNames(fileName string) (string, string) {
-	hashedFileName := utils.Hash(strings.NewReader(fileName))
+	hashedFileName := srvutils.Hash(strings.NewReader(fileName))
 	metadataFileName := "meta-" + hashedFileName + ".bin"
 	keyFileName := "key-" + hashedFileName + ".bin"
 	return metadataFileName, keyFileName
@@ -83,11 +84,11 @@ func (handler *DataHandler) getBuckets() (map[string]objectstorage.Bucket, []str
 	return bucketMap, bucketNames, buckets
 }
 
-func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.ChunkGroup, error) {
+func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*srvutils.ChunkGroup, error) {
 	metadataFileName, keyFileName := getFileNames(fileName)
 
 	var buffer bytes.Buffer
-	var keyInfo *utils.KeyInfo
+	var keyInfo *srvutils.KeyInfo
 	var i int
 	for i = range buckets {
 		buffer.Reset()
@@ -95,7 +96,7 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 		if err != nil {
 			continue
 		}
-		keyInfo, err = utils.DecryptKeyInfo(buffer.Bytes(), keyFilePathConst)
+		keyInfo, err = srvutils.DecryptKeyInfo(buffer.Bytes(), keyFilePathConst)
 		if err != nil {
 			return nil, err
 		}
@@ -110,7 +111,7 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 	if err != nil {
 		return nil, fmt.Errorf("failed to read the chunkGroup from the bucket '%s' : %s", buckets[i].GetName(), err.Error())
 	}
-	chunkGroup, err := utils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
+	chunkGroup, err := srvutils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +120,14 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 
 //Push ...
 func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) (err error) {
-	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Push(%s) called", fileLocalPath), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", fileLocalPath), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	//localFile inspection
 	file, err := os.Open(fileLocalPath)
@@ -141,7 +149,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 
 	//Preprocess buckets info
 	bucketMap, bucketNames, buckets := handler.getBuckets()
-	bucketGenerator := utils.NewBucketGenerator(buckets)
+	bucketGenerator := srvutils.NewBucketGenerator(buckets)
 	metadataFileName, keyInfoFileName := getFileNames(fileName)
 	//Check if the file is not already present on one of the buckets
 	for i := range buckets {
@@ -152,7 +160,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 
 	}
 	//Create ChunkGroup
-	chunkGroup, err := utils.NewChunkGroup(fileName, fileSize, bucketNames)
+	chunkGroup, err := srvutils.NewChunkGroup(fileName, fileSize, bucketNames)
 	if err != nil {
 		return err
 	}
@@ -280,7 +288,14 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 
 //Get ...
 func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) (err error) {
-	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Get(%s) called", fileName), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", fileLocalPath, fileName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Check if the local file is available
 	if _, err := os.Stat(fileLocalPath); err == nil {
@@ -381,7 +396,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
 			if encryptedShards[j].Len() != 0 {
 				checkSum := chunkGroup.GetCheckSum(chunkGroup.GetShardNum(i, j))
-				computedCheckSum := utils.Hash(bytes.NewReader(encryptedShards[j].Bytes()))
+				computedCheckSum := srvutils.Hash(bytes.NewReader(encryptedShards[j].Bytes()))
 				if checkSum != computedCheckSum {
 					log.Warnf("%d-th shard of the batch corrupted, will be reconstructed", j)
 					encryptedShards[j].Reset()
@@ -440,7 +455,14 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 
 // Delete ...
 func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err error) {
-	defer timing.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::Delete(%s) called", fileName), &err, log.TraceLevel)()
+	if handler == nil {
+		return utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", fileName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	bucketMap, _, buckets := handler.getBuckets()
 	metadataFileName, keyFileName := getFileNames(fileName)
@@ -485,8 +507,24 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err er
 }
 
 // List returns []fileName []UploadDate []fileSize [][]buckets, error
-func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int64, [][]string, error) {
-	defer timing.TimerWithLevel(fmt.Sprintf("lib.server.handlers.DataHandler::List() called"), log.TraceLevel)()
+func (handler *DataHandler) List(
+	ctx context.Context,
+) (
+	fileNames []string,
+	uploadDates []string,
+	fileSizes []int64,
+	fileBuckets [][]string,
+	err error,
+) {
+
+	if handler == nil {
+		return nil, nil, nil, nil, utils.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	bucketMap, _, buckets := handler.getBuckets()
 
@@ -503,10 +541,10 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 	}
 
 	var buffer bytes.Buffer
-	fileNames := []string{}
-	uploadDates := []string{}
-	fileSizes := []int64{}
-	fileBuckets := [][]string{}
+	fileNames = []string{}
+	uploadDates = []string{}
+	fileSizes = []int64{}
+	fileBuckets = [][]string{}
 
 	for keyInfoFileName, bucketNames := range keyInfosMap {
 		chunkGroupFileName := "meta-" + strings.Split(keyInfoFileName, "-")[1]
@@ -516,7 +554,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to read the keyInfo from the bucket '%s' : %s", bucketNames[0], err.Error())
 		}
-		keyInfo, err := utils.DecryptKeyInfo(buffer.Bytes(), keyFilePathConst)
+		keyInfo, err := srvutils.DecryptKeyInfo(buffer.Bytes(), keyFilePathConst)
 		if err != nil {
 			continue
 			//return nil, nil, nil, nil, err
@@ -527,7 +565,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to read the chunkGroup from the bucket '%s' : %s", bucketNames[0], err.Error())
 		}
-		chunkGroup, err := utils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
+		chunkGroup, err := srvutils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
 		if err != nil {
 			continue
 			//return nil, nil, nil, nil, err

@@ -19,8 +19,9 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 
 	log "github.com/sirupsen/logrus"
 
@@ -74,11 +75,24 @@ func (handler *NetworkHandler) Create(
 	sizing resources.SizingRequirements, theos string, gwname string,
 	failover bool,
 ) (network *resources.Network, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Create() called"), &err, log.TraceLevel)()
 
-	if gwname != "" && failover {
-		return nil, fmt.Errorf("can't name gateway when failover is requested")
+	if handler == nil {
+		return nil, utils.InvalidInstanceError()
 	}
+	if name == "" {
+		return nil, utils.InvalidParameterError("name", "can't be nil")
+	}
+	if failover && gwname != "" {
+		return nil, utils.InvalidParameterError("gwname", "can't be set if failover is set")
+	}
+
+	tracer := concurrency.NewTracer(
+		nil,
+		fmt.Sprintf("('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover),
+		true,
+	).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Verify that the network doesn't exist first
 	_, err = handler.service.GetNetworkByName(name)
@@ -573,7 +587,14 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	}
 
 	// Executes userdata phase2 script to finalize host installation
-	defer utils.TimerErrWithLevel(fmt.Sprintf("Starting configuration of the gateway '%s'", gw.Name), &err, log.InfoLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gw.Name), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer utils.Stopwatch{}.OnExitLogInfo(
+		fmt.Sprintf("Starting configuration phase 2 on the gateway '%s'...", gw.Name),
+		fmt.Sprintf("Ending configuration phase 2 on the gateway '%s'", gw.Name),
+	)
+
 	content, err := userData.Generate("phase2")
 	if err != nil {
 		return nil, err
@@ -585,7 +606,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
 	sshHandler := NewSSHHandler(handler.service)
 
-	log.Debugf("Provisioning gateway '%s', phase 2", gw.Name)
+	// log.Debugf("Configuring gateway '%s', phase 2", gw.Name)
 	returnCode, _, _, err := sshHandler.Run(task.GetContext(), gw.Name, command)
 	if err != nil {
 		retrieveForensicsData(task.GetContext(), sshHandler, gw)
@@ -673,7 +694,9 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 
 // List returns the network list
 func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*resources.Network, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::List(%v) called", all), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if all {
 		return handler.service.ListNetworks()
@@ -694,7 +717,9 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*r
 
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *resources.Network, err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Inspect(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
@@ -705,7 +730,9 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network
 
 // Delete deletes network referenced by ref
 func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err error) {
-	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.NetworkHandler::Delete(%s) called", ref), &err, log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {

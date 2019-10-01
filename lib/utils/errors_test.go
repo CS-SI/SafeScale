@@ -26,7 +26,7 @@ func TestNotImplementedError(t *testing.T) {
 
 func chaos() (err error) {
 	logrus.SetOutput(os.Stdout)
-	defer LogErrorWithLevelCallback("Here it begins", &err, logrus.InfoLevel)()
+	defer OnExitLogErrorWithLevel("Here it begins", &err, logrus.InfoLevel)()
 
 	// return nil
 	return fmt.Errorf("it failed")
@@ -34,7 +34,7 @@ func chaos() (err error) {
 
 func success() (err error) {
 	logrus.SetOutput(os.Stdout)
-	defer LogErrorWithLevelCallback("Here it begins", &err, logrus.InfoLevel)()
+	defer OnExitLogErrorWithLevel("Here it begins", &err, logrus.InfoLevel)()
 
 	return nil
 }
