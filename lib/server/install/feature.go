@@ -18,9 +18,11 @@ package install
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"strings"
+
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
 
@@ -28,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 )
 
 var (
@@ -315,6 +318,10 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
 func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
+	if f == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
 	methods := t.Methods()
 	var (
 		installer Installer
@@ -333,7 +340,11 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	defer utils.Timer(fmt.Sprintf("Adding feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()))()
+	defer loghelpers.LogInfoStopwatchCallback(
+		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()),
+		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()),
+		nil,
+	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -375,7 +386,19 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 }
 
 // Remove uninstalls the feature from the target
-func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Remove(t Target, v Variables, s Settings) (results Results, err error) {
+	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+		"", "",
+		concurrency.NewTracer(nil, "").Enable(true),
+		&err,
+		logrus.TraceLevel,
+	)()
+
+	if f == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
+	results = Results{}
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -390,7 +413,11 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 
-	defer utils.Timer(fmt.Sprintf("Removing feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()))()
+	defer loghelpers.LogInfoStopwatchCallback(
+		fmt.Sprintf("Starting removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
+		fmt.Sprintf("Ending removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
+		nil,
+	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -402,12 +429,12 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	f.setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(f, myV)
+	err = checkParameters(f, myV)
 	if err != nil {
 		return nil, err
 	}
 
-	results, err := installer.Remove(f, t, myV, s)
+	results, err = installer.Remove(f, t, myV, s)
 	// checkCache.Reset(f.DisplayName() + "@" + t.Name())
 	return results, err
 }

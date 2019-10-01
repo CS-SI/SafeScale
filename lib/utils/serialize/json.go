@@ -17,9 +17,11 @@
 package serialize
 
 import (
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
@@ -54,16 +56,17 @@ type SyncedJSONProperty struct {
 // If the extension is locked for read, no change will be encoded into the extension.
 // The lock applied on the extension is automatically released on exit.
 func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("utils.serialize.SyncedJSONProperty::ThenUse() called..."), &err)()
+
+	defer loghelpers.LogTraceErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
 
 	if sp == nil {
-		panic("Calling utils.serialize.SyncedJSONProperty::ThenUse() from a nil pointer!")
+		return utils.InvalidInstanceError()
 	}
 	if sp.jsonProperty == nil {
-		panic("sp.jsonProperty is nil!")
+		return utils.InvalidParameterError("sp.jsonProperty", "can't be nil")
 	}
 	if apply == nil {
-		panic("apply is nil!")
+		return utils.InvalidParameterError("apply", "can't be nil")
 	}
 	defer sp.unlock()
 

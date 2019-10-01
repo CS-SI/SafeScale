@@ -26,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -94,10 +96,14 @@ func (m *Network) Get() *resources.Network {
 
 // Write updates the metadata corresponding to the network in the Object Storage
 func (m *Network) Write() (err error) {
-	if m.item == nil {
-		panic("m.item is nil!")
+	defer loghelpers.LogTraceErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if m == nil {
+		return utils.InvalidInstanceError()
 	}
-	defer utils.TraceOnExitErr(fmt.Sprintf("Write network metadata: %v", *m), &err)()
+	if m.item == nil {
+		return utils.InvalidParameterError("m.item", "can't be nil")
+	}
 
 	err1 := m.item.WriteInto(ByIDFolderName, *m.id)
 	err2 := m.item.WriteInto(ByNameFolderName, *m.name)
@@ -113,7 +119,11 @@ func (m *Network) Write() (err error) {
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Network) Reload() (err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Reload network metadata: %v", *m), &err)()
+	defer loghelpers.LogTraceErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
 
 	err = m.ReadByID(*m.id)
 	if err != nil {
@@ -125,11 +135,11 @@ func (m *Network) Reload() (err error) {
 	return nil
 }
 
-// ReadByIDorName reads network metadata either by ID or by name
-func (m *Network) ReadByIDorName(id string) (err error) {
-	errID := m.ReadByID(id)
+// ReadByReference tries to read first using 'ref' as an ID then as a name
+func (m *Network) ReadByReference(ref string) (err error) {
+	errID := m.ReadByID(ref)
 	if errID != nil {
-		errName := m.ReadByName(id)
+		errName := m.ReadByName(ref)
 		if errName != nil {
 			return errName
 		}
@@ -139,11 +149,14 @@ func (m *Network) ReadByIDorName(id string) (err error) {
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
 func (m *Network) ReadByID(id string) (err error) {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
+	defer loghelpers.LogTraceErrorCallback("", concurrency.NewTracer(nil, "("+id+")").Enable(true), &err)()
 
-	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Read network metadata: %v", *m), &err)()
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return utils.InvalidParameterError("m.item", "can't be nil")
+	}
 
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
@@ -164,11 +177,14 @@ func (m *Network) ReadByID(id string) (err error) {
 
 // ReadByName reads the metadata of a network identified by name
 func (m *Network) ReadByName(name string) (err error) {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
+	defer loghelpers.LogTraceErrorCallback("", concurrency.NewTracer(nil, "("+name+")").Enable(true), &err)()
 
-	defer utils.TraceOnExitErrAsTrace(fmt.Sprintf("Read network metadata by name: %v", *m), &err)()
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return utils.InvalidParameterError("m.item", "can't be nil")
+	}
 
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
@@ -189,11 +205,14 @@ func (m *Network) ReadByName(name string) (err error) {
 
 // Delete deletes the metadata corresponding to the network
 func (m *Network) Delete() (err error) {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
 
-	defer utils.TraceOnExitErr(fmt.Sprintf("Delete network metadata: %v", *m), &err)()
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return utils.InvalidParameterError("m.item", "can't be nil")
+	}
 
 	// Delete the entry in 'ByIDFolderName' folder
 	err1 := m.item.DeleteFrom(ByIDFolderName, *m.id)
@@ -212,11 +231,14 @@ func (m *Network) Delete() (err error) {
 
 // Browse walks through all the metadata objects in network
 func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
 
-	defer utils.TraceOnExitErr(fmt.Sprintf("Browse network metadata: %v", *m), &err)()
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return utils.InvalidParameterError("m.item", "can't be nil")
+	}
 
 	return m.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
 		network := resources.Network{}
@@ -230,7 +252,15 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 
 // AttachHost links host ID to the network
 func (m *Network) AttachHost(host *resources.Host) (err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Attach host to network metadata: %v", *m), &err)()
+
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
+	if host == nil {
+		return utils.InvalidParameterError("host", "can't be nil")
+	}
+
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "("+host.Name+")").Enable(true), &err)()
 
 	network := m.Get()
 	return network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -243,7 +273,14 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 
 // DetachHost unlinks host ID from network
 func (m *Network) DetachHost(hostID string) (err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Detach host from metadata: %v", *m), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "("+hostID+")").Enable(true), &err)()
+
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
+	if hostID == "" {
+		return utils.InvalidParameterError("hostID", "can't be empty string")
+	}
 
 	network := m.Get()
 	err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -263,7 +300,11 @@ func (m *Network) DetachHost(hostID string) (err error) {
 
 // ListHosts returns the list of resources.Host attached to the network (excluding gateway)
 func (m *Network) ListHosts() (list []*resources.Host, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Lists hosts from network metadata: %v", *m), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if m == nil {
+		return nil, utils.InvalidInstanceError()
+	}
 
 	network := m.Get()
 	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -299,14 +340,30 @@ func (m *Network) Release() {
 
 // SaveNetwork saves the Network definition in Object Storage
 func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Save network metadata: %v", *net), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if net == nil {
+		return nil, utils.InvalidParameterError("net", "can't be nil")
+	}
 
 	mn = NewNetwork(svc)
 	return mn, mn.Carry(net).Write()
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
-func RemoveNetwork(svc iaas.Service, net *resources.Network) error {
+func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if svc == nil {
+		return utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if net == nil {
+		return utils.InvalidParameterError("net", "can't be nil")
+	}
+
 	return NewNetwork(svc).Carry(net).Delete()
 }
 
@@ -315,12 +372,19 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) error {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Load network metadata: %s", ref), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "("+ref+")").Enable(true), &err)()
+
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if ref == "" {
+		return nil, utils.InvalidParameterError("ref", "can't be empty string")
+	}
 
 	mn = NewNetwork(svc)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr := mn.ReadByIDorName(ref)
+			innerErr := mn.ReadByReference(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
 					return retry.StopRetryError("no metadata found", innerErr)
@@ -348,7 +412,14 @@ type Gateway struct {
 
 // NewGateway creates an instance of metadata.Gateway
 func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Creating gateway in network metadata: %s", networkID), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if networkID == "" {
+		return nil, utils.InvalidParameterError("networkID", "can't be empty string")
+	}
 
 	network := NewNetwork(svc)
 	err = network.ReadByID(networkID)
@@ -392,11 +463,14 @@ func (mg *Gateway) Write() error {
 
 // Read reads the metadata of a gateway of a network identified by ID from Object Storage
 func (mg *Gateway) Read() (err error) {
-	if mg.network == nil {
-		panic("mg.network is nil!")
-	}
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
 
-	defer utils.TraceOnExitErr(fmt.Sprintf("Read gateway metadata from network metadata"), &err)()
+	if mg == nil {
+		return utils.InvalidInstanceError()
+	}
+	if mg.network == nil {
+		return utils.InvalidParameterError("mg.network", "can't be nil")
+	}
 
 	err = mg.network.Reload()
 	if err != nil {
@@ -415,7 +489,11 @@ func (mg *Gateway) Read() (err error) {
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 // It's advised to Acquire/Release around Reload()...
 func (mg *Gateway) Reload() (err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Reload gateway from network metadata"), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if mg == nil {
+		return utils.InvalidInstanceError()
+	}
 
 	err = mg.Read()
 	if err != nil {
@@ -429,13 +507,16 @@ func (mg *Gateway) Reload() (err error) {
 
 // Delete updates the metadata of the network concerning the gateway
 func (mg *Gateway) Delete() (err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Delete gateway from network metadata"), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
 
+	if mg == nil {
+		return utils.InvalidInstanceError()
+	}
 	if mg.network == nil {
-		panic("mg.network is nil!")
+		return utils.InvalidParameterError("mg.network", "can't be nil")
 	}
 	if mg.host == nil {
-		panic("mg.host is nil!")
+		return utils.InvalidParameterError("mg.host", "can't be nil")
 	}
 
 	mg.network.Acquire()
@@ -462,8 +543,14 @@ func (mg *Gateway) Release() {
 
 // LoadGateway returns the metadata of the Gateway of a network
 func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Loading gateway from network metadata: %s", networkID), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
 
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if networkID == "" {
+		return nil, utils.InvalidParameterError("networkID", "can't be empty string")
+	}
 	mg, err = NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
@@ -495,7 +582,17 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 
 // SaveGateway saves the metadata of a gateway
 func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *Gateway, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Saving gateway in network metadata: %s", networkID), &err)()
+	defer loghelpers.LogErrorCallback("", concurrency.NewTracer(nil, "").Enable(true), &err)()
+
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if host == nil {
+		return nil, utils.InvalidParameterError("host", "can't be nil")
+	}
+	if networkID == "" {
+		return nil, utils.InvalidParameterError("networkID", "can't be empty string")
+	}
 
 	mg, err = NewGateway(svc, networkID)
 	if err != nil {

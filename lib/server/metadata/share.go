@@ -17,9 +17,10 @@
 package metadata
 
 import (
-	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -113,8 +114,8 @@ func (ms *Share) Write() error {
 	return ms.item.WriteInto(ByNameFolderName, *ms.name)
 }
 
-// ReadByIDorName reads share metadata either by ID or by name
-func (ms *Share) ReadByIDorName(id string) (err error) {
+// ReadByReference tries to read 'ref' as an ID, and if not found as a name
+func (ms *Share) ReadByReference(id string) (err error) {
 	errID := ms.ReadByID(id)
 	if errID != nil {
 		errName := ms.ReadByName(id)
@@ -262,13 +263,24 @@ func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) 
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadShare(svc iaas.Service, ref string) (share string, err error) {
-	defer utils.TraceOnExitErr(fmt.Sprintf("Loading metadata share called..."), &err)()
+	defer loghelpers.LogErrorCallback(
+		"",
+		concurrency.NewTracer(nil, "").Enable(true),
+		&err,
+	)()
+
+	if svc == nil {
+		return "", utils.InvalidParameterError("svc", "can't be nil")
+	}
+	if ref == "" {
+		return "", utils.InvalidParameterError("ref", "can't be empty string")
+	}
 
 	ms := NewShare(svc)
 
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr := ms.ReadByIDorName(ref)
+			innerErr := ms.ReadByReference(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
 					return retry.StopRetryError("no metadata found", innerErr)
