@@ -604,9 +604,12 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	// Reboot gateway
 	log.Debugf("Rebooting gateway '%s'", gw.Name)
 	command = "sudo systemctl reboot"
-	_, _, _, err = sshHandler.Run(task.GetContext(), gw.Name, command)
+	returnCode, _, _, err = sshHandler.Run(task.GetContext(), gw.Name, command)
 	if err != nil {
 		return nil, err
+	}
+	if returnCode != 0 {
+		log.Warnf("Unexpected problem rebooting...")
 	}
 
 	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)

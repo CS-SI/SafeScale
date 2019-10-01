@@ -40,7 +40,6 @@ func getTester() (*tests.ServiceTester, error) {
 		the_service, err := getService()
 		if err != nil {
 			tester = nil
-			the_service = nil
 			return nil, err
 		}
 		tester = &tests.ServiceTester{
