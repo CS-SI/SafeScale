@@ -41,7 +41,7 @@ type Tracer struct {
 }
 
 // NewTracer creates a new Tracer instance
-func NewTracer(t Task, enabled bool, message string) *Tracer {
+func NewTracer(t Task, message string, enabled bool) *Tracer {
 	tracer := Tracer{}
 	if t != nil {
 		tracer.taskSig = t.GetSignature()
@@ -97,9 +97,8 @@ func (t *Tracer) GoingIn() *Tracer {
 	return t
 }
 
-// OnExitLog logs the input message (== Tracer.In()), then returns a function that will log the output message using TRACE level.
-func (t *Tracer) OnExitLog() func() {
-	t.GoingIn()
+// OnExitTrace logs the input message (== Tracer.In()), then returns a function that will log the output message using TRACE level.
+func (t *Tracer) OnExitTrace() func() {
 	if t.outDone {
 		return func() {}
 	}
