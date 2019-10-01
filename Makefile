@@ -36,8 +36,9 @@ XUNIT := github.com/tebeka/go2xunit
 REPORTER := github.com/360EntSecGroup-Skylar/goreporter
 COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
+GOLANGCI := github.com/golangci/golangci-lint/cmd/golangci-lint
 
-DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR)
+DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR) $(GOLANGCI)
 
 BUILD_TAGS = ""
 export BUILD_TAGS
@@ -73,8 +74,9 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover covertool convey errcheck goreporter govendor > /dev/null; if [ $$? -ne 0 ]; then \
+	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover covertool convey errcheck goreporter govendor golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
     	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(DEP) $(GOVENDOR); \
+    	  $(GO) version | grep 1.10 > /dev/null || $(GO) get -u  $(GOLANGCI); \
     fi
 
 ensure:
