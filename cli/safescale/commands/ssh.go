@@ -78,10 +78,10 @@ var sshRun = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
-			fmt.Printf(stderr)
+			fmt.Print(stderr)
 			return cli.NewExitError(stderr, retcode)
 		}
-		fmt.Printf(stdout)
+		fmt.Print(stdout)
 		return nil
 	},
 }

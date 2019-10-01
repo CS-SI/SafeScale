@@ -508,9 +508,8 @@ func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
 			return false, fmt.Errorf("error listing subnets: %s", openstack.ProviderErrorToString(err))
 		}
 
-		for _, subnet := range list {
-			subnetList = append(subnetList, subnet)
-		}
+		subnetList = append(subnetList, list...)
+
 		return true, nil
 	})
 
@@ -630,7 +629,6 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 
 	defer utils.TimerWithLevel(fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called", gwname), log.TraceLevel)()
 
-	userData := userdata.NewContent()
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,

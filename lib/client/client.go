@@ -147,8 +147,5 @@ func IsTimeoutError(err error) bool {
 // IsProvisioningError detects provisioning errors
 func IsProvisioningError(err error) bool {
 	errText := err.Error()
-	if strings.Contains(errText, "PROVISIONING_ERROR:") {
-		return true
-	}
-	return false
+	return strings.Contains(errText, "PROVISIONING_ERROR:")
 }

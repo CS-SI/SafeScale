@@ -65,12 +65,12 @@ func newTaskGroup(ctx context.Context, parentTask Task) *taskGroup {
 			t = NewTaskWithContext(ctx)
 		}
 	} else {
-		switch parentTask.(type) {
+		switch parentTask := parentTask.(type) {
 		case *task:
-			p := parentTask.(*task)
+			p := parentTask
 			t = NewTask(p)
 		case *taskGroup:
-			p := parentTask.(*taskGroup)
+			p := parentTask
 			t = NewTask(p.task)
 		}
 	}

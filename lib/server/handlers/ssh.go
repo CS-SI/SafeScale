@@ -69,15 +69,15 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.handlers.SSHHandler::GetConfig() called"), &err, log.TraceLevel)()
 	host := resources.NewHost()
 
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
-		mh, err := metadata.LoadHost(handler.service, hostParam.(string))
+		mh, err := metadata.LoadHost(handler.service, hostParam)
 		if err != nil {
 			return nil, err
 		}
 		host = mh.Get()
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
+		host = hostParam
 	default:
 		panic("param must be a string or a *resources.Host!")
 	}

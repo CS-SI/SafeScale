@@ -660,6 +660,7 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 	out = ""
 	for !strings.Contains(out, "STOPPED") {
 		out, err = GetOutput("safescale host status " + names.Hosts[0])
+		require.NotNil(t, err)
 	}
 
 	out, err = GetOutput("safescale host start " + names.Hosts[0])

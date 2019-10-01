@@ -149,10 +149,9 @@ func (b *foreman) ExecuteScript(
 	if err != nil {
 		return 0, "", "", err
 	}
-	var cmd string
 
 	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
-	cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
+	cmd := fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
 
 	return client.New().SSH.Run(hostID, cmd, utils.GetConnectionTimeout(), 2*utils.GetLongOperationTimeout())
 }
@@ -1503,7 +1502,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	defer utils.TimerErrWithLevel(fmt.Sprintf("lib.server.cluster.control.Foreman::taskConfigureMasters() called"), &err, log.TraceLevel)()
 
 	list := b.cluster.ListMasterIDs(t)
-	if len(list) <= 0 {
+	if len(list) == 0 {
 		return nil, nil
 	}
 
@@ -1515,7 +1514,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	for i, hostID := range b.cluster.ListMasterIDs(t) {
 		host, err := clientHost.Inspect(hostID, utils.GetExecutionTimeout())
 		if err != nil {
-			err = fmt.Errorf("failed to get metadata of host: %s", err.Error())
+			log.Warnf("failed to get metadata of host: %s", err.Error())
 			continue
 		}
 		subtask := t.New().Start(b.taskConfigureMaster, data.Map{
@@ -1726,7 +1725,7 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 	defer utils.TimerErrWithLevel(fmt.Sprintf("[cluster %s] nodes configuration called", clusterName), &err, log.DebugLevel)()
 
 	list := b.cluster.ListNodeIDs(t)
-	if len(list) <= 0 {
+	if len(list) == 0 {
 		log.Debugf("[cluster %s] no nodes to configure.", clusterName)
 		return nil, nil
 	}

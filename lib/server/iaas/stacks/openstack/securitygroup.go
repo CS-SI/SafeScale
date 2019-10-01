@@ -89,6 +89,9 @@ func (s *Stack) createTCPRules(groupID string) error {
 		RemoteIPPrefix: "::/0",
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
+	if err != nil {
+		return err
+	}
 
 	// Outbound = egress == going to Outside
 	ruleOpts = secrules.CreateOpts{

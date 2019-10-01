@@ -40,7 +40,7 @@ func Run() {
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-			instance, err = cluster.Create(concurrency.RootTask(), control.Request{
+			cinstance, cerr := cluster.Create(concurrency.RootTask(), control.Request{
 				Name:       clusterName,
 				Complexity: Complexity.Small,
 				//Complexity: Complexity.Normal,
@@ -48,10 +48,11 @@ func Run() {
 				CIDR:   "192.168.0.0/28",
 				Flavor: Flavor.DCOS,
 			})
-			if err != nil {
-				fmt.Printf("Failed to create cluster: %s\n", err.Error())
+			if cerr != nil {
+				fmt.Printf("Failed to create cluster: %s\n", cerr.Error())
 				return
 			}
+			instance = cinstance
 		} else {
 			fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
 			return

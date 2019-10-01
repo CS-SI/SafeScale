@@ -31,9 +31,9 @@ type Node struct {
 
 // Nodes ...
 type Nodes struct {
-	Masters          []*Node `json:"masters"`                 // MasterIDs contains the ID of the masters
-	PublicNodes      []*Node `json:"public_nodes,omitempty"`  // PublicNodeIDs is a slice of IDs of the public cluster nodes
-	PrivateNodes     []*Node `json:"private_nodes,omitempty"` // PrivateNodedIDs is a slice of IDs of the private cluster nodes
+	Masters          []*Node `json:"masters"`                 // Masters contains the ID of the masters
+	PublicNodes      []*Node `json:"public_nodes,omitempty"`  // PublicNodes is a slice of IDs of the public cluster nodes
+	PrivateNodes     []*Node `json:"private_nodes,omitempty"` // PrivateNodes is a slice of IDs of the private cluster nodes
 	MasterLastIndex  int     `json:"master_last_index"`       // MasterLastIndex
 	PrivateLastIndex int     `json:"private_last_index"`      // PrivateLastIndex
 	PublicLastIndex  int     `json:"public_last_index"`       // PublicLastIndex

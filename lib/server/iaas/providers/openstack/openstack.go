@@ -70,7 +70,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	}
 	defaultImage, _ := compute["DefaultImage"].(string)
 	dnsServers, _ := network["DNSServers"].([]string)
-	if len(dnsServers) <= 0 {
+	if len(dnsServers) == 0 {
 		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
 	}
 	operatorUsername := resources.DefaultUser

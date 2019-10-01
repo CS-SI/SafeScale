@@ -18,6 +18,7 @@ package utils
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -396,6 +397,34 @@ func NotImplementedError(what string) ErrNotImplemented {
 			consequences: []error{},
 		},
 	}
+}
+
+// ErrList ...
+type ErrList struct {
+	ErrCore
+	errors []error
+}
+
+// ErrListError creates a ErrList
+func ErrListError(errors []error) error {
+	if len(errors) == 0 {
+		return nil
+	}
+
+	return ErrList{
+		ErrCore: ErrCore{},
+		errors:  errors,
+	}
+}
+
+func (e ErrList) Error() string {
+	return spew.Sdump(e.errors)
+}
+
+// AddConsequence adds an error 'err' to the list of consequences
+func (e ErrList) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
 }
 
 // ErrInvalidInstance ...

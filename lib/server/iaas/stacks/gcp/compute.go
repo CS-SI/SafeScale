@@ -232,7 +232,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	networks := request.Networks
 	hostMustHavePublicIP := request.PublicIP
 
-	if networks == nil || len(networks) == 0 {
+	if len(networks) == 0 {
 		return nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
 	}
 
@@ -491,12 +491,12 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 	}
 
 	var host *resources.Host
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
 		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
+		host = hostParam
 	default:
 		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
@@ -646,12 +646,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, utils.InvalidInstanceError()
 	}
 
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
 		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
+		host = hostParam
 	}
 
 	if host == nil {
