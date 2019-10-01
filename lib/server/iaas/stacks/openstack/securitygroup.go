@@ -269,12 +269,6 @@ func (s *Stack) InitDefaultSecurityGroup() error {
 		return err
 	}
 
-	err = s.createICMPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(s.NetworkClient, group.ID)
-		return err
-	}
-
 	s.SecurityGroup = group
 	return nil
 }
