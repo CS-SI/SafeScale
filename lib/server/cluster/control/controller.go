@@ -109,13 +109,13 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 		task = concurrency.RootTask()
 	}
 
-	defer loghelpers.LogStopwatchWithLevelAndErrorCallback(
+	tracer := concurrency.NewTracer(task, "")
+	defer tracer.GoingIn().OnExitLog()
+	defer utils.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
-		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'...", req.Name),
-		concurrency.NewTracer(nil, "").Enable(true),
-		&err,
-		log.InfoLevel,
-	)()
+		fmt.Sprintf("Ending creation of infrastructure of cluster '%s', req.Name"),
+	)
+	defer utils.OnExitLogError(tracer.TraceMessage(), &err)
 
 	c.Lock(task)
 

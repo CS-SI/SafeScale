@@ -24,6 +24,8 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // Tracer ...
@@ -33,15 +35,19 @@ type Tracer struct {
 	funcName     string
 	inOutMessage string
 	enabled      bool
+	inDone       bool
+	outDone      bool
+	sw           *utils.Stopwatch
 }
 
 // NewTracer creates a new Tracer instance
-func NewTracer(t Task, message string) *Tracer {
+func NewTracer(t Task, enabled bool, message string) *Tracer {
 	tracer := Tracer{}
 	if t != nil {
 		tracer.taskSig = t.GetSignature()
 		tracer.generation = t.(*task).generation
 	}
+	tracer.enabled = enabled
 
 	if message == "" {
 		message = "()"
@@ -59,53 +65,94 @@ func NewTracer(t Task, message string) *Tracer {
 	return &tracer
 }
 
-// Enable enables the traces (if there is something to trace...)
-func (t *Tracer) Enable(flag bool) *Tracer {
-	if t.inOutMessage == "" {
-		// If there is nothing to trace, disable the tracer
-		t.enabled = false
-	} else {
-		t.enabled = flag
-	}
-	return t
-}
-
-// InputMessage returns the content of the message when entering the function
-func (t *Tracer) InputMessage() string {
+// GoingInMessage returns the content of the message when entering the function
+func (t *Tracer) GoingInMessage() string {
 	if t.enabled {
 		return blockquoteGeneration(t.generation) + ">>>" + t.inOutMessage
 	}
 	return ""
 }
 
-// In signifies we are going in
-func (t *Tracer) In() *Tracer {
-	if t.enabled {
-		logrus.Tracef(t.InputMessage())
+// WithStopwatch will add a measure of duration between GoingIn and GoingOut.
+// GoingOut will add the elapsed time in the log message (if it has to be logged...).
+func (t *Tracer) WithStopwatch() *Tracer {
+	if t.sw == nil {
+		t.sw = &utils.Stopwatch{}
 	}
 	return t
 }
 
-// OutputMessage returns the content of the message when exiting the function
-func (t *Tracer) OutputMessage() string {
+// GoingIn logs the input message (signifying we are going in) using TRACE level
+func (t *Tracer) GoingIn() *Tracer {
+	if t.inDone {
+		return t
+	}
+	if t.sw != nil {
+		t.sw.Start()
+	}
+	if t.enabled {
+		t.inDone = true
+		logrus.Tracef(t.GoingInMessage())
+	}
+	return t
+}
+
+// OnExitLog logs the input message (== Tracer.In()), then returns a function that will log the output message using TRACE level.
+func (t *Tracer) OnExitLog() func() {
+	t.GoingIn()
+	if t.outDone {
+		return func() {}
+	}
+	return func() { t.GoingOut() }
+}
+
+// GoingOutMessage returns the content of the message when exiting the function
+func (t *Tracer) GoingOutMessage() string {
 	if t.enabled {
 		return blockquoteGeneration(t.generation) + "<<<" + t.inOutMessage
 	}
 	return ""
 }
 
-// Out signifies we are going out
-func (t *Tracer) Out() {
-	if t.enabled {
-		logrus.Tracef(t.OutputMessage())
+// GoingOut logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
+func (t *Tracer) GoingOut() *Tracer {
+	if t.outDone {
+		return t
 	}
+	if t.sw != nil {
+		t.sw.Stop()
+	}
+	if t.enabled {
+		t.outDone = true
+		msg := t.GoingOutMessage()
+		if t.sw != nil {
+			msg += " (duration: " + t.sw.String() + ")"
+		}
+		logrus.Tracef(msg)
+	}
+	return t
+}
+
+// TraceMessage returns a string containing a trace message
+func (t *Tracer) TraceMessage(message string) string {
+	var root string
+	if t.enabled {
+		root = fmt.Sprintf(blockquoteGeneration(t.generation)+"---%s %s: ", t.taskSig, t.inOutMessage)
+	}
+	return root + message
 }
 
 // Trace traces a message
-func (t *Tracer) Trace(message string) {
+func (t *Tracer) Trace(message string) *Tracer {
 	if t.enabled {
-		logrus.Tracef(blockquoteGeneration(t.generation)+"---%s %s %s", t.taskSig, t.inOutMessage, message)
+		logrus.Tracef(t.TraceMessage(message))
 	}
+	return t
+}
+
+// Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
+func (t *Tracer) Stopwatch() *utils.Stopwatch {
+	return t.sw
 }
 
 // blockquoteGeneration ...

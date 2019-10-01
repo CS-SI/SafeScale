@@ -40,6 +40,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/loghelpers"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"golang.org/x/crypto/ssh"
@@ -455,10 +456,9 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
 	if strings.Contains(sc.Display(), "ENDSSH") {
-		defer loghelpers.LogStopwatchWithLevelCallback(
+		defer utils.Stopwatch{}.OnExitLogWithLevel(
 			fmt.Sprintf("Running command with timeout of %s: [%s]", timeout, sc.Display()),
 			fmt.Sprintf("Command run: [%s]", sc.Display()),
-			nil,
 			log.DebugLevel,
 		)()
 	}
@@ -649,17 +649,21 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
 func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out string, err error) {
+	if ssh == nil {
+		return "", utils.InvalidInstanceError()
+	}
 	if phase == "" {
-		panic("phase can't be empty string")
+		return "", utils.InvalidParameterError("phase", "can't be empty string")
 	}
 	if ssh.Host == "" {
-		panic("SSHConfig.Host is empty!")
+		return "", utils.InvalidParameterError("ssh.Host", "can't be empty string")
 	}
 
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s,%s"), phase, utils.FormatDuration(timeout)).Enable(true).In()
+
 	// log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
-	defer loghelpers.LogTraceErrorCallback(
+	defer utils.OnExitTraceError(
 		fmt.Sprintf("Waiting for remote SSH phase '%s' of host '%s', timeout of %d minutes", phase, ssh.Host, int(timeout.Minutes())),
-		nil,
 		&err,
 	)()
 
