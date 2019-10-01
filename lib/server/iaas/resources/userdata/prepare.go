@@ -137,7 +137,7 @@ func (ud *Content) Prepare(
 	useNATService = options.UseNATService
 	operatorUsername = options.OperatorUsername
 	dnsList = options.DNSList
-	if len(dnsList) <= 0 {
+	if len(dnsList) == 0 {
 		dnsList = []string{"1.1.1.1"}
 	}
 
