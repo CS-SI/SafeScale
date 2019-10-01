@@ -60,10 +60,10 @@ func (sr stepResult) ErrorMessage() string {
 	return ""
 }
 
-// stepResults contains the errors of the step for each host target
-type stepResults map[string]stepResult
+// StepResults contains the errors of the step for each host target
+type StepResults map[string]stepResult
 
-func (s stepResults) ErrorMessages() string {
+func (s StepResults) ErrorMessages() string {
 	output := ""
 	for h, k := range s {
 		val := k.ErrorMessage()
@@ -74,7 +74,7 @@ func (s stepResults) ErrorMessages() string {
 	return output
 }
 
-func (s stepResults) Successful() bool {
+func (s StepResults) Successful() bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -228,8 +228,8 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results stepResults, err error) {
-	results = stepResults{}
+func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResults, err error) {
+	results = StepResults{}
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
 	defer tracer.OnExitTrace()

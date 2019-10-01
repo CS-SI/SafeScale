@@ -131,7 +131,7 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 	}
 
 	imagesJSON := result["images"].([]interface{})
-	images := []resources.Image{}
+	images = []resources.Image{}
 	for _, imageJSON := range imagesJSON {
 		image := resources.Image{
 			ID:   imageJSON.(map[string]interface{})["imageID"].(string),
@@ -220,7 +220,7 @@ func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) 
 	}
 
 	templatesJSON := result["templates"].([]interface{})
-	templates := []resources.HostTemplate{}
+	templates = []resources.HostTemplate{}
 	for _, templateJSON := range templatesJSON {
 		template := resources.HostTemplate{
 			Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
@@ -805,7 +805,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if imageID == "" {
 		return nil, userData, fmt.Errorf("The ImageID is mandatory")
 	}
-	host, _, err := s.getHostAndDomainFromRef(resourceName)
+	host, _, err = s.getHostAndDomainFromRef(resourceName)
 	if err == nil && host != nil {
 		return nil, userData, fmt.Errorf("The Host %s already exists", resourceName)
 	}
@@ -1041,8 +1041,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, utils.InvalidInstanceError()
 	}
 
-	var host *resources.Host
-
 	switch hostParam.(type) {
 	case string:
 		host = resources.NewHost()
@@ -1139,11 +1137,10 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	if s == nil {
-		return utils.InvalidInstanceError()
-	}
-
 	var hosts []*resources.Host
+	if s == nil {
+		return hosts, utils.InvalidInstanceError()
+	}
 
 	domains, err := s.LibvirtService.ListAllDomains(16383)
 	if err != nil {
@@ -1221,7 +1218,7 @@ func (s *Stack) RebootHost(id string) error {
 // GetHostState returns the host identified by id
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return HostState.ERROR, utils.InvalidInstanceError()
 	}
 
 	host, err := s.InspectHost(hostParam)

@@ -527,6 +527,15 @@ func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
 		logLevelFn = logrus.Error
 	}
 
+	// in the meantime if 'in' is empty, recover function name from caller
+	if len(in) == 0 {
+		if pc, _, _, ok := runtime.Caller(1); ok {
+			if f := runtime.FuncForPC(pc); f != nil {
+				in = filepath.Base(f.Name())
+			}
+		}
+	}
+
 	return func() {
 		if err != nil && *err != nil {
 			logLevelFn(fmt.Sprintf(outputErrorTemplate, in, *err))
