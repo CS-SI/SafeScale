@@ -201,6 +201,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 				}
 				if system.IsSCPRetryable(retcode) {
 					err = fmt.Errorf("failed to copy file '%s' to '%s' (retcode: %d=%s)", localpath, to, retcode, system.SCPErrorString(retcode))
+					return err
 				}
 				return nil
 			}

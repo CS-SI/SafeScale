@@ -37,8 +37,6 @@ import (
 )
 
 const (
-	defaultUser string = "cloud"
-
 	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com"
 )
 

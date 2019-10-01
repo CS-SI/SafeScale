@@ -163,7 +163,7 @@ func (svc *service) WaitHostState(hostID string, state HostState.Enum, timeout t
 		case <-timer:
 			return utils.TimeoutError("Wait volume state timeout", timeout, nil)
 		default:
-			time.Sleep(1)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
