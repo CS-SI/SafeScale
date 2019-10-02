@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"io/ioutil"
 	"math"
 	"net"
@@ -354,7 +353,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			if delerr != nil {
 				log.Warnf("Error deleting network '%s'", network.ID)
 			}
-			err = retry.AddConsequence(err, delerr)
+			err = utils.AddConsequence(err, delerr)
 		}()
 
 		_, err = metadata.SaveNetwork(serviceProvider, network)

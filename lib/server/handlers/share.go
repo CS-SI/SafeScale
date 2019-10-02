@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 
 	log "github.com/sirupsen/logrus"
 
@@ -163,7 +162,7 @@ func (handler *ShareHandler) Create(
 			err2 := nfsServer.RemoveShare(sharePath)
 			if err2 != nil {
 				log.Warn("Failed to RemoveShare")
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -206,12 +205,12 @@ func (handler *ShareHandler) Create(
 			})
 			if err2 != nil {
 				log.Warnf("Failed to set shares metadata of host %s", hostName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
 				log.Warnf("Failed to save metadata of host %s", hostName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -224,7 +223,7 @@ func (handler *ShareHandler) Create(
 			derr := ms.Delete()
 			if derr != nil {
 				log.Warnf("Failed to delete metadata of share '%s'", newShare.Name)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -495,25 +494,25 @@ func (handler *ShareHandler) Mount(
 			sshConfig, derr := sshHandler.GetConfig(ctx, target)
 			if derr != nil {
 				log.Warn(derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 
 			nfsClient, derr := nfs.NewNFSClient(sshConfig)
 			if derr != nil {
 				log.Warn(derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 
 			derr = nfsClient.Install()
 			if derr != nil {
 				log.Warn(derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 
 			derr = nfsClient.Unmount(export)
 			if derr != nil {
 				log.Warn(derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -552,12 +551,12 @@ func (handler *ShareHandler) Mount(
 			})
 			if err2 != nil {
 				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
 				log.Warnf("Failed to save host %s metadatas : %s", server.Name, err2.Error())
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -581,12 +580,12 @@ func (handler *ShareHandler) Mount(
 			})
 			if err2 != nil {
 				log.Warnf("Failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 			_, err2 = metadata.SaveHost(handler.service, target)
 			if err2 != nil {
 				log.Warnf("Failed to save host '%s' metadata : %s", hostName, err2.Error())
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 		}
 	}()

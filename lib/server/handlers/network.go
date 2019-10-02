@@ -148,7 +148,7 @@ func (handler *NetworkHandler) Create(
 					default:
 						log.Errorf("Failed to delete network, other reason: %+v", derr)
 					}
-					err = retry.AddConsequence(err, derr)
+					err = utils.AddConsequence(err, derr)
 				}
 			}
 		}
@@ -173,7 +173,7 @@ func (handler *NetworkHandler) Create(
 					derr := handler.service.DeleteVIP(newNetwork.VIP)
 					if derr != nil {
 						log.Errorf("Failed to delete VIP: %+v", derr)
-						err = retry.AddConsequence(err, derr)
+						err = utils.AddConsequence(err, derr)
 					}
 				}
 			}
@@ -193,7 +193,7 @@ func (handler *NetworkHandler) Create(
 				derr := mn.Delete()
 				if derr != nil {
 					log.Errorf("Failed to delete network metadata: %+v", derr)
-					err = retry.AddConsequence(err, derr)
+					err = utils.AddConsequence(err, derr)
 				}
 			}
 		}
@@ -304,7 +304,7 @@ func (handler *NetworkHandler) Create(
 						log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 					default:
 					}
-					err = retry.AddConsequence(err, derr)
+					err = utils.AddConsequence(err, derr)
 				}
 				dmerr := handler.deleteGatewayMetadata(primaryMetadata)
 				if dmerr != nil {
@@ -313,11 +313,11 @@ func (handler *NetworkHandler) Create(
 						log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 					default:
 					}
-					err = retry.AddConsequence(err, dmerr)
+					err = utils.AddConsequence(err, dmerr)
 				}
 				if failover {
 					failErr := handler.unbindHostFromVIP(newNetwork.VIP, primaryGateway)
-					err = retry.AddConsequence(err, failErr)
+					err = utils.AddConsequence(err, failErr)
 				}
 			}
 		}()
@@ -339,7 +339,7 @@ func (handler *NetworkHandler) Create(
 							log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 						default:
 						}
-						err = retry.AddConsequence(err, derr)
+						err = utils.AddConsequence(err, derr)
 					}
 					dmerr := handler.deleteGatewayMetadata(secondaryMetadata)
 					if dmerr != nil {
@@ -348,10 +348,10 @@ func (handler *NetworkHandler) Create(
 							log.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 						default:
 						}
-						err = retry.AddConsequence(err, dmerr)
+						err = utils.AddConsequence(err, dmerr)
 					}
 					failErr := handler.unbindHostFromVIP(newNetwork.VIP, secondaryGateway)
-					err = retry.AddConsequence(err, failErr)
+					err = utils.AddConsequence(err, failErr)
 				}
 			}()
 		}
@@ -478,11 +478,11 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", request.Name, derr)
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			} else {
 				log.Infof("Cleaning up on failure, gateway '%s' deleted", request.Name)
 			}
-			err = retry.AddConsequence(err, derr)
+			err = utils.AddConsequence(err, derr)
 		}
 	}()
 
@@ -749,7 +749,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 					log.Warnf("error deleting network on cleanup after failure to load metadata '%s': %v", ref, cleanErr)
 				}
 			}
-			err = retry.AddConsequence(err, cleanErr)
+			err = utils.AddConsequence(err, cleanErr)
 		}
 		return err
 	}
@@ -865,7 +865,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			if mn.Get() != nil {
 				derr := mn.Delete()
 				if derr != nil {
-					err = retry.AddConsequence(err, derr)
+					err = utils.AddConsequence(err, derr)
 				}
 			}
 		}
@@ -899,7 +899,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			return fmt.Errorf("another kind of error")
 		}, utils.GetContextTimeout())
 		if errWaitMore != nil {
-			err = retry.AddConsequence(err, errWaitMore)
+			err = utils.AddConsequence(err, errWaitMore)
 		}
 	}
 

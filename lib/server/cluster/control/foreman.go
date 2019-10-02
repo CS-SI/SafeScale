@@ -182,7 +182,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		})
 
 		if metaErr != nil {
-			err = retry.AddConsequence(err, metaErr)
+			err = utils.AddConsequence(err, metaErr)
 		}
 	}()
 
@@ -297,7 +297,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := clientNetwork.Delete([]string{network.Id}, utils.GetExecutionTimeout())
 			if derr != nil {
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -425,7 +425,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := b.cluster.DeleteMetadata(task)
 			if derr != nil {
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -480,7 +480,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil && !req.KeepOnFailure {
 			derr := client.New().Host.Delete(b.cluster.ListMasterIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -527,7 +527,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			clientHost := clientInstance.Host
 			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), utils.GetExecutionTimeout())
 			if derr != nil {
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -1433,7 +1433,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 		if mErr != nil && nokeep {
 			derr := clientHost.Delete([]string{pbHost.Id}, utils.GetLongOperationTimeout())
 			if derr != nil {
-				mErr = retry.AddConsequence(mErr, derr)
+				mErr = utils.AddConsequence(mErr, derr)
 			}
 			return nil, mErr
 		}
@@ -1665,7 +1665,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		if mErr != nil && nokeep {
 			derr := clientHost.Delete([]string{pbHost.Id}, utils.GetLongOperationTimeout())
 			if derr != nil {
-				mErr = retry.AddConsequence(mErr, derr)
+				mErr = utils.AddConsequence(mErr, derr)
 			}
 			return nil, mErr
 		}

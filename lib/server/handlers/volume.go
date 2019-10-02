@@ -268,7 +268,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -285,7 +285,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 			derr := md.Delete()
 			if derr != nil {
 				log.Warnf("Failed to delete metadata of volume '%s'", newVolume.Name)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -415,7 +415,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 							default:
 								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							}
-							err = retry.AddConsequence(err, derr)
+							err = utils.AddConsequence(err, derr)
 						}
 					}
 				}()
@@ -479,7 +479,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						derr := server.UnmountBlockDevice(volumeUUID)
 						if derr != nil {
 							log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-							err = retry.AddConsequence(err, derr)
+							err = utils.AddConsequence(err, derr)
 						}
 					}
 				}()
@@ -505,7 +505,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			derr := server.UnmountBlockDevice(volumeUUID)
 			if derr != nil {
 				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
 			if derr != nil {
@@ -517,7 +517,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				default:
 					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -536,12 +536,12 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			})
 			if err2 != nil {
 				log.Warnf("Failed to set volume %s metadatas", volumeName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 			_, err2 = metadata.SaveVolume(handler.service, volume)
 			if err2 != nil {
 				log.Warnf("Failed to save volume %s metadatas", volumeName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -563,7 +563,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			})
 			if err2 != nil {
 				log.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 			err2 = host.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 				hostMountsV1 := v.(*propsv1.HostMounts)
@@ -573,13 +573,13 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			})
 			if err2 != nil {
 				log.Warnf("Failed to set host '%s' metadata about mounts", volumeName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 
 			}
 			err2 = mh.Write()
 			if err2 != nil {
 				log.Warnf("Failed to save host '%s' metadata", volumeName)
-				err = retry.AddConsequence(err, err2)
+				err = utils.AddConsequence(err, err2)
 			}
 		}
 	}()

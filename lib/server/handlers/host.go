@@ -446,7 +446,7 @@ func (handler *HostHandler) Create(
 					log.Errorf("Failed to delete host '%s', other reason: %v", host.Name, derr)
 				}
 			}
-			err = retry.AddConsequence(err, derr)
+			err = utils.AddConsequence(err, derr)
 		}
 	}()
 
@@ -472,7 +472,7 @@ func (handler *HostHandler) Create(
 			derr := mh.Delete()
 			if derr != nil {
 				log.Errorf("failed to remove host metadata after host creation failure")
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
