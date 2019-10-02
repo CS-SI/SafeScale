@@ -23,8 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -60,7 +58,7 @@ func (m *Metadata) Written() bool {
 // Carry links metadata with cluster struct
 func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 	if m.item == nil {
-		panic("m.item is nil!")
+		panic("m.item is nil!") // FIXME No more panics
 	}
 	if cluster == nil {
 		panic("Invalid parameter 'cluster': can't be nil!")
@@ -163,7 +161,24 @@ func (m *Metadata) Get() *Controller {
 	if p, ok := m.item.Get().(*Controller); ok {
 		return p
 	}
+
 	panic("Missing cluster content in metadata!")
+}
+
+func (m *Metadata) OK() bool {
+	if m == nil {
+		return false
+	}
+
+	if m.item == nil {
+		return false
+	}
+
+	if _, ok := m.item.Get().(*Controller); ok {
+		return true
+	}
+
+	return false
 }
 
 // Browse walks through cluster folder and executes a callback for each entry
@@ -171,15 +186,13 @@ func (m *Metadata) Browse(callback func(*Controller) error) error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
+
 	return m.item.Browse(func(buf []byte) error {
 		cc := NewController(m.GetService())
 		err := cc.Deserialize(buf)
 		if err != nil {
 			return err
 		}
-
-		// FIXME Remove log later
-		logrus.Warnf(spew.Sdump(cc))
 
 		return callback(cc)
 	})

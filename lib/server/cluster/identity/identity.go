@@ -58,3 +58,14 @@ func (i *Identity) Replace(p serialize.Property) serialize.Property {
 	*i.Keypair = *src.Keypair
 	return i
 }
+
+func (i *Identity) OK() bool {
+	if i == nil {
+		return false
+	}
+
+	result := true
+	result = result && i.Name != ""
+	result = result && i.Flavor != 0
+	return result
+}
