@@ -18,6 +18,7 @@ package firewall
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/lib/system/firewall/Policy"
@@ -43,7 +44,7 @@ func (t *Table) NewChain(name string, policy Policy.Enum) *Chain {
 // Chain returns the chain named 'name'
 func (t *Table) Chain(name string) (*Chain, error) {
 	if name == "" {
-		panic("name is empty!")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
 	}
 	var chain *Chain
 	var found bool

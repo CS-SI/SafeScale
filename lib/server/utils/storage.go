@@ -165,7 +165,7 @@ func NewShard(bucket objectstorage.Bucket) *Shard {
 		if i > 10 {
 			panic(fmt.Sprintf("Issue on random shard name generations (or extremely++ unlucky)  : %v", err))
 		}
-		// To be accepted by a maximum of objects storages, passwords should be generated without symbols
+		// To be accepted by a maximum of objects storage providers, passwords should be generated without symbols
 		if name, err = generateAesPassword(false); err != nil {
 			continue
 		}

@@ -78,7 +78,7 @@ func (mv *Volume) Get() *resources.Volume {
 // Write updates the metadata corresponding to the volume in the Object Storage
 func (mv *Volume) Write() error {
 	if mv.item == nil {
-		panic("mv.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("mv.item cannot be nil!")
 	}
 
 	err := mv.item.WriteInto(ByIDFolderName, *mv.id)
@@ -91,7 +91,7 @@ func (mv *Volume) Write() error {
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (mv *Volume) Reload() error {
 	if mv.item == nil {
-		panic("mv.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("mv.item cannot be nil!")
 	}
 	err := mv.ReadByID(*mv.id)
 	if err != nil {

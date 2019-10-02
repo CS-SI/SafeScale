@@ -477,6 +477,27 @@ func (e ErrInvalidInstance) AddConsequence(err error) error {
 	return e
 }
 
+func InvalidInstanceErrorWithMessage(message string) ErrInvalidInstance {
+	var msg string
+	if pc, file, line, ok := runtime.Caller(2); ok {
+		if f := runtime.FuncForPC(pc); f != nil {
+			filename := strings.Replace(file, getPartToRemove(), "", 1)
+			msg = fmt.Sprintf("invalid instance: calling %s() : %s : [%s:%d]\n%s", filepath.Base(f.Name()), message, filename, line, debug.Stack())
+		}
+	}
+	if msg == "" {
+		msg = fmt.Sprintf("invalid instance: %s", message)
+	}
+
+	return ErrInvalidInstance{
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
 // InvalidInstanceError creates a ErrInvalidInstance error
 func InvalidInstanceError() ErrInvalidInstance {
 	var msg string

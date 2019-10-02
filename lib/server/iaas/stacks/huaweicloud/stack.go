@@ -18,6 +18,7 @@ package huaweicloud
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	// Gophercloud OpenStack API
 	gc "github.com/gophercloud/gophercloud"
@@ -47,7 +48,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		panic("auth.IdentityEndpoint is empty!")
+		return nil, scerr.InvalidParameterError("auth.IdentityEndPoint", "cannot be empty!")
 	}
 
 	authOptions := auth

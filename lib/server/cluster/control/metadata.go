@@ -72,7 +72,7 @@ func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 // Delete removes a cluster metadata
 func (m *Metadata) Delete() error {
 	if m.item == nil {
-		panic("m.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("m.item cannot be nil!")
 	}
 	err := m.item.Delete(m.name)
 	if err != nil {
@@ -122,7 +122,7 @@ func (m *Metadata) Write() error {
 // It's a good idea to do that just after an Acquire() to be sure to have the latest data
 func (m *Metadata) Reload(task concurrency.Task) error {
 	if m.item == nil {
-		panic("m.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
 	}
 
 	// If the metadata object has never been written yet, succeed doing nothing
@@ -185,7 +185,7 @@ func (m *Metadata) OK() bool {
 // Browse walks through cluster folder and executes a callback for each entry
 func (m *Metadata) Browse(callback func(*Controller) error) error {
 	if m.item == nil {
-		panic("m.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
 	}
 
 	return m.item.Browse(func(buf []byte) error {

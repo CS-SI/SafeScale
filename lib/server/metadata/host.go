@@ -72,7 +72,7 @@ func (mh *Host) Get() *resources.Host {
 // Write updates the metadata corresponding to the host in the Object Storage
 func (mh *Host) Write() (err error) {
 	if mh.item == nil {
-		panic("m.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("m.item cannot be nil!")
 	}
 
 	tracer := concurrency.NewTracer(nil, "('"+*mh.id+"')", true).GoingIn()

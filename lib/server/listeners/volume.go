@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"google.golang.org/grpc/status"
 
 	log "github.com/sirupsen/logrus"
@@ -54,10 +55,10 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::List() called"), log.TraceLevel)()
 
 	if s == nil {
-		panic("Calling server.listeners.VolumeListener::List from nil pointer!")
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		panic("Calling server.listeners.VolumeListener::List with nil parameter!")
+		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
 	}
 
 	ctx, cancelFunc := context.WithCancel(ctx)
@@ -90,10 +91,10 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 // Create a new volume
 func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
 	if s == nil {
-		panic("Calling server.listeners.VolumeListener::Create from nil pointer!")
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		panic("Calling server.listeners.VolumeListener::Create with nil parameter!")
+		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
 	}
 
 	volumeName := in.GetName()
@@ -123,10 +124,10 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 // Attach a volume to an host and create a mount point
 func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
 	if s == nil {
-		panic("Calling server.listeners.VolumeListener::Attach from nil pointer!")
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		panic("Calling server.listeners.VolumeListener::Attach with nil parameter!")
+		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
 	}
 
 	volumeName := in.GetVolume().GetName()
@@ -158,10 +159,10 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 // Detach a volume from an host. It umount associated mountpoint
 func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
 	if s == nil {
-		panic("Calling server.listeners.VolumeListener::Detach from nil pointer!")
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		panic("Calling server.listeners.VolumeListener::Detach with nil parameter!")
+		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
 	}
 
 	ctx, cancelFunc := context.WithCancel(ctx)
@@ -193,10 +194,10 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 // Delete a volume
 func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	if s == nil {
-		panic("Calling server.listeners.VolumeListener::Delete from nil pointer!")
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		panic("Calling server.listeners.VolumeListener::Delete with nil parameter!")
+		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
 	}
 
 	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Delete(%s) called", in.Name), log.TraceLevel)()
@@ -230,10 +231,10 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 // Inspect a volume
 func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
 	if s == nil {
-		panic("Calling server.listeners.VolumeListener::Inspect from nil pointer!")
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		panic("Calling server.listeners.VolumeListener::Inspect with nil parameter!")
+		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
 	}
 
 	ctx, cancelFunc := context.WithCancel(ctx)
