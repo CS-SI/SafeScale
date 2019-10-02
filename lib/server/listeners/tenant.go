@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+
 	"google.golang.org/grpc/status"
 
 	log "github.com/sirupsen/logrus"
@@ -28,7 +29,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
@@ -73,8 +74,8 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenants List"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenants List"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants, err := iaas.GetTenantNames()
@@ -99,8 +100,8 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*p
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant Get"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant Get"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	getCurrentTenant()
@@ -116,9 +117,8 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_pr
 	// defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::Set(%s) called", in.Name), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant Set "+in.GetName()); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant Set "+in.GetName()); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
@@ -174,8 +174,8 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 	// defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::StorageList() called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant StorageList"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageList"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants, err := iaas.GetTenants()
@@ -204,8 +204,8 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 	// defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::StorageGet() called"), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant StorageGet"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageGet"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	getCurrentStorageTenants()
@@ -222,8 +222,8 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 	// defer timing.TimerWithLevel(fmt.Sprintf("TenantListener::StorageSet(%v) called", in.Names), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := utils.ProcessRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames())); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames())); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	storageServices, err := iaas.UseStorages(in.GetNames())

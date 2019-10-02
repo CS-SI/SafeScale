@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
@@ -63,8 +64,8 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes List"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes List"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
@@ -101,9 +102,10 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Create(%s) called", volumeName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
+	defer srvutils.JobDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -136,10 +138,11 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Attach(%s, %s) called", volumeName, hostName), log.TraceLevel)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Attach "+volumeName+" to host "+hostName)
+	err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Attach "+volumeName+" to host "+hostName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
+	defer srvutils.JobDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -167,8 +170,8 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Dettach "+in.GetVolume().GetName()+"from host"+in.GetHost().GetName()); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Dettach "+in.GetVolume().GetName()+"from host"+in.GetHost().GetName()); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	volumeName := in.GetVolume().GetName()
@@ -204,8 +207,8 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Delete "+in.GetName()); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Delete "+in.GetName()); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	ref := utils.GetReference(in)
@@ -238,9 +241,8 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 	}
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	ref := utils.GetReference(in)

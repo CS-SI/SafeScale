@@ -18,12 +18,15 @@ package listeners
 
 import (
 	"context"
+
 	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -38,13 +41,19 @@ var TemplateHandler = handlers.NewTemplateHandler
 type TemplateListener struct{}
 
 // List available templates
-func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
-	log.Debugf("Template List called")
+func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (tl *pb.TemplateList, err error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+	all := in.GetAll()
+
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Teplates List"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Teplates List"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
@@ -54,7 +63,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	}
 
 	handler := TemplateHandler(tenant.Service)
-	templates, err := handler.List(ctx, in.GetAll())
+	templates, err := handler.List(ctx, all)
 	if err != nil {
 		return nil, err
 	}

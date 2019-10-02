@@ -22,72 +22,76 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
 
-type processInfo struct {
+type jobInfo struct {
 	commandName string
 	launchTime  time.Time
 	context     context.Context
 	cancelFunc  func()
 }
 
-func (pi *processInfo) toString() string {
-	return fmt.Sprintf("Task : %s\nCreation time : %s", pi.commandName, pi.launchTime.String())
+func (ji *jobInfo) toString() string {
+	return fmt.Sprintf("Task : %s\nCreation time : %s", ji.commandName, ji.launchTime.String())
 }
 
-var processMap map[string]processInfo
-var mutexProcessManager sync.Mutex
+var (
+	jobMap          = map[string]jobInfo{}
+	mutexJobManager sync.Mutex
+)
 
-// ProcessRegister ...
-func ProcessRegister(ctx context.Context, cancelFunc func(), command string) error {
-	if processMap == nil {
-		processMap = map[string]processInfo{}
-	}
+// JobRegister ...
+func JobRegister(ctx context.Context, cancelFunc func(), command string) error {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return fmt.Errorf("no uuid in grpc metadata")
 	}
-	mutexProcessManager.Lock()
-	processMap[md.Get("uuid")[0]] = processInfo{
+	mutexJobManager.Lock()
+	defer mutexJobManager.Unlock()
+
+	jobMap[md.Get("uuid")[0]] = jobInfo{
 		commandName: command,
 		launchTime:  time.Now(),
 		context:     ctx,
 		cancelFunc:  cancelFunc,
 	}
-	mutexProcessManager.Unlock()
+
 	return nil
 }
 
-// ProcessCancelUUID ...
-func ProcessCancelUUID(uuid string) {
-	mutexProcessManager.Lock()
-	defer mutexProcessManager.Unlock()
-	if info, found := processMap[uuid]; found {
+// JobCancelUUID ...
+func JobCancelUUID(uuid string) {
+	mutexJobManager.Lock()
+	defer mutexJobManager.Unlock()
+	if info, found := jobMap[uuid]; found {
 		info.cancelFunc()
 	}
 }
 
-// ProcessDeregisterUUID ...
-func ProcessDeregisterUUID(uuid string) {
-	mutexProcessManager.Lock()
-	defer mutexProcessManager.Unlock()
-	delete(processMap, uuid)
+// JobDeregisterUUID ...
+func JobDeregisterUUID(uuid string) {
+	mutexJobManager.Lock()
+	defer mutexJobManager.Unlock()
+
+	delete(jobMap, uuid)
 }
 
-// ProcessDeregister ...
-func ProcessDeregister(ctx context.Context) {
+// JobDeregister ...
+func JobDeregister(ctx context.Context) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		panic("no uuid in metadata")
+		logrus.Errorf("Trying to deregister a job without uuid!")
+	} else {
+		JobDeregisterUUID(md.Get("uuid")[0])
 	}
-	ProcessDeregisterUUID(md.Get("uuid")[0])
 }
 
-// ProcessList ...
-func ProcessList() map[string]string {
+// JobList ...
+func JobList() map[string]string {
 	listMap := map[string]string{}
-	for uuid, info := range processMap {
+	for uuid, info := range jobMap {
 		listMap[uuid] = info.toString()
 	}
 	return listMap
