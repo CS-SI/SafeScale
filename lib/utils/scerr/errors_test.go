@@ -17,7 +17,7 @@ func lazyDevs() error {
 func TestNotImplementedError(t *testing.T) {
 	what := lazyDevs()
 	whatContent := what.Error()
-	if !strings.Contains(whatContent, "utils.lazyDevs") {
+	if !strings.Contains(whatContent, "scerr.lazyDevs") {
 		t.Errorf("Expected 'utils.lazyDevs' in error content but found: %s", whatContent)
 	}
 }
