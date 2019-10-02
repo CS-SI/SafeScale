@@ -29,10 +29,50 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 var removePart atomic.Value
+
+// AddConsequence adds an error 'err' to the list of consequences
+func AddConsequence(err error, cons error) error {
+	type consequencer interface {
+		Consequences() []error
+		AddConsequence(error) error
+		Error() string
+	}
+
+	if err != nil {
+		conseq, ok := err.(consequencer)
+		if ok {
+			if cons != nil {
+				nerr := conseq.AddConsequence(cons)
+				return nerr
+			}
+			return conseq
+		}
+		logrus.Errorf("trying to add error [%s] to existing error [%s] but failed", cons, err)
+	}
+	return err
+}
+
+// Consequences returns the list of consequences
+func Consequences(err error) []error {
+	type consequencer interface {
+		Consequences() []error
+		AddConsequence(error) error
+		Error() string
+	}
+
+	if err != nil {
+		conseq, ok := err.(consequencer)
+		if ok {
+			return conseq.Consequences()
+		}
+	}
+
+	return []error{}
+}
 
 // DecorateError changes the error to something more comprehensible when
 // timeout occurred
@@ -58,7 +98,7 @@ func DecorateError(err error, action string, timeout time.Duration) error {
 
 // IsGRPCTimeout tells if the err is a timeout kind
 func IsGRPCTimeout(err error) bool {
-	return status.Code(err) == codes.DeadlineExceeded
+	return grpcstatus.Code(err) == codes.DeadlineExceeded
 }
 
 // ErrCore ...

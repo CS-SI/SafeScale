@@ -399,7 +399,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 						default:
 							logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
 						}
-						err = retry.AddConsequence(err, killErr)
+						err = utils.AddConsequence(err, killErr)
 					}
 					return err
 				}
@@ -434,7 +434,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					default:
 						logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
 					}
-					err = retry.AddConsequence(err, killErr)
+					err = utils.AddConsequence(err, killErr)
 				}
 				return err
 			}
@@ -466,7 +466,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()

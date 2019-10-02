@@ -708,7 +708,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -868,7 +868,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 			if derr != nil {
 				log.Errorf("failed to restore node ownership in cluster")
 			}
-			err = retry.AddConsequence(err, derr)
+			err = utils.AddConsequence(err, derr)
 		}
 	}()
 
@@ -913,7 +913,7 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 		if err != nil {
 			// FIXME Try deletion anyway ?
 			errDelNode := c.deleteNode(task, node, "")
-			err = retry.AddConsequence(err, errDelNode)
+			err = utils.AddConsequence(err, errDelNode)
 			return err
 		}
 	}
@@ -964,7 +964,7 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 		if err != nil {
 			// FIXME Try deletion anyway ?
 			errDelNode := c.deleteNode(task, node, "")
-			err = retry.AddConsequence(err, errDelNode)
+			err = utils.AddConsequence(err, errDelNode)
 			return err
 		}
 	}
@@ -1019,7 +1019,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 			if derr != nil {
 				log.Errorf("failed to restore node ownership in cluster")
 			}
-			err = retry.AddConsequence(err, derr)
+			err = utils.AddConsequence(err, derr)
 		}
 	}()
 

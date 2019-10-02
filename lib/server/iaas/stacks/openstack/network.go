@@ -100,7 +100,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 			derr := networks.Delete(s.NetworkClient, network.ID).ExtractErr()
 			if derr != nil {
 				log.Errorf("failed to delete network '%s': %v", req.Name, derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -116,7 +116,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Errorf("failed to delete subnet '%s': %+v", subnet.ID, derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -359,7 +359,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -484,7 +484,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Warnf("Error deleting subnet: %v", derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -504,7 +504,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 				derr := s.deleteRouter(router.ID)
 				if derr != nil {
 					log.Warnf("Error deleting router: %v", derr)
-					err = retry.AddConsequence(err, derr)
+					err = utils.AddConsequence(err, derr)
 				}
 			}
 		}()

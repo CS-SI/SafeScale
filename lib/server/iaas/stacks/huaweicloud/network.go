@@ -225,7 +225,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()

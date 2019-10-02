@@ -23,6 +23,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -175,6 +177,10 @@ func (m *Metadata) Browse(callback func(*Controller) error) error {
 		if err != nil {
 			return err
 		}
+
+		// FIXME Remove log later
+		logrus.Warnf(spew.Sdump(cc))
+
 		return callback(cc)
 	})
 }

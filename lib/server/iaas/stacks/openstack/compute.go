@@ -929,7 +929,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -951,7 +951,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				derr := floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
 				if derr != nil {
 					logrus.Errorf("Error deleting Floating IP: %v", derr)
-					err = retry.AddConsequence(err, derr)
+					err = utils.AddConsequence(err, derr)
 				}
 			}
 		}()

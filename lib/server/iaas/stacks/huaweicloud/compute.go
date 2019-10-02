@@ -501,7 +501,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -523,7 +523,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
-					err = retry.AddConsequence(err, derr)
+					err = utils.AddConsequence(err, derr)
 				}
 			}
 		}()

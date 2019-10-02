@@ -965,7 +965,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			if derr := s.DeleteHost(resourceName); derr != nil {
 				fmt.Printf("Failed to Delete the host %s : %s", resourceName, err.Error())
-				err = retry.AddConsequence(err, derr)
+				err = utils.AddConsequence(err, derr)
 			}
 		}
 	}()

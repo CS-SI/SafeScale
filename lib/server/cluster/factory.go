@@ -18,7 +18,7 @@ package cluster
 
 import (
 	"fmt"
-
+	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -155,7 +155,7 @@ func Delete(task concurrency.Task, name string) error {
 }
 
 // List lists the clusters already created
-func List() ([]api.Cluster, error) {
+func List() (clusterList []api.Cluster, err error) {
 	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
@@ -165,11 +165,14 @@ func List() ([]api.Cluster, error) {
 		return nil, err
 	}
 
-	var clusterList []api.Cluster
 	m, err := control.NewMetadata(svc)
 	if err != nil {
 		return clusterList, err
 	}
+
+	// FIXME Remove log later
+	log.Warnf(spew.Sdump(m))
+
 	err = m.Browse(func(controller *control.Controller) error {
 		clusterList = append(clusterList, controller)
 		return nil

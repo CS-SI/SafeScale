@@ -3,52 +3,11 @@ package retry
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/sirupsen/logrus"
 	"time"
 )
 
 // ErrTimeout is an alias for utils.ErrTimeout
 type ErrTimeout = utils.ErrTimeout
-
-// AddConsequence adds an error 'err' to the list of consequences
-func AddConsequence(err error, cons error) error {
-	type consequencer interface {
-		Consequences() []error
-		AddConsequence(error) error
-		Error() string
-	}
-
-	if err != nil {
-		conseq, ok := err.(consequencer)
-		if ok {
-			if cons != nil {
-				nerr := conseq.AddConsequence(cons)
-				return nerr
-			}
-			return conseq
-		}
-		logrus.Error(err)
-	}
-	return err
-}
-
-// Consequences returns the list of consequences
-func Consequences(err error) []error {
-	type consequencer interface {
-		Consequences() []error
-		AddConsequence(error) error
-		Error() string
-	}
-
-	if err != nil {
-		conseq, ok := err.(consequencer)
-		if ok {
-			return conseq.Consequences()
-		}
-	}
-
-	return []error{}
-}
 
 // TimeoutError ...
 func TimeoutError(limit time.Duration, err error) utils.ErrTimeout {
