@@ -713,9 +713,17 @@ func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) 
 }
 
 // configureCluster configures cluster
-func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskParameters) error {
+func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (err error) {
+	if params == nil {
+		return utils.InvalidParameterError("params", "can't be nil")
+	}
+
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	var (
-		p                                data.Map
+		p                                = data.Map{}
 		ok                               bool
 		primaryGateway, secondaryGateway *resources.Host
 	)
@@ -1118,6 +1126,11 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	netCfg, err := b.cluster.GetNetworkConfig(task)
+	if err != nil {
+		return err
+	}
+
 	// Get installation script based on node type; if == "", do nothing
 	script, params := b.getNodeInstallationScript(task, nodeType)
 	if script == "" {
@@ -1235,7 +1248,6 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	params["DNSServerIPs"] = dnsServers
 	params["MasterIPs"] = b.cluster.ListMasterIPs(task)
 	params["CladmPassword"] = identity.AdminPassword
-	netCfg := b.cluster.GetNetworkConfig(task)
 	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["EndpointIP"] = netCfg.EndpointIP
 
@@ -1406,13 +1418,18 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
 
+	netCfg, err := b.cluster.GetNetworkConfig(t)
+	if err != nil {
+		return nil, err
+	}
+
 	hostDef := *def
 	hostDef.Name, err = b.buildHostname(t, "master", NodeType.Master)
 	if err != nil {
 		return nil, err
 	}
 
-	hostDef.Network = b.cluster.GetNetworkConfig(t).NetworkID
+	hostDef.Network = netCfg.NetworkID
 	hostDef.Public = false
 	clientHost := client.New().Host
 	pbHost, err := clientHost.Create(hostDef, timeout)
@@ -1635,13 +1652,18 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	hostLabel := fmt.Sprintf("node #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
 
+	netCfg, err := b.cluster.GetNetworkConfig(t)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create the host
 	hostDef := *def
 	hostDef.Name, err = b.buildHostname(t, "node", NodeType.Node)
 	if err != nil {
 		return nil, err
 	}
-	hostDef.Network = b.cluster.GetNetworkConfig(t).NetworkID
+	hostDef.Network = netCfg.NetworkID
 	if timeout < utils.GetLongOperationTimeout() {
 		timeout = utils.GetLongOperationTimeout()
 	}
@@ -1831,7 +1853,10 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 		if err != nil {
 			return err
 		}
-		target := install.NewClusterTarget(task, b.cluster)
+		target, err := install.NewClusterTarget(task, b.cluster)
+		if err != nil {
+			return err
+		}
 		results, err := feat.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
 			return err
@@ -1869,7 +1894,10 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 		log.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
 
 		adminPassword := identity.AdminPassword
-		target := install.NewClusterTarget(task, b.cluster)
+		target, err := install.NewClusterTarget(task, b.cluster)
+		if err != nil {
+			return err
+		}
 
 		// Adds remotedesktop feature on master
 		feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
@@ -1913,7 +1941,10 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 		if err != nil {
 			return err
 		}
-		target := install.NewHostTarget(pbHost)
+		target, err := install.NewHostTarget(pbHost)
+		if err != nil {
+			return err
+		}
 		results, err := feature.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
 			return err
@@ -1947,7 +1978,10 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 		if err != nil {
 			return err
 		}
-		target := install.NewHostTarget(pbHost)
+		target, err := install.NewHostTarget(pbHost)
+		if err != nil {
+			return err
+		}
 		results, err := feat.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
 			return err
@@ -1970,7 +2004,11 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 	if err != nil {
 		return err
 	}
-	results, err := feat.Add(install.NewHostTarget(pbHost), install.Variables{}, install.Settings{})
+	target, err := install.NewHostTarget(pbHost)
+	if err != nil {
+		return err
+	}
+	results, err := feat.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		return err
 	}

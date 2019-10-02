@@ -321,7 +321,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 
 	// Ensure network exists
 	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil!")
+		return nil, nil, scerrils.InvalidParameterError("req.Network", "can't be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {

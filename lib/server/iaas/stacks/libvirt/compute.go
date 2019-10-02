@@ -37,6 +37,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
@@ -1048,8 +1050,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		host.ID = hostParam.(string)
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
-	default:
-		panic("host must be a string or a *resources.Host!")
+	}
+	if host == nil {
+		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 
 	newHost, _, err := s.getHostAndDomainFromRef(host.ID)

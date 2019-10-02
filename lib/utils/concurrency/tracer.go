@@ -44,7 +44,7 @@ func NewTracer(t Task, message string, enabled bool) *Tracer {
 	tracer := Tracer{}
 	if t != nil {
 		tracer.taskSig = t.GetSignature()
-		tracer.generation = t.(*task).generation
+		tracer.generation = t.(*task).generation + 1
 	}
 	tracer.enabled = enabled
 
@@ -66,10 +66,7 @@ func NewTracer(t Task, message string, enabled bool) *Tracer {
 
 // GoingInMessage returns the content of the message when entering the function
 func (t *Tracer) GoingInMessage() string {
-	if t.enabled {
-		return blockquoteGeneration(t.generation) + ">>>" + t.inOutMessage
-	}
-	return ""
+	return blockquoteGeneration(t.generation) + ">>>" + t.inOutMessage
 }
 
 // WithStopwatch will add a measure of duration between GoingIn and GoingOut.
@@ -96,7 +93,7 @@ func (t *Tracer) GoingIn() *Tracer {
 	return t
 }
 
-// OnExitTrace logs the input message (== Tracer.In()), then returns a function that will log the output message using TRACE level.
+// OnExitTrace returns a function that will log the output message using TRACE level.
 func (t *Tracer) OnExitTrace() func() {
 	if t.outDone {
 		return func() {}
@@ -106,10 +103,7 @@ func (t *Tracer) OnExitTrace() func() {
 
 // GoingOutMessage returns the content of the message when exiting the function
 func (t *Tracer) GoingOutMessage() string {
-	if t.enabled {
-		return blockquoteGeneration(t.generation) + "<<<" + t.inOutMessage
-	}
-	return ""
+	return blockquoteGeneration(t.generation) + "<<<" + t.inOutMessage
 }
 
 // GoingOut logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
@@ -132,18 +126,15 @@ func (t *Tracer) GoingOut() *Tracer {
 }
 
 // TraceMessage returns a string containing a trace message
-func (t *Tracer) TraceMessage(message string) string {
-	var root string
-	if t.enabled {
-		root = fmt.Sprintf(blockquoteGeneration(t.generation)+"---%s %s: ", t.taskSig, t.inOutMessage)
-	}
-	return root + message
+func (t *Tracer) TraceMessage(format string, a ...interface{}) string {
+	root := fmt.Sprintf(blockquoteGeneration(t.generation)+"---%s %s: ", t.taskSig, t.inOutMessage)
+	return root + fmt.Sprintf(format, a...)
 }
 
 // Trace traces a message
-func (t *Tracer) Trace(message string) *Tracer {
+func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
 	if t.enabled {
-		logrus.Tracef(t.TraceMessage(message))
+		logrus.Tracef(t.TraceMessage(format, a...))
 	}
 	return t
 }

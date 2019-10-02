@@ -30,9 +30,10 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
@@ -52,25 +53,30 @@ var VolumeHandler = handlers.NewVolumeHandler
 type VolumeListener struct{}
 
 // List the available volumes
-func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
-	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::List() called"), log.TraceLevel)()
-
+func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ *pb.VolumeList, err error) {
 	if s == nil {
+		// FIXME: return a status.Errorf
 		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
+		// FIXME: return a status.Errorf
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
+	all := in.GetAll()
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't list volumes: no tenant set")
+		// log.Info("Can't list volumes: no tenant set")
 		return nil, status.Errorf(codes.FailedPrecondition, "can't list volumes: no tenant set")
 	}
 
@@ -90,19 +96,27 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 }
 
 // Create a new volume
-func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
+func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_ *pb.Volume, err error) {
 	if s == nil {
+		// FIXME: return a status.Errorf
 		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
+		// FIXME: return a status.Errorf
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
+	name := in.GetName()
+	speed := in.GetSpeed()
+	size := in.GetSize()
+	// FIXME: validate parameters
 
-	volumeName := in.GetName()
-	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Create(%s) called", volumeName), log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
+		// FIXME: return a status.Errorf
 		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
 	defer srvutils.JobDeregister(ctx)
@@ -114,147 +128,188 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volume, err := handler.Create(ctx, volumeName, int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
+	vol, err := handler.Create(ctx, name, int(size), VolumeSpeed.Enum(speed))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
-	log.Infof("Volume '%s' created: %v", in.GetName(), volume.Name)
-	return conv.ToPBVolume(volume), nil
+	log.Infof("Volume '%s' created", name)
+	return conv.ToPBVolume(vol), nil
 }
 
 // Attach a volume to an host and create a mount point
-func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
+func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *google_protobuf.Empty, err error) {
+	empty := &google_protobuf.Empty{}
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		// FIXME: return a status.Errorf
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
+		// FIXME: return a status.Errorf
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
+	}
+	volumeRef := srvutils.GetReference(in.GetVolume())
+	if volumeRef == "" {
+		return empty, status.Errorf(codes.InvalidArgument, "can't attach volume: neither name nor id given as reference for volume")
+	}
+	hostRef := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return empty, status.Errorf(codes.InvalidArgument, "can't attach volume: neither name nor id given as reference for host")
+	}
+	mountPath := in.GetMountPath()
+	// FIXME: change Format to Filesystem in protobuf
+	filesystem := in.GetFormat()
+	doNotFormat := in.DoNotFormat
+
+	var doNotFormatStr string
+	if doNotFormat {
+		doNotFormatStr = "NOFORMAT"
+	} else {
+		doNotFormatStr = "FORMAT"
 	}
 
-	volumeName := in.GetVolume().GetName()
-	hostName := in.GetHost().GetName()
-
-	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Attach(%s, %s) called", volumeName, hostName), log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr), true)
+	defer tracer.WithStopwatch().GoingIn().OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Attach "+volumeName+" to host "+hostName)
+	err = srvutils.JobRegister(ctx, cancelFunc, "Volumes Attach "+volumeRef+" to host "+hostRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
+		// FIXME: return a status.Errorf
+		return empty, fmt.Errorf("failed to register the process : %s", err.Error())
 	}
 	defer srvutils.JobDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't attach volumes: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't attach volume: no tenant set")
+		// log.Info("Can't attach volumes: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "can't attach volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err = handler.Attach(ctx, volumeName, hostName, in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
+	err = handler.Attach(ctx, volumeRef, hostRef, mountPath, filesystem, doNotFormat)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, err.Error())
 	}
 
-	return &google_protobuf.Empty{}, nil
+	return empty, nil
 }
 
 // Detach a volume from an host. It umount associated mountpoint
-func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
+func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_ *google_protobuf.Empty, err error) {
+	empty := &google_protobuf.Empty{}
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		// FIXME: return a status.Errorf
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
+		// FIXME: return a status.Errorf
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
+	volumeRef := srvutils.GetReference(in.GetVolume())
+	if volumeRef == "" {
+		return empty, status.Errorf(codes.InvalidArgument, "can't detach volume: neither name nor id given as reference for volume")
+	}
+	hostRef := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return empty, status.Errorf(codes.InvalidArgument, "can't detach volume: neither name nor id given as reference for host")
+	}
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Dettach "+in.GetVolume().GetName()+"from host"+in.GetHost().GetName()); err == nil {
+	// FIXME: handle error
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume detach "+volumeRef+" from host "+hostRef); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
-
-	volumeName := in.GetVolume().GetName()
-	hostName := in.GetHost().GetName()
-	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Detach(%s, %s) called", volumeName, hostName), log.TraceLevel)()
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't detach volumes: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't detach volume: no tenant set")
+		// log.Info("Can't detach volumes: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "can't detach volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Detach(ctx, volumeName, hostName)
+	err = handler.Detach(ctx, volumeRef, hostRef)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, err.Error())
 	}
 
-	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", volumeName, hostName))
-	return &google_protobuf.Empty{}, nil
+	log.Infof("Volume '%s' detached from '%s'", volumeRef, hostRef)
+	return empty, nil
 }
 
 // Delete a volume
-func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *google_protobuf.Empty, err error) {
+	empty := &google_protobuf.Empty{}
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		// FIXME: return a status.Errorf
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
+		// FIXME: return a status.Errorf
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
+	}
+	ref := srvutils.GetReference(in)
+	if ref == "" {
+		return empty, status.Errorf(codes.InvalidArgument, "can't delete volume: neither name nor id given as reference")
 	}
 
-	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Delete(%s) called", in.Name), log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Delete "+in.GetName()); err == nil {
+	// FIXME: handle error
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume delete "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
-
-	ref := utils.GetReference(in)
-	if ref == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't delete volumes: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't delete volume: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "can't delete volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Delete(ctx, ref)
+	err = handler.Delete(ctx, ref)
 	if err != nil {
-		return &google_protobuf.Empty{}, status.Errorf(codes.Internal, fmt.Sprintf("can't delete volume '%s': %s", ref, err.Error()))
+		return empty, status.Errorf(codes.Internal, fmt.Sprintf("can't delete volume '%s': %s", ref, err.Error()))
 	}
 	log.Infof("Volume '%s' successfully deleted.", ref)
-	return &google_protobuf.Empty{}, nil
+	return empty, nil
 }
 
 // Inspect a volume
-func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
+func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.VolumeInfo, err error) {
 	if s == nil {
+		// FIXME: return a status.Errorf
 		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil!")
+		// FIXME: return a status.Errorf
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
-
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	}
-
-	ref := utils.GetReference(in)
+	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
 	}
 
-	// defer timing.TimerWithLevel(fmt.Sprintf("server.listeners.VolumeListener::Inspect(%s) called", ref), log.TraceLevel)()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err == nil {
+		defer srvutils.JobDeregister(ctx)
+	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't inspect volumes: no tenant set")
+		// log.Info("Can't inspect volumes: no tenant set")
 		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect volume: no tenant set")
 	}
 

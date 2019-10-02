@@ -1034,15 +1034,14 @@ func (s *Stack) SelectedAvailabilityZone() (string, error) {
 }
 
 // WaitHostReady waits an host achieve ready state
-// hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
+// hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
 func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
 	var host *resources.Host
-
-	switch hostParam := hostParam.(type) {
+	switch hostParam.(type) {
 	case string:
 		host = resources.NewHost()
 		host.ID = hostParam
@@ -1084,13 +1083,13 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 }
 
 // GetHostState returns the current state of host identified by id
-// hostParam can be a string or an instance of *resources.Host; any other type will panic
+// hostParam can be a string or an instance of *resources.Host; any other type will return an utils.InvalidParameterError
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	if s == nil {
 		return HostState.ERROR, scerr.InvalidInstanceError()
 	}
 
-	// defer concurrency.NewTracer(nil, "(<host>)", true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {

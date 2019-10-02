@@ -131,7 +131,10 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 		return err
 	}
 	cluster := foreman.Cluster()
-	target := install.NewClusterTarget(task, cluster)
+	target, err := install.NewClusterTarget(task, cluster)
+	if err != nil {
+		return err
+	}
 	list := cluster.ListMasterIPs(task)
 	values := install.Variables{
 		"PrimaryMasterIP":   list[0],
@@ -199,6 +202,13 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 			return "", err
 		}
 
+		// We will need information about cluster network
+		cluster := foreman.Cluster()
+		netCfg, err := cluster.GetNetworkConfig(task)
+		if err != nil {
+			return "", err
+		}
+
 		// get file contents as string
 		tmplString, err := box.String("ohpc_install_requirements.sh")
 		if err != nil {
@@ -211,10 +221,10 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		cluster := foreman.Cluster()
+
 		identity := cluster.GetIdentity(task)
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          cluster.GetNetworkConfig(task).CIDR,
+			"CIDR":          netCfg.CIDR,
 			"CladmPassword": identity.AdminPassword,
 			"SSHPublicKey":  identity.Keypair.PublicKey,
 			"SSHPrivateKey": identity.Keypair.PrivateKey,

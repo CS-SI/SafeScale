@@ -42,12 +42,17 @@ const (
 )
 
 type stepResult struct {
-	success bool
-	err     error
+	completed bool  // if true, the script has been run to completion
+	success   bool  // if true, the script has been run successfully and the result is a success
+	err       error // if an error occured, contains the err
 }
 
 func (sr stepResult) Successful() bool {
 	return sr.success
+}
+
+func (sr stepResult) Completed() bool {
+	return sr.completed
 }
 
 func (sr stepResult) Error() error {
@@ -75,12 +80,34 @@ func (s StepResults) ErrorMessages() string {
 	return output
 }
 
-func (s StepResults) Successful() bool {
+func (s stepResults) UncompletedEntries() []string {
+	output := []string{}
+	for k, v := range s {
+		if !v.Completed() {
+			output = append(output, k)
+		}
+	}
+	return output
+}
+
+func (s stepResults) Successful() bool {
 	if len(s) == 0 {
 		return false
 	}
 	for _, k := range s {
 		if !k.Successful() {
+			return false
+		}
+	}
+	return true
+}
+
+func (s stepResults) Completed() bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, k := range s {
+		if !k.Completed() {
 			return false
 		}
 	}
@@ -326,22 +353,32 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
 func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	var (
+		p  = data.Map{}
+		ok bool
+	)
+	if params != nil {
+		if p, ok = params.(data.Map); !ok {
+			return nil, utils.InvalidParameterError("params", "must be a data.Map")
+		}
+	}
+
 	// Get parameters
-	p := params.(data.Map)
+	// FIXME: validate parameters
 	host := p["host"].(*pb.Host)
 	variables := p["variables"].(Variables)
 
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
-		return stepResult{success: false, err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())}, nil
+		return stepResult{err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())}, nil
 	}
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
 		err := UploadStringToRemoteFile(is.OptionsFileContent, host, srvutils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
 		if err != nil {
-			return stepResult{success: false, err: err}, nil
+			return stepResult{err: err}, nil
 		}
 	}
 
@@ -349,7 +386,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
-		return stepResult{success: false, err: err}, nil
+		return stepResult{err: err}, nil
 	}
 
 	//command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s %s/options.json; fi; exit $rc", filename, filename, srvutils.TempFolder)
@@ -358,12 +395,12 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	// Executes the script on the remote host
 	retcode, _, _, err := client.New().SSH.Run(host.Name, command, utils.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
-		return stepResult{success: false, err: err}, nil
+		return stepResult{err: err}, nil
 	}
 	err = nil
-	ok := retcode == 0
+	ok = retcode == 0
 	if !ok {
-		err = fmt.Errorf("step '%s' failed (retcode=%d)", is.Name, retcode)
+		err = fmt.Errorf("failure: retcode=%d", retcode)
 	}
-	return stepResult{success: ok, err: err}, nil
+	return stepResult{success: ok, completed: true, err: err}, nil
 }

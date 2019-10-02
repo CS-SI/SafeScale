@@ -27,6 +27,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // Stack is the implementation for huaweicloud cloud stack
@@ -48,7 +49,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		return nil, scerr.InvalidParameterError("auth.IdentityEndPoint", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("auth.IdentityEndpoint", "can't be empty string")
 	}
 
 	authOptions := auth
