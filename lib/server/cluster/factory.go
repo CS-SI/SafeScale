@@ -18,7 +18,6 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -90,10 +89,10 @@ func Create(task concurrency.Task, req control.Request) (clu api.Cluster, err er
 
 	// Validates parameters
 	if req.Name == "" {
-		panic("req.Name is empty!")
+		return nil, utils.InvalidParameterError("req.Name", "cannot be empty!")
 	}
 	if req.CIDR == "" {
-		panic("req.CIDR is empty!")
+		return nil, utils.InvalidParameterError("req.CIDR", "cannot be empty!")
 	}
 
 	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
@@ -170,13 +169,14 @@ func List() (clusterList []api.Cluster, err error) {
 		return clusterList, err
 	}
 
-	// FIXME Remove log later
-	log.Warnf(spew.Sdump(m))
-
 	err = m.Browse(func(controller *control.Controller) error {
-		clusterList = append(clusterList, controller)
+		if controller.Identity.OK() {
+			clusterList = append(clusterList, controller)
+		}
+
 		return nil
 	})
+
 	return clusterList, err
 }
 
