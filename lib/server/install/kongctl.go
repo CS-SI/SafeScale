@@ -150,7 +150,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 
 	var sourceControl map[string]interface{}
 
-	// Sets the values useable in all cases
+	// Sets the values usable in all cases
 	if k.network.VIP != nil {
 		// VPL: for now, no public IP on VIP, so uses the IP of the first Gateway
 		// (*values)["EndpointIP"] = k.network.VIP.PublicIP

@@ -182,7 +182,7 @@ content | Parameters of the rule, they will depend of the rule type | - | json r
 ### Install-step-run
 
 Each install step has a run field describing the commands who will be executed on the targeted host (the execution method will depend of the chosen installer). If a step exits with a return code different from 0, the step will be considered failed and the following steps will not be executed.<br>
-Several templated parameters are useable (using GO text template syntax) :
+Several templated parameters are usable (using GO text template syntax) :
 *   `{{.Username}}` : the name of the default user of the targeted host/cluster
 *   `{{.Hostname}}` : the hostname of the current targeted host (keep in mind at the lower level, each step is applied on all hosts targeted)
 *   `{{.HostIP}}`   : the private IP of the current targeted host

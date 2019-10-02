@@ -812,7 +812,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
 	}
 
-	// Select useable availability zone, the first one in the list
+	// Select usable availability zone, the first one in the list
 	azone, err := s.SelectedAvailabilityZone()
 	if err != nil {
 		return nil, userData, err

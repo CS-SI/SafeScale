@@ -43,6 +43,6 @@ const (
 	// NotImplemented is returned when a function is not yet implemented
 	NotImplemented
 
-	// NextExitCode is the next error code useable
+	// NextExitCode is the next error code usable
 	NextExitCode
 )
