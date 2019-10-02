@@ -43,6 +43,7 @@ lib/Pipfile.lock
 
 *.new
 *_results.log
+version.go
 
 vendor
 Gopkg.lock
