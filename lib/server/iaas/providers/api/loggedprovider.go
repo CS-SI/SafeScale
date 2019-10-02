@@ -73,8 +73,8 @@ func (w LoggedProvider) prepare(s string, startTime time.Time) {
 }
 
 // NewLoggedProvider ...
-func NewLoggedProvider(InnerProvider Provider, name string) *LoggedProvider {
-	return &LoggedProvider{InnerProvider: InnerProvider, Name: name}
+func NewLoggedProvider(innerProvider Provider, name string) *LoggedProvider {
+	return &LoggedProvider{InnerProvider: innerProvider, Name: name}
 }
 
 // ListAvailabilityZones ...

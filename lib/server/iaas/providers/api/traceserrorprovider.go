@@ -78,8 +78,8 @@ func (w ErrorTraceProvider) GetTenantParameters() map[string]interface{} {
 // Stack specific functions
 
 // NewErrorTraceProvider ...
-func NewErrorTraceProvider(InnerProvider Provider, name string) *ErrorTraceProvider {
-	return &ErrorTraceProvider{InnerProvider: InnerProvider, Name: name}
+func NewErrorTraceProvider(innerProvider Provider, name string) *ErrorTraceProvider {
+	return &ErrorTraceProvider{InnerProvider: innerProvider, Name: name}
 }
 
 // ListAvailabilityZones ...

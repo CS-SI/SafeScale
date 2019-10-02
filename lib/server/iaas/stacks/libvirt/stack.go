@@ -33,7 +33,7 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, 
 	if stack.LibvirtConfig.LibvirtStorage != "" {
 		err := stack.CreatePoolIfUnexistant(stack.LibvirtConfig.LibvirtStorage)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to create StoragePool : %s", err.Error())
+			return nil, fmt.Errorf("unable to create StoragePool : %s", err.Error())
 		}
 	}
 
