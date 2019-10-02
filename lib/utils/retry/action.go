@@ -21,6 +21,7 @@ package retry
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/sirupsen/logrus"
 	"time"
 
@@ -56,13 +57,13 @@ func Action(run func() error, arbiter Arbiter, officer *Officer,
 	first func() error, last func() error, notify Notify) error {
 
 	if run == nil {
-		panic("retry.Action(): run == nil!")
+		return scerr.InvalidParameterError("run", "cannot be nil!")
 	}
 	if arbiter == nil {
-		panic("retry.Action(): arbiter == nil!")
+		return scerr.InvalidParameterError("arbiter", "cannot be nil!")
 	}
 	if officer == nil {
-		panic("retry.Action(): officer == nil!")
+		return scerr.InvalidParameterError("officer", "cannot be nil!")
 	}
 
 	return action{
@@ -151,7 +152,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	}
 
 	if notify == nil {
-		panic("retry.WhileUnsuccessfulWithNotify(): notify == nil!")
+		return scerr.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -181,7 +182,7 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 	}
 
 	if notify == nil {
-		panic("retry.WhileUnsuccessfulWithNotify(): notify == nil!")
+		return scerr.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -271,7 +272,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 	}
 
 	if notify == nil {
-		panic("notify == nil!")
+		return scerr.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {

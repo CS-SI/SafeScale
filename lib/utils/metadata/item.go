@@ -138,10 +138,10 @@ func (i *Item) Read(name string, callback ItemDecoderCallback) error {
 // WriteInto saves the content of Item in a subfolder to the Object Storage
 func (i *Item) WriteInto(path string, name string) error {
 	if i == nil {
-		panic("i is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("i cannot be nil!")
 	}
 	if i.payload == nil {
-		panic("i.payload is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("i.payload cannot be nil!")
 	}
 	data, err := i.payload.Serialize()
 	if err != nil {
@@ -163,7 +163,7 @@ func (i *Item) Write(name string) error {
 // BrowseInto walks through a subfolder and item folder and executes a callback for each entry
 func (i *Item) BrowseInto(path string, callback func([]byte) error) error {
 	if callback == nil {
-		panic("callback is nil!")
+		return scerr.InvalidParameterError("callback", "cannot be nil!")
 	}
 
 	if path == "" {
