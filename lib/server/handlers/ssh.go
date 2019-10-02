@@ -75,16 +75,16 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 
 	var hostRef string
 	host := resources.NewHost()
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
-		hostRef = hostParam.(string)
+		hostRef = hostParam
 		mh, err := metadata.LoadHost(handler.service, hostRef)
 		if err != nil {
 			return nil, err
 		}
 		host = mh.Get()
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
+		host = hostParam
 		if host.Name != "" {
 			hostRef = host.Name
 		} else {
