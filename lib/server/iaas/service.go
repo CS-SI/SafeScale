@@ -280,8 +280,8 @@ func filterBlacklistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
 // returned list is ordered by size fitting
 func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (selectedTpls []*resources.HostTemplate, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if svc == nil {
 		return nil, scerr.InvalidInstanceError()

@@ -66,8 +66,8 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
 	defer sp.unlock()
 
 	if data, ok := sp.jsonProperty.Data.(Property); ok {

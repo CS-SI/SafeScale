@@ -57,7 +57,7 @@ import (
 var (
 	timeoutCtxHost = utils.GetLongOperationTimeout()
 
-	// funcMap defines the custome functions to be used in templates
+	// funcMap defines the custom functions to be used in templates
 	funcMap = txttmpl.FuncMap{
 		// The name "inc" is what the function will be called in the template text.
 		"inc": func(i int) int {
@@ -77,7 +77,7 @@ type Makers struct {
 	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)   // returns masterCount, pruvateNodeCount, publicNodeCount
 	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) pb.HostDefinition // sizing of Gateway(s)
 	DefaultMasterSizing         func(task concurrency.Task, b Foreman) pb.HostDefinition // default sizing of master(s)
-	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition // defailt sizing of node(s)
+	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition // default sizing of node(s)
 	DefaultImage                func(task concurrency.Task, b Foreman) string            // default image of server(s)
 	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType NodeType.Enum) (string, map[string]interface{})
 	GetGlobalSystemRequirements func(task concurrency.Task, b Foreman) (string, error)
@@ -132,8 +132,8 @@ func (b *foreman) ExecuteScript(
 ) (errCode int, stdOut string, stdErr string, err error) {
 
 	tracer := concurrency.NewTracer(nil, "("+hostID+")", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, err := system.GetBashLibrary()
@@ -156,14 +156,14 @@ func (b *foreman) ExecuteScript(
 // construct ...
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Wants to inform about the duration of the operation
 	defer scerr.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
-	)
+	)()
 
 	state := ClusterState.Unknown
 
@@ -667,8 +667,8 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 // params contains a data.Map with primary and secondary Gateway hosts
 func (b *foreman) configureCluster(task concurrency.Task, params concurrency.TaskParameters) (err error) {
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	log.Infof("[cluster %s] configuring cluster...", b.cluster.Name)
 	defer func() {
@@ -880,8 +880,8 @@ func uploadTemplateToFile(
 // configureNodesFromList configures nodes from a list
 func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) (err error) {
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
 		host   *pb.Host
@@ -1115,8 +1115,8 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Get installation script based on node type; if == "", do nothing
 	script, params := b.getNodeInstallationScript(task, nodeType)
@@ -1274,8 +1274,8 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	}
 
 	tracer := concurrency.NewTracer(t, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := pbGateway.Name
 	log.Debugf("[%s] starting installation...", hostLabel)
@@ -1324,8 +1324,8 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	}
 
 	tracer := concurrency.NewTracer(t, "("+gw.Name+")", false).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	log.Debugf("[%s] starting configuration...", gw.Name)
 
@@ -1350,8 +1350,8 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	nokeep := p["nokeep"].(bool)
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1400,8 +1400,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	nokeep := p["nokeep"].(bool)
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, scerr.FormatDuration(timeout), nokeep), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1487,8 +1487,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	list := b.cluster.ListMasterIDs(t)
 	if len(list) == 0 {
@@ -1538,8 +1538,8 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	started := time.Now()
 
@@ -1572,8 +1572,8 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	nokeep := p["nokeep"].(bool)
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1629,8 +1629,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	nokeep := p["nokeep"].(bool)
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := fmt.Sprintf("node #%d", index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1724,8 +1724,8 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 	clusterName := b.cluster.GetIdentity(t).Name
 
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	list := b.cluster.ListNodeIDs(t)
 	if len(list) == 0 {
@@ -1783,8 +1783,8 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 	pbHost := p["host"].(*pb.Host)
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %s)", index, pbHost.Name), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...", hostLabel)
@@ -1811,8 +1811,8 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 	clusterName := identity.Name
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
 	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
@@ -1851,8 +1851,8 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	clusterName := identity.Name
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
 	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
@@ -1895,8 +1895,8 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 // install proxycache-client feature if not disabled
 func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
 	b.cluster.RLock(task)
@@ -1929,8 +1929,8 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 // install proxycache-server feature if not disabled
 func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
 	b.cluster.RLock(task)
@@ -1963,8 +1963,8 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 // intallDocker installs docker and docker-compose
 func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	feat, err := install.NewEmbeddedFeature(task, "docker")
 	if err != nil {

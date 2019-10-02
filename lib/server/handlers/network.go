@@ -92,8 +92,8 @@ func (handler *NetworkHandler) Create(
 		fmt.Sprintf("('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover),
 		true,
 	).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Verify that the network doesn't exist first
 	_, err = handler.service.GetNetworkByName(name)
@@ -589,12 +589,12 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 
 	// Executes userdata phase2 script to finalize host installation
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gw.Name), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting configuration phase 2 on the gateway '%s'...", gw.Name),
 		fmt.Sprintf("Ending configuration phase 2 on the gateway '%s'", gw.Name),
-	)
+	)()
 
 	content, err := userData.Generate("phase2")
 	if err != nil {
@@ -699,8 +699,8 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 // List returns the network list
 func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*resources.Network, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if all {
 		return handler.service.ListNetworks()
@@ -722,8 +722,8 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*r
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *resources.Network, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
@@ -735,8 +735,8 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network
 // Delete deletes network referenced by ref
 func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {

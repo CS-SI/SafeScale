@@ -342,7 +342,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	defer scerr.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()),
-	)
+	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -392,8 +392,8 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (results Results, er
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	results = Results{}
 	methods := t.Methods()
@@ -413,7 +413,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (results Results, er
 	defer scerr.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
-	)
+	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)

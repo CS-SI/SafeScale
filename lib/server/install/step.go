@@ -233,13 +233,13 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	results = StepResults{}
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.Stopwatch{}.OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d hosts...", is.Name, len(hosts)),
 		fmt.Sprintf("Ending step '%s' on %d hosts", is.Name, len(hosts)),
 		log.DebugLevel,
-	)
+	)()
 
 	if is.Serial || s.Serialize {
 		subtask := concurrency.NewTask(is.Worker.feature.task)
