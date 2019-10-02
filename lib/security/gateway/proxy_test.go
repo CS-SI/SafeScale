@@ -119,7 +119,7 @@ func runTestService() {
 					now := time.Now()
 					text, _ := now.MarshalText()
 					_ = conn.WriteMessage(websocket.TextMessage, text)
-					time.Sleep(utils.GetMinDelay())
+					time.Sleep(temporal.GetMinDelay())
 				}
 
 			}()

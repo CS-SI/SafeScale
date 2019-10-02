@@ -18,8 +18,8 @@ package install
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
@@ -52,7 +52,7 @@ type HostTarget struct {
 // NewHostTarget ...
 func NewHostTarget(host *pb.Host) (Target, error) {
 	if host == nil {
-		return nil, utils.InvalidParameterError("host", "can't be nil")
+		return nil, scerr.InvalidParameterError("host", "can't be nil")
 	}
 	return createHostTarget(host)
 }
@@ -119,7 +119,7 @@ type ClusterTarget struct {
 // NewClusterTarget ...
 func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) (Target, error) {
 	if cluster == nil {
-		return nil, utils.InvalidParameterError("cluster", "can't be nil")
+		return nil, scerr.InvalidParameterError("cluster", "can't be nil")
 	}
 	var (
 		index   uint8
@@ -168,7 +168,7 @@ type NodeTarget struct {
 // NewNodeTarget ...
 func NewNodeTarget(host *pb.Host) (Target, error) {
 	if host == nil {
-		return nil, utils.InvalidParameterError("host", "can't be nil")
+		return nil, scerr.InvalidParameterError("host", "can't be nil")
 	}
 	t, err := createHostTarget(host)
 	if err != nil {

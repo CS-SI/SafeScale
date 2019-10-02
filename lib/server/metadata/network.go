@@ -18,7 +18,6 @@ package metadata
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
 
@@ -26,11 +25,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -423,7 +423,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 
 			return nil
 		},
-		2*utils.GetDefaultDelay(),
+		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		return nil, retryErr
@@ -607,7 +607,7 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 			}
 			return nil
 		},
-		2*utils.GetDefaultDelay(),
+		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet

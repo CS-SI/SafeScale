@@ -18,9 +18,11 @@ package commands
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	log "github.com/sirupsen/logrus"
 
@@ -296,7 +298,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		remoteDesktops := map[string][]string{}
 		clientHost := client.New().Host
 		for _, id := range c.ListMasterIDs(concurrency.RootTask()) {
-			host, err := clientHost.Inspect(id, utils.GetExecutionTimeout())
+			host, err := clientHost.Inspect(id, temporal.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
@@ -963,7 +965,7 @@ func executeCommand(command string) error {
 	}
 	safescalessh := client.New().SSH
 	for i, m := range masters {
-		retcode, stdout, stderr, err := safescalessh.Run(m, command, utils.GetConnectionTimeout(), utils.GetExecutionTimeout())
+		retcode, stdout, stderr, err := safescalessh.Run(m, command, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
@@ -1267,7 +1269,7 @@ var clusterNodeListCommand = cli.Command{
 
 		list := clusterInstance.ListNodeIDs(concurrency.RootTask())
 		for _, i := range list {
-			host, err := hostClt.Inspect(i, utils.GetExecutionTimeout())
+			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 				//fmt.Println(msg)
@@ -1312,7 +1314,7 @@ var clusterNodeInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		host, err := client.New().Host.Inspect(hostName, utils.GetExecutionTimeout())
+		host, err := client.New().Host.Inspect(hostName, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
@@ -1497,7 +1499,7 @@ var clusterMasterListCommand = cli.Command{
 
 		list := clusterInstance.ListMasterIDs(concurrency.RootTask())
 		for _, i := range list {
-			host, err := hostClt.Inspect(i, utils.GetExecutionTimeout())
+			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("Failed to get data for master '%s': %s. Ignoring.", i, err.Error())
 				fmt.Println(msg)

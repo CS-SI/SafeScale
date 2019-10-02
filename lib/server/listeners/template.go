@@ -19,17 +19,16 @@ package listeners
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // TemplateHandler exists to ease integration tests
@@ -43,13 +42,13 @@ type TemplateListener struct{}
 // List available templates
 func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (tl *pb.TemplateList, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	all := in.GetAll()
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Teplates List"); err == nil {

@@ -19,11 +19,10 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -36,6 +35,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers VolumeAPI
@@ -108,7 +109,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 		case scerr.ErrNotFound:
 			return resources.ResourceNotFoundError("volume", ref)
 		default:
-			log.Debugf("Failed to delete volume: %+v", err)
+			logrus.Debugf("Failed to delete volume: %+v", err)
 			return err
 		}
 	}
@@ -134,7 +135,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound:
-			log.Warnf("Unable to find the volume on provider side, cleaning up metadata")
+			logrus.Warnf("Unable to find the volume on provider side, cleaning up metadata")
 		case scerr.ErrInvalidRequest, scerr.ErrTimeout:
 			return err
 		default:
@@ -148,7 +149,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume deletion cancelled by user")
+		logrus.Warnf("Volume deletion cancelled by user")
 		volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
 		if err != nil {
 			return fmt.Errorf("failed to stop volume deletion")
@@ -263,11 +264,11 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 			if derr != nil {
 				switch derr.(type) {
 				case scerr.ErrNotFound:
-					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
 				case scerr.ErrTimeout:
-					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
 				default:
-					log.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			}
@@ -276,7 +277,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 
 	md, err := metadata.SaveVolume(handler.service, volume)
 	if err != nil {
-		log.Debugf("Error creating volume: saving volume metadata: %+v", err)
+		logrus.Debugf("Error creating volume: saving volume metadata: %+v", err)
 		return nil, err
 	}
 
@@ -285,7 +286,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 		if err != nil {
 			derr := md.Delete()
 			if derr != nil {
-				log.Warnf("Failed to delete metadata of volume '%s'", newVolume.Name)
+				logrus.Warnf("Failed to delete metadata of volume '%s'", newVolume.Name)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
@@ -293,7 +294,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume creation cancelled by user")
+		logrus.Warnf("Volume creation cancelled by user")
 		err = fmt.Errorf("volume creation cancelled by user")
 		return nil, err
 	default:
@@ -410,11 +411,11 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						if derr != nil {
 							switch derr.(type) {
 							case scerr.ErrNotFound:
-								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+								logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							case scerr.ErrTimeout:
-								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+								logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							default:
-								log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+								logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							}
 							err = scerr.AddConsequence(err, derr)
 						}
@@ -440,10 +441,10 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						}
 						return nil
 					},
-					utils.GetContextTimeout(),
+					temporal.GetContextTimeout(),
 				)
 				if retryErr != nil {
-					return fmt.Errorf("failed to confirm the disk attachment after %s", utils.GetContextTimeout())
+					return fmt.Errorf("failed to confirm the disk attachment after %s", temporal.GetContextTimeout())
 				}
 
 				// Recovers real device name from the system
@@ -479,7 +480,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 					if err != nil {
 						derr := server.UnmountBlockDevice(volumeUUID)
 						if derr != nil {
-							log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+							logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							err = scerr.AddConsequence(err, derr)
 						}
 					}
@@ -505,18 +506,18 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		if err != nil {
 			derr := server.UnmountBlockDevice(volumeUUID)
 			if derr != nil {
-				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+				logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
 			if derr != nil {
 				switch derr.(type) {
 				case scerr.ErrNotFound:
-					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				case scerr.ErrTimeout:
-					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				default:
-					log.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			}
@@ -536,12 +537,12 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to set volume %s metadatas", volumeName)
+				logrus.Warnf("Failed to set volume %s metadatas", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 			_, err2 = metadata.SaveVolume(handler.service, volume)
 			if err2 != nil {
-				log.Warnf("Failed to save volume %s metadatas", volumeName)
+				logrus.Warnf("Failed to save volume %s metadatas", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
@@ -563,7 +564,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
+				logrus.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 			err2 = host.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
@@ -573,13 +574,13 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to set host '%s' metadata about mounts", volumeName)
+				logrus.Warnf("Failed to set host '%s' metadata about mounts", volumeName)
 				err = scerr.AddConsequence(err, err2)
 
 			}
 			err2 = mh.Write()
 			if err2 != nil {
-				log.Warnf("Failed to save host '%s' metadata", volumeName)
+				logrus.Warnf("Failed to save host '%s' metadata", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
@@ -587,13 +588,13 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume attachment cancelled by user")
+		logrus.Warnf("Volume attachment cancelled by user")
 		err = fmt.Errorf("volume attachment cancelled by user")
 		return err
 	default:
 	}
 
-	log.Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volume.Name, host.Name, volumeUUID)
+	logrus.Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volume.Name, host.Name, volumeUUID)
 	return nil
 }
 
@@ -625,10 +626,10 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 			}
 			return nil
 		},
-		utils.GetContextTimeout(),
+		temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
-		return nil, scerr.Wrap(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", utils.GetContextTimeout()))
+		return nil, scerr.Wrap(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", temporal.GetContextTimeout()))
 	}
 	disks := strings.Split(stdout, "\n")
 	set = mapset.NewThreadUnsafeSet()
@@ -727,7 +728,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				err = nfsServer.UnmountBlockDevice(attachment.Device)
 				if err != nil {
 					// FIXME Think about this
-					log.Error(err)
+					logrus.Error(err)
 					//return err
 				}
 
@@ -777,7 +778,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume detachment cancelled by user")
+		logrus.Warnf("Volume detachment cancelled by user")
 		// Currently format is not registered anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
 		err = handler.Attach(context.Background(), volumeName, hostName, mountPath, "ext4", true)
 		if err != nil {

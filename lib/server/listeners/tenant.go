@@ -20,18 +20,16 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/grpc/status"
-
-	log "github.com/sirupsen/logrus"
-
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
@@ -74,12 +72,12 @@ type TenantListener struct{}
 func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (list *pb.TenantList, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -107,12 +105,12 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (l
 func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (tn *pb.TenantName, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -133,18 +131,18 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 	empty = &google_protobuf.Empty{}
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidInstanceError()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidParameterError("in", "can't be nil")
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	name := in.GetName()
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -204,12 +202,12 @@ func getCurrentStorageTenants() *StorageTenants {
 func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (tl *pb.TenantList, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -242,12 +240,12 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (tnl *pb.TenantNameList, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -269,16 +267,16 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 	empty = &google_protobuf.Empty{}
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidInstanceError()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidParameterError("in", "can't be nil")
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error

@@ -2,6 +2,7 @@ package scerr
 
 import "fmt"
 
+// ErrorLike interface
 type ErrorLike interface {
 	IsError() bool
 }
@@ -17,6 +18,7 @@ func iserror(err error) bool {
 	return ei.IsError()
 }
 
+// Status interface
 type Status interface {
 	Message() string
 	Cause() error
@@ -29,6 +31,7 @@ type status struct {
 	cause   error
 }
 
+// WrapErr ...
 func WrapErr(err error, msg string) Status {
 	return &status{
 		success: false,
@@ -37,6 +40,7 @@ func WrapErr(err error, msg string) Status {
 	}
 }
 
+// Success ..
 func Success(msg string, args ...interface{}) Status {
 	return &status{
 		success: true,
@@ -44,14 +48,17 @@ func Success(msg string, args ...interface{}) Status {
 	}
 }
 
+// Message ...
 func (me *status) Message() string {
 	return me.message
 }
 
+// Cause ...
 func (me *status) Cause() error {
 	return me.cause
 }
 
+// IsError ...
 func (me *status) IsError() bool {
 	return me.cause != nil || !me.success
 }

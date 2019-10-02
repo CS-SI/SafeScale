@@ -19,15 +19,16 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/davecgh/go-spew/spew"
 	"strconv"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	timeouts "github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -79,7 +80,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 			DesiredState: "DONE",
 		}
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +118,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +179,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 			DesiredState: "DONE",
 		}
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostTimeout())
+		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +224,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 			DesiredState: "DONE",
 		}
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), 2*timeouts.GetContextTimeout())
+		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +367,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrTimeout:
@@ -390,7 +391,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
+			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 			if operr != nil {
 				logrus.Warn(operr)
 			}
@@ -412,7 +413,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
+			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 			if operr != nil {
 				logrus.Warn(operr)
 			}

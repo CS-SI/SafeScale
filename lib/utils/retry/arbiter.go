@@ -21,13 +21,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Arbiter sleeps or selects any amount of time for each attempt.
 type Arbiter func(Try) (Verdict.Enum, error)
 
 // DefaultArbiter allows 10 retries, with a maximum duration of 30 seconds
-var DefaultArbiter = PrevailDone(Max(10), Timeout(utils.GetBigDelay()))
+var DefaultArbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
 
 // PrevailRetry aggregates verdicts from Arbiters for a try :
 // - Returns Abort and the error as soon as an arbiter decides for an Abort.

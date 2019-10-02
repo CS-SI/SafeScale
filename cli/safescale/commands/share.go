@@ -18,8 +18,9 @@ package commands
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var shareCmdName = "share"
@@ -114,7 +116,7 @@ var shareCreate = cli.Command{
 			},
 			SecurityModes: c.StringSlice("securityModes"),
 		}
-		err := client.New().Share.Create(def, utils.GetExecutionTimeout())
+		err := client.New().Share.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error()))
 		}
@@ -146,7 +148,7 @@ var shareDelete = cli.Command{
 
 		shareDeleter := func(aname string) {
 			defer wg.Done()
-			err := client.New().Share.Delete(aname, utils.GetExecutionTimeout())
+			err := client.New().Share.Delete(aname, temporal.GetExecutionTimeout())
 			if err != nil {
 				errMessage += fmt.Sprintf("error while deleting share %s : %s \n", aname, utils.Capitalize(err.Error()))
 				errs++
@@ -212,7 +214,7 @@ var shareMount = cli.Command{
 			Type:      "nfs",
 			WithCache: c.Bool("ac"),
 		}
-		err := client.New().Share.Mount(def, utils.GetExecutionTimeout())
+		err := client.New().Share.Mount(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error()))
 		}
@@ -238,7 +240,7 @@ var shareUnmount = cli.Command{
 			Host:  &pb.Reference{Name: hostName},
 			Share: &pb.Reference{Name: shareName},
 		}
-		err := client.New().Share.Unmount(def, utils.GetExecutionTimeout())
+		err := client.New().Share.Unmount(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error()))
 		}
@@ -258,7 +260,7 @@ var shareInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
 		}
 
-		list, err := client.New().Share.Inspect(c.Args().Get(0), utils.GetExecutionTimeout())
+		list, err := client.New().Share.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error()))
 		}

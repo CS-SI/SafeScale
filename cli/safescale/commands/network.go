@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var networkCmdName = "network"
@@ -51,7 +52,7 @@ var networkList = cli.Command{
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
-		networks, err := client.New().Network.List(c.Bool("all"), utils.GetExecutionTimeout())
+		networks, err := client.New().Network.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
 		}
@@ -75,7 +76,7 @@ var networkDelete = cli.Command{
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		err := client.New().Network.Delete(networkList, utils.GetExecutionTimeout())
+		err := client.New().Network.Delete(networkList, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
 		}
@@ -95,7 +96,7 @@ var networkInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		network, err := client.New().Network.Inspect(c.Args().First(), utils.GetExecutionTimeout())
+		network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
 		}
@@ -185,7 +186,7 @@ var networkCreate = cli.Command{
 				Sizing:  def.Sizing,
 			},
 		}
-		network, err := client.New().Network.Create(netdef, utils.GetExecutionTimeout())
+		network, err := client.New().Network.Create(netdef, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 		}

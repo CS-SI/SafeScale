@@ -18,15 +18,16 @@ package gcp
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
+
+	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"google.golang.org/api/compute/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //-------------Volumes Management---------------------------------------------------------------------------------------
@@ -67,7 +68,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +195,7 @@ func (s *Stack) DeleteVolume(ref string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	return err
 }
 
@@ -236,7 +237,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	if err != nil {
 		return "", err
 	}
@@ -307,7 +308,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	if err != nil {
 		return err
 	}

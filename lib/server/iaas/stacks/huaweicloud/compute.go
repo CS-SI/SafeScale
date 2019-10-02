@@ -19,19 +19,18 @@ package huaweicloud
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/pengux/check"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/pengux/check"
-
-	uuid "github.com/satori/go.uuid"
-
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	gc "github.com/gophercloud/gophercloud"
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
@@ -467,7 +466,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			host.ID = server.ID
 
 			// Wait that host is ready, not just that the build is started
-			host, err = s.WaitHostReady(host, utils.GetHostTimeout())
+			host, err = s.WaitHostReady(host, temporal.GetHostTimeout())
 			if err != nil {
 				switch err.(type) {
 				case scerr.ErrNotAvailable:
@@ -478,7 +477,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 			return nil
 		},
-		utils.GetLongOperationTimeout(),
+		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		err = retryErr
@@ -635,8 +634,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		utils.GetMinDelay(),
-		utils.GetHostTimeout(),
+		temporal.GetMinDelay(),
+		temporal.GetHostTimeout(),
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
@@ -644,11 +643,11 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			if host != nil {
 				msg += fmt.Sprintf(" '%s'", host.Name)
 			}
-			msg += fmt.Sprintf(" information after %v", utils.GetHostTimeout())
+			msg += fmt.Sprintf(" information after %v", temporal.GetHostTimeout())
 			if err != nil {
 				msg += fmt.Sprintf(": %v", err)
 			}
-			return nil, resources.TimeoutError(msg, utils.GetHostTimeout())
+			return nil, resources.TimeoutError(msg, temporal.GetHostTimeout())
 		}
 		return nil, retryErr
 	}
@@ -921,12 +920,12 @@ func (s *Stack) DeleteHost(id string) error {
 					}
 					return err
 				},
-				utils.GetContextTimeout(),
+				temporal.GetContextTimeout(),
 			)
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
-					return resources.TimeoutError(fmt.Sprintf("host '%s' not deleted after %v", id, utils.GetContextTimeout()), utils.GetContextTimeout())
+					return resources.TimeoutError(fmt.Sprintf("host '%s' not deleted after %v", id, temporal.GetContextTimeout()), temporal.GetContextTimeout())
 				}
 				return innerRetryErr
 			}
@@ -936,7 +935,7 @@ func (s *Stack) DeleteHost(id string) error {
 			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
 		},
 		0,
-		utils.GetHostCleanupTimeout(),
+		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
 		log.Errorf("failed to remove host '%s': %s", id, outerRetryErr.Error())
@@ -1013,7 +1012,7 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 			}
 			return nil
 		},
-		utils.GetBigDelay(),
+		temporal.GetBigDelay(),
 	)
 	if retryErr != nil {
 		return fmt.Errorf("failed to enable Router Mode on host '%s': %v", host.Name, retryErr)
@@ -1150,7 +1149,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			}
 			return nil
 		},
-		utils.GetDefaultDelay(),
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if retryErr != nil {

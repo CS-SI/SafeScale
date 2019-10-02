@@ -34,8 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // NetworkHandler ...
@@ -53,17 +53,17 @@ type NetworkListener struct{}
 func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) (net *pb.Network, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterError("in", "can't be nil")
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	networkName := in.GetName()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create network "+networkName); err == nil {
@@ -122,16 +122,16 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (rv *pb.NetworkList, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterError("in", "can't be nil")
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	log.Infof("Listeners: network list")
 
@@ -165,11 +165,11 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *pb.Network, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterError("in", "can't be nil")
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -178,7 +178,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err == nil {
@@ -207,11 +207,11 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *google_protobuf.Empty, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterError("in", "can't be nil")
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -220,7 +220,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err == nil {

@@ -3,10 +3,11 @@ package integration_tests
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/CS-SI/SafeScale/integration_tests/enums/Providers"
 	"github.com/stretchr/testify/require"
@@ -543,23 +544,23 @@ func ShareError(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale volume attach " + names.Volumes[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale volume detach " + names.Volumes[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	require.Nil(t, err)
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale volume list")
 	require.Nil(t, err)
@@ -618,12 +619,12 @@ func VolumeError(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale volume create " + names.Volumes[0])
 	require.Nil(t, err)
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale volume  attach " + names.Volumes[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	require.NotNil(t, err)
@@ -666,7 +667,7 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host start " + names.Hosts[0])
 	require.Nil(t, err)
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
@@ -675,7 +676,7 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host reboot " + names.Hosts[0])
 	require.Nil(t, err)
 
-	time.Sleep(utils.GetDefaultDelay())
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)

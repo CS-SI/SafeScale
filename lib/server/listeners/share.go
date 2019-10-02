@@ -19,21 +19,19 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	errors "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	convert "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // ShareHandler ...
@@ -53,11 +51,11 @@ type ShareListener struct{}
 func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd *pb.ShareDefinition, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterError("in", "can't be nil")
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	shareName := in.GetName()
 	hostRef := srvutils.GetReference(in.GetHost())
@@ -67,7 +65,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create share "+in.GetName()); err == nil {
@@ -94,18 +92,18 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	empty = &google_protobuf.Empty{}
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidInstanceError()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidParameterError("in", "can't be nil")
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	shareName := in.GetName()
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete share "+in.GetName()); err == nil {
@@ -125,14 +123,13 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 		case scerr.ErrNotFound:
 			return empty, status.Errorf(codes.NotFound, err.Error())
 		default:
-			return empty, status.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
+			return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
 		}
 	}
 
 	err = handler.Delete(ctx, shareName)
 	if err != nil {
 		return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
-		return empty, status.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
 	}
 	return empty, nil
 }
@@ -141,12 +138,12 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (sl *pb.ShareList, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List shares "); err == nil {
@@ -180,11 +177,11 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (sl
 func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) (smd *pb.ShareMountDefinition, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterError("in", "can't be nil")
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
@@ -194,7 +191,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Mount share "+in.GetShare().GetName()+" on host "+in.GetHost().GetName()); err == nil {
@@ -221,11 +218,11 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	empty = &google_protobuf.Empty{}
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidInstanceError()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return empty, utils.InvalidParameterError("in", "can't be nil")
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
@@ -235,7 +232,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -261,18 +258,18 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.ShareMountList, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterError("in", "can't be nil")
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	shareRef := srvutils.GetReference(in)
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", shareRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error

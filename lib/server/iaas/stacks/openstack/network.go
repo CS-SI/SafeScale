@@ -18,9 +18,11 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"net"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	log "github.com/sirupsen/logrus"
 
@@ -321,7 +323,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 
 	// Ensure network exists
 	if req.Network == nil {
-		return nil, nil, scerrils.InvalidParameterError("req.Network", "can't be nil")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "can't be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {
@@ -644,7 +646,7 @@ func (s *Stack) deleteSubnet(id string) error {
 			}
 			return nil
 		},
-		utils.GetContextTimeout(),
+		temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
@@ -653,10 +655,10 @@ func (s *Stack) deleteSubnet(id string) error {
 				if _, ok := err.(scerr.ErrNotAvailable); ok {
 					return err
 				}
-				return resources.TimeoutError(fmt.Sprintf("failed to delete subnet after %v: %v", utils.GetContextTimeout(), err), utils.GetContextTimeout())
+				return resources.TimeoutError(fmt.Sprintf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), err), temporal.GetContextTimeout())
 			}
 		}
-		return fmt.Errorf("failed to delete subnet after %v: %v", utils.GetContextTimeout(), retryErr)
+		return fmt.Errorf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), retryErr)
 	}
 	return nil
 }

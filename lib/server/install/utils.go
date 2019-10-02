@@ -19,7 +19,6 @@ package install
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -27,8 +26,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/sirupsen/logrus"
-
-	// log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -37,6 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -179,7 +178,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(localpath, to, utils.GetDefaultDelay(), utils.GetExecutionTimeout())
+			retcode, _, _, err := sshClt.Copy(localpath, to, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -187,7 +186,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", localpath), utils.GetBigDelay(), utils.GetExecutionTimeout())
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", localpath), temporal.GetBigDelay(), temporal.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -203,8 +202,8 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 			}
 			return nil
 		},
-		utils.GetDefaultDelay(),
-		utils.GetLongOperationTimeout(),
+		temporal.GetDefaultDelay(),
+		temporal.GetLongOperationTimeout(),
 	)
 	if networkError {
 		return fmt.Errorf("an unrecoverable network error has occurred")
@@ -236,7 +235,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = sshClt.Run(host.Name, cmd, utils.GetDefaultDelay(), utils.GetExecutionTimeout())
+			retcode, _, _, err = sshClt.Run(host.Name, cmd, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -246,8 +245,8 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 			}
 			return nil
 		},
-		utils.GetMinDelay(),
-		utils.GetContextTimeout(),
+		temporal.GetMinDelay(),
+		temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -409,7 +408,7 @@ func gatewayFromHost(host *pb.Host) *pb.Host {
 	if gwID == "" {
 		return host
 	}
-	gw, err := client.New().Host.Inspect(gwID, utils.GetExecutionTimeout())
+	gw, err := client.New().Host.Inspect(gwID, temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil
 	}

@@ -18,7 +18,7 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -30,13 +30,14 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Load ...
 func Load(task concurrency.Task, name string) (api.Cluster, error) {
-	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
+	tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 
 	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
+	tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +163,7 @@ func Delete(task concurrency.Task, name string) error {
 
 // List lists the clusters already created
 func List() (clusterList []api.Cluster, err error) {
-	tenant, err := client.New().Tenant.Get(utils.GetExecutionTimeout())
+	tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}

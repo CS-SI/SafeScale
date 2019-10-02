@@ -22,9 +22,16 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
+	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
@@ -35,13 +42,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
-	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //-------------IMAGES---------------------------------------------------------------------------------------------------
@@ -425,7 +427,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			host.Name = server.Name
 
 			// Wait that Host is ready, not just that the build is started
-			_, err = s.WaitHostReady(host, utils.GetLongOperationTimeout())
+			_, err = s.WaitHostReady(host, temporal.GetLongOperationTimeout())
 			if err != nil {
 				killErr := s.DeleteHost(host.ID)
 				if killErr != nil {
@@ -441,7 +443,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 			return nil
 		},
-		utils.GetLongOperationTimeout(),
+		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		return nil, userData, retryErr
@@ -499,7 +501,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 		host = hostParam
 	}
 	if host == nil {
-		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
@@ -519,7 +521,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 			}
 			return nil
 		},
-		utils.GetDefaultDelay(),
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -614,7 +616,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -851,7 +853,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostCleanupTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 
 	waitErr := retry.WhileUnsuccessfulDelay5Seconds(func() error {
 		_, recErr := service.Instances.Get(projectID, zone, instanceName).Do()
@@ -861,7 +863,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 			}
 		}
 		return fmt.Errorf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr)
-	}, utils.GetContextTimeout())
+	}, temporal.GetContextTimeout())
 
 	if waitErr != nil {
 		logrus.Error(scerr.Cause(waitErr))
@@ -930,7 +932,7 @@ func (s *Stack) StopHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	return err
 }
 
@@ -957,7 +959,7 @@ func (s *Stack) StartHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	return err
 }
 
@@ -984,7 +986,7 @@ func (s *Stack) RebootHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	if err != nil {
 		return err
 	}
@@ -1001,7 +1003,7 @@ func (s *Stack) RebootHost(id string) error {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, utils.GetMinDelay(), utils.GetHostTimeout())
+	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
 	return err
 }
 

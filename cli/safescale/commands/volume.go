@@ -18,16 +18,17 @@ package commands
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var volumeCmdName = "volume"
@@ -57,7 +58,7 @@ var volumeList = cli.Command{
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", volumeCmdName, c.Command.Name, c.Args())
-		volumes, err := client.New().Volume.List(c.Bool("all"), utils.GetExecutionTimeout())
+		volumes, err := client.New().Volume.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of volumes", false).Error())))
 		}
@@ -77,7 +78,7 @@ var volumeInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
 		}
 
-		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), utils.GetExecutionTimeout())
+		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of volume", false).Error())))
 		}
@@ -101,7 +102,7 @@ var volumeDelete = cli.Command{
 		volumeList = append(volumeList, c.Args().First())
 		volumeList = append(volumeList, c.Args().Tail()...)
 
-		err := client.New().Volume.Delete(volumeList, utils.GetExecutionTimeout())
+		err := client.New().Volume.Delete(volumeList, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of volume", false).Error())))
 		}
@@ -148,7 +149,7 @@ var volumeCreate = cli.Command{
 			Speed: pb.VolumeSpeed(volSpeed),
 		}
 
-		volume, err := client.New().Volume.Create(def, utils.GetExecutionTimeout())
+		volume, err := client.New().Volume.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of volume", true).Error())))
 		}
@@ -189,7 +190,7 @@ var volumeAttach = cli.Command{
 			Host:        &pb.Reference{Name: c.Args().Get(1)},
 			Volume:      &pb.Reference{Name: c.Args().Get(0)},
 		}
-		err := client.New().Volume.Attach(def, utils.GetExecutionTimeout())
+		err := client.New().Volume.Attach(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "attach of volume", true).Error())))
 		}
@@ -208,7 +209,7 @@ var volumeDetach = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		}
 
-		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), utils.GetExecutionTimeout())
+		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unattach of volume", true).Error())))
 		}
@@ -240,7 +241,7 @@ func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
 		volumeInfo.GetName(),
 		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
-		safescaleutils.GetReference(volumeInfo.GetHost()),
+		srvutils.GetReference(volumeInfo.GetHost()),
 		volumeInfo.GetMountPath(),
 		volumeInfo.GetFormat(),
 		volumeInfo.GetDevice(),

@@ -19,25 +19,22 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
-
-	//"github.com/davecgh/go-spew/spew"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
-
-	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const protocolSeparator = ":"
@@ -106,7 +103,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	if userIf, ok := cfg.Get("OperatorUsername"); ok {
 		user = userIf.(string)
 		if user == "" {
-			log.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
 			user = resources.DefaultUser
 		}
 	}
@@ -191,13 +188,13 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, utils.GetHostTimeout())
+			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
 			return err
 		},
-		utils.GetHostTimeout(),
+		temporal.GetHostTimeout(),
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
-				log.Debugf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
+				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
 			}
 		},
 	)

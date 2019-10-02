@@ -17,14 +17,16 @@
 package commands
 
 import (
-	"github.com/sirupsen/logrus"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var dataCmdName = "data"
@@ -67,7 +69,7 @@ var dataPush = cli.Command{
 		} else {
 			fileName = strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
 		}
-		err := client.New().Data.Push(localFilePath, fileName, utils.GetExecutionTimeout())
+		err := client.New().Data.Push(localFilePath, fileName, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
 		}
@@ -100,7 +102,7 @@ var dataGet = cli.Command{
 			localFilePath = utils.AbsPathify(fileName)
 		}
 
-		err := client.New().Data.Get(localFilePath, fileName, utils.GetExecutionTimeout())
+		err := client.New().Data.Get(localFilePath, fileName, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
 		}
@@ -120,7 +122,7 @@ var dataDelete = cli.Command{
 		}
 
 		fileName := c.Args().First()
-		err := client.New().Data.Delete(fileName, utils.GetExecutionTimeout())
+		err := client.New().Data.Delete(fileName, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
 		}
@@ -134,7 +136,7 @@ var dataList = cli.Command{
 	ArgsUsage: "<local_file_path>",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", dataCmdName, c.Command.Name, c.Args())
-		filesList, err := client.New().Data.List(utils.GetExecutionTimeout())
+		filesList, err := client.New().Data.List(temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
 		}

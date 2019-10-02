@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package utils
+package temporal
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
 	"github.com/sirupsen/logrus"
 )
 
@@ -44,7 +45,23 @@ func (sw Stopwatch) Start() {
 // Stop stops the Stopwatch
 func (sw Stopwatch) Stop() {
 	sw.stopped = true
-	sw.duration += time.Since(sw.start)
+	if sw.running {
+		sw.duration += time.Since(sw.start)
+		sw.running = false
+	}
+}
+
+// Pause pauses the Stopwatch, which can then unpause by calling Start again
+func (sw Stopwatch) Pause() {
+	if sw.stopped {
+		return
+	}
+	if sw.running {
+		if !sw.start.IsZero() {
+			sw.duration += time.Since(sw.start)
+		}
+		sw.running = false
+	}
 }
 
 // Duration returns the time elapsed since the Stopwatch has been started
@@ -52,7 +69,10 @@ func (sw Stopwatch) Duration() time.Duration {
 	if sw.stopped {
 		return sw.duration
 	}
-	return time.Since(sw.start)
+	if sw.running {
+		return sw.duration + time.Since(sw.start)
+	}
+	return time.Duration(0)
 }
 
 // String returns a string representation of duration
@@ -63,7 +83,11 @@ func (sw Stopwatch) String() string {
 // OnExitLogWithLevel logs 'in' with log level 'level', then returns a function (to be used with defer for example)
 // that will log 'out' + elapsed time
 func (sw Stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func() {
-	logLevelFn, ok := logLevelFnMap[level]
+	if in == "" && out == "" {
+		return func() {}
+	}
+
+	logLevelFn, ok := commonlog.LogLevelFnMap[level]
 	if !ok {
 		logLevelFn = logrus.Info
 	}

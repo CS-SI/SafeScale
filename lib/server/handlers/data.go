@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"strings"
 	"sync"
@@ -32,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //Default chunk sizes that will used to spit files (in Bytes)

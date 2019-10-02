@@ -29,8 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // DataHandler ...
@@ -43,7 +43,7 @@ type DataListener struct{}
 func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl *pb.FileList, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -71,7 +71,7 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -99,7 +99,7 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (empty *google_prot
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -127,7 +127,7 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_p
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
