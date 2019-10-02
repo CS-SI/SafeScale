@@ -525,7 +525,7 @@ func monitoring4platformFeature() *Feature {
 	}
 }
 
-// ListAvailables returns an array of availables features with the useable installers
+// ListAvailables returns an array of availables features with the usable installers
 // func ListAvailables() []string {
 // 	var output []string
 // 	for k, v := range allAvailables {

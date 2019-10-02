@@ -33,7 +33,7 @@ const (
 	MPICHCompile
 	MPICHInstall
 
-	//NextErrorCode is the next error code useable
+	//NextErrorCode is the next error code usable
 	NextErrorCode
 )
 
@@ -68,16 +68,6 @@ func Parse(v string) (Enum, error) {
 	}
 	return e, nil
 
-}
-
-// FromString returns a Enum corresponding to the string parameter
-// This method is intended to be used from validated input.
-func FromString(v string) (e Enum) {
-	e, err := Parse(v)
-	if err != nil {
-		panic(err.Error()) // FIXME No more panics
-	}
-	return
 }
 
 // String returns a string representation of an Enum

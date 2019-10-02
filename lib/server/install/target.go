@@ -34,7 +34,7 @@ type Target interface {
 	Name() string
 	// Type returns the name of the target
 	Type() string
-	// Methods returns a list of installation methods useable on the target, ordered from
+	// Methods returns a list of installation methods usable on the target, ordered from
 	// upper to lower priority (1 = highest priority)
 	Methods() map[uint8]Method.Enum
 	// Installed returns a list of installed features
@@ -97,7 +97,7 @@ func (t *HostTarget) Name() string {
 	return t.name
 }
 
-// Methods returns a list of packaging managers useable on the target
+// Methods returns a list of packaging managers usable on the target
 func (t *HostTarget) Methods() map[uint8]Method.Enum {
 	return t.methods
 }
@@ -148,7 +148,7 @@ func (t *ClusterTarget) Name() string {
 	return t.name
 }
 
-// Methods returns a list of packaging managers useable on the target
+// Methods returns a list of packaging managers usable on the target
 func (t *ClusterTarget) Methods() map[uint8]Method.Enum {
 	return t.methods
 }

@@ -99,7 +99,7 @@ type HostRequest struct {
 	ImageID string
 	// KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
 	KeyPair *KeyPair
-	// Password contains the safescale password useable on host console only
+	// Password contains the safescale password usable on host console only
 	Password string
 	// DiskSize allows to ask for a specific size for system disk (in GB)
 	DiskSize int
