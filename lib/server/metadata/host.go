@@ -17,15 +17,16 @@
 package metadata
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -297,7 +298,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 			}
 			return nil
 		},
-		2*utils.GetDefaultDelay(),
+		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet

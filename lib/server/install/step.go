@@ -18,11 +18,8 @@ package install
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"time"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
 
 	log "github.com/sirupsen/logrus"
 
@@ -32,6 +29,8 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -69,6 +68,7 @@ func (sr stepResult) ErrorMessage() string {
 // StepResults contains the errors of the step for each host target
 type StepResults map[string]stepResult
 
+// ErrorMessages returns a string containing all the errors registered
 func (s StepResults) ErrorMessages() string {
 	output := ""
 	for h, k := range s {
@@ -80,7 +80,9 @@ func (s StepResults) ErrorMessages() string {
 	return output
 }
 
-func (s stepResults) UncompletedEntries() []string {
+// UncompletedEntries returns an array of string of all keys where the script
+// to run action wasn't completed
+func (s StepResults) UncompletedEntries() []string {
 	output := []string{}
 	for k, v := range s {
 		if !v.Completed() {
@@ -90,7 +92,8 @@ func (s stepResults) UncompletedEntries() []string {
 	return output
 }
 
-func (s stepResults) Successful() bool {
+// Successful tells if all the steps have been successful
+func (s StepResults) Successful() bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -102,7 +105,8 @@ func (s stepResults) Successful() bool {
 	return true
 }
 
-func (s stepResults) Completed() bool {
+// Completed tells if all the scripts corresponding to action have been completed.
+func (s StepResults) Completed() bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -262,7 +266,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.Stopwatch{}.OnExitLogWithLevel(
+	defer temporal.Stopwatch{}.OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d hosts...", is.Name, len(hosts)),
 		fmt.Sprintf("Ending step '%s' on %d hosts", is.Name, len(hosts)),
 		log.DebugLevel,
@@ -290,16 +294,16 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
 					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
 					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done",
 					is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-					scerr.FormatDuration(time.Since(is.Worker.startTime)))
+					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	} else {
@@ -324,7 +328,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 		for k, s := range subtasks {
 			result, err := s.Wait()
 			if err != nil {
-				log.Warnf("%s(%s):step(%s)@%s finished in [%s]: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, scerr.FormatDuration(time.Since(is.Worker.startTime)))
+				log.Warnf("%s(%s):step(%s)@%s finished in [%s]: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime)))
 				continue
 			}
 			results[k] = result.(stepResult)
@@ -333,16 +337,16 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
 					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
-						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
 					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
-						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done",
 					is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
-					scerr.FormatDuration(time.Since(is.Worker.startTime)))
+					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	}
@@ -359,7 +363,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	)
 	if params != nil {
 		if p, ok = params.(data.Map); !ok {
-			return nil, utils.InvalidParameterError("params", "must be a data.Map")
+			return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 		}
 	}
 
@@ -393,7 +397,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	command = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
 
 	// Executes the script on the remote host
-	retcode, _, _, err := client.New().SSH.Run(host.Name, command, utils.GetConnectionTimeout(), is.WallTime)
+	retcode, _, _, err := client.New().SSH.Run(host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{err: err}, nil
 	}

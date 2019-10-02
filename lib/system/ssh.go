@@ -24,7 +24,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io"
 	"io/ioutil"
 	"net"
@@ -39,11 +38,13 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"golang.org/x/crypto/ssh"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
@@ -667,7 +668,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		return "", scerr.InvalidParameterError("ssh.Host", "can't be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, scerr.FormatDuration(timeout)), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), true).GoingIn().OnExitTrace()
 
 	// log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
 	defer scerr.OnExitTraceError(
@@ -707,10 +708,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		timeout,
 	)
 	if retryErr != nil {
-		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, scerr.FormatDuration(time.Since(begins)), retryErr)
+		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, temporal.FormatDuration(time.Since(begins)), retryErr)
 		return stdout, retryErr
 	}
-	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, scerr.FormatDuration(time.Since(begins)), stdout)
+	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 

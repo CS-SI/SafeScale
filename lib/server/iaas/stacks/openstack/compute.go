@@ -22,14 +22,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
-
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -41,6 +37,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -54,6 +51,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // ListRegions ...
@@ -198,7 +197,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 			flv, err = flavors.Get(s.ComputeClient, id).Extract()
 			return err
 		},
-		2*utils.GetDefaultDelay(),
+		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		return nil, scerr.Wrap(retryErr, fmt.Sprintf("error getting template: %s", ProviderErrorToString(retryErr)))
@@ -455,7 +454,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 		notFound bool
 	)
 
-	timeout := 2 * utils.GetBigDelay()
+	timeout := 2 * temporal.GetBigDelay()
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(s.ComputeClient, id).Extract()
@@ -492,7 +491,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		utils.GetMinDelay(),
+		temporal.GetMinDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -899,7 +898,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			host.ID = server.ID
 
 			// Wait that Host is ready, not just that the build is started
-			host, err = s.WaitHostReady(host, utils.GetHostTimeout())
+			host, err = s.WaitHostReady(host, temporal.GetHostTimeout())
 			if err != nil {
 				servers.Delete(s.ComputeClient, server.ID)
 				msg := ProviderErrorToString(err)
@@ -908,7 +907,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 			return nil
 		},
-		utils.GetLongOperationTimeout(),
+		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		return nil, userData, scerr.Wrap(retryErr, fmt.Sprintf("error creating host: timeout"))
@@ -1070,7 +1069,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			}
 			return nil
 		},
-		utils.GetDefaultDelay(),
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -1083,7 +1082,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 }
 
 // GetHostState returns the current state of host identified by id
-// hostParam can be a string or an instance of *resources.Host; any other type will return an utils.InvalidParameterError
+// hostParam can be a string or an instance of *resources.Host; any other type will return an scerr.InvalidParameterError
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	if s == nil {
 		return HostState.ERROR, scerr.InvalidInstanceError()
@@ -1234,12 +1233,12 @@ func (s *Stack) DeleteHost(id string) error {
 					}
 					return err
 				},
-				utils.GetContextTimeout(),
+				temporal.GetContextTimeout(),
 			)
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
-					return resources.TimeoutError(fmt.Sprintf("failed to acknowledge host '%s' deletion! %s", id, innerRetryErr.Error()), utils.GetContextTimeout())
+					return resources.TimeoutError(fmt.Sprintf("failed to acknowledge host '%s' deletion! %s", id, innerRetryErr.Error()), temporal.GetContextTimeout())
 				}
 				return innerRetryErr
 			}
@@ -1250,7 +1249,7 @@ func (s *Stack) DeleteHost(id string) error {
 			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
 		},
 		0,
-		utils.GetHostCleanupTimeout(),
+		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
 		return scerr.Wrap(outerRetryErr, fmt.Sprintf("error deleting host: retry error"))

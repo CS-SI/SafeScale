@@ -18,12 +18,12 @@ package control
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -60,18 +60,18 @@ func (m *Metadata) Written() bool {
 func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 	var err error
 	tracer := concurrency.NewTracer(task, "", false)
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if m == nil {
-		err = utils.InvalidInstanceError()
+		err = scerr.InvalidInstanceError()
 		return m
 	}
 	if m.item == nil {
-		err = utils.InvalidParameterError("m.item", "can't be nil")
+		err = scerr.InvalidParameterError("m.item", "can't be nil")
 		return m
 	}
 	if cluster == nil {
-		err = utils.InvalidParameterError("cluster", "can't be nil")
+		err = scerr.InvalidParameterError("cluster", "can't be nil")
 		return m
 	}
 
@@ -83,7 +83,7 @@ func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 // Delete removes a cluster metadata
 func (m *Metadata) Delete() error {
 	if m == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
 		return scerr.InvalidParameterError("m.item", "can't be nil")
@@ -141,7 +141,7 @@ func (m *Metadata) Write() error {
 // It's a good idea to do that just after an Acquire() to be sure to have the latest data
 func (m *Metadata) Reload(task concurrency.Task) error {
 	if m == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
 		return scerr.InvalidParameterError("m.item", "can't be nil")
@@ -164,7 +164,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 			}
 			return nil
 		},
-		utils.GetDefaultDelay(),
+		temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet
@@ -179,18 +179,18 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 // Get returns the content of the metadata
 func (m *Metadata) Get() (_ *Controller, err error) {
 	tracer := concurrency.NewTracer(nil, "", false)
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if m == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return nil, utils.InvalidParameterError("m.item", "can't be nil")
+		return nil, scerr.InvalidParameterError("m.item", "can't be nil")
 	}
 	if p, ok := m.item.Get().(*Controller); ok {
 		return p, nil
 	}
-	return nil, utils.NotFoundError("missing cluster content in metadata")
+	return nil, scerr.NotFoundError("missing cluster content in metadata")
 }
 
 func (m *Metadata) OK() bool {
@@ -212,7 +212,7 @@ func (m *Metadata) OK() bool {
 // Browse walks through cluster folder and executes a callback for each entry
 func (m *Metadata) Browse(callback func(*Controller) error) error {
 	if m == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
 		return scerr.InvalidParameterError("m.item", "can't be nil")

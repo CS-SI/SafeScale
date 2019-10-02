@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io/ioutil"
 	"math"
 	"net"
@@ -32,8 +31,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -42,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	_ "github.com/CS-SI/SafeScale/lib/server" // Imported to initialise tenants
 )

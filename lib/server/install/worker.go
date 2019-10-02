@@ -18,28 +18,26 @@ package install
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/metadata"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -152,7 +150,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		w.availableMaster, err = client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
+		w.availableMaster, err = client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +168,7 @@ func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		host, err := client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
+		host, err := client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +249,7 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 		w.allMasters = []*pb.Host{}
 		safescale := client.New().Host
 		for _, i := range w.cluster.ListMasterIDs(w.feature.task) {
-			host, err := safescale.Inspect(i, utils.GetExecutionTimeout())
+			host, err := safescale.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
@@ -293,7 +291,7 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 		hostClt := client.New().Host
 		allHosts := []*pb.Host{}
 		for _, i := range w.cluster.ListNodeIDs(w.feature.task) {
-			host, err := hostClt.Inspect(i, utils.GetExecutionTimeout())
+			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
@@ -314,7 +312,7 @@ func (w *worker) identifyAvailableGateway() (*pb.Host, error) {
 	if w.availableGateway == nil {
 		netCfg, err := w.cluster.GetNetworkConfig(w.feature.task)
 		if err == nil {
-			w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
+			w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, temporal.GetExecutionTimeout())
 		}
 		if err != nil {
 			return nil, err
@@ -363,7 +361,7 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	gw, err := client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
+	gw, err := client.New().Host.Inspect(netCfg.GatewayID, temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +370,7 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	results = append(results, gw)
 
 	if netCfg.SecondaryGatewayID != "" {
-		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, utils.GetExecutionTimeout())
+		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -417,7 +415,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 	for _, k := range order {
 		_, stepErr, continuation, breaking := func() (res Results, inner error, cont bool, brea bool) {
 			defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), k), &inner)
-			defer scerr.Stopwatch{}.OnExitLogWithLevel(
+			defer temporal.Stopwatch{}.OnExitLogWithLevel(
 				fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), k),
 				fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), k),
 				logrus.DebugLevel,
@@ -526,7 +524,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 				v["options"] = ""
 			}
 
-			wallTime := utils.GetLongOperationTimeout()
+			wallTime := temporal.GetLongOperationTimeout()
 			anon, ok = stepMap[yamlTimeoutKeyword]
 			if ok {
 				if _, ok := anon.(int); ok {
@@ -534,7 +532,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 				} else {
 					wallTimeConv, inner := strconv.Atoi(anon.(string))
 					if inner != nil {
-						log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+						logrus.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
 					} else {
 						wallTime = time.Duration(wallTimeConv) * time.Minute
 					}
@@ -583,7 +581,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 			if !results[k].Successful() {
 				// If there are some not completed steps, reports them and break
 				if !results[k].Completed() {
-					log.Warnf(fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), k, results[k].UncompletedEntries()))
+					logrus.Warnf(fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), k, results[k].UncompletedEntries()))
 					return nil, fmt.Errorf(results[k].ErrorMessages()), false, true
 				}
 				// not successful but completed, if action is check means the feature is not install, it's not a failure)
@@ -648,7 +646,7 @@ func (w *worker) validateContextForHost() error {
 		return nil
 	}
 	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.DisplayName())
-	// log.Println(msg)
+	// logrus.Println(msg)
 	return fmt.Errorf(msg)
 }
 
@@ -814,10 +812,10 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 			msg += " '" + ruleName + "'"
 		}
 		msg += " for host '" + hostName + "': " + err.Error()
-		log.Error(msg)
+		logrus.Error(msg)
 		return nil, fmt.Errorf(msg)
 	}
-	log.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
+	logrus.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 	return nil, nil
 }
 

@@ -604,7 +604,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.HostNet
 					}
 					return fmt.Errorf("no local IP matching inteface %s found", iface.Alias)
 				},
-				utils.GetHostTimeout(),
+				temporal.GetHostTimeout(),
 			)
 
 		}
@@ -1052,7 +1052,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		host = hostParam.(*resources.Host)
 	}
 	if host == nil {
-		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 
 	newHost, _, err := s.getHostAndDomainFromRef(host.ID)

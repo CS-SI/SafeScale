@@ -1,15 +1,19 @@
 package main
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils"
-	log "github.com/sirupsen/logrus"
 	"io"
+	"log"
 	"os"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
 )
 
 func init() {
-	log.SetFormatter(utils.GetDefaultFormatter())
-	log.SetLevel(log.DebugLevel)
+	logrus.SetFormatter(commonlog.GetDefaultFormatter())
+	logrus.SetLevel(logrus.DebugLevel)
 
 	// Log as JSON instead of the default ASCII formatter.
 	// log.SetFormatter(&log.JSONFormatter{})

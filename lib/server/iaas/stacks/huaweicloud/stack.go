@@ -18,7 +18,6 @@ package huaweicloud
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	// Gophercloud OpenStack API
 	gc "github.com/gophercloud/gophercloud"
@@ -27,7 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Stack is the implementation for huaweicloud cloud stack

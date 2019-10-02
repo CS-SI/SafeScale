@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,7 +57,7 @@ type ServiceTester struct {
 	Service iaas.Service
 }
 
-// Check at compile that initialized tenants are valid stacks
+// VerifyStacks checks at compile that initialized tenants are valid stacks
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	var stack api.Stack
 
@@ -468,7 +468,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		err := tester.Service.StopHost(host.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, HostState.STOPPED, utils.GetBigDelay())
+		err = tester.Service.WaitHostState(host.ID, HostState.STOPPED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
@@ -478,7 +478,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		err := tester.Service.StartHost(host.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, HostState.STARTED, utils.GetBigDelay())
+		err = tester.Service.WaitHostState(host.ID, HostState.STARTED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
@@ -507,7 +507,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	assert.Equal(t, 25, v1.Size)
 	assert.Equal(t, VolumeSpeed.HDD, v1.Speed)
 
-	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(resources.VolumeRequest{
@@ -520,7 +520,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	lst, err = tester.Service.ListVolumes()
@@ -572,7 +572,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	defer func() {
 		_ = tester.Service.DeleteVolume(v1.ID)
 	}()
-	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(resources.VolumeRequest{
@@ -585,7 +585,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
@@ -703,7 +703,7 @@ func (tester *ServiceTester) GetImage(t *testing.T) {
 	// TODO Implement this test
 }
 
-// GetImage ...
+// GetTemplate ...
 func (tester *ServiceTester) GetTemplate(t *testing.T) {
 	// TODO Implement this test
 }

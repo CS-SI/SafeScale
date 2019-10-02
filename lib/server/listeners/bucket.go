@@ -19,8 +19,6 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"google.golang.org/grpc/status"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -31,8 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // BucketHandler ...
@@ -52,7 +50,7 @@ type BucketListener struct{}
 func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (bl *pb.BucketList, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -81,7 +79,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Create : "+bucketName); err != nil {
@@ -109,7 +107,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -138,7 +136,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
@@ -169,7 +167,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	hostName := in.GetHost().GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Mount : "+bucketName+" on "+hostName); err != nil {
@@ -196,7 +194,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	hostName := in.GetHost().GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

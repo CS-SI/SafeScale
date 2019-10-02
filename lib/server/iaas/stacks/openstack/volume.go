@@ -18,9 +18,10 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+
 	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
@@ -246,7 +247,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 	defer concurrency.NewTracer(nil, "("+id+")", true).WithStopwatch().GoingIn().OnExitTrace()
 
 	var (
-		timeout = utils.GetBigDelay()
+		timeout = temporal.GetBigDelay()
 	)
 
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(

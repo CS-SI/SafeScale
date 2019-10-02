@@ -28,8 +28,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // JobManagerHandler ...
@@ -42,10 +42,10 @@ type JobManagerListener struct{}
 func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, utils.InvalidInstanceError()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, utils.InvalidParameterError("in", "can't be nil")
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	uuid := in.Uuid
 	if in.Uuid == "" {
@@ -54,7 +54,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", uuid), true).GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	log.Infof("Received stop order for job '%s'...", uuid)
 
@@ -78,12 +78,12 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 // List running process
 func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *pb.JobList, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

@@ -18,13 +18,14 @@ package concurrency
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Tracer ...
@@ -36,7 +37,7 @@ type Tracer struct {
 	enabled      bool
 	inDone       bool
 	outDone      bool
-	sw           *scerr.Stopwatch
+	sw           *temporal.Stopwatch
 }
 
 // NewTracer creates a new Tracer instance
@@ -73,7 +74,7 @@ func (t *Tracer) GoingInMessage() string {
 // GoingOut will add the elapsed time in the log message (if it has to be logged...).
 func (t *Tracer) WithStopwatch() *Tracer {
 	if t.sw == nil {
-		t.sw = &scerr.Stopwatch{}
+		t.sw = &temporal.Stopwatch{}
 	}
 	return t
 }
@@ -140,7 +141,7 @@ func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
 }
 
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
-func (t *Tracer) Stopwatch() *scerr.Stopwatch {
+func (t *Tracer) Stopwatch() *temporal.Stopwatch {
 	return t.sw
 }
 

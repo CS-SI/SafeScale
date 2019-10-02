@@ -18,11 +18,12 @@ package commands
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var sshCmdName = "ssh"
@@ -69,11 +71,14 @@ var sshRun = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		timeout := utils.GetHostTimeout()
+		var timeout time.Duration
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+		} else {
+			timeout = temporal.GetHostTimeout()
+
 		}
-		retcode, stdout, stderr, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), utils.GetConnectionTimeout(), timeout)
+		retcode, stdout, stderr, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
 		}
@@ -111,11 +116,13 @@ var sshCopy = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		}
 
-		timeout := utils.GetHostTimeout()
+		var timeout time.Duration
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+		} else {
+			timeout = temporal.GetHostTimeout()
 		}
-		retcode, _, _, err := client.New().SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), utils.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := client.New().SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
 		}

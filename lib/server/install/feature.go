@@ -18,9 +18,11 @@ package install
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io/ioutil"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	log "github.com/sirupsen/logrus"
 
@@ -150,12 +152,12 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 // with its content
 func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	v := viper.New()
 	v.AddConfigPath(".")
@@ -198,12 +200,12 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var feat Feature
 	if _, ok := allEmbeddedMap[name]; !ok {
@@ -279,12 +281,12 @@ func (f *Feature) Applyable(t Target) bool {
 // Check is ok if error is nil and Results.Successful() is true
 func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error) {
 	if f == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// cacheKey := f.DisplayName() + "@" + t.Name()
 	// if anon, ok := checkCache.Get(cacheKey); ok {
@@ -336,7 +338,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 
 	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	methods := t.Methods()
 	var (
@@ -356,7 +358,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	defer scerr.Stopwatch{}.OnExitLogInfo(
+	defer temporal.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 	)()
@@ -427,7 +429,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 
-	defer scerr.Stopwatch{}.OnExitLogInfo(
+	defer temporal.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 	)()

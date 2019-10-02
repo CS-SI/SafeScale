@@ -19,7 +19,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"os/user"
 	"strings"
@@ -43,6 +42,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers HostAPI
@@ -99,7 +100,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 		}
 	}
 
-	err = handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout())
+	err = handler.service.WaitHostState(id, HostState.STARTED, temporal.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound, scerr.ErrTimeout:
@@ -136,7 +137,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 		}
 	}
 
-	err = handler.service.WaitHostState(id, HostState.STOPPED, utils.GetHostTimeout())
+	err = handler.service.WaitHostState(id, HostState.STOPPED, temporal.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound, scerr.ErrTimeout:
@@ -173,9 +174,9 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	}
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			return handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout())
+			return handler.service.WaitHostState(id, HostState.STARTED, temporal.GetHostTimeout())
 		},
-		utils.GetHostTimeout(),
+		temporal.GetHostTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -401,7 +402,7 @@ func (handler *HostHandler) Create(
 			img, innerErr = handler.service.SearchImage(los)
 			return innerErr
 		},
-		2*utils.GetDefaultDelay(),
+		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -583,7 +584,7 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	_, err = sshCfg.WaitServerReady("phase1", utils.GetHostCreationTimeout())
+	_, err = sshCfg.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
 	if err != nil {
 		derr := err
 		err = nil
@@ -656,7 +657,7 @@ func (handler *HostHandler) Create(
 	}
 
 	// Wait like 2 min for the machine to reboot
-	_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
+	_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, err

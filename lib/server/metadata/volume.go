@@ -18,15 +18,15 @@ package metadata
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -224,7 +224,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 
 			return nil
 		},
-		2*utils.GetDefaultDelay(),
+		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet

@@ -18,11 +18,9 @@ package huaweicloud
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"net"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	log "github.com/sirupsen/logrus"
@@ -41,6 +39,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // VPCRequest defines a request to create a VPC
@@ -265,7 +265,7 @@ func validateNetworkName(req resources.NetworkRequest) (bool, error) {
 // GetNetworkByName ...
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "can't be empty string")
@@ -491,7 +491,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 			}
 			return err
 		},
-		utils.GetContextTimeout(),
+		temporal.GetContextTimeout(),
 		func(try retry.Try, verdict Verdict.Enum) {
 			if verdict != Verdict.Done {
 				log.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
@@ -563,16 +563,16 @@ func (s *Stack) deleteSubnet(id string) error {
 			}
 			return fmt.Errorf("%d", r.StatusCode)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(utils.GetHostTimeout())),
-		retry.Constant(utils.GetDefaultDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
+		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil,
 		func(t retry.Try, verdict Verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					log.Debugf("network still owns host(s), retrying in %s...", utils.GetDefaultDelay())
+					log.Debugf("network still owns host(s), retrying in %s...", temporal.GetDefaultDelay())
 				default:
-					log.Debugf("error submitting network deletion (status=%s), retrying in %s...", t.Err.Error(), utils.GetDefaultDelay())
+					log.Debugf("error submitting network deletion (status=%s), retrying in %s...", t.Err.Error(), temporal.GetDefaultDelay())
 				}
 			}
 		},

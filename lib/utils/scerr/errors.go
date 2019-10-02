@@ -18,7 +18,6 @@ package scerr
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -26,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -566,20 +567,10 @@ const (
 	outputErrorTemplate = "%s WITH ERROR [%+v]"
 )
 
-var (
-	logLevelFnMap = map[logrus.Level]func(args ...interface{}){
-		logrus.TraceLevel: logrus.Trace,
-		logrus.DebugLevel: logrus.Debug,
-		logrus.InfoLevel:  logrus.Info,
-		logrus.WarnLevel:  logrus.Warn,
-		logrus.ErrorLevel: logrus.Error,
-	}
-)
-
 // OnExitLogErrorWithLevel returns a function that will log error with the log level wanted
 // Intended to be used with defer for example.
 func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
-	logLevelFn, ok := logLevelFnMap[level]
+	logLevelFn, ok := commonlog.LogLevelFnMap[level]
 	if !ok {
 		logLevelFn = logrus.Error
 	}

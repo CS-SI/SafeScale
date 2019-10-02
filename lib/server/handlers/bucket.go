@@ -19,14 +19,13 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"regexp"
-
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers BucketAPI

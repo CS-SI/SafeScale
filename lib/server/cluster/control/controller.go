@@ -18,9 +18,11 @@ package control
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	log "github.com/sirupsen/logrus"
 
@@ -110,7 +112,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.Stopwatch{}.OnExitLogInfo(
+	defer temporal.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
 	)()
@@ -137,10 +139,10 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 // GetService returns the service from the provider
 func (c *Controller) GetService(task concurrency.Task) iaas.Service {
 	var err error
-	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
 
 	if c == nil {
-		err = utils.InvalidInstanceError()
+		err = scerr.InvalidInstanceError()
 		return nil
 	}
 
@@ -156,10 +158,10 @@ func (c *Controller) GetIdentity(task concurrency.Task) identity.Identity {
 	}
 
 	var err error
-	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
 
 	if c == nil {
-		err = utils.InvalidInstanceError()
+		err = scerr.InvalidInstanceError()
 		return identity.Identity{}
 	}
 
@@ -174,10 +176,10 @@ func (c *Controller) GetProperties(task concurrency.Task) *serialize.JSONPropert
 		task = concurrency.RootTask()
 	}
 	var err error
-	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
 
 	if c == nil {
-		err = utils.InvalidInstanceError()
+		err = scerr.InvalidInstanceError()
 		return nil
 	}
 
@@ -193,10 +195,10 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.N
 		task = concurrency.RootTask()
 	}
 
-	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
 
 	if c == nil {
-		return config, utils.InvalidInstanceError()
+		return config, scerr.InvalidInstanceError()
 	}
 
 	c.RLock(task)
@@ -226,13 +228,13 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.N
 // CountNodes returns the number of nodes in the cluster
 func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
 	if c == nil {
-		return 0, utils.InvalidInstanceError()
+		return 0, scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 
-	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
 
 	var count uint
 
@@ -452,7 +454,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
 	}
-	return client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
+	return client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
 }
 
 // SearchNode tells if an host ID corresponds to a node of the Cluster
@@ -495,7 +497,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
+		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				lastError = err
@@ -532,7 +534,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 			log.Errorf("failed to get ssh config of node '%s': %s", hostID, err.Error())
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
+		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
@@ -709,7 +711,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	}
 	nodeDef.Network = netCfg.NetworkID
 
-	timeout := utils.GetExecutionTimeout() + time.Duration(count)*time.Minute
+	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
@@ -739,7 +741,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	defer func() {
 		if err != nil {
 			if len(newHosts) > 0 {
-				derr := hostClt.Delete(newHosts, utils.GetExecutionTimeout())
+				derr := hostClt.Delete(newHosts, temporal.GetExecutionTimeout())
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}
@@ -908,7 +910,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 	}()
 
 	// Finally delete host
-	err = client.New().Host.Delete([]string{master.ID}, utils.GetLongOperationTimeout())
+	err = client.New().Host.Delete([]string{master.ID}, temporal.GetLongOperationTimeout())
 	if err != nil {
 		return err
 	}
@@ -1071,7 +1073,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	}
 
 	// Finally delete host
-	err = client.New().Host.Delete([]string{node.ID}, utils.GetLongOperationTimeout())
+	err = client.New().Host.Delete([]string{node.ID}, temporal.GetLongOperationTimeout())
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
@@ -1176,9 +1178,9 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	clientNetwork := client.New().Network
 	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
-			return clientNetwork.Delete([]string{networkID}, utils.GetExecutionTimeout())
+			return clientNetwork.Delete([]string{networkID}, temporal.GetExecutionTimeout())
 		},
-		utils.GetHostTimeout(),
+		temporal.GetHostTimeout(),
 	)
 	if retryErr != nil {
 		cleaningErrors = append(cleaningErrors, retryErr)

@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var imageCmdName = "image"
@@ -47,7 +48,7 @@ var imageList = cli.Command{
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", imageCmdName, c.Command.Name, c.Args())
-		images, err := client.New().Image.List(c.Bool("all"), utils.GetExecutionTimeout())
+		images, err := client.New().Image.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error())))
 		}
