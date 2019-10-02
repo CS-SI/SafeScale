@@ -43,7 +43,12 @@ lib/Pipfile.lock
 
 *.new
 *_results.log
-cli/**/version.go
+
+# ignore version files
+cli/perform/version.go
+cli/safescale/version.go
+cli/safescaled/version.go
+cli/scanner/version.go
 
 vendor
 Gopkg.lock
