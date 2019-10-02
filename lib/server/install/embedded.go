@@ -135,9 +135,24 @@ func ntpClientFeature() *Feature {
 	}
 }
 
-// ansible feature from official repos ...
+// ansibleFeature from official repos ...
 func ansibleFeature() *Feature {
 	name := "ansible"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// postgresxlFeature feature. ...
+func postgresxlFeature() *Feature {
+	name := "postgresxl"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
