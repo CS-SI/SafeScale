@@ -77,7 +77,7 @@ func Parse(v string) (Enum, error) {
 func FromString(v string) (e Enum) {
 	e, err := Parse(v)
 	if err != nil {
-		panic(err.Error())
+		panic(err.Error()) // FIXME No more panics
 	}
 	return
 }
