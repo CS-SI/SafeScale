@@ -28,12 +28,12 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/libvirt/libvirt-go"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -124,8 +124,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	log.Debug("local.Client.CreateNetwork() called")
-	defer log.Debug("local.Client.CreateNetwork() done")
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
 
 	name := req.Name
 	ipVersion := req.IPVersion
@@ -201,8 +200,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 // GetNetwork returns the network identified by ref (id or name)
 func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
-	log.Debug("local.Client.GetNetwork() called")
-	defer log.Debug("local.Client.GetNetwork() done")
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
 	if err != nil {
@@ -229,15 +227,13 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 
 // GetNetworkByName returns the network identified by ref (id or name)
 func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
-	log.Debug("local.Client.GetNetworkByName() called")
-	defer log.Debug("local.Client.GetNetworkByName() done")
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
 	return s.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	log.Debug("local.Client.ListNetworks() called")
-	defer log.Debug("local.Client.ListNetworks() done")
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
 
 	var networks []*resources.Network
 
@@ -259,8 +255,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(ref string) error {
-	log.Debug("local.Client.DeleteNetwork() called")
-	defer log.Debug("local.Client.DeleteNetwork() done")
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
 	if err != nil {
@@ -288,8 +283,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
-	log.Debug("local.Client.CreateGateway() called")
-	defer log.Debug("local.Client.CreateGateway() done")
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
 
 	network := req.Network
 	templateID := req.TemplateID
@@ -328,8 +322,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
 func (s *Stack) DeleteGateway(ref string) error {
-	log.Debug("local.Client.DeleteGateway() called")
-	defer log.Debug("local.Client.DeleteGateway() done")
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
 
 	return s.DeleteHost(ref)
 }

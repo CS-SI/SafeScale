@@ -18,10 +18,11 @@ package client
 
 import (
 	"fmt"
-	logr "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 	"strings"
+
+	logr "github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -33,17 +34,17 @@ import (
 
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
-	Bucket         *bucket
-	Data           *data
-	Host           *host
-	Image          *image
-	Network        *network
-	ProcessManager *processManager
-	Share          *share
-	SSH            *ssh
-	Template       *template
-	Tenant         *tenant
-	Volume         *volume
+	Bucket     *bucket
+	Data       *data
+	Host       *host
+	Image      *image
+	JobManager *jobManager
+	Network    *network
+	Share      *share
+	SSH        *ssh
+	Template   *template
+	Tenant     *tenant
+	Volume     *volume
 
 	safescaledHost string
 	safescaledPort int
@@ -82,7 +83,7 @@ func New() Client {
 	s.Host = &host{session: s}
 	s.Image = &image{session: s}
 	s.Network = &network{session: s}
-	s.ProcessManager = &processManager{session: s}
+	s.JobManager = &jobManager{session: s}
 	s.Share = &share{session: s}
 	s.SSH = &ssh{session: s}
 	s.Template = &template{session: s}

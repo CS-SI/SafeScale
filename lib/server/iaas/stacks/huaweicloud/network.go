@@ -632,8 +632,8 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		gwname = "gw-" + req.Network.Name
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("huaweicloud.Stack::CreateGateway(%s) called", gwname), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gwname), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
 
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,

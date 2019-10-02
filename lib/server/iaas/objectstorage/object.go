@@ -179,8 +179,6 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 
 // Write the source to the object in Object Storage
 func (o *object) Write(source io.Reader, sourceSize int64) error {
-	// log.Debugf("objectstorage.object<%s:%s>.Write() called", o.bucket.Name, o.Name)
-	// defer log.Debugf("objectstorage.object<%s:%s>.Write() done", o.bucket.Name, o.Name)
 	if o == nil {
 		return scerr.InvalidInstanceError()
 	}

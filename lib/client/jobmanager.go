@@ -19,34 +19,35 @@ package client
 import (
 	"time"
 
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // bucket is the part of the safescale client handling buckets
-type processManager struct {
+type jobManager struct {
 	// session is not used currently.
 	session *Session
 }
 
 // List ...
-func (c *processManager) List(timeout time.Duration) (*pb.ProcessList, error) {
+func (c *jobManager) List(timeout time.Duration) (*pb.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewProcessManagerServiceClient(c.session.connection)
+	service := pb.NewJobManagerServiceClient(c.session.connection)
 	ctx := utils.GetContext(false)
 
 	return service.List(ctx, &google_protobuf.Empty{})
 }
 
-// Stop ...
-func (c *processManager) Stop(uuid string, timeout time.Duration) error {
+// Stop sends a signal to the server to stop a running job
+func (c *jobManager) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewProcessManagerServiceClient(c.session.connection)
+	service := pb.NewJobManagerServiceClient(c.session.connection)
 	ctx := utils.GetContext(false)
 
-	_, err := service.Stop(ctx, &pb.ProcessDefinition{Uuid: uuid})
+	_, err := service.Stop(ctx, &pb.JobDefinition{Uuid: uuid})
 	return err
 }

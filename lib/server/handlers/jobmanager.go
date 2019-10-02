@@ -20,35 +20,35 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
-//go:generate mockgen -destination=../mocks/mock_processmanager.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ProcessManagerAPI
+//go:generate mockgen -destination=../mocks/mock_JobManager.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers JobManagerAPI
 
-// ProcessManagerAPI defines API to manipulate process
-type ProcessManagerAPI interface {
+// JobManagerAPI defines API to manipulate process
+type JobManagerAPI interface {
 	List(ctx context.Context) (map[string]string, error)
 	Stop(ctx context.Context, uuid string)
 }
 
-// ProcessManagerHandler service
-type ProcessManagerHandler struct {
+// JobManagerHandler service
+type JobManagerHandler struct {
 	service iaas.Service
 }
 
-// NewProcessManagerHandler creates a Volume service
-func NewProcessManagerHandler(svc iaas.Service) ProcessManagerAPI {
-	return &ProcessManagerHandler{
+// NewJobManagerHandler creates a Volume service
+func NewJobManagerHandler(svc iaas.Service) JobManagerAPI {
+	return &JobManagerHandler{
 		service: svc,
 	}
 }
 
 // List returns the Running Process list
-func (pmh *ProcessManagerHandler) List(ctx context.Context) (map[string]string, error) {
-	return utils.ProcessList(), nil
+func (pmh *JobManagerHandler) List(ctx context.Context) (map[string]string, error) {
+	return srvutils.JobList(), nil
 }
 
 // Stop stop the designed Process
-func (pmh *ProcessManagerHandler) Stop(ctx context.Context, uuid string) {
-	utils.ProcessCancelUUID(uuid)
+func (pmh *JobManagerHandler) Stop(ctx context.Context, uuid string) {
+	srvutils.JobCancelUUID(uuid)
 }

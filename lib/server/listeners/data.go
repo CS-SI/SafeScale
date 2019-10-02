@@ -18,6 +18,8 @@ package listeners
 
 import (
 	"context"
+	"fmt"
+
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -25,8 +27,10 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // DataHandler ...
@@ -36,13 +40,15 @@ var DataHandler = handlers.NewDataHandler
 type DataListener struct{}
 
 // List will returns all the files from one or several ObjectStorages
-func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.FileList, error) {
-	// defer timing.TimerWithLevel(fmt.Sprintf("listeners.DataListener::List() called"), log.TraceLevel)()
+func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl *pb.FileList, err error) {
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Data List"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Data List"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants := GetCurrentStorageTenants()
@@ -61,13 +67,16 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb
 }
 
 // Push upload a file to one or several ObjectStorages
-func (s *DataListener) Push(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
-	// defer timing.TimerWithLevel(fmt.Sprintf("listeners.DataListener::Push(%s) called", in.GetLocalPath()), log.TraceLevel)()
+func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
+	objectName := in.GetName()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Data Push"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Data Push"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants := GetCurrentStorageTenants()
@@ -77,7 +86,7 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (*google_protobuf.
 	}
 
 	handler := DataHandler(tenants.StorageServices)
-	err := handler.Push(ctx, in.GetLocalPath(), in.GetName())
+	err = handler.Push(ctx, in.GetLocalPath(), objectName)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
@@ -86,13 +95,16 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (*google_protobuf.
 }
 
 // Get fetch a file from one or several ObjectStorages
-func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
-	// defer timing.TimerWithLevel(fmt.Sprintf("listeners.DataListener::Get(%s) called", in.GetName()), log.TraceLevel)()
+func (s *DataListener) Get(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
+	objectName := in.GetName()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Data Push"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Data Push"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants := GetCurrentStorageTenants()
@@ -102,7 +114,7 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.E
 	}
 
 	handler := DataHandler(tenants.StorageServices)
-	err := handler.Get(ctx, in.GetLocalPath(), in.GetName())
+	err = handler.Get(ctx, in.GetLocalPath(), objectName)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
@@ -111,13 +123,16 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.E
 }
 
 // Delete remove a file from one or several ObjectStorages
-func (s *DataListener) Delete(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
-	// defer timing.TimerWithLevel(fmt.Sprintf("listeners.DataListener::Delete(%s) called", in.GetName()), log.TraceLevel)()
+func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
+	objectName := in.GetName()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Data Delete"); err == nil {
-		defer utils.ProcessDeregister(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Data Delete"); err == nil {
+		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants := GetCurrentStorageTenants()
@@ -127,7 +142,7 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (*google_protobu
 	}
 
 	handler := DataHandler(tenants.StorageServices)
-	err := handler.Delete(ctx, in.GetName())
+	err = handler.Delete(ctx, objectName)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}

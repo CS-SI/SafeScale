@@ -423,16 +423,16 @@ service ShareService{
 }
 
 
-message ProcessDefinition{
+message JobDefinition{
     string uuid = 1;
     string info = 2;
 }
 
-message ProcessList{
-    repeated ProcessDefinition list = 1;
+message JobList{
+    repeated JobDefinition list = 1;
 }
 
-service ProcessManagerService{
-    rpc Stop(ProcessDefinition) returns (google.protobuf.Empty){}
-    rpc List(google.protobuf.Empty) returns (ProcessList){}
+service JobManagerService{
+    rpc Stop(JobDefinition) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (JobList){}
 }
