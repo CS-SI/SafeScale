@@ -18,6 +18,7 @@ package cluster
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -50,7 +51,7 @@ func Load(task concurrency.Task, name string) (api.Cluster, error) {
 	}
 	err = m.Read(task, name)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			return nil, err
 		}
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
@@ -77,7 +78,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 	case Flavor.SWARM:
 		return controller.Restore(task, control.NewForeman(controller, swarm.Makers))
 	default:
-		return utils.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", flavor.String()))
+		return scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", flavor.String()))
 	}
 }
 
@@ -85,14 +86,14 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 func Create(task concurrency.Task, req control.Request) (clu api.Cluster, err error) {
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Validates parameters
 	if req.Name == "" {
-		return nil, utils.InvalidParameterError("req.Name", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("req.Name", "cannot be empty!")
 	}
 	if req.CIDR == "" {
-		return nil, utils.InvalidParameterError("req.CIDR", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("req.CIDR", "cannot be empty!")
 	}
 
 	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
@@ -135,7 +136,7 @@ func Create(task concurrency.Task, req control.Request) (clu api.Cluster, err er
 			return nil, err
 		}
 	default:
-		return nil, utils.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", req.Flavor.String()))
+		return nil, scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", req.Flavor.String()))
 	}
 
 	log.Infof("Cluster '%s' created and initialized successfully", req.Name)

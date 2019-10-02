@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"time"
 
@@ -68,7 +69,7 @@ func NewSSHHandler(svc iaas.Service) *SSHHandler {
 // GetConfig creates SSHConfig to connect to an host
 func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (sshConfig *system.SSHConfig, err error) {
 	if handler == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	// FIXME: validate parameters
 
@@ -90,15 +91,15 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 			hostRef = host.ID
 		}
 	default:
-		return nil, utils.InvalidParameterError("param", "must be either a string or a *resources.Host!")
+		return nil, scerr.InvalidParameterError("param", "must be either a string or a *resources.Host!")
 	}
 	if host == nil {
-		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	cfg, err := handler.service.GetConfigurationOptions()
 	if err != nil {
@@ -150,13 +151,13 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
 func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) {
 	if handler == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
@@ -170,13 +171,13 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 // Run tries to execute command 'cmd' on the host
 func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
-		return -1, "", "", utils.InvalidInstanceError()
+		return -1, "", "", scerr.InvalidInstanceError()
 	}
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	hostSvc := NewHostHandler(handler.service)
@@ -267,13 +268,13 @@ func extractPath(in string) (string, error) {
 // Copy copy file/directory
 func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
-		return -1, "", "", utils.InvalidInstanceError()
+		return -1, "", "", scerr.InvalidInstanceError()
 	}
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostName := ""
 	var upload bool

@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io/ioutil"
 	"math"
 	"net"
@@ -353,7 +354,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			if delerr != nil {
 				log.Warnf("Error deleting network '%s'", network.ID)
 			}
-			err = utils.AddConsequence(err, delerr)
+			err = scerr.AddConsequence(err, delerr)
 		}()
 
 		_, err = metadata.SaveNetwork(serviceProvider, network)

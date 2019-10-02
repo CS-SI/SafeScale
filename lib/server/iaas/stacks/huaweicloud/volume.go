@@ -18,7 +18,7 @@ package huaweicloud
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
 
@@ -123,7 +123,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		if _, ok := err.(gc.ErrDefault404); ok {
 			return nil, resources.ResourceNotFoundError("volume", id)
 		}
-		return nil, utils.Wrap(err, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(err)))
+		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}
 
 	av := resources.Volume{
@@ -159,7 +159,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	})
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)))
+			return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)))
 		}
 		log.Warnf("Complete volume list empty")
 	}

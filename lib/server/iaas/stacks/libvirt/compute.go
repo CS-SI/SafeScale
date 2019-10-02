@@ -27,6 +27,7 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"os"
@@ -107,7 +108,7 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 // ListImages lists available OS images
 func (s *Stack) ListImages() (images []resources.Image, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
@@ -146,10 +147,10 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, utils.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
@@ -196,7 +197,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
@@ -240,7 +241,7 @@ func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
@@ -286,7 +287,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
@@ -318,17 +319,17 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, utils.NotImplementedError("GetKeyPair() not implemented yet")
+	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet")
 }
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, utils.NotImplementedError("ListKeyPairs() not implemented yet")
+	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return utils.NotImplementedError("DeleteKeyPair() not implemented yet")
+	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet")
 }
 
 //-------------HOST MANAGEMENT------------------------------------------------------------------------------------------
@@ -348,7 +349,7 @@ func downloadImage(path string, downloadInfo map[string]interface{}) error {
 			return fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
 		}
 	default:
-		return utils.NotImplementedError(fmt.Sprintf("download method %s not implemented", downloadInfo["method"].(string)))
+		return scerr.NotImplementedError(fmt.Sprintf("download method %s not implemented", downloadInfo["method"].(string)))
 	}
 	return nil
 }
@@ -772,7 +773,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, utils.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 
 	resourceName := request.ResourceName
@@ -860,7 +861,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			networkDefault, err := s.GetNetwork("default")
 			if err != nil {
 				switch err.(type) {
-				case utils.ErrNotFound:
+				case scerr.ErrNotFound:
 					networkDefault, err = s.CreateNetwork(
 						resources.NetworkRequest{
 							Name:      "default",
@@ -965,7 +966,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			if derr := s.DeleteHost(resourceName); derr != nil {
 				fmt.Printf("Failed to Delete the host %s : %s", resourceName, err.Error())
-				err = utils.AddConsequence(err, derr)
+				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -1038,7 +1039,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 // GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
 func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	switch hostParam.(type) {
@@ -1070,7 +1071,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 // GetHostByName returns the host identified by ref (name or id)
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	return s.InspectHost(name)
@@ -1079,7 +1080,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1132,14 +1133,14 @@ func (s *Stack) DeleteHost(id string) error {
 
 // ResizeHost change the template used by an host
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, utils.NotImplementedError("ResizeHost() not implemented yet")
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet")
 }
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	var hosts []*resources.Host
 	if s == nil {
-		return hosts, utils.InvalidInstanceError()
+		return hosts, scerr.InvalidInstanceError()
 	}
 
 	domains, err := s.LibvirtService.ListAllDomains(16383)
@@ -1161,7 +1162,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1180,7 +1181,7 @@ func (s *Stack) StopHost(id string) error {
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1199,7 +1200,7 @@ func (s *Stack) StartHost(id string) error {
 // RebootHost reboot the host identified by id
 func (s *Stack) RebootHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1218,7 +1219,7 @@ func (s *Stack) RebootHost(id string) error {
 // GetHostState returns the host identified by id
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	if s == nil {
-		return HostState.ERROR, utils.InvalidInstanceError()
+		return HostState.ERROR, scerr.InvalidInstanceError()
 	}
 
 	host, err := s.InspectHost(hostParam)
@@ -1233,14 +1234,14 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	return map[string]bool{"local": true}, nil
 }
 
 func (s *Stack) ListRegions() ([]string, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	return []string{"local"}, nil

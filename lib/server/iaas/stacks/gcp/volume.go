@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
 
@@ -36,7 +37,7 @@ import (
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
@@ -93,7 +94,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
@@ -135,7 +136,7 @@ func volumeStateConvert(gcpDriveStatus string) VolumeState.Enum {
 //ListVolumes return the list of all volume known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	var volumes []resources.Volume
@@ -171,7 +172,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(ref string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	service := s.ComputeService
@@ -197,7 +198,7 @@ func (s *Stack) DeleteVolume(ref string) error {
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
 	if s == nil {
-		return "", utils.InvalidInstanceError()
+		return "", scerr.InvalidInstanceError()
 	}
 
 	service := s.ComputeService
@@ -240,7 +241,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	dat := newGcpDiskAttachmentFromID(id)
@@ -272,7 +273,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 // DeleteVolumeAttachment ...
 func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	service := s.ComputeService
@@ -311,7 +312,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	var vats []resources.VolumeAttachment

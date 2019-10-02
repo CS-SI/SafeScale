@@ -21,6 +21,7 @@ package local
 import (
 	"encoding/xml"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"math"
 	"net"
 	"regexp"
@@ -32,8 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	libvirt "github.com/libvirt/libvirt-go"
+	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -134,16 +134,16 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	if ipVersion != IPVersion.IPv4 {
 		// TODO implement IPV6 networks
-		return nil, utils.NotImplementedError("only ipv4 networks are implemented")
+		return nil, scerr.NotImplementedError("only ipv4 networks are implemented")
 	}
 	if len(dns) != 0 {
 		// TODO implement DNS for networks
-		return nil, utils.NotImplementedError("DNS not implemented yet in networks creation")
+		return nil, scerr.NotImplementedError("DNS not implemented yet in networks creation")
 	}
 
 	libvirtNetwork, err := getNetworkFromRef(name, s.LibvirtService)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -337,25 +337,25 @@ func (s *Stack) DeleteGateway(ref string) error {
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
-	return nil, utils.NotImplementedError("CreateVIP() not implemented yet")
+	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet")
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
-	return utils.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet")
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
-	return utils.NotImplementedError("BindHostToVIP() not implemented yet")
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet")
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
-	return utils.NotImplementedError("UnbindHostFromVIP() not implemented yet")
+	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet")
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s *Stack) DeleteVIP(vip *resources.VIP) error {
-	return utils.NotImplementedError("DeleteVIP() not implemented yet")
+	return scerr.NotImplementedError("DeleteVIP() not implemented yet")
 }

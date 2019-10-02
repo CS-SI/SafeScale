@@ -17,9 +17,9 @@
 package serialize
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -56,18 +56,18 @@ type SyncedJSONProperty struct {
 // The lock applied on the extension is automatically released on exit.
 func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error) {
 	if sp == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if sp.jsonProperty == nil {
-		return utils.InvalidParameterError("sp.jsonProperty", "can't be nil")
+		return scerr.InvalidParameterError("sp.jsonProperty", "can't be nil")
 	}
 	if apply == nil {
-		return utils.InvalidParameterError("apply", "can't be nil")
+		return scerr.InvalidParameterError("apply", "can't be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitTraceError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)
 	defer sp.unlock()
 
 	if data, ok := sp.jsonProperty.Data.(Property); ok {

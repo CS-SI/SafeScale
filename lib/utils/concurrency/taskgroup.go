@@ -19,12 +19,11 @@ package concurrency
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // TaskGroupResult is a map of the TaskResult of each task
@@ -198,7 +197,7 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, utils.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tg.GetID()), duration, nil)
+			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tg.GetID()), duration, nil)
 		default:
 			ok, result, err := tg.TryWait()
 			if ok {

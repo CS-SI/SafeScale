@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
@@ -88,17 +89,17 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources.Volume, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if request.Name == "" {
-		return nil, utils.InvalidParameterError("request.Name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("request.Name", "can't be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.Name), true).WithStopwatch().GoingIn().OnExitTrace()
 
 	volume, err = s.GetVolume(request.Name)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -161,7 +162,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 		err = fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
+		return nil, scerr.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
 	}
 
 	return &v, nil
@@ -170,10 +171,10 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, utils.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
@@ -184,7 +185,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		if _, ok := err.(gc.ErrDefault404); ok {
 			return nil, resources.ResourceNotFoundError("volume", id)
 		}
-		return nil, utils.Wrap(err, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(err)))
+		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(err)))
 	}
 
 	av := resources.Volume{
@@ -200,7 +201,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 // ListVolumes returns the list of all volumes known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()
@@ -226,7 +227,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	})
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, utils.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
+			return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 		}
 		log.Warnf("Complete volume list empty")
 	}
@@ -236,10 +237,10 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) (err error) {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return utils.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "("+id+")", true).WithStopwatch().GoingIn().OnExitTrace()
@@ -279,10 +280,10 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
 	if s == nil {
-		return "", utils.InvalidInstanceError()
+		return "", scerr.InvalidInstanceError()
 	}
 	if request.Name == "" {
-		return "", utils.InvalidParameterError("request.Name", "can't be empty string")
+		return "", scerr.InvalidParameterError("request.Name", "can't be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "("+request.Name+")", true).WithStopwatch().GoingIn().OnExitTrace()
@@ -299,7 +300,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		// }
 		// message := extractMessageFromBadRequest(r.Err)
 		// if message != ""
-		return "", utils.Wrap(err, fmt.Sprintf("error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
+		return "", scerr.Wrap(err, fmt.Sprintf("error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
 	}
 
 	return va.ID, nil
@@ -308,20 +309,20 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return nil, utils.InvalidParameterError("serverID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("serverID", "can't be empty string")
 	}
 	if id == "" {
-		return nil, utils.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "('"+serverID+"', '"+id+"')", true).WithStopwatch().GoingIn().OnExitTrace()
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
+		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
 	}
 	return &resources.VolumeAttachment{
 		ID:       va.ID,
@@ -334,10 +335,10 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return nil, utils.InvalidParameterError("serverID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("serverID", "can't be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "('"+serverID+"')", true).WithStopwatch().GoingIn().OnExitTrace()
@@ -346,7 +347,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	err := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumeattach.ExtractVolumeAttachments(page)
 		if err != nil {
-			return false, utils.Wrap(err, "Error listing volume attachment: extracting attachments")
+			return false, scerr.Wrap(err, "Error listing volume attachment: extracting attachments")
 		}
 		for _, va := range list {
 			ava := resources.VolumeAttachment{
@@ -360,7 +361,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 		return true, nil
 	})
 	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
+		return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 	}
 	return vs, nil
 }
@@ -368,13 +369,13 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return utils.InvalidParameterError("serverID", "can't be empty string")
+		return scerr.InvalidParameterError("serverID", "can't be empty string")
 	}
 	if vaID == "" {
-		return utils.InvalidParameterError("vaID", "can't be empty string")
+		return scerr.InvalidParameterError("vaID", "can't be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "('"+serverID+"', '"+vaID+"')", true).WithStopwatch().GoingIn().OnExitTrace()
@@ -382,7 +383,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {
-		return utils.Wrap(err, fmt.Sprintf("error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
+		return scerr.Wrap(err, fmt.Sprintf("error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
 	}
 	return nil
 }

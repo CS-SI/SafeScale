@@ -19,11 +19,11 @@ package objectstorage
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io"
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/graymeta/stow"
 	log "github.com/sirupsen/logrus"
@@ -84,7 +84,7 @@ func (o *object) Stored() bool {
 // Reload reloads the data of the Object from the Object Storage
 func (o *object) Reload() error {
 	if o == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()
@@ -110,10 +110,10 @@ func (o *object) reloadFromItem(item stow.Item) error {
 // Read reads the content of the object from Object Storage and writes it in 'target'
 func (o *object) Read(target io.Writer, from, to int64) error {
 	if target == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if from > to {
-		return utils.InvalidParameterError("from", "can't be greater than 'to'")
+		return scerr.InvalidParameterError("from", "can't be greater than 'to'")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", from, to), false /*Trace.Controller*/).GoingIn().OnExitTrace()
@@ -182,13 +182,13 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 	// log.Debugf("objectstorage.object<%s:%s>.Write() called", o.bucket.Name, o.Name)
 	// defer log.Debugf("objectstorage.object<%s:%s>.Write() done", o.bucket.Name, o.Name)
 	if o == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if source == nil {
-		return utils.InvalidParameterError("source", "can't be nil")
+		return scerr.InvalidParameterError("source", "can't be nil")
 	}
 	if o.bucket == nil {
-		return utils.InvalidParameterError("o.bucket", "can't be nil")
+		return scerr.InvalidParameterError("o.bucket", "can't be nil")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()
@@ -204,7 +204,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) error {
 	if o == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", sourceSize, chunkSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()
@@ -260,7 +260,7 @@ func writeChunk(
 // Delete deletes the object from Object Storage
 func (o *object) Delete() error {
 	if o.item == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()
@@ -309,7 +309,7 @@ func (o *object) GetName() string {
 // GetLastUpdate returns the date of last update
 func (o *object) GetLastUpdate() (time.Time, error) {
 	if o == nil {
-		return time.Time{}, utils.InvalidInstanceError()
+		return time.Time{}, scerr.InvalidInstanceError()
 	}
 
 	if o.item != nil {

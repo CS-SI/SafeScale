@@ -18,7 +18,7 @@ package ovh
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/ovh/go-ovh/ovh"
 )
@@ -59,11 +59,11 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 			return nil, err
 		}
 	case "PUT":
-		return nil, utils.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
 	case "POST":
-		return nil, utils.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
 	case "DELETE":
-		return nil, utils.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
 	default:
 		return nil, fmt.Errorf("unexpected HTTP code : %s", httpCode)
 	}

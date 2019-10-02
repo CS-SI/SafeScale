@@ -18,10 +18,10 @@ package nfs
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
-	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // Server structure
@@ -32,7 +32,7 @@ type Server struct {
 // NewServer instantiates a new nfs.Server struct
 func NewServer(sshconfig *system.SSHConfig) (srv *Server, err error) {
 	if sshconfig == nil {
-		return nil, utils.InvalidParameterError("sshconfig", "can't be nil")
+		return nil, scerr.InvalidParameterError("sshconfig", "can't be nil")
 	}
 
 	server := Server{

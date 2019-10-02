@@ -17,8 +17,8 @@
 package concurrency
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Shielded allows to store data with controlled access to it
@@ -59,16 +59,16 @@ func (d *Shielded) Clone() *Shielded {
 // Inspect is used to lock a clonable for read
 func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) error) error {
 	if d == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return utils.InvalidParameterError("task", "can't be nil")
+		return scerr.InvalidParameterError("task", "can't be nil")
 	}
 	if inspector == nil {
-		return utils.InvalidParameterError("inspector", "can't be nil")
+		return scerr.InvalidParameterError("inspector", "can't be nil")
 	}
 	if d.witness == nil {
-		return utils.InvalidParameterError("d.witness", "can't be nil; use concurency.NewShielded() to instanciate")
+		return scerr.InvalidParameterError("d.witness", "can't be nil; use concurency.NewShielded() to instanciate")
 	}
 	d.lock.RLock(task)
 	defer d.lock.RUnlock(task)
@@ -96,16 +96,16 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 // Alter allows to update a clonable using a write lock
 func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) error {
 	if d == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return utils.InvalidParameterError("task", "can't be nil")
+		return scerr.InvalidParameterError("task", "can't be nil")
 	}
 	if alterer == nil {
-		return utils.InvalidParameterError("alterer", "can't be nil")
+		return scerr.InvalidParameterError("alterer", "can't be nil")
 	}
 	if d.witness == nil {
-		return utils.InvalidParameterError("d.witness", "can't be nil; use concurency.NewData() to instanciate")
+		return scerr.InvalidParameterError("d.witness", "can't be nil; use concurency.NewData() to instanciate")
 	}
 
 	d.lock.Lock(task)

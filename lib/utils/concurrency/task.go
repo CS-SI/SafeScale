@@ -19,13 +19,12 @@ package concurrency
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // TaskStatus ...
@@ -256,7 +255,7 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 			// tracer.Trace("receiving abort signal")
 			t.lock.Lock()
 			t.status = ABORTED
-			t.err = utils.AbortedError()
+			t.err = scerr.AbortedError()
 			t.lock.Unlock()
 			finish = true
 		}
@@ -346,7 +345,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, utils.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", t.GetID()), duration, nil)
+			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", t.GetID()), duration, nil)
 		default:
 			ok, result, err := t.TryWait()
 			if ok {

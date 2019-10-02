@@ -19,9 +19,9 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -54,12 +54,12 @@ func NewBucketHandler(svc iaas.Service) BucketAPI {
 // List retrieves all available buckets
 func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error) {
 	if handler == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	rv, err = handler.service.ListBuckets(objectstorage.RootPath)
 	return rv, err
@@ -68,15 +68,15 @@ func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error)
 // Create a bucket
 func (handler *BucketHandler) Create(ctx context.Context, name string) (err error) {
 	if handler == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return utils.InvalidParameterError("name", "can't be empty string")
+		return scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
@@ -98,7 +98,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) {
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	err = handler.service.DeleteBucket(name)
 	if err != nil {
@@ -111,7 +111,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	b, err := handler.service.GetBucket(name)
 	if err != nil {
@@ -130,7 +130,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Check bucket existence
 	_, err = handler.service.GetBucket(bucketName)
@@ -197,12 +197,12 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Check bucket existence
 	_, err = handler.Inspect(ctx, bucketName)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			return err
 		}
 		return err
@@ -212,7 +212,7 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 	hostHandler := NewHostHandler(handler.service)
 	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			return err
 		}
 		return err

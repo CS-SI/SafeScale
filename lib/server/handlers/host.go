@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"os/user"
 	"strings"
@@ -78,7 +79,7 @@ func NewHostHandler(svc iaas.Service) HostAPI {
 func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -91,7 +92,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	err = handler.service.StartHost(id)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -101,7 +102,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	err = handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -115,7 +116,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -128,7 +129,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	err = handler.service.StopHost(id)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -138,7 +139,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	err = handler.service.WaitHostState(id, HostState.STOPPED, utils.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -151,7 +152,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -164,7 +165,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	err = handler.service.RebootHost(id)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -178,9 +179,9 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case utils.ErrTimeout:
+		case scerr.ErrTimeout:
 			return retryErr
-		case utils.ErrNotFound:
+		case scerr.ErrNotFound:
 			return retryErr
 		default:
 			return retryErr
@@ -194,7 +195,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -218,7 +219,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrTimeout, utils.ErrNotFound:
+		case scerr.ErrTimeout, scerr.ErrNotFound:
 			return nil, err
 		default:
 			return nil, err
@@ -247,7 +248,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	newHost, err = handler.service.ResizeHost(id, hostSizeRequest)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrTimeout, utils.ErrNotFound:
+		case scerr.ErrTimeout, scerr.ErrNotFound:
 			return nil, err
 		default:
 			return nil, err
@@ -272,16 +273,16 @@ func (handler *HostHandler) Create(
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if handler == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, utils.InvalidParameterError("ctx", "can't be nil")
+		return nil, scerr.InvalidParameterError("ctx", "can't be nil")
 	}
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
 	var (
@@ -294,14 +295,14 @@ func (handler *HostHandler) Create(
 	case string:
 		templateName = sizingParam
 	default:
-		return nil, utils.InvalidParameterError("sizing", "must be *resources.SizingRequirements or string")
+		return nil, scerr.InvalidParameterError("sizing", "must be *resources.SizingRequirements or string")
 	}
 
 	host, err := handler.service.GetHostByName(name)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrNotFound:
-		case utils.ErrTimeout:
+		case scerr.ErrNotFound:
+		case scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -321,7 +322,7 @@ func (handler *HostHandler) Create(
 		networkHandler := NewNetworkHandler(handler.service)
 		defaultNetwork, err = networkHandler.Inspect(ctx, net)
 		if err != nil {
-			if _, ok := err.(utils.ErrNotFound); ok {
+			if _, ok := err.(scerr.ErrNotFound); ok {
 				return nil, err
 			}
 			return nil, err
@@ -357,7 +358,7 @@ func (handler *HostHandler) Create(
 		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
 		if err != nil {
 			switch err.(type) {
-			case utils.ErrNotFound, utils.ErrTimeout:
+			case scerr.ErrNotFound, scerr.ErrTimeout:
 				return nil, err
 			default:
 				return nil, err
@@ -385,7 +386,7 @@ func (handler *HostHandler) Create(
 		template, err = handler.service.SelectTemplateByName(templateName)
 		if err != nil {
 			switch err.(type) {
-			case utils.ErrNotFound, utils.ErrTimeout:
+			case scerr.ErrNotFound, scerr.ErrTimeout:
 				return nil, err
 			default:
 				return nil, err
@@ -404,7 +405,7 @@ func (handler *HostHandler) Create(
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, retryErr
 		default:
 			return nil, retryErr
@@ -425,9 +426,9 @@ func (handler *HostHandler) Create(
 	host, userData, err = handler.service.CreateHost(hostRequest)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrInvalidRequest:
+		case scerr.ErrInvalidRequest:
 			return nil, err
-		case utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -438,15 +439,15 @@ func (handler *HostHandler) Create(
 			derr := handler.service.DeleteHost(host.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case utils.ErrNotFound:
+				case scerr.ErrNotFound:
 					log.Errorf("Failed to delete host '%s', resource not found: %v", host.Name, derr)
-				case utils.ErrTimeout:
+				case scerr.ErrTimeout:
 					log.Errorf("Failed to delete host '%s', timeout: %v", host.Name, derr)
 				default:
 					log.Errorf("Failed to delete host '%s', other reason: %v", host.Name, derr)
 				}
 			}
-			err = utils.AddConsequence(err, derr)
+			err = scerr.AddConsequence(err, derr)
 		}
 	}()
 
@@ -472,7 +473,7 @@ func (handler *HostHandler) Create(
 			derr := mh.Delete()
 			if derr != nil {
 				log.Errorf("failed to remove host metadata after host creation failure")
-				err = utils.AddConsequence(err, derr)
+				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -587,7 +588,7 @@ func (handler *HostHandler) Create(
 		derr := err
 		err = nil
 		if client.IsTimeoutError(derr) {
-			return nil, utils.Wrap(derr, fmt.Sprintf("timeout waiting host '%s' to become ready", host.Name))
+			return nil, scerr.Wrap(derr, fmt.Sprintf("timeout waiting host '%s' to become ready", host.Name))
 		}
 
 		if client.IsProvisioningError(derr) {
@@ -595,7 +596,7 @@ func (handler *HostHandler) Create(
 			return nil, fmt.Errorf("failed to provision host '%s', please check safescaled logs", host.Name)
 		}
 
-		return nil, utils.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
+		return nil, scerr.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
 	}
 
 	// Updates host link with networks
@@ -724,7 +725,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	network, err = handler.service.GetNetworkByName(resources.SingleHostNetworkName)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrInvalidRequest, utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -743,7 +744,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	network, err = handler.service.CreateNetwork(request)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrInvalidRequest, utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -761,7 +762,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if all {
 		return handler.service.ListHosts()
@@ -783,7 +784,7 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host *resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	host, err = handler.Inspect(ctx, ref)
 	if err != nil {
@@ -798,11 +799,11 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			return nil, resources.ResourceNotFoundError("host", ref)
 		}
 		return nil, err
@@ -812,7 +813,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrInvalidRequest, utils.ErrNotFound, utils.ErrTimeout:
+		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -830,11 +831,11 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			return resources.ResourceNotFoundError("host", ref)
 		}
 		return err
@@ -957,9 +958,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	err = handler.service.DeleteHost(host.ID) // FIXME DeleteHost, check retry.ErrTimeout
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrNotFound:
+		case scerr.ErrNotFound:
 			deleteMetadataOnly = true
-		case utils.ErrTimeout:
+		case scerr.ErrTimeout:
 			moreTimeNeeded = true
 		default:
 			return err
@@ -1035,7 +1036,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 func (handler *HostHandler) SSH(ctx context.Context, ref string) (sshConfig *system.SSHConfig, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	sshHandler := NewSSHHandler(handler.service)
 	sshConfig, err = sshHandler.GetConfig(ctx, ref)

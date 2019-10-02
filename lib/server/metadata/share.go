@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -263,15 +264,15 @@ func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) 
 //        If retry times out, return errNotFound
 func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	if svc == nil {
-		return "", utils.InvalidParameterError("svc", "can't be nil")
+		return "", scerr.InvalidParameterError("svc", "can't be nil")
 	}
 	if ref == "" {
-		return "", utils.InvalidParameterError("ref", "can't be empty string")
+		return "", scerr.InvalidParameterError("ref", "can't be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<svc>, '"+ref+"')", true).GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ms := NewShare(svc)
 
@@ -279,7 +280,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 		func() error {
 			innerErr := ms.ReadByReference(ref)
 			if innerErr != nil {
-				if _, ok := innerErr.(utils.ErrNotFound); ok {
+				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.StopRetryError("no metadata found", innerErr)
 				}
 				return innerErr
@@ -292,8 +293,8 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	// If retry timed out, log it and return error ErrNotFound
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(utils.ErrTimeout); !ok {
-			return "", utils.Cause(retryErr)
+		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
+			return "", scerr.Cause(retryErr)
 		}
 		return "", retryErr
 	}

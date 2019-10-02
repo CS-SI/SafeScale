@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/davecgh/go-spew/spew"
 	"strconv"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	timeouts "github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
@@ -38,7 +38,7 @@ import (
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	// disable subnetwork auto-creation
@@ -237,7 +237,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 // GetNetwork returns the network identified by ref (id or name)
 func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	nets, err := s.ListNetworks()
@@ -256,7 +256,7 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 // GetNetworkByName returns the network identified by ref (id or name)
 func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	nets, err := s.ListNetworks()
@@ -275,7 +275,7 @@ func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	var networks []*resources.Network
@@ -326,7 +326,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(ref string) (err error) {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	theNetwork, err := s.GetNetwork(ref)
@@ -369,7 +369,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, timeouts.GetMinDelay(), timeouts.GetHostCleanupTimeout())
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrTimeout:
+		case scerr.ErrTimeout:
 			logrus.Warnf("Timeout waiting for subnetwork deletion")
 			return err
 		default:
@@ -428,10 +428,10 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
 	if s == nil {
-		return nil, nil, utils.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 	if req.Network == nil {
-		return nil, nil, utils.InvalidParameterError("req.Network", "can't be nil")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "can't be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {
@@ -450,7 +450,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrInvalidRequest:
+		case scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
 			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
@@ -478,25 +478,25 @@ func (s *Stack) DeleteGateway(ref string) error {
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
-	return nil, utils.NotImplementedError("CreateVIP() not implemented yet")
+	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet")
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
-	return utils.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet")
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
-	return utils.NotImplementedError("BindHostToVIP() not implemented yet")
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet")
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
-	return utils.NotImplementedError("UnbindHostFromVIP() not implemented yet")
+	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet")
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s *Stack) DeleteVIP(vip *resources.VIP) error {
-	return utils.NotImplementedError("DeleteVIP() not implemented yet")
+	return scerr.NotImplementedError("DeleteVIP() not implemented yet")
 }

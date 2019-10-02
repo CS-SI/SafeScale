@@ -19,7 +19,7 @@ package commands
 import (
 	"bufio"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"os/exec"
 
@@ -105,7 +105,7 @@ func extractClusterArgument(c *cli.Context) error {
 		}
 		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
-			if _, ok := err.(utils.ErrNotFound); ok {
+			if _, ok := err.(scerr.ErrNotFound); ok {
 				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
 				return cli.NewExitError(msg, int(ExitCode.NotFound))
 			}

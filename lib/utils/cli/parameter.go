@@ -18,11 +18,10 @@ package cli
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
 	"text/scanner"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // Token describes a token (<keyword> <operator> <value>)
@@ -42,7 +41,7 @@ func NewToken() *Token {
 // Push sets an item of the token based on its current content
 func (t *Token) Push(item string) error {
 	if t.IsFull() {
-		return utils.NotAvailableError("token is full")
+		return scerr.NotAvailableError("token is full")
 	}
 
 	item = strings.ToLower(item)
@@ -61,7 +60,7 @@ func (t *Token) GetKeyword() (string, error) {
 	if t.pos > 0 {
 		return t.members[0], nil
 	}
-	return "", utils.InvalidRequestError("keyword is not set in token")
+	return "", scerr.InvalidRequestError("keyword is not set in token")
 }
 
 // GetOperator returns the operator member of the token (pos == 1)
@@ -69,7 +68,7 @@ func (t *Token) GetOperator() (string, error) {
 	if t.pos > 1 {
 		return t.members[1], nil
 	}
-	return "", utils.InvalidRequestError("operator is not set in token")
+	return "", scerr.InvalidRequestError("operator is not set in token")
 }
 
 // GetValue returns the value member of the token (pos == 2)
@@ -77,7 +76,7 @@ func (t *Token) GetValue() (string, error) {
 	if t.pos > 2 {
 		return t.members[2], nil
 	}
-	return "", utils.InvalidRequestError("value is not set in token")
+	return "", scerr.InvalidRequestError("value is not set in token")
 }
 
 // String returns a string representing the token
@@ -88,7 +87,7 @@ func (t *Token) String() string {
 // Validate validates value in relation with operator, and returns min and max values if validated
 func (t *Token) Validate() (string, string, error) {
 	if !t.IsFull() {
-		return "", "", utils.InvalidRequestError("token isn't complete")
+		return "", "", scerr.InvalidRequestError("token isn't complete")
 	}
 
 	keyword := t.members[0]
@@ -101,7 +100,7 @@ func (t *Token) Validate() (string, string, error) {
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 			return fmt.Sprintf("%.01f", valf), fmt.Sprintf("%.01f", 2*valf), nil
 		}
@@ -111,17 +110,17 @@ func (t *Token) Validate() (string, string, error) {
 			value = value[1 : len(value)-1]
 			splitted := strings.Split(value, "-")
 			if len(splitted) != 2 {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of '%s' token isn't a valid interval", value, keyword))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of '%s' token isn't a valid interval", value, keyword))
 			}
 			min := splitted[0]
 			_, err := strconv.ParseFloat(min, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error()))
 			}
 			max := splitted[1]
 			_, err = strconv.ParseFloat(max, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error()))
 			}
 			return min, max, nil
 		}
@@ -129,7 +128,7 @@ func (t *Token) Validate() (string, string, error) {
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 		}
 		return value, value, nil
@@ -141,7 +140,7 @@ func (t *Token) Validate() (string, string, error) {
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 			return "", fmt.Sprintf("%.01f", valf-0.1), nil
 		}
@@ -154,7 +153,7 @@ func (t *Token) Validate() (string, string, error) {
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 		}
 		return "", value, nil
@@ -166,7 +165,7 @@ func (t *Token) Validate() (string, string, error) {
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 			return fmt.Sprintf("%.01f", valf+0.1), "", nil
 		}
@@ -179,13 +178,13 @@ func (t *Token) Validate() (string, string, error) {
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 		}
 		return value, "", nil
 	}
 
-	return "", "", utils.InvalidRequestError(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
+	return "", "", scerr.InvalidRequestError(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
 }
 
 // ParseParameter transforms a string to a list of tokens

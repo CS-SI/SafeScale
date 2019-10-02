@@ -19,7 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
-	errors "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"google.golang.org/grpc/status"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -64,7 +64,7 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 	handler := BucketHandler(tenant.Service)
 	buckets, err := handler.List(ctx)
 	if err != nil {
-		tbr := errors.Wrap(err, "Can't list buckets")
+		tbr := scerr.Wrap(err, "Can't list buckets")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
@@ -90,7 +90,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 	handler := BucketHandler(tenant.Service)
 	err := handler.Create(ctx, bucketName)
 	if err != nil {
-		tbr := errors.Wrap(err, "can't create bucket")
+		tbr := scerr.Wrap(err, "can't create bucket")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
@@ -117,7 +117,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_pro
 	handler := BucketHandler(tenant.Service)
 	err := handler.Delete(ctx, bucketName)
 	if err != nil {
-		tbr := errors.Wrap(err, "can't delete bucket")
+		tbr := scerr.Wrap(err, "can't delete bucket")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
@@ -143,7 +143,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.Bucket
 	handler := BucketHandler(tenant.Service)
 	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
-		tbr := errors.Wrap(err, "can't inspect bucket")
+		tbr := scerr.Wrap(err, "can't inspect bucket")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 	if resp == nil {

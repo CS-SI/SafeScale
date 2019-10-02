@@ -19,7 +19,7 @@ package retry
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"reflect"
 	"testing"
 	"time"
@@ -52,7 +52,7 @@ func quick_sleepy_failure() error {
 func complex_sleepy_failure() error {
 	fmt.Println("Quick fail")
 	time.Sleep(1 * time.Second)
-	return utils.NotFoundError("Not here")
+	return scerr.NotFoundError("Not here")
 }
 
 func CreateErrorWithNConsequences(n uint) (err error) {
@@ -60,7 +60,7 @@ func CreateErrorWithNConsequences(n uint) (err error) {
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
-			err = utils.AddConsequence(err, nerr)
+			err = scerr.AddConsequence(err, nerr)
 		}
 	}
 	return err
@@ -69,7 +69,7 @@ func CreateErrorWithNConsequences(n uint) (err error) {
 func CreateSkippableError() (err error) {
 	err = WhileSuccessfulDelay1Second(func() error {
 		fmt.Println("Around the world...")
-		return StopRetryError("no more", utils.NotFoundError("wrong place"))
+		return StopRetryError("no more", scerr.NotFoundError("wrong place"))
 	}, time.Minute)
 	return err
 }
@@ -79,7 +79,7 @@ func CreateComplexErrorWithNConsequences(n uint) (err error) {
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
-			err = utils.AddConsequence(err, nerr)
+			err = scerr.AddConsequence(err, nerr)
 		}
 	}
 	return err
@@ -95,7 +95,7 @@ func JustThrowError() (err error) {
 
 func JustThrowComplexError() (err error) {
 	err = resources.ResourceDuplicateError("host", "booboo")
-	err = utils.AddConsequence(err, fmt.Errorf("cleanup error"))
+	err = scerr.AddConsequence(err, fmt.Errorf("cleanup error"))
 	return err
 }
 
@@ -104,7 +104,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (err error) {
 		if err != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				err = utils.AddConsequence(err, nerr)
+				err = scerr.AddConsequence(err, nerr)
 			}
 		}
 	}()
@@ -118,7 +118,7 @@ func CreateWrappedDeferredErrorWithNConsequences(n uint) (err error) {
 		if err != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				err = utils.AddConsequence(err, nerr)
+				err = scerr.AddConsequence(err, nerr)
 			}
 		}
 	}()
@@ -130,7 +130,7 @@ func CreateWrappedDeferredErrorWithNConsequences(n uint) (err error) {
 func TestDeferredWrappedConsequence(t *testing.T) {
 	recovered := CreateWrappedDeferredErrorWithNConsequences(1)
 	if recovered != nil {
-		cons := utils.Consequences(recovered)
+		cons := scerr.Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
 		} else {
@@ -144,23 +144,23 @@ func TestDeferredWrappedConsequence(t *testing.T) {
 func TestVerifyErrorType(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(utils.ErrTimeout); !ok {
+		if _, ok := recovered.(scerr.ErrTimeout); !ok {
 			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := utils.Cause(recovered); cause != nil {
+		if cause := scerr.Cause(recovered); cause != nil {
 			fmt.Println(cause.Error())
 		}
 	}
 
 	recovered = CreateComplexErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(utils.ErrTimeout); !ok {
+		if _, ok := recovered.(scerr.ErrTimeout); !ok {
 			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := utils.Cause(recovered); cause != nil {
-			if _, ok := cause.(utils.ErrNotFound); !ok {
+		if cause := scerr.Cause(recovered); cause != nil {
+			if _, ok := cause.(scerr.ErrNotFound); !ok {
 				t.Errorf("It should be a ErrNotFound, but it's [%s]", reflect.TypeOf(recovered).String())
 			}
 		}
@@ -170,12 +170,12 @@ func TestVerifyErrorType(t *testing.T) {
 func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
 	if recovered != nil {
-		if _, ok := recovered.(utils.ErrTimeout); ok {
+		if _, ok := recovered.(scerr.ErrTimeout); ok {
 			t.Errorf("It should NOT be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := utils.Cause(recovered); cause != nil {
-			if _, ok := cause.(utils.ErrNotFound); ok {
+		if cause := scerr.Cause(recovered); cause != nil {
+			if _, ok := cause.(scerr.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
 				t.Errorf("This should be a NotFound error...")
@@ -187,8 +187,8 @@ func TestSkipRetries(t *testing.T) {
 func TestAddingConsequencesToABasicError(t *testing.T) {
 	recovered := JustThrowBasicError()
 	if recovered != nil {
-		recovered = utils.AddConsequence(recovered, fmt.Errorf("another mishap"))
-		cons := utils.Consequences(recovered)
+		recovered = scerr.AddConsequence(recovered, fmt.Errorf("another mishap"))
+		cons := scerr.Consequences(recovered)
 		if len(cons) != 0 {
 			t.Errorf("This error should have NO consequences because it's a basic error...")
 		}
@@ -198,7 +198,7 @@ func TestAddingConsequencesToABasicError(t *testing.T) {
 func TestConsequence(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
-		cons := utils.Consequences(recovered)
+		cons := scerr.Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
 		}
@@ -206,7 +206,7 @@ func TestConsequence(t *testing.T) {
 
 	recovered = CreateErrorWithNConsequences(0)
 	if recovered != nil {
-		cons := utils.Consequences(recovered)
+		cons := scerr.Consequences(recovered)
 		if len(cons) != 0 {
 			t.Errorf("This error should have NO consequences...")
 		}
@@ -214,8 +214,8 @@ func TestConsequence(t *testing.T) {
 
 	recovered = JustThrowError()
 	if recovered != nil {
-		recovered = utils.AddConsequence(recovered, fmt.Errorf("another disgrace"))
-		cons := utils.Consequences(recovered)
+		recovered = scerr.AddConsequence(recovered, fmt.Errorf("another disgrace"))
+		cons := scerr.Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
 		}
@@ -223,7 +223,7 @@ func TestConsequence(t *testing.T) {
 
 	recovered = JustThrowComplexError()
 	if recovered != nil {
-		cons := utils.Consequences(recovered)
+		cons := scerr.Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
 		}
@@ -233,7 +233,7 @@ func TestConsequence(t *testing.T) {
 func TestDeferredConsequence(t *testing.T) {
 	recovered := CreateDeferredErrorWithNConsequences(1)
 	if recovered != nil {
-		cons := utils.Consequences(recovered)
+		cons := scerr.Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
 		} else {
@@ -245,7 +245,7 @@ func TestDeferredConsequence(t *testing.T) {
 
 	recovered = CreateDeferredErrorWithNConsequences(0)
 	if recovered != nil {
-		cons := utils.Consequences(recovered)
+		cons := scerr.Consequences(recovered)
 		if len(cons) != 0 {
 			t.Errorf("This error should have NO consequences...")
 		}
@@ -255,7 +255,7 @@ func TestDeferredConsequence(t *testing.T) {
 func TestDeferredConsequenceText(t *testing.T) {
 	recovered := CreateDeferredErrorWithNConsequences(2)
 	if recovered != nil {
-		cons := utils.Consequences(recovered)
+		cons := scerr.Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
 		} else {
@@ -374,7 +374,7 @@ func genErr() error {
 func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
 
-	if _, ok := nerr.(utils.ErrNotFound); !ok {
+	if _, ok := nerr.(scerr.ErrNotFound); !ok {
 		t.Errorf("Is not a resourceNotFound")
 	}
 }
