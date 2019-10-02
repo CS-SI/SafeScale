@@ -78,8 +78,8 @@ func NewHostHandler(svc iaas.Service) HostAPI {
 // Start starts a host
 func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -115,8 +115,8 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 // Stop stops a host
 func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -151,8 +151,8 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 // Reboot reboots a host
 func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -194,8 +194,8 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 // Resize ...
 func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -272,8 +272,8 @@ func (handler *HostHandler) Create(
 ) (newHost *resources.Host, err error) {
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -761,8 +761,8 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 // List returns the host list
 func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if all {
 		return handler.service.ListHosts()
@@ -783,8 +783,8 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 // If not found, return (nil, err)
 func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host *resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	host, err = handler.Inspect(ctx, ref)
 	if err != nil {
@@ -798,8 +798,8 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 // If not found, returns (nil, nil)
 func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -830,8 +830,8 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 // Delete deletes host referenced by ref
 func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -1035,8 +1035,8 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 // SSH returns ssh parameters to access the host referenced by ref
 func (handler *HostHandler) SSH(ctx context.Context, ref string) (sshConfig *system.SSHConfig, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	sshHandler := NewSSHHandler(handler.service)
 	sshConfig, err = sshHandler.GetConfig(ctx, ref)

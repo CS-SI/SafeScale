@@ -86,7 +86,7 @@ func (tm *taskedLock) RLock(task Task) {
 // only if no lock for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) {
 	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	tid := task.GetID()
 
@@ -113,7 +113,7 @@ func (tm *taskedLock) RUnlock(task Task) {
 // Lock acquires a write lock.
 func (tm *taskedLock) Lock(task Task) {
 	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	tid := task.GetID()
 
@@ -139,7 +139,7 @@ func (tm *taskedLock) Lock(task Task) {
 // Unlock releases a write lock
 func (tm *taskedLock) Unlock(task Task) {
 	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	tid := task.GetID()
 

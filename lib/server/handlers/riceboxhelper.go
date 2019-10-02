@@ -32,7 +32,7 @@ import (
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)()
 
 	box, err := rice.FindBox("../handlers/scripts")
 	if err != nil {

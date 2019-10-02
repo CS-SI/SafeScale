@@ -271,8 +271,8 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<svc>, '"+ref+"')", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ms := NewShare(svc)
 

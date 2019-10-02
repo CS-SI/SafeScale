@@ -172,8 +172,8 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	sshClt := client.New().SSH
 	networkError := false

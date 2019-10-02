@@ -207,8 +207,8 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mv = NewVolume(svc)
 

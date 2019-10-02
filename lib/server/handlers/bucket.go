@@ -58,8 +58,8 @@ func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error)
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	rv, err = handler.service.ListBuckets(objectstorage.RootPath)
 	return rv, err
@@ -75,8 +75,8 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 	}
 
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
@@ -97,8 +97,8 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 // Delete a bucket
 func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) {
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = handler.service.DeleteBucket(name)
 	if err != nil {
@@ -110,8 +110,8 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 // Inspect a bucket
 func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	b, err := handler.service.GetBucket(name)
 	if err != nil {
@@ -129,8 +129,8 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 // Mount a bucket on an host on the given mount point
 func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Check bucket existence
 	_, err = handler.service.GetBucket(bucketName)
@@ -196,8 +196,8 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 // Unmount a bucket
 func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Check bucket existence
 	_, err = handler.Inspect(ctx, bucketName)

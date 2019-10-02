@@ -261,8 +261,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	userData = userdata.NewContent()
 

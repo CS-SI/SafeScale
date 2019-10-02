@@ -502,8 +502,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

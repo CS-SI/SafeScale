@@ -70,8 +70,8 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 	//FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if all {
 		volumes, err := handler.service.ListVolumes()
@@ -99,8 +99,8 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
@@ -176,8 +176,8 @@ func (handler *VolumeHandler) Inspect(
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
@@ -238,8 +238,8 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	volume, err = handler.service.CreateVolume(resources.VolumeRequest{
 		Name:  name,
@@ -310,7 +310,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	// FIXME: validate parameters
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
 	defer tracer.WithStopwatch().GoingIn().OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
@@ -603,7 +603,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 	}
 	// FIXME: validate parameters
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)()
 
 	var (
 		retcode        int
@@ -646,8 +646,8 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeName, hostName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Load volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)

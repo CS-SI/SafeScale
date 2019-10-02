@@ -409,10 +409,10 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 		_, stepErr, continuation, breaking := func() (res Results, inner error, cont bool, brea bool) {
 			defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), k), &inner)
 			defer scerr.Stopwatch{}.OnExitLogWithLevel(
-				fmt.Sprintf("Starting executiion of step '%s::%s'...", w.action.String(), k),
+				fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), k),
 				fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), k),
 				logrus.DebugLevel,
-			)
+			)()
 
 			stepKey := stepsKey + "." + k
 			var (

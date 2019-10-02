@@ -104,8 +104,8 @@ func (m *Network) Write() (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err1 := m.item.WriteInto(ByIDFolderName, *m.id)
 	err2 := m.item.WriteInto(ByNameFolderName, *m.name)
@@ -126,8 +126,8 @@ func (m *Network) Reload() (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = m.ReadByID(*m.id)
 	if err != nil {
@@ -161,8 +161,8 @@ func (m *Network) ReadByID(id string) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
@@ -194,8 +194,8 @@ func (m *Network) ReadByName(name string) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+name+")", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
@@ -224,8 +224,8 @@ func (m *Network) Delete() (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Delete the entry in 'ByIDFolderName' folder
 	err1 := m.item.DeleteFrom(ByIDFolderName, *m.id)
@@ -255,8 +255,8 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return m.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
 		network := resources.Network{}
@@ -278,8 +278,8 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+host.Name+")", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	network := m.Get()
 	return network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -300,8 +300,8 @@ func (m *Network) DetachHost(hostID string) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "('"+hostID+"')", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	network := m.Get()
 	err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -326,8 +326,8 @@ func (m *Network) ListHosts() (list []*resources.Host, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	network := m.Get()
 	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -371,8 +371,8 @@ func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err err
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mn = NewNetwork(svc)
 	return mn, mn.Carry(net).Write()
@@ -388,8 +388,8 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, "+net.Name+")", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return NewNetwork(svc).Carry(net).Delete()
 }
@@ -407,8 +407,8 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+ref+"')", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mn = NewNetwork(svc)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
@@ -449,8 +449,8 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	network := NewNetwork(svc)
 	err = network.ReadByID(networkID)
@@ -502,8 +502,8 @@ func (mg *Gateway) Read() (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = mg.network.Reload()
 	if err != nil {
@@ -527,8 +527,8 @@ func (mg *Gateway) Reload() (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = mg.Read()
 	if err != nil {
@@ -553,8 +553,8 @@ func (mg *Gateway) Delete() (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mg.network.Acquire()
 	mg.network.Get().GatewayID = ""
@@ -588,8 +588,8 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mg, err = NewGateway(svc, networkID)
 	if err != nil {
@@ -633,8 +633,8 @@ func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(<iaas.Service>, %s, '%s'", host.Name, networkID), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mg, err = NewGateway(svc, networkID)
 	if err != nil {

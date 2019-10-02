@@ -109,12 +109,12 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 	defer scerr.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
-	)
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	)()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.Lock(task)
 
@@ -404,7 +404,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true)
 	defer tracer.GoingIn().OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.RLock(task)
 	defer c.RUnlock(task)
@@ -450,8 +450,8 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	masterID := ""
 	found := false
@@ -491,8 +491,8 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostID := ""
 	found := false
@@ -530,8 +530,8 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -568,8 +568,8 @@ func (c *Controller) DeleteMetadata(task concurrency.Task) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -628,7 +628,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%d)", count), true)
 	defer tracer.GoingIn().OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.RLock(task)
 	nodeDef := complementHostDefinition(req, pb.HostDefinition{})
@@ -764,8 +764,8 @@ func (c *Controller) GetState(task concurrency.Task) (state ClusterState.Enum, e
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	now := time.Now()
 	var collectInterval time.Duration
@@ -798,8 +798,8 @@ func (c *Controller) ForceGetState(task concurrency.Task) (state ClusterState.En
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	state, err = c.foreman.getState(task)
 	if err != nil {
@@ -827,8 +827,8 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 	}
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -892,8 +892,8 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 	}
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", selectedMaster), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var node *clusterpropsv1.Node
 
@@ -934,8 +934,8 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	}
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
 		node *clusterpropsv1.Node
@@ -984,8 +984,8 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	}
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, '%s')", node.Name, selectedMaster), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
 	err = c.UpdateMetadata(task, func() error {
@@ -1059,8 +1059,8 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Updates metadata
 	err = c.UpdateMetadata(task, func() error {
@@ -1172,8 +1172,8 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	state, _ := c.ForceGetState(task)
 	if state == ClusterState.Stopped {
@@ -1272,8 +1272,8 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	state, err := c.ForceGetState(task)
 	if err != nil {

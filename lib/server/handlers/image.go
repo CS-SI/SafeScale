@@ -52,8 +52,8 @@ func NewImageHandler(svc iaas.Service) ImageAPI {
 // List returns the image list
 func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return handler.service.ListImages(all)
 }

@@ -93,8 +93,8 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	allPages, err := az.List(s.ComputeClient).AllPages()
 	if err != nil {
@@ -127,8 +127,8 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	opts := images.ListOpts{}
 
@@ -167,8 +167,8 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	img, err := images.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -187,8 +187,8 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
@@ -220,7 +220,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	opts := flavors.ListOpts{}
 
@@ -268,7 +268,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
@@ -302,7 +302,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {

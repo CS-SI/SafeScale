@@ -98,8 +98,8 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	cfg, err := handler.service.GetConfigurationOptions()
 	if err != nil {
@@ -156,8 +156,8 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
@@ -176,8 +176,8 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>", hostName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	hostSvc := NewHostHandler(handler.service)
@@ -273,8 +273,8 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostName := ""
 	var upload bool
