@@ -19,6 +19,7 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"math"
 	"os"
 	"regexp"
@@ -139,7 +140,7 @@ func (svc *service) SetProvider(provider providers.Provider) {
 // If timeout is reached, returns utils.ErrTimeout
 func (svc *service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) error {
 	if svc == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	var err error
@@ -156,11 +157,11 @@ func (svc *service) WaitHostState(hostID string, state HostState.Enum, timeout t
 			return nil
 		}
 		if host.LastState == HostState.ERROR {
-			return utils.NotAvailableError("host in error state")
+			return scerr.NotAvailableError("host in error state")
 		}
 		select {
 		case <-timer:
-			return utils.TimeoutError("Wait volume state timeout", timeout, nil)
+			return scerr.TimeoutError("Wait volume state timeout", timeout, nil)
 		default:
 			time.Sleep(1 * time.Second)
 		}
@@ -171,7 +172,7 @@ func (svc *service) WaitHostState(hostID string, state HostState.Enum, timeout t
 // If timeout is reached, returns utils.ErrTimeout
 func (svc *service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*resources.Volume, error) {
 	if svc == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	cout := make(chan int)
@@ -193,7 +194,7 @@ func (svc *service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, utils.TimeoutError("Wait host state timeout", timeout, nil)
+			return nil, scerr.TimeoutError("Wait host state timeout", timeout, nil)
 		}
 	}
 }
@@ -241,7 +242,7 @@ func (svc *service) SelectTemplateByName(name string) (*resources.HostTemplate, 
 			return &i, nil
 		}
 	}
-	return nil, utils.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
+	return nil, scerr.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
 }
 
 func (svc *service) reduceTemplates(tpls []resources.HostTemplate) []resources.HostTemplate {
@@ -280,10 +281,10 @@ func filterBlacklistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
 func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (selectedTpls []*resources.HostTemplate, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if svc == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	allTpls, err := svc.ListTemplates(false)
@@ -456,7 +457,7 @@ func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 // FilterImages search an images corresponding to OS Name
 func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 	if svc == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	imgs, err := svc.ListImages(false)
@@ -537,7 +538,7 @@ func (svc *service) ListImages(all bool) ([]resources.Image, error) {
 // SearchImage search an image corresponding to OS Name
 func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 	if svc == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	imgs, err := svc.ListImages(false)
@@ -572,7 +573,7 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 // CreateHostWithKeyPair creates an host
 func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, *userdata.Content, *resources.KeyPair, error) {
 	if svc == nil {
-		return nil, nil, nil, utils.InvalidInstanceError()
+		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	_, err := svc.GetHostByName(request.ResourceName)
@@ -614,7 +615,7 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 // ListHostsByName list hosts by name
 func (svc *service) ListHostsByName() (map[string]*resources.Host, error) {
 	if svc == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	hosts, err := svc.ListHosts()

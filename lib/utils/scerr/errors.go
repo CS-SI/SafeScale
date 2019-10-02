@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package utils
+package scerr
 
 import (
 	"fmt"
@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 )
@@ -430,7 +429,6 @@ func NotImplementedError(what string) ErrNotImplemented {
 		}
 	}
 
-	log.Error(Capitalize(msg))
 	return ErrNotImplemented{
 		ErrCore: ErrCore{
 			Message:      msg,
@@ -492,7 +490,6 @@ func InvalidInstanceError() ErrInvalidInstance {
 		msg = fmt.Sprintf("invalid instance: calling from a nil pointer")
 	}
 
-	log.Error(Capitalize(msg))
 	return ErrInvalidInstance{
 		ErrCore: ErrCore{
 			Message:      msg,
@@ -526,7 +523,6 @@ func InvalidParameterError(what, why string) ErrInvalidParameter {
 		msg = fmt.Sprintf("invalid parameter '%s': %s", what, why)
 	}
 
-	log.Error(Capitalize(msg))
 	return ErrInvalidParameter{
 		ErrCore: ErrCore{
 			Message:      msg,

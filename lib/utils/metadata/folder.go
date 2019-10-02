@@ -19,13 +19,13 @@ package metadata
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 )
 
@@ -104,7 +104,7 @@ func (f *Folder) Search(path string, name string) error {
 			return nil
 		}
 	}
-	return utils.NotFoundError(fmt.Sprintf("failed to find '%s'", fullPath))
+	return scerr.NotFoundError(fmt.Sprintf("failed to find '%s'", fullPath))
 }
 
 // Delete removes metadata passed as parameter
@@ -124,7 +124,7 @@ func (f *Folder) Delete(path string, name string) error {
 func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) error {
 	err := f.Search(path, name)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			return err
 		}
 
@@ -134,8 +134,8 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	var buffer bytes.Buffer
 	_, err = f.service.GetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
-			return utils.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+		if _, ok := err.(scerr.ErrNotFound); ok {
+			return scerr.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
 		}
 		return err
 	}
@@ -143,16 +143,16 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	if f.crypt {
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			if _, ok := err.(utils.ErrNotFound); ok {
-				return utils.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
+			if _, ok := err.(scerr.ErrNotFound); ok {
+				return scerr.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
 			}
 			return err
 		}
 	}
 	err = callback(data)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
-			return utils.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
+		if _, ok := err.(scerr.ErrNotFound); ok {
+			return scerr.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
 		}
 		return err
 	}

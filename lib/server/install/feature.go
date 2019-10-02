@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io/ioutil"
 	"strings"
 
@@ -149,7 +150,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 // with its content
 func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
 	}
 
 	v := viper.New()
@@ -193,7 +194,7 @@ func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (*Feature, error) {
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
 	}
 
 	var (
@@ -317,7 +318,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 // Installs succeeds if error == nil and Results.Successful() is true
 func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	if f == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	methods := t.Methods()
@@ -338,7 +339,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	defer utils.Stopwatch{}.OnExitLogInfo(
+	defer scerr.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 	)
@@ -387,12 +388,12 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 // Remove uninstalls the feature from the target
 func (f *Feature) Remove(t Target, v Variables, s Settings) (results Results, err error) {
 	if f == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	results = Results{}
 	methods := t.Methods()
@@ -409,7 +410,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (results Results, er
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 
-	defer utils.Stopwatch{}.OnExitLogInfo(
+	defer scerr.Stopwatch{}.OnExitLogInfo(
 		fmt.Sprintf("Starting removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 	)

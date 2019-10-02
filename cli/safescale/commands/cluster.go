@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"strings"
 
@@ -93,7 +94,7 @@ func extractClusterArgument(c *cli.Context) error {
 		var err error
 		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
-			if _, ok := err.(utils.ErrNotFound); ok {
+			if _, ok := err.(scerr.ErrNotFound); ok {
 				if !c.Command.HasName("create") {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 				}

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"text/template"
 
@@ -58,10 +59,10 @@ type KongController struct {
 // func NewKongController(host *pb.Host) (*KongController, error) {
 func NewKongController(svc iaas.Service, network *resources.Network, addressPrimaryGateway bool) (*KongController, error) {
 	if svc == nil {
-		return nil, utils.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "can't be nil")
 	}
 	if network == nil {
-		return nil, utils.InvalidParameterError("network", "can't be nil")
+		return nil, scerr.InvalidParameterError("network", "can't be nil")
 	}
 
 	// Check if reverseproxy feature is installed on host
@@ -224,7 +225,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		create := false
 		_, _, err = k.get(ruleName, url)
 		if err != nil {
-			if _, ok := err.(utils.ErrNotFound); !ok {
+			if _, ok := err.(scerr.ErrNotFound); !ok {
 				return "", err
 			}
 			create = true
@@ -286,7 +287,7 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 	url += fmt.Sprintf("%s/plugins", resourceID)
 	result, _, err := k.get(ruleName, url)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return err
 		}
 	}
@@ -438,14 +439,14 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 		return response, httpcode, nil
 	case "404":
 		if msg, ok := response["message"]; ok {
-			return nil, httpcode, utils.NotFoundError(msg.(string))
+			return nil, httpcode, scerr.NotFoundError(msg.(string))
 		}
-		return nil, output[1], utils.NotFoundError("")
+		return nil, output[1], scerr.NotFoundError("")
 	case "409":
 		if msg, ok := response["message"]; ok {
-			return nil, httpcode, utils.DuplicateError(msg.(string))
+			return nil, httpcode, scerr.DuplicateError(msg.(string))
 		}
-		return nil, httpcode, utils.DuplicateError("")
+		return nil, httpcode, scerr.DuplicateError("")
 	default:
 		if msg, ok := response["message"]; ok {
 			return response, httpcode, fmt.Errorf("post failed: HTTP error code=%s: %s", httpcode, msg.(string))

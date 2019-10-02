@@ -19,6 +19,7 @@ package huaweicloud
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"net"
 	"net/http"
 	"strings"
@@ -256,12 +257,12 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 // On success returns an instance of resources.Host, and a string containing the script to execute to finalize host installation
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, utils.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	userData = userdata.NewContent()
 
@@ -469,7 +470,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			host, err = s.WaitHostReady(host, utils.GetHostTimeout())
 			if err != nil {
 				switch err.(type) {
-				case utils.ErrNotAvailable:
+				case scerr.ErrNotAvailable:
 					return fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
 				default:
 					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
@@ -494,14 +495,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case utils.ErrNotFound:
+				case scerr.ErrNotFound:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
-				case utils.ErrTimeout:
+				case scerr.ErrTimeout:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
-				err = utils.AddConsequence(err, derr)
+				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -523,7 +524,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
-					err = utils.AddConsequence(err, derr)
+					err = scerr.AddConsequence(err, derr)
 				}
 			}
 		}()
@@ -585,7 +586,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	)
 
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	switch hostParam := hostParam.(type) {
@@ -596,7 +597,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		host.ID = hostParam
 	}
 	if host == nil {
-		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	retryErr := retry.WhileUnsuccessful(
@@ -827,7 +828,7 @@ func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[IPVersion.
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	pager := servers.List(s.Stack.ComputeClient, servers.ListOpts{})
@@ -858,7 +859,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
 	_, err := s.InspectHost(id)
@@ -1125,7 +1126,7 @@ func toHostState(status string) HostState.Enum {
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
 func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	var (

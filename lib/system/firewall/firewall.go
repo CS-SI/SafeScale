@@ -18,7 +18,7 @@ package firewall
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -63,7 +63,7 @@ func NewFirewall(ssh *system.SSHConfig) *Firewall {
 
 // FromSystem loads the current Firewall configuration from system
 func (fw *Firewall) FromSystem() error {
-	return utils.NotImplementedError("FromSystem() not implemented yet")
+	return scerr.NotImplementedError("FromSystem() not implemented yet")
 }
 
 // Table returns the Table instance corresponding to table 'name'
@@ -79,5 +79,5 @@ func (fw *Firewall) Table(name string) (*Table, error) {
 
 // ToSystem applies the firewall rules to the host
 func (fw *Firewall) ToSystem() error {
-	return utils.NotImplementedError("ToSystem() not implemented yet")
+	return scerr.NotImplementedError("ToSystem() not implemented yet")
 }

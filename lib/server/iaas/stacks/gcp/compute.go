@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"time"
 
@@ -48,7 +49,7 @@ import (
 // ListImages lists available OS images
 func (s *Stack) ListImages() (images []resources.Image, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	compuService := s.ComputeService
@@ -84,10 +85,10 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, utils.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	images, err := s.ListImages()
@@ -109,7 +110,7 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	compuService := s.ComputeService
@@ -151,10 +152,10 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 //GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
 func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, utils.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	templates, err := s.ListTemplates(true)
@@ -176,10 +177,10 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
@@ -206,23 +207,23 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, utils.NotImplementedError("GetKeyPair() not implemented yet")
+	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet")
 }
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, utils.NotImplementedError("ListKeyPairs() not implemented yet")
+	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return utils.NotImplementedError("DeleteKeyPair() not implemented yet")
+	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet")
 }
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, utils.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 
 	userData = userdata.NewContent()
@@ -394,12 +395,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					killErr := s.DeleteHost(server.ID)
 					if killErr != nil {
 						switch killErr.(type) {
-						case utils.ErrTimeout:
+						case scerr.ErrTimeout:
 							logrus.Error("Timeout cleaning up gcp instance")
 						default:
 							logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
 						}
-						err = utils.AddConsequence(err, killErr)
+						err = scerr.AddConsequence(err, killErr)
 					}
 					return err
 				}
@@ -429,12 +430,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				killErr := s.DeleteHost(host.ID)
 				if killErr != nil {
 					switch killErr.(type) {
-					case utils.ErrTimeout:
+					case scerr.ErrTimeout:
 						logrus.Error("Timeout cleaning up gcp instance")
 					default:
 						logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
 					}
-					err = utils.AddConsequence(err, killErr)
+					err = scerr.AddConsequence(err, killErr)
 				}
 				return err
 			}
@@ -459,14 +460,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case utils.ErrNotFound:
+				case scerr.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
-				case utils.ErrTimeout:
+				case scerr.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
-				err = utils.AddConsequence(err, derr)
+				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -486,7 +487,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
 func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *resources.Host, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	var host *resources.Host
@@ -497,12 +498,12 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 	case *resources.Host:
 		host = hostParam
 	default:
-		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -638,7 +639,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 // InspectHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
 func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	switch hostParam := hostParam.(type) {
@@ -650,7 +651,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	}
 
 	if host == nil {
-		return nil, utils.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	hostRef := host.Name
@@ -795,10 +796,10 @@ func stateConvert(gcpHostStatus string) HostState.Enum {
 // GetHostByName returns the host identified by ref (name or id)
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
 	hosts, err := s.ListHosts()
@@ -818,10 +819,10 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) (err error) {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return utils.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	service := s.ComputeService
@@ -859,7 +860,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 	}, utils.GetContextTimeout())
 
 	if waitErr != nil {
-		logrus.Error(utils.Cause(waitErr))
+		logrus.Error(scerr.Cause(waitErr))
 	}
 
 	return err
@@ -867,13 +868,13 @@ func (s *Stack) DeleteHost(id string) (err error) {
 
 // ResizeHost change the template used by an host
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, utils.NotImplementedError("ResizeHost() not implemented yet")
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet")
 }
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	compuService := s.ComputeService
@@ -905,10 +906,10 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return utils.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	service := s.ComputeService
@@ -932,10 +933,10 @@ func (s *Stack) StopHost(id string) error {
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return utils.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	service := s.ComputeService
@@ -959,10 +960,10 @@ func (s *Stack) StartHost(id string) error {
 // RebootHost reboot the host identified by id
 func (s *Stack) RebootHost(id string) error {
 	if s == nil {
-		return utils.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return utils.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
 	service := s.ComputeService
@@ -1003,7 +1004,7 @@ func (s *Stack) RebootHost(id string) error {
 // GetHostState returns the host identified by id
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	if s == nil {
-		return HostState.ERROR, utils.InvalidInstanceError()
+		return HostState.ERROR, scerr.InvalidInstanceError()
 	}
 
 	host, err := s.InspectHost(hostParam)
@@ -1020,7 +1021,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	zones := make(map[string]bool)
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	resp, err := s.ComputeService.Zones.List(s.GcpConfig.ProjectID).Do()
@@ -1037,7 +1038,7 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 // ListRegions ...
 func (s *Stack) ListRegions() ([]string, error) {
 	if s == nil {
-		return nil, utils.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	var regions []string

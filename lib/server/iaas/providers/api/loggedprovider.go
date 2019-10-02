@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -9,7 +10,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // LoggedProvider ...
@@ -69,7 +69,7 @@ func (w LoggedProvider) trace(s string) (string, time.Time) {
 
 // prepare ...
 func (w LoggedProvider) prepare(s string, startTime time.Time) {
-	logrus.Tracef("stacks.%s::%s() done in [%s]", w.Name, s, utils.FormatDuration(time.Since(startTime)))
+	logrus.Tracef("stacks.%s::%s() done in [%s]", w.Name, s, scerr.FormatDuration(time.Since(startTime)))
 }
 
 // NewLoggedProvider ...

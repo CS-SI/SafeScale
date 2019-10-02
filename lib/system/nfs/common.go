@@ -19,6 +19,7 @@ package nfs
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"os/exec"
 	"strings"
@@ -221,7 +222,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 				collected += errline + ";"
 			}
 		}
-		return utils.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
+		return scerr.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
 	}
 	if retcode != 0 {
 		return fmt.Errorf("%s: Errorcode [%d], std error [%s], std output [%s]", msg, retcode, stderr, stdout)

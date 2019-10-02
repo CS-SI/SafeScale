@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"runtime"
 
 	"github.com/sirupsen/logrus"
@@ -38,7 +38,7 @@ func Run() {
 	clusterName := "test-cluster"
 	instance, err := cluster.Load(concurrency.RootTask(), clusterName)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 			cinstance, cerr := cluster.Create(concurrency.RootTask(), control.Request{
 				Name:       clusterName,

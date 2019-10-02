@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -134,7 +135,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 		func() error {
 			innerErr := m.Read(task, m.name)
 			if innerErr != nil {
-				if _, ok := innerErr.(utils.ErrNotFound); ok {
+				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.StopRetryError("not found", innerErr)
 				}
 				return innerErr
@@ -145,8 +146,8 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(utils.ErrTimeout); !ok {
-			return utils.Cause(retryErr)
+		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
+			return scerr.Cause(retryErr)
 		}
 		return retryErr
 	}

@@ -19,6 +19,7 @@ package install
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -159,20 +160,20 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 // UploadFile uploads a file to remote host
 func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) (err error) {
 	if localpath == "" {
-		return utils.InvalidParameterError("localpath", "can't be empty string")
+		return scerr.InvalidParameterError("localpath", "can't be empty string")
 	}
 	if host == nil {
-		return utils.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "can't be nil")
 	}
 	if remotepath == "" {
-		return utils.InvalidParameterError("remotepath", "can't be empty string")
+		return scerr.InvalidParameterError("remotepath", "can't be empty string")
 	}
 
 	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	sshClt := client.New().SSH
 	networkError := false
@@ -262,13 +263,13 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 // UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
 func UploadStringToRemoteFile(content string, host *pb.Host, filename string, owner, group, rights string) error {
 	if content == "" {
-		return utils.InvalidParameterError("content", "can't be empty string")
+		return scerr.InvalidParameterError("content", "can't be empty string")
 	}
 	if host == nil {
-		return utils.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "can't be nil")
 	}
 	if filename == "" {
-		return utils.InvalidParameterError("filename", "can't be empty string")
+		return scerr.InvalidParameterError("filename", "can't be empty string")
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {

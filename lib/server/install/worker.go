@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
 	"time"
@@ -406,8 +407,8 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
 		_, stepErr, continuation, breaking := func() (res Results, inner error, cont bool, brea bool) {
-			defer utils.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), k), &inner)
-			defer utils.Stopwatch{}.OnExitLogWithLevel(
+			defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), k), &inner)
+			defer scerr.Stopwatch{}.OnExitLogWithLevel(
 				fmt.Sprintf("Starting executiion of step '%s::%s'...", w.action.String(), k),
 				fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), k),
 				logrus.DebugLevel,
@@ -673,7 +674,7 @@ func (w *worker) validateClusterSizing() error {
 // parseClusterSizingRequest returns count, cpu and ram components of request
 func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, error) {
 
-	return 0, 0, 0.0, utils.NotImplementedError("parseClusterSizingRequest() not yet implemented")
+	return 0, 0, 0.0, scerr.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
@@ -684,11 +685,11 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 
 	if w.cluster == nil {
-		return utils.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
+		return scerr.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
 	if w.feature.task == nil {
-		return utils.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
+		return scerr.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
 	}
 
 	svc := w.cluster.GetService(w.feature.task)

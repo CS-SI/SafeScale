@@ -19,10 +19,10 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	errors "github.com/CS-SI/SafeScale/lib/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -31,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	convert "github.com/CS-SI/SafeScale/lib/server/utils"
-	timing "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // ShareHandler ...
@@ -67,7 +66,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb
 	shareName := in.GetName()
 	share, err := handler.Create(ctx, shareName, in.GetHost().GetName(), in.GetPath(), in.GetSecurityModes(), in.GetOptions().GetReadOnly(), in.GetOptions().GetRootSquash(), in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(), in.GetOptions().GetCrossMount(), in.GetOptions().GetSubtreeCheck())
 	if err != nil {
-		tbr := errors.Wrap(err, fmt.Sprintf("can't create share '%s'", shareName))
+		tbr := scerr.Wrap(err, fmt.Sprintf("can't create share '%s'", shareName))
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 	return convert.ToPBShare(in.GetName(), share), err
@@ -94,16 +93,16 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 	_, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		switch err.(type) {
-		case timing.ErrNotFound:
+		case scerr.ErrNotFound:
 			return &google_protobuf.Empty{}, status.Errorf(codes.NotFound, err.Error())
 		default:
-			return &google_protobuf.Empty{}, status.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
+			return &google_protobuf.Empty{}, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
 		}
 	}
 
 	err = handler.Delete(ctx, shareName)
 	if err != nil {
-		return &google_protobuf.Empty{}, status.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
+		return &google_protobuf.Empty{}, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
 	}
 	return &google_protobuf.Empty{}, nil
 }
@@ -127,7 +126,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*p
 	handler := ShareHandler(tenant.Service)
 	shares, err := handler.List(ctx)
 	if err != nil {
-		tbr := errors.Wrap(err, "Can't list Shares")
+		tbr := scerr.Wrap(err, "Can't list Shares")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
@@ -162,7 +161,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	handler := ShareHandler(tenant.Service)
 	mount, err := handler.Mount(ctx, shareName, in.GetHost().GetName(), in.GetPath(), in.GetWithCache())
 	if err != nil {
-		tbr := errors.Wrap(err, fmt.Sprintf("Can't mount share '%s'", shareName))
+		tbr := scerr.Wrap(err, fmt.Sprintf("Can't mount share '%s'", shareName))
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 	return convert.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
@@ -190,7 +189,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	handler := ShareHandler(tenant.Service)
 	err := handler.Unmount(ctx, shareName, hostName)
 	if err != nil {
-		return &google_protobuf.Empty{}, status.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("Can't unmount share '%s'", shareName)).Error())
+		return &google_protobuf.Empty{}, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("Can't unmount share '%s'", shareName)).Error())
 	}
 	return &google_protobuf.Empty{}, nil
 }
@@ -215,7 +214,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Shar
 	handler := ShareHandler(tenant.Service)
 	host, share, mounts, err := handler.Inspect(ctx, shareName)
 	if err != nil {
-		err := errors.Wrap(err, fmt.Sprintf("can't inspect share '%s'", shareName))
+		err := scerr.Wrap(err, fmt.Sprintf("can't inspect share '%s'", shareName))
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if host == nil {

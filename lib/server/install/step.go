@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"time"
 
@@ -233,8 +234,8 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer utils.Stopwatch{}.OnExitLogWithLevel(
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.Stopwatch{}.OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d hosts...", is.Name, len(hosts)),
 		fmt.Sprintf("Ending step '%s' on %d hosts", is.Name, len(hosts)),
 		log.DebugLevel,
@@ -262,16 +263,16 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
 					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-						utils.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
 					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-						utils.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done",
 					is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-					utils.FormatDuration(time.Since(is.Worker.startTime)))
+					scerr.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	} else {
@@ -296,7 +297,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 		for k, s := range subtasks {
 			result, err := s.Wait()
 			if err != nil {
-				log.Warnf("%s(%s):step(%s)@%s finished in [%s]: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, utils.FormatDuration(time.Since(is.Worker.startTime)))
+				log.Warnf("%s(%s):step(%s)@%s finished in [%s]: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, scerr.FormatDuration(time.Since(is.Worker.startTime)))
 				continue
 			}
 			results[k] = result.(stepResult)
@@ -305,16 +306,16 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
 					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
-						utils.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
 					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
-						utils.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						scerr.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done",
 					is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
-					utils.FormatDuration(time.Since(is.Worker.startTime)))
+					scerr.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	}

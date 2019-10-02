@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -94,8 +95,8 @@ func (mv *Volume) Reload() error {
 	}
 	err := mv.ReadByID(*mv.id)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
-			return utils.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
+		if _, ok := err.(scerr.ErrNotFound); ok {
+			return scerr.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
 		}
 		return err
 	}
@@ -199,15 +200,15 @@ func RemoveVolume(svc iaas.Service, volumeID string) error {
 //        If retry times out, return errNotFound
 func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	if svc == nil {
-		return nil, utils.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "can't be nil")
 	}
 	if ref == "" {
-		return nil, utils.InvalidParameterError("ref", "can't be empty string")
+		return nil, scerr.InvalidParameterError("ref", "can't be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()
-	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	mv = NewVolume(svc)
 
@@ -215,7 +216,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 		func() error {
 			innerErr := mv.ReadByReference(ref)
 			if innerErr != nil {
-				if _, ok := innerErr.(utils.ErrNotFound); ok {
+				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.StopRetryError("no metadata found", innerErr)
 				}
 				return innerErr
@@ -227,8 +228,8 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(utils.ErrTimeout); !ok {
-			return nil, utils.Cause(retryErr)
+		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
+			return nil, scerr.Cause(retryErr)
 		}
 		return nil, retryErr
 	}

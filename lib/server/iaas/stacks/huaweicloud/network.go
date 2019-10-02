@@ -18,6 +18,7 @@ package huaweicloud
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"net"
 	"strings"
 
@@ -175,12 +176,12 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 // ListVPCs lists all the VPC created
 func (s *Stack) ListVPCs() ([]VPC, error) {
 	var vpcList []VPC
-	return vpcList, utils.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet")
+	return vpcList, scerr.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet")
 }
 
 // DeleteVPC deletes a Network (ie a VPC in Huawei Cloud) identified by 'id'
 func (s *Stack) DeleteVPC(id string) error {
-	return utils.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet")
+	return scerr.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet")
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
@@ -190,7 +191,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -225,7 +226,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
-				err = utils.AddConsequence(err, derr)
+				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -620,10 +621,10 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // to contain only one hostID
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
 	if s == nil {
-		return nil, nil, utils.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 	if req.Network == nil {
-		return nil, nil, utils.InvalidParameterError("req.Network", "can't be nil")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "can't be nil")
 	}
 
 	gwname := req.Name
@@ -645,7 +646,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case utils.ErrInvalidRequest:
+		case scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
 			return nil, userData, fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))
