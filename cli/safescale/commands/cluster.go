@@ -18,7 +18,6 @@ package commands
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"os"
 	"strings"
 
@@ -197,8 +196,6 @@ func outputClusterConfig() (map[string]interface{}, error) {
 // with fields converted to string and used as keys
 func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	identity := c.GetIdentity(concurrency.RootTask())
-
-	log.Warnf(spew.Sdump(identity))
 
 	result := map[string]interface{}{
 		"name":             identity.Name,

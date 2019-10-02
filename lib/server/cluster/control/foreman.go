@@ -457,19 +457,21 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		"nokeep":  !req.KeepOnFailure,
 	})
 
+	// FIXME What about cleanup ?, unit test Task class
+
 	// Step 2: awaits gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		mastersTask.Abort()      // FIXME What about cleanup ?
-		privateNodesTask.Abort() // FIXME What about cleanup ?
+		mastersTask.Abort()
+		privateNodesTask.Abort()
 		return primaryGatewayStatus
 	}
 	if !gwFailoverDisabled {
 		if secondaryGatewayTask != nil {
 			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
 			if secondaryGatewayStatus != nil {
-				mastersTask.Abort()      // FIXME What about cleanup ?
-				privateNodesTask.Abort() // FIXME What about cleanup ?
+				mastersTask.Abort()
+				privateNodesTask.Abort()
 				return secondaryGatewayStatus
 			}
 		}
@@ -844,7 +846,7 @@ func uploadTemplateToFile(
 ) (string, error) {
 
 	if box == nil {
-		panic("box is nil!")
+		return "", utils.InvalidParameterError("box", "cannot be nil!")
 	}
 	host, err := client.New().Host.Inspect(hostID, utils.GetExecutionTimeout())
 	if err != nil {

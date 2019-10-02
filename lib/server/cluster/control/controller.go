@@ -911,7 +911,6 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 	if selectedMaster == "" {
 		selectedMaster, err = c.FindAvailableMaster(task)
 		if err != nil {
-			// FIXME Try deletion anyway ?
 			errDelNode := c.deleteNode(task, node, "")
 			err = utils.AddConsequence(err, errDelNode)
 			return err
@@ -962,7 +961,6 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	if selectedMaster == "" {
 		selectedMaster, err = c.FindAvailableMaster(task)
 		if err != nil {
-			// FIXME Try deletion anyway ?
 			errDelNode := c.deleteNode(task, node, "")
 			err = utils.AddConsequence(err, errDelNode)
 			return err

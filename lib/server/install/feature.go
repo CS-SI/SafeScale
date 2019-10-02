@@ -100,7 +100,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
 					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if err != nil {
-						log.Error(err)
+						log.Error(err) // FIXME Don't hide errors
 						continue
 					}
 					if _, ok := allEmbeddedMap[feature.displayName]; !ok {
@@ -149,7 +149,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 // with its content
 func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 	if name == "" {
-		panic("name is empty!")
+		return nil, utils.InvalidParameterError("name", "cannot be empty!")
 	}
 
 	v := viper.New()
@@ -193,7 +193,7 @@ func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (*Feature, error) {
 	if name == "" {
-		panic("name is empty!")
+		return nil, utils.InvalidParameterError("name", "cannot be empty!")
 	}
 
 	var (
@@ -520,7 +520,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		}
 
 		if host == nil {
-			panic("nil host in feature")
+			panic("nil host in feature") // FIXME No more panics
 		}
 
 		// v["Hostname"] = host.Name
