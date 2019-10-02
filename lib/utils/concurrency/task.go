@@ -52,6 +52,8 @@ type TaskResult interface{}
 // TaskAction ...
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
+// FIXME Unit test this class
+
 // Task ...
 type Task interface {
 	Abort()

@@ -90,7 +90,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 			hostRef = host.ID
 		}
 	default:
-		panic("param must be a string or a *resources.Host!")
+		return nil, utils.InvalidParameterError("param", "must be either a string or a *resources.Host!")
 	}
 	if host == nil {
 		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
