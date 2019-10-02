@@ -47,7 +47,7 @@ type taskGroup struct {
 
 // NewTaskGroup ...
 func NewTaskGroup(parentTask Task) Task {
-	return newTaskGroup(nil, parentTask)
+	return newTaskGroup(context.TODO(), parentTask)
 }
 
 // NewTaskGroupWithContext ...
@@ -244,5 +244,6 @@ func (tg *taskGroup) Abort() {
 
 // New creates a subtask from current task
 func (tg *taskGroup) New() Task {
-	return newTask(nil, tg.task)
+	theTask, _ := newTask(context.TODO(), tg.task)
+	return theTask
 }

@@ -101,7 +101,7 @@ var globalTask atomic.Value
 func RootTask() Task {
 	anon := globalTask.Load()
 	if anon == nil {
-		newT := newTask(nil, nil)
+		newT, _ := newTask(context.TODO(), nil)
 		newT.id = "0"
 		newT.generation = 0
 		globalTask.Store(newT)
@@ -117,24 +117,36 @@ func VoidTask() Task {
 
 // NewTask ...
 func NewTask(parentTask Task) Task {
-	return newTask(nil, parentTask)
+	task, err := newTask(context.TODO(), parentTask)
+	if err != nil {
+		panic(err)
+	}
+	return task
 }
 
 // NewTaskWithContext ...
 func NewTaskWithContext(ctx context.Context) Task {
-	return newTask(ctx, nil)
+	task, err := newTask(ctx, nil)
+	if err != nil {
+		panic(err)
+	}
+	return task
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
-func newTask(ctx context.Context, parentTask Task) *task {
+func newTask(ctx context.Context, parentTask Task) (*task, error) {
 	var (
 		childContext context.Context
 		cancel       context.CancelFunc
 		generation   uint
 	)
 
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil!, use context.TODO() instead!")
+	}
+
 	if parentTask == nil {
-		if ctx == nil {
+		if ctx == context.TODO() {
 			childContext, cancel = context.WithCancel(context.Background())
 		} else {
 			childContext, cancel = context.WithCancel(ctx)
@@ -159,7 +171,7 @@ func newTask(ctx context.Context, parentTask Task) *task {
 
 	t.sig = fmt.Sprintf("{task %s}", t.GetID())
 
-	return &t
+	return &t, nil
 }
 
 // GetID returns an unique id for the task
@@ -418,7 +430,8 @@ func (t *task) StoreResult(result TaskParameters) {
 
 // New creates a subtask from current task
 func (t *task) New() Task {
-	return newTask(nil, t)
+	theTask, _ := newTask(context.TODO(), t)
+	return theTask
 }
 
 // Lock locks the TaskedLock
