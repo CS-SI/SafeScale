@@ -30,27 +30,52 @@ const outputStopwatchTemplate = "%s (elapsed: %s)"
 // Stopwatch allows to time duration
 type Stopwatch struct {
 	start    time.Time
-	stoptime time.Time
 	stopped  bool
+	started  bool
 	duration time.Duration
 }
 
 // Start starts the Stopwatch
-func (sw Stopwatch) Start() {
-	sw.start = time.Now()
-	sw.stoptime = sw.start
-	sw.stopped = false
+func (sw *Stopwatch) Start() {
+	if !sw.stopped && !sw.started { // first time
+		sw.start = time.Now()
+		sw.stopped = false
+		sw.started = true
+	} else {
+		if sw.stopped {
+			sw.start = time.Now()
+			sw.started = true
+			sw.stopped = false
+		}
+	}
 }
 
 // Stop stops the Stopwatch
-func (sw Stopwatch) Stop() {
-	sw.stopped = true
-	sw.duration += time.Since(sw.stoptime)
-	sw.stoptime = time.Now()
+func (sw *Stopwatch) Stop() {
+	if !sw.stopped && !sw.started { // first time
+		sw.start = time.Now()
+		sw.started = false
+		sw.stopped = true
+	} else {
+		if sw.started {
+			if sw.duration == 0 {
+				sw.duration = time.Since(sw.start)
+			} else {
+				sw.duration += time.Since(sw.start)
+			}
+
+			sw.started = false
+			sw.stopped = true
+		}
+	}
 }
 
 // Duration returns the time elapsed since the Stopwatch has been started
-func (sw Stopwatch) Duration() time.Duration {
+func (sw *Stopwatch) Duration() time.Duration {
+	if !sw.stopped && !sw.started { // first time
+		return sw.duration
+	}
+
 	if sw.stopped {
 		return sw.duration
 	}
