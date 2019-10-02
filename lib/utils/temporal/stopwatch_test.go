@@ -61,11 +61,29 @@ func TestStartStopDurationAgain(t *testing.T) {
 
 	stowa.Start()
 	time.Sleep(10 * time.Millisecond)
-	stowa.Stop()
+	stowa.Stop() // next calls won't change Duration because we used Stop instead of Pause
+
 	time.Sleep(time.Second)
 	stowa.Start()
 	time.Sleep(20 * time.Millisecond)
+	stowa.Stop()
+
+	res := FormatDuration(stowa.Duration())
+	if !strings.Contains(res, "0.010 ms") {
+		t.Errorf("This should be 10 ms and it isn't: %s", res)
+	}
+}
+
+func TestStartStopDurationWithPause(t *testing.T) {
+	stowa := Stopwatch{}
+
 	stowa.Start()
+	time.Sleep(10 * time.Millisecond)
+	stowa.Pause() // this time, duration changes because we used Pause
+
+	time.Sleep(time.Second)
+	stowa.Start()
+	time.Sleep(20 * time.Millisecond)
 	stowa.Stop()
 
 	res := FormatDuration(stowa.Duration())

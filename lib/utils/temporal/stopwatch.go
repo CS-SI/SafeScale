@@ -34,8 +34,10 @@ type Stopwatch struct {
 	duration time.Duration
 }
 
+// We need Stopwatch pointer receivers in order to change the underlying struct
+
 // Start starts the Stopwatch
-func (sw Stopwatch) Start() {
+func (sw *Stopwatch) Start() {
 	if !sw.running && !sw.stopped {
 		sw.start = time.Now()
 		sw.running = true
@@ -43,7 +45,7 @@ func (sw Stopwatch) Start() {
 }
 
 // Stop stops the Stopwatch
-func (sw Stopwatch) Stop() {
+func (sw *Stopwatch) Stop() {
 	sw.stopped = true
 	if sw.running {
 		sw.duration += time.Since(sw.start)
@@ -52,7 +54,7 @@ func (sw Stopwatch) Stop() {
 }
 
 // Pause pauses the Stopwatch, which can then unpause by calling Start again
-func (sw Stopwatch) Pause() {
+func (sw *Stopwatch) Pause() {
 	if sw.stopped {
 		return
 	}
