@@ -38,7 +38,8 @@ COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
 GOLANGCI := github.com/golangci/golangci-lint/cmd/golangci-lint
 
-DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR) $(GOLANGCI)
+DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR)
+NEWDEVDEPSLIST := $(GOLANGCI)
 
 BUILD_TAGS = ""
 export BUILD_TAGS
@@ -142,6 +143,7 @@ convey:
 devdeps:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dev dependencies, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) get -u $(DEVDEPSLIST))
+	@$(GO) version | grep 1.10 > /dev/null || $(GO) get -u $(NEWDEVDEPSLIST)
 
 depclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -218,7 +220,7 @@ lint: begin
 
 metalint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@golangci-lint --color never --disable-all --enable=deadcode --enable=gocyclo --enable=varcheck --enable=structcheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals ./... || true
+	@(which golangci-lint && golangci-lint --color never --disable-all --enable=deadcode --enable=gocyclo --enable=varcheck --enable=structcheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals ./... || true) || echo "golangci-lint not installed in your system"
 
 coverage: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
