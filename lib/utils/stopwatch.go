@@ -30,6 +30,7 @@ const outputStopwatchTemplate = "%s (elapsed: %s)"
 // Stopwatch allows to time duration
 type Stopwatch struct {
 	start    time.Time
+	stoptime time.Time
 	stopped  bool
 	duration time.Duration
 }
@@ -37,12 +38,15 @@ type Stopwatch struct {
 // Start starts the Stopwatch
 func (sw Stopwatch) Start() {
 	sw.start = time.Now()
+	sw.stoptime = sw.start
+	sw.stopped = false
 }
 
 // Stop stops the Stopwatch
 func (sw Stopwatch) Stop() {
 	sw.stopped = true
-	sw.duration += time.Since(sw.start)
+	sw.duration += time.Since(sw.stoptime)
+	sw.stoptime = time.Now()
 }
 
 // Duration returns the time elapsed since the Stopwatch has been started
