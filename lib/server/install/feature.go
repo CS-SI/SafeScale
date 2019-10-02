@@ -148,10 +148,14 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func NewFeature(task concurrency.Task, name string) (*Feature, error) {
+func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
+		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
+
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	v := viper.New()
 	v.AddConfigPath(".")
@@ -161,7 +165,7 @@ func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 	v.SetConfigName(name)
 
 	var feat Feature
-	err := v.ReadInConfig()
+	err = v.ReadInConfig()
 	if err != nil {
 		switch err.(type) {
 		case viper.ConfigFileNotFoundError:
@@ -192,15 +196,16 @@ func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(task concurrency.Task, name string) (*Feature, error) {
+func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
+		return nil, utils.InvalidParameterError("name", "can't be empty string")
 	}
 
-	var (
-		feat Feature
-		err  error
-	)
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
+	var feat Feature
 	if _, ok := allEmbeddedMap[name]; !ok {
 		err = fmt.Errorf("failed to find a feature named '%s'", name)
 	} else {
@@ -272,7 +277,15 @@ func (f *Feature) Applyable(t Target) bool {
 
 // Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error) {
+	if f == nil {
+		return nil, utils.InvalidInstanceError()
+	}
+
+	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
 	// cacheKey := f.DisplayName() + "@" + t.Name()
 	// if anon, ok := checkCache.Get(cacheKey); ok {
 	// 	return anon.(Results), nil
@@ -304,7 +317,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	f.setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(f, myV)
+	err = checkParameters(f, myV)
 	if err != nil {
 		return nil, err
 	}
@@ -316,10 +329,14 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) {
 	if f == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+
+	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	methods := t.Methods()
 	var (
@@ -354,7 +371,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	f.setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(f, myV)
+	err = checkParameters(f, myV)
 	if err != nil {
 		return nil, err
 	}
@@ -386,16 +403,16 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 }
 
 // Remove uninstalls the feature from the target
-func (f *Feature) Remove(t Target, v Variables, s Settings) (results Results, err error) {
+func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err error) {
 	if f == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
-	results = Results{}
+	results := Results{}
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -486,20 +503,25 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		v["ClusterName"] = identity.Name
 		v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
 		v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
-		networkCfg := cluster.GetNetworkConfig(f.task)
-		// if networkCfg.VIP != nil {
-		// 	v["GatewayIP"] = networkCfg.VIP.PrivateIP // VPL: Should be replaced by the next entry
-		// 	v["DefaultRouteIP"] = networkCfg.VIP.PrivateIP
-		// 	v["PublicIP"] = networkCfg.VIP.PublicIP // VPL: Should be replaced by the next entry
-		// 	v["EndpointIP"] = networkCfg.VIP.PublicIP
-		v["PrimaryGatewayIP"] = networkCfg.GatewayIP
-		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-		v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
-		v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
-		v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
-		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
-		v["EndpointIP"] = networkCfg.EndpointIP
-		v["PublicIP"] = v["EndpointIP"] // legacy ...
+		networkCfg, err := cluster.GetNetworkConfig(f.task)
+		if err == nil {
+			// if networkCfg.VIP != nil {
+			// 	v["GatewayIP"] = networkCfg.VIP.PrivateIP // VPL: Should be replaced by the next entry
+			// 	v["DefaultRouteIP"] = networkCfg.VIP.PrivateIP
+			// 	v["PublicIP"] = networkCfg.VIP.PublicIP // VPL: Should be replaced by the next entry
+			// 	v["EndpointIP"] = networkCfg.VIP.PublicIP
+			v["PrimaryGatewayIP"] = networkCfg.GatewayIP
+			v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+			v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
+			v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
+			v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
+			v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
+			v["EndpointIP"] = networkCfg.EndpointIP
+			v["PublicIP"] = v["EndpointIP"] // legacy ...
+			if _, ok := v["CIDR"]; !ok {
+				v["CIDR"] = networkCfg.CIDR
+			}
+		}
 		v["Masters"] = cluster.ListMasters(f.task)
 		v["MasterNames"] = cluster.ListMasterNames(f.task)
 		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
@@ -507,9 +529,6 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "cladm"
 			v["Password"] = identity.AdminPassword
-		}
-		if _, ok := v["CIDR"]; !ok {
-			v["CIDR"] = networkCfg.CIDR
 		}
 	} else {
 		var host *pb.Host

@@ -75,7 +75,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 				return err
 			}
 
-			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(executionTimeout)
+			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(nil, executionTimeout)
 
 			// If an error occurred, stop the loop and propagates this error
 			if err != nil {

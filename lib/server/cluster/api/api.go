@@ -36,7 +36,7 @@ type Cluster interface {
 	// GetIdentity returns the identity of the cluster (name, flavor, complexity)
 	GetIdentity(task concurrency.Task) identity.Identity
 	// GetNetworkConfig returns network configuration of the cluster
-	GetNetworkConfig(concurrency.Task) propsv2.Network
+	GetNetworkConfig(concurrency.Task) (propsv2.Network, error)
 	// GetProperties returns the extension of the cluster
 	GetProperties(concurrency.Task) *serialize.JSONProperties
 
@@ -79,7 +79,7 @@ type Cluster interface {
 	// GetNode returns a node based on its ID
 	GetNode(concurrency.Task, string) (*pb.Host, error)
 	// CountNodes counts the nodes of the cluster
-	CountNodes(concurrency.Task) uint
+	CountNodes(concurrency.Task) (uint, error)
 
 	// Delete allows to destroy infrastructure of cluster
 	Delete(concurrency.Task) error

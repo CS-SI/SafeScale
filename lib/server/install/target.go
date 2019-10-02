@@ -18,6 +18,7 @@ package install
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
@@ -49,15 +50,15 @@ type HostTarget struct {
 }
 
 // NewHostTarget ...
-func NewHostTarget(host *pb.Host) Target {
+func NewHostTarget(host *pb.Host) (Target, error) {
 	if host == nil {
-		panic("Invalid parameter 'host': can't be nil!")
+		return nil, utils.InvalidParameterError("host", "can't be nil")
 	}
 	return createHostTarget(host)
 }
 
 // createHostTarget ...
-func createHostTarget(host *pb.Host) *HostTarget {
+func createHostTarget(host *pb.Host) (*HostTarget, error) {
 	var (
 		index   uint8
 		methods = map[uint8]Method.Enum{}
@@ -84,7 +85,7 @@ func createHostTarget(host *pb.Host) *HostTarget {
 		host:    host,
 		methods: methods,
 		name:    host.Name,
-	}
+	}, nil
 }
 
 // Type returns the type of the Target
@@ -116,9 +117,9 @@ type ClusterTarget struct {
 }
 
 // NewClusterTarget ...
-func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) Target {
+func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) (Target, error) {
 	if cluster == nil {
-		panic("cluster is nil!")
+		return nil, utils.InvalidParameterError("cluster", "can't be nil")
 	}
 	var (
 		index   uint8
@@ -135,7 +136,7 @@ func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) Target 
 		cluster: cluster,
 		methods: methods,
 		name:    identity.Name,
-	}
+	}, nil
 }
 
 // Type returns the type of the Target
@@ -165,13 +166,15 @@ type NodeTarget struct {
 }
 
 // NewNodeTarget ...
-func NewNodeTarget(host *pb.Host) Target {
+func NewNodeTarget(host *pb.Host) (Target, error) {
 	if host == nil {
-		panic("host is nil!")
+		return nil, utils.InvalidParameterError("host", "can't be nil")
 	}
-	return &NodeTarget{
-		HostTarget: createHostTarget(host),
+	t, err := createHostTarget(host)
+	if err != nil {
+		return nil, err
 	}
+	return &NodeTarget{HostTarget: t}, nil
 }
 
 // Type returns the type of the Target

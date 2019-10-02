@@ -32,9 +32,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -57,7 +57,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterEror("in", "can't be nil")
+		return nil, utils.InvalidParameterError("in", "can't be nil")
 	}
 	networkName := in.GetName()
 
@@ -126,10 +126,10 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterEror("in", "can't be nil")
+		return nil, utils.InvalidParameterError("in", "can't be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, ""), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()
 	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
 
@@ -169,7 +169,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterEror("in", "can't be nil")
+		return nil, utils.InvalidParameterError("in", "can't be nil")
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -211,7 +211,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	}
 	if in == nil {
 		// FIXME: return a status.Errorf
-		return nil, utils.InvalidParameterEror("in", "can't be nil")
+		return nil, utils.InvalidParameterError("in", "can't be nil")
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {

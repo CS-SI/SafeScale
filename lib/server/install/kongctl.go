@@ -101,7 +101,10 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		present = anon.(bool)
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(network.Name, func() (interface{}, error) {
-			target := NewNodeTarget(srvutils.ToPBHost(addressedGateway))
+			target, err := NewNodeTarget(srvutils.ToPBHost(addressedGateway))
+			if err != nil {
+				return false, err
+			}
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
 				return false, fmt.Errorf("failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s", err.Error(), addressedGateway.Name)

@@ -71,7 +71,6 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
 
 	var hostRef string
 	host := resources.NewHost()
@@ -90,8 +89,6 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		} else {
 			hostRef = host.ID
 		}
-	default:
-		return nil, scerr.InvalidParameterError("param", "must be either a string or a *resources.Host!")
 	}
 	if host == nil {
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
@@ -218,7 +215,7 @@ func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, 
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.Run() // FIXME It CAN lock, use RunWithTimeout instead
+	return sshCmd.Run(nil) // FIXME It CAN lock, use RunWithTimeout instead
 }
 
 // run executes command on the host
@@ -228,7 +225,7 @@ func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.RunWithTimeout(duration)
+	return sshCmd.RunWithTimeout(nil, duration)
 }
 
 func extracthostName(in string) (string, error) {

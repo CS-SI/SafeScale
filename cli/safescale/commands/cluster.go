@@ -218,7 +218,10 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	netCfg := c.GetNetworkConfig(concurrency.RootTask())
+	netCfg, err := c.GetNetworkConfig(concurrency.RootTask())
+	if err != nil {
+		return nil, err
+	}
 	result["network_id"] = netCfg.NetworkID
 	result["cidr"] = netCfg.CIDR
 	result["default_route_ip"] = netCfg.DefaultRouteIP
@@ -826,7 +829,10 @@ var clusterShrinkCommand = cli.Command{
 		if count > 1 {
 			countS = "s"
 		}
-		present := clusterInstance.CountNodes(concurrency.RootTask())
+		present, err := clusterInstance.CountNodes(concurrency.RootTask())
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
 		if count > present {
 			msg := fmt.Sprintf("can't delete %d node%s, the cluster contains only %d of them", count, countS, present)
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
@@ -1055,7 +1061,10 @@ var clusterAddFeatureCommand = cli.Command{
 		settings := install.Settings{}
 		settings.SkipProxy = c.Bool("skip-proxy")
 
-		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
+		target, err := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
@@ -1115,7 +1124,10 @@ var clusterCheckFeatureCommand = cli.Command{
 
 		settings := install.Settings{}
 
-		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
+		target, err := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
@@ -1179,7 +1191,10 @@ var clusterDeleteFeatureCommand = cli.Command{
 		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 		settings.SkipProxy = true
 
-		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
+		target, err := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
 		results, err := feature.Remove(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())

@@ -58,12 +58,23 @@ func (m *Metadata) Written() bool {
 
 // Carry links metadata with cluster struct
 func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
+	var err error
+	tracer := concurrency.NewTracer(task, "", false)
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
+	if m == nil {
+		err = utils.InvalidInstanceError()
+		return m
+	}
 	if m.item == nil {
-		panic("m.item is nil!") // FIXME No more panics
+		err = utils.InvalidParameterError("m.item", "can't be nil")
+		return m
 	}
 	if cluster == nil {
-		panic("Invalid parameter 'cluster': can't be nil!")
+		err = utils.InvalidParameterError("cluster", "can't be nil")
+		return m
 	}
+
 	m.item.Carry(cluster)
 	m.name = cluster.GetIdentity(task).Name
 	return m
@@ -71,9 +82,13 @@ func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 
 // Delete removes a cluster metadata
 func (m *Metadata) Delete() error {
-	if m.item == nil {
-		return scerr.InvalidInstanceErrorWithMessage("m.item cannot be nil!")
+	if m == nil {
+		return utils.InvalidInstanceError()
 	}
+	if m.item == nil {
+		return scerr.InvalidParameterError("m.item", "can't be nil")
+	}
+
 	err := m.item.Delete(m.name)
 	if err != nil {
 		return err
@@ -87,19 +102,23 @@ func (m *Metadata) Read(task concurrency.Task, name string) error {
 	var (
 		ptr *Controller
 		ok  bool
+		err error
 	)
 	// If m.item is already carrying data, overwrites it
 	// Otherwise, allocates new one
 	anon := m.item.Get()
 	if anon == nil {
-		ptr = NewController(m.GetService())
+		ptr, err = NewController(m.GetService())
+		if err != nil {
+			return err
+		}
 	} else {
 		ptr, ok = anon.(*Controller)
 		if !ok {
 			ptr = &Controller{}
 		}
 	}
-	err := m.item.Read(name, func(buf []byte) (serialize.Serializable, error) {
+	err = m.item.Read(name, func(buf []byte) (serialize.Serializable, error) {
 		err := ptr.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -121,8 +140,11 @@ func (m *Metadata) Write() error {
 // Reload reloads the metadata from ObjectStorage
 // It's a good idea to do that just after an Acquire() to be sure to have the latest data
 func (m *Metadata) Reload(task concurrency.Task) error {
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
 	if m.item == nil {
-		return scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
+		return scerr.InvalidParameterError("m.item", "can't be nil")
 	}
 
 	// If the metadata object has never been written yet, succeed doing nothing
@@ -155,15 +177,20 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 }
 
 // Get returns the content of the metadata
-func (m *Metadata) Get() *Controller {
+func (m *Metadata) Get() (_ *Controller, err error) {
+	tracer := concurrency.NewTracer(nil, "", false)
+	defer utils.OnExitLogError(tracer.TraceMessage(""), &err)
+
+	if m == nil {
+		return nil, utils.InvalidInstanceError()
+	}
 	if m.item == nil {
-		panic("m.item is nil!")
+		return nil, utils.InvalidParameterError("m.item", "can't be nil")
 	}
 	if p, ok := m.item.Get().(*Controller); ok {
-		return p
+		return p, nil
 	}
-
-	panic("Missing cluster content in metadata!")
+	return nil, utils.NotFoundError("missing cluster content in metadata")
 }
 
 func (m *Metadata) OK() bool {
@@ -184,13 +211,18 @@ func (m *Metadata) OK() bool {
 
 // Browse walks through cluster folder and executes a callback for each entry
 func (m *Metadata) Browse(callback func(*Controller) error) error {
+	if m == nil {
+		return utils.InvalidInstanceError()
+	}
 	if m.item == nil {
-		return scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
+		return scerr.InvalidParameterError("m.item", "can't be nil")
 	}
 
 	return m.item.Browse(func(buf []byte) error {
-		cc := NewController(m.GetService())
-		err := cc.Deserialize(buf)
+		cc, err := NewController(m.GetService())
+		if err == nil {
+			err = cc.Deserialize(buf)
+		}
 		if err != nil {
 			return err
 		}

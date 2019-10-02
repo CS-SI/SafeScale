@@ -86,7 +86,10 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 	nvol.Size = int(gcpDisk.SizeGb)
 	nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
-	nvol.State = volumeStateConvert(gcpDisk.Status)
+	nvol.State, err = volumeStateConvert(gcpDisk.Status)
+	if err != nil {
+		return nil, err
+	}
 
 	return nvol, nil
 }
@@ -103,6 +106,10 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 	}
 
 	nvol := resources.NewVolume()
+	nvol.State, err = volumeStateConvert(gcpDisk.Status)
+	if err != nil {
+		return nil, err
+	}
 	nvol.Name = gcpDisk.Name
 	if strings.Contains(gcpDisk.Type, "pd-ssd") {
 		nvol.Speed = VolumeSpeed.SSD
@@ -111,25 +118,24 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 	}
 	nvol.Size = int(gcpDisk.SizeGb)
 	nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
-	nvol.State = volumeStateConvert(gcpDisk.Status)
 
 	return nvol, nil
 }
 
-func volumeStateConvert(gcpDriveStatus string) VolumeState.Enum {
+func volumeStateConvert(gcpDriveStatus string) (VolumeState.Enum, error) {
 	switch gcpDriveStatus {
 	case "CREATING":
-		return VolumeState.CREATING
+		return VolumeState.CREATING, nil
 	case "DELETING":
-		return VolumeState.DELETING
+		return VolumeState.DELETING, nil
 	case "FAILED":
-		return VolumeState.ERROR
+		return VolumeState.ERROR, nil
 	case "READY":
-		return VolumeState.AVAILABLE
+		return VolumeState.AVAILABLE, nil
 	case "RESTORING":
-		return VolumeState.CREATING
+		return VolumeState.CREATING, nil
 	default:
-		panic(fmt.Sprintf("Unexpected volume status: [%s]", gcpDriveStatus))
+		return -1, fmt.Errorf("Unexpected volume status: [%s]", gcpDriveStatus)
 	}
 }
 
@@ -154,7 +160,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 			nvolume.ID = strconv.FormatUint(instance.Id, 10)
 			nvolume.Name = instance.Name
 			nvolume.Size = int(instance.SizeGb)
-			nvolume.State = volumeStateConvert(instance.Status)
+			nvolume.State, _ = volumeStateConvert(instance.Status)
 			if strings.Contains(instance.Type, "pd-ssd") {
 				nvolume.Speed = VolumeSpeed.SSD
 			} else {

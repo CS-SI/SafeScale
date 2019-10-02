@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package scerr
+package utils
 
 import (
 	"fmt"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -30,52 +28,27 @@ const outputStopwatchTemplate = "%s (elapsed: %s)"
 // Stopwatch allows to time duration
 type Stopwatch struct {
 	start    time.Time
+	running  bool
 	stopped  bool
-	started  bool
 	duration time.Duration
 }
 
 // Start starts the Stopwatch
-func (sw *Stopwatch) Start() {
-	if !sw.stopped && !sw.started { // first time
+func (sw Stopwatch) Start() {
+	if !sw.running && !sw.stopped {
 		sw.start = time.Now()
-		sw.stopped = false
-		sw.started = true
-	} else {
-		if sw.stopped {
-			sw.start = time.Now()
-			sw.started = true
-			sw.stopped = false
-		}
+		sw.running = true
 	}
 }
 
 // Stop stops the Stopwatch
-func (sw *Stopwatch) Stop() {
-	if !sw.stopped && !sw.started { // first time
-		sw.start = time.Now()
-		sw.started = false
-		sw.stopped = true
-	} else {
-		if sw.started {
-			if sw.duration == 0 {
-				sw.duration = time.Since(sw.start)
-			} else {
-				sw.duration += time.Since(sw.start)
-			}
-
-			sw.started = false
-			sw.stopped = true
-		}
-	}
+func (sw Stopwatch) Stop() {
+	sw.stopped = true
+	sw.duration += time.Since(sw.start)
 }
 
 // Duration returns the time elapsed since the Stopwatch has been started
-func (sw *Stopwatch) Duration() time.Duration {
-	if !sw.stopped && !sw.started { // first time
-		return sw.duration
-	}
-
+func (sw Stopwatch) Duration() time.Duration {
 	if sw.stopped {
 		return sw.duration
 	}
@@ -94,17 +67,6 @@ func (sw Stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func(
 	if !ok {
 		logLevelFn = logrus.Info
 	}
-
-	// In the meantime, if both 'in' and 'out' are empty, recover function name from caller...
-	if len(in) == 0 && len(out) == 0 {
-		if pc, _, _, ok := runtime.Caller(1); ok {
-			if f := runtime.FuncForPC(pc); f != nil {
-				in = filepath.Base(f.Name())
-				out = filepath.Base(f.Name()) + " called"
-			}
-		}
-	}
-
 	logLevelFn(in)
 
 	sw.Start()
@@ -125,16 +87,11 @@ func FormatDuration(dur time.Duration) string {
 	if ms == 0 {
 		if dur.Nanoseconds()/1000000000 == 0 {
 			ms = 1
-			return fmt.Sprintf("%d ms", ms)
+			// return fmt.Sprintf("%.03d s", ms)
 		}
 	}
 
 	sec := int64(dur.Truncate(time.Second).Seconds()) % 60
 	min := int64(dur.Truncate(time.Minute).Minutes())
-
-	if min == 0 {
-		return fmt.Sprintf("%d seconds, %d ms", sec, ms)
-	}
-
-	return fmt.Sprintf("%d minutes, %d seconds, %d ms", min, sec, ms)
+	return fmt.Sprintf("00h%02dm%02d.%03ds", min, sec, ms)
 }

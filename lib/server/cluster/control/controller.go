@@ -57,17 +57,17 @@ type Controller struct {
 }
 
 // NewController ...
-func NewController(svc iaas.Service) *Controller {
+func NewController(svc iaas.Service) (*Controller, error) {
 	metadata, err := NewMetadata(svc)
 	if err != nil {
-		panic("failed to create metadata object")
+		return nil, err
 	}
 	return &Controller{
 		service:    svc,
 		metadata:   metadata,
 		Properties: serialize.NewJSONProperties("clusters"),
 		TaskedLock: concurrency.NewTaskedLock(),
-	}
+	}, nil
 }
 
 func (c *Controller) replace(task concurrency.Task, src *Controller) {
@@ -136,9 +136,14 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 
 // GetService returns the service from the provider
 func (c *Controller) GetService(task concurrency.Task) iaas.Service {
+	var err error
+	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+
 	if c == nil {
-		panic("Calling Controller::GetService() from nil pointer!")
+		err = utils.InvalidInstanceError()
+		return nil
 	}
+
 	c.RLock(task)
 	defer c.RUnlock(task)
 	return c.service
@@ -146,9 +151,18 @@ func (c *Controller) GetService(task concurrency.Task) iaas.Service {
 
 // GetIdentity returns the core data of a cluster
 func (c *Controller) GetIdentity(task concurrency.Task) identity.Identity {
-	if c == nil {
-		panic("Calling lib.server.cluster.control.Controller::GetIdentity() from nil pointer!")
+	if task == nil {
+		task = concurrency.RootTask()
 	}
+
+	var err error
+	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+
+	if c == nil {
+		err = utils.InvalidInstanceError()
+		return identity.Identity{}
+	}
+
 	c.RLock(task)
 	defer c.RUnlock(task)
 	return c.Identity
@@ -156,24 +170,33 @@ func (c *Controller) GetIdentity(task concurrency.Task) identity.Identity {
 
 // GetProperties returns the properties of the cluster
 func (c *Controller) GetProperties(task concurrency.Task) *serialize.JSONProperties {
-	if c == nil {
-		panic("Calling lib.server.cluster.control.Controller::GetProperties() from nil pointer!")
-	}
 	if task == nil {
 		task = concurrency.RootTask()
 	}
+	var err error
+	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+
+	if c == nil {
+		err = utils.InvalidInstanceError()
+		return nil
+	}
+
 	c.RLock(task)
 	defer c.RUnlock(task)
 	return c.Properties
 }
 
 // GetNetworkConfig returns the network configuration of the cluster
-func (c *Controller) GetNetworkConfig(task concurrency.Task) (config clusterpropsv2.Network) {
-	if c == nil {
-		panic("Calling lib.server.cluster.control.Controller::GetNetworkConfig() from nil pointer!")
-	}
+func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.Network, err error) {
+	config := clusterpropsv2.Network{}
 	if task == nil {
 		task = concurrency.RootTask()
+	}
+
+	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+
+	if c == nil {
+		return config, utils.InvalidInstanceError()
 	}
 
 	c.RLock(task)
@@ -197,19 +220,24 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (config clusterprop
 		})
 	}
 	c.RUnlock(task)
-	return config
+	return config, nil
 }
 
 // CountNodes returns the number of nodes in the cluster
-func (c *Controller) CountNodes(task concurrency.Task) uint {
+func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
+	if c == nil {
+		return 0, utils.InvalidInstanceError()
+	}
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 
+	defer utils.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+
 	var count uint
 
 	c.RLock(task)
-	err := c.GetProperties(task).LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+	err = c.GetProperties(task).LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		count = uint(len(v.(*clusterpropsv1.Nodes).PrivateNodes))
 		return nil
 	})
@@ -217,7 +245,7 @@ func (c *Controller) CountNodes(task concurrency.Task) uint {
 	if err != nil {
 		log.Debugf("failed to count nodes: %v", err)
 	}
-	return count
+	return count, nil
 }
 
 // ListMasters lists the names of the master nodes in the Cluster
@@ -544,7 +572,11 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 		return err
 	}
 	if c.metadata.Written() {
-		c.replace(task, c.metadata.Get())
+		mc, err := c.metadata.Get()
+		if err != nil {
+			return err
+		}
+		c.replace(task, mc)
 	} else {
 		c.metadata.Carry(task, c)
 	}
@@ -669,12 +701,14 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	var (
 		nodeType    NodeType.Enum
 		nodeTypeStr string
+		errors      []string
 	)
-	nodeDef.Network = c.GetNetworkConfig(task).NetworkID
+	netCfg, err := c.GetNetworkConfig(task)
+	if err != nil {
+		return nil, err
+	}
+	nodeDef.Network = netCfg.NetworkID
 
-	var (
-		errors []string
-	)
 	timeout := utils.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
 	var subtasks []concurrency.Task

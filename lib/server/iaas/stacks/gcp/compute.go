@@ -484,7 +484,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 }
 
 // WaitHostReady waits an host achieve ready state
-// hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
+// hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter.
 func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *resources.Host, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -497,8 +497,9 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 		host.ID = hostParam
 	case *resources.Host:
 		host = hostParam
-	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+	}
+	if host == nil {
+		return nil, utils.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
@@ -668,7 +669,10 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, err
 	}
 
-	host.LastState = stateConvert(gcpHost.Status)
+	host.LastState, err = stateConvert(gcpHost.Status)
+	if err != nil {
+		return nil, err
+	}
 	var subnets []IPInSubnet
 
 	for _, nit := range gcpHost.NetworkInterfaces {
@@ -768,28 +772,28 @@ func fromMachineTypeToAllocatedSize(machineType string) propsv1.HostSize {
 	return hz
 }
 
-func stateConvert(gcpHostStatus string) HostState.Enum {
+func stateConvert(gcpHostStatus string) (HostState.Enum, error) {
 	switch gcpHostStatus {
 	case "PROVISIONING":
-		return HostState.STARTING
+		return HostState.STARTING, nil
 	case "REPAIRING":
-		return HostState.ERROR
+		return HostState.ERROR, nil
 	case "RUNNING":
-		return HostState.STARTED
+		return HostState.STARTED, nil
 	case "STAGING":
-		return HostState.STARTING
+		return HostState.STARTING, nil
 	case "STOPPED":
-		return HostState.STOPPED
+		return HostState.STOPPED, nil
 	case "STOPPING":
-		return HostState.STOPPING
+		return HostState.STOPPING, nil
 	case "SUSPENDED":
-		return HostState.STOPPED
+		return HostState.STOPPED, nil
 	case "SUSPENDING":
-		return HostState.STOPPING
+		return HostState.STOPPING, nil
 	case "TERMINATED":
-		return HostState.STOPPED
+		return HostState.STOPPED, nil
 	default:
-		panic(fmt.Sprintf("Unexpected host status: [%s]", gcpHostStatus))
+		return -1, fmt.Errorf("Unexpected host status: [%s]", gcpHostStatus)
 	}
 }
 
@@ -891,7 +895,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 			nhost := resources.NewHost()
 			nhost.ID = strconv.FormatUint(instance.Id, 10)
 			nhost.Name = instance.Name
-			nhost.LastState = stateConvert(instance.Status)
+			nhost.LastState, _ = stateConvert(instance.Status)
 
 			// FIXME Populate host, what's missing ?
 			hostList = append(hostList, nhost)

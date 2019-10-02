@@ -264,8 +264,11 @@ func validateNetworkName(req resources.NetworkRequest) (bool, error) {
 
 // GetNetworkByName ...
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
+	if s == nil {
+		return nil, utils.InvalidInstanceError()
+	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...

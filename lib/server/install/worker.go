@@ -212,7 +212,12 @@ func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) 
 		dones[h] = d
 		results[h] = r
 		go func(host *pb.Host, res chan Results, done chan error) {
-			nodeTarget := NewNodeTarget(host)
+			nodeTarget, err := NewNodeTarget(host)
+			if err != nil {
+				res <- nil
+				done <- err
+				return
+			}
 			results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
 			if err != nil {
 				res <- nil
@@ -307,9 +312,10 @@ func (w *worker) identifyAvailableGateway() (*pb.Host, error) {
 		return gatewayFromHost(w.host), nil
 	}
 	if w.availableGateway == nil {
-		var err error
-		netCfg := w.cluster.GetNetworkConfig(w.feature.task)
-		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
+		netCfg, err := w.cluster.GetNetworkConfig(w.feature.task)
+		if err == nil {
+			w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -353,7 +359,10 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 		results []*pb.Host
 	)
 
-	netCfg := w.cluster.GetNetworkConfig(w.feature.task)
+	netCfg, err := w.cluster.GetNetworkConfig(w.feature.task)
+	if err != nil {
+		return nil, err
+	}
 	gw, err := client.New().Host.Inspect(netCfg.GatewayID, utils.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
@@ -566,17 +575,22 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 				Serial:             serial,
 			}
 			results[k], inner = step.Run(hostsList, w.variables, w.settings)
-
 			// If an error occurred, don't do the remaining steps, fail immediately
 			if inner != nil {
 				return nil, inner, false, true
 			}
 
 			if !results[k].Successful() {
-				if strings.Contains(w.action.String(), "Check") {
-					log.Warnf(fmt.Sprintf("executing step '%s::%s'... was a failure, not installed yet ?", w.action.String(), k))
-					return nil, nil, false, true
+				// If there are some not completed steps, reports them and break
+				if !results[k].Completed() {
+					log.Warnf(fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), k, results[k].UncompletedEntries()))
+					return nil, fmt.Errorf(results[k].ErrorMessages()), false, true
 				}
+				// not successful but completed, if action is check means the feature is not install, it's not a failure)
+				if strings.Contains(w.action.String(), "Check") {
+					return nil, nil, false, false
+				}
+				// For any other situations, raise error and break
 				return nil, fmt.Errorf(results[k].ErrorMessages()), false, true
 			}
 
@@ -693,7 +707,10 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 
 	svc := w.cluster.GetService(w.feature.task)
-	netprops := w.cluster.GetNetworkConfig(w.feature.task)
+	netprops, err := w.cluster.GetNetworkConfig(w.feature.task)
+	if err != nil {
+		return err
+	}
 	mn, err := metadata.LoadNetwork(svc, netprops.NetworkID)
 	if err != nil {
 		return err

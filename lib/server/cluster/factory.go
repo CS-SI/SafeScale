@@ -56,7 +56,10 @@ func Load(task concurrency.Task, name string) (api.Cluster, error) {
 		}
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
-	controller := m.Get()
+	controller, err := m.Get()
+	if err != nil {
+		return nil, err
+	}
 	err = setForeman(task, controller)
 	if err != nil {
 		return nil, err
@@ -83,7 +86,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 }
 
 // Create creates a cluster following the parameters of the request
-func Create(task concurrency.Task, req control.Request) (clu api.Cluster, err error) {
+func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err error) {
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -107,7 +110,10 @@ func Create(task concurrency.Task, req control.Request) (clu api.Cluster, err er
 		return nil, err
 	}
 
-	controller := control.NewController(svc)
+	controller, err := control.NewController(svc)
+	if err != nil {
+		return nil, err
+	}
 	req.Tenant = tenant.Name
 	switch req.Flavor {
 	case Flavor.BOH:

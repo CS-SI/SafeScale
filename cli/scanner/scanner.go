@@ -32,6 +32,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -431,7 +433,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				log.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
-			_, cout, _, err := c.RunWithTimeout(8 * time.Minute) // FIXME Hardcoded timeout
+			_, cout, _, err := c.RunWithTimeout(nil, 8*time.Minute) // FIXME Hardcoded timeout
 			if err != nil {
 				log.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
 				return err

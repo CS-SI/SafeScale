@@ -149,8 +149,12 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index int, 
 
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, host.Name)
 
+	netCfg, err := foreman.Cluster().GetNetworkConfig(task)
+	if err != nil {
+		return err
+	}
 	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
-		"BootstrapIP":   foreman.Cluster().GetNetworkConfig(task).GatewayIP,
+		"BootstrapIP":   netCfg.GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
 	if err != nil {
@@ -178,8 +182,12 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 	if err != nil {
 		return err
 	}
+	netCfg, err := foreman.Cluster().GetNetworkConfig(task)
+	if err != nil {
+		return err
+	}
 	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
-		"BootstrapIP":   foreman.Cluster().GetNetworkConfig(task).GatewayIP,
+		"BootstrapIP":   netCfg.GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
 	if err != nil {
@@ -228,7 +236,12 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
-	netCfg := cluster.GetNetworkConfig(task)
+
+	netCfg, err := cluster.GetNetworkConfig(task)
+	if err != nil {
+		return err
+	}
+
 	identity := cluster.GetIdentity(task)
 	// VPL: FIXME: use Property.NetworkV2 with VIP awareness...
 	data := map[string]interface{}{
@@ -288,6 +301,13 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 			return "", err
 		}
 
+		// We will need information about cluster network
+		cluster := foreman.Cluster()
+		netCfg, err := cluster.GetNetworkConfig(task)
+		if err != nil {
+			return "", err
+		}
+
 		// get file contents as string
 		tmplString, err := box.String("dcos_install_requirements.sh")
 		if err != nil {
@@ -300,10 +320,9 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		cluster := foreman.Cluster()
 		identity := cluster.GetIdentity(task)
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          cluster.GetNetworkConfig(task).CIDR,
+			"CIDR":          netCfg.CIDR,
 			"Username":      "cladm",
 			"CladmPassword": identity.AdminPassword,
 			"SSHPublicKey":  identity.Keypair.PublicKey,

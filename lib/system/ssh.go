@@ -415,7 +415,11 @@ func (sc *SSHCommand) Display() string {
 //
 // If the command starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
-func (sc *SSHCommand) Run() (int, string, string, error) {
+func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
+	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+	tracer.Trace("command=\n%s\n", sc.Display())
+	defer tracer.OnExitTrace()
+
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
 	if err != nil {
@@ -454,14 +458,18 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
-	if strings.Contains(sc.Display(), "ENDSSH") {
-		defer scerr.Stopwatch{}.OnExitLogWithLevel(
-			fmt.Sprintf("Running command with timeout of %s: [%s]", timeout, sc.Display()),
-			fmt.Sprintf("Command run: [%s]", sc.Display()),
-			log.DebugLevel,
-		)()
-	}
+func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) (int, string, string, error) {
+	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+	tracer.Trace("command=\n%s\n", sc.Display())
+	defer tracer.OnExitTrace()
+
+	// if strings.Contains(sc.Display(), "ENDSSH") {
+	// 	defer utils.Stopwatch{}.OnExitLogWithLevel(
+	// 		fmt.Sprintf("Running command with timeout of %s:\n%s", timeout, sc.Display()),
+	// 		fmt.Sprintf("Command run: [%s]", sc.Display()),
+	// 		log.DebugLevel,
+	// 	)()
+	// }
 
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
@@ -684,7 +692,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				return err
 			}
 
-			retcode, stdout, stderr, err = cmd.RunWithTimeout(timeout)
+			retcode, stdout, stderr, err = cmd.RunWithTimeout(nil, timeout)
 			if err != nil {
 				return err
 			}
@@ -755,7 +763,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		keyFile: identityfile,
 	}
 
-	return sshCommand.Run() // FIXME It CAN lock, use .RunWithTimeout instead
+	return sshCommand.Run(nil) // FIXME It CAN lock, use .RunWithTimeout instead
 }
 
 // Exec executes the cmd using ssh

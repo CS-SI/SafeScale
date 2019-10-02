@@ -149,6 +149,13 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 			return "", err
 		}
 
+		// We will need information about cluster network
+		cluster := foreman.Cluster()
+		netCfg, err := cluster.GetNetworkConfig(task)
+		if err != nil {
+			return "", err
+		}
+
 		// get file contents as string
 		tmplString, err := b.String("boh_install_requirements.sh")
 		if err != nil {
@@ -161,10 +168,9 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		cluster := foreman.Cluster()
 		identity := cluster.GetIdentity(task)
 		data := map[string]interface{}{
-			"CIDR":          cluster.GetNetworkConfig(task).CIDR,
+			"CIDR":          netCfg.CIDR,
 			"CladmPassword": identity.AdminPassword,
 			"SSHPublicKey":  identity.Keypair.PublicKey,
 			"SSHPrivateKey": identity.Keypair.PrivateKey,
