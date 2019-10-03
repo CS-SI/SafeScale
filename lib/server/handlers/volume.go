@@ -79,7 +79,10 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 		return volumes, err
 	}
 
-	mv := metadata.NewVolume(handler.service)
+	mv, err := metadata.NewVolume(handler.service)
+	if err != nil {
+		return nil, err
+	}
 	err = mv.Browse(func(volume *resources.Volume) error {
 		volumes = append(volumes, *volume)
 		return nil
@@ -109,7 +112,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 		case scerr.ErrNotFound:
 			return resources.ResourceNotFoundError("volume", ref)
 		default:
-			logrus.Debugf("Failed to delete volume: %+v", err)
+			logrus.Debugf("failed to delete volume: %+v", err)
 			return err
 		}
 	}
@@ -286,7 +289,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 		if err != nil {
 			derr := md.Delete()
 			if derr != nil {
-				logrus.Warnf("Failed to delete metadata of volume '%s'", newVolume.Name)
+				logrus.Warnf("failed to delete metadata of volume '%s'", newVolume.Name)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
@@ -310,7 +313,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	}
 	// FIXME: validate parameters
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
-	defer tracer.WithStopwatch().GoingIn().OnExitTrace()
+	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Get volume data
@@ -537,12 +540,12 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				return nil
 			})
 			if err2 != nil {
-				logrus.Warnf("Failed to set volume %s metadatas", volumeName)
+				logrus.Warnf("failed to set volume %s metadatas", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 			_, err2 = metadata.SaveVolume(handler.service, volume)
 			if err2 != nil {
-				logrus.Warnf("Failed to save volume %s metadatas", volumeName)
+				logrus.Warnf("failed to save volume %s metadatas", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
@@ -564,7 +567,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				return nil
 			})
 			if err2 != nil {
-				logrus.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
+				logrus.Warnf("failed to set host '%s' metadata about volumes", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 			err2 = host.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
@@ -574,13 +577,13 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				return nil
 			})
 			if err2 != nil {
-				logrus.Warnf("Failed to set host '%s' metadata about mounts", volumeName)
+				logrus.Warnf("failed to set host '%s' metadata about mounts", volumeName)
 				err = scerr.AddConsequence(err, err2)
 
 			}
 			err2 = mh.Write()
 			if err2 != nil {
-				logrus.Warnf("Failed to save host '%s' metadata", volumeName)
+				logrus.Warnf("failed to save host '%s' metadata", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
 		}

@@ -420,7 +420,7 @@ var hostAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 		values := install.Variables{}
@@ -438,7 +438,7 @@ var hostAddFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
-			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -452,7 +452,7 @@ var hostAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
+			msg := fmt.Sprintf("failed to add feature '%s' on host '%s'", featureName, hostName)
 			if Debug || Verbose {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
@@ -517,7 +517,7 @@ var hostCheckFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
@@ -533,7 +533,7 @@ var hostCheckFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
-			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -588,7 +588,7 @@ var hostDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
@@ -604,7 +604,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
-			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -618,7 +618,7 @@ var hostDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to delete feature '%s' from host '%s'", featureName, hostName)
+			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", featureName, hostName)
 			if Verbose || Debug {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}

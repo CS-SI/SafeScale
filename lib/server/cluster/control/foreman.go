@@ -720,8 +720,8 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
 		p                                = data.Map{}
@@ -1184,14 +1184,14 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		if path == "" {
 			path, err = exec.LookPath("safescale")
 			if err != nil {
-				msg := "Failed to find local binary 'safescale', make sure its path is in environment variable PATH"
+				msg := "failed to find local binary 'safescale', make sure its path is in environment variable PATH"
 				logrus.Errorf(utils.Capitalize(msg))
 				return fmt.Errorf(msg)
 			}
 		}
 		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescale", "root", "root", "0755")
 		if err != nil {
-			logrus.Errorf("Failed to upload 'safescale' binary")
+			logrus.Errorf("failed to upload 'safescale' binary")
 			return fmt.Errorf("failed to upload 'safescale' binary': %s", err.Error())
 		}
 
@@ -1203,14 +1203,14 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		if path == "" {
 			path, err = exec.LookPath("safescaled")
 			if err != nil {
-				msg := "Failed to find local binary 'safescaled', make sure its path is in environment variable PATH"
+				msg := "failed to find local binary 'safescaled', make sure its path is in environment variable PATH"
 				logrus.Errorf(utils.Capitalize(msg))
 				return fmt.Errorf(msg)
 			}
 		}
 		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescaled", "root", "root", "0755")
 		if err != nil {
-			logrus.Errorf("Failed to upload 'safescaled' binary")
+			logrus.Errorf("failed to upload 'safescaled' binary")
 			return fmt.Errorf("failed to upload 'safescaled' binary': %s", err.Error())
 		}
 
@@ -1221,7 +1221,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
 			retcode, stdout, stderr, err := client.New().SSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, 2*temporal.GetLongOperationTimeout())
 			if err != nil {
-				msg := fmt.Sprintf("Failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error())
+				msg := fmt.Sprintf("failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error())
 				logrus.Errorf(utils.Capitalize(msg))
 				return fmt.Errorf(msg)
 			}
@@ -1232,7 +1232,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 				} else if stderr != "" {
 					output = stderr
 				}
-				msg := fmt.Sprintf("Failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, output)
+				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, output)
 				logrus.Errorf(utils.Capitalize(msg))
 				return fmt.Errorf(msg)
 			}
@@ -1413,8 +1413,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	nokeep := p["nokeep"].(bool)
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true).GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	logrus.Debugf("[%s] starting host resource creation...", hostLabel)

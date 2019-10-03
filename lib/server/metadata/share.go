@@ -39,10 +39,14 @@ type Share struct {
 }
 
 // NewShare creates an instance of metadata.Nas
-func NewShare(svc iaas.Service) *Share {
-	return &Share{
-		item: metadata.NewItem(svc, shareFolderName),
+func NewShare(svc iaas.Service) (*Share, error) {
+	aShare, err := metadata.NewItem(svc, shareFolderName)
+	if err != nil {
+		return nil, err
 	}
+	return &Share{
+		item: aShare,
+	}, nil
 }
 
 type shareItem struct {
@@ -63,21 +67,21 @@ func (n *shareItem) Deserialize(buf []byte) error {
 }
 
 // Carry links an export instance to the Metadata instance
-func (ms *Share) Carry(hostID, hostName, shareID, shareName string) *Share {
+func (ms *Share) Carry(hostID, hostName, shareID, shareName string) (*Share, error) {
 	if hostID == "" {
-		panic("hostID is empty!")
+		return nil, scerr.InvalidParameterError("hostID", "cannot be empty!")
 	}
 	if hostName == "" {
-		panic("hostName is empty!")
+		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
 	}
 	if shareID == "" {
-		panic("shareID is empty!")
+		return nil, scerr.InvalidParameterError("shareID", "cannot be empty!")
 	}
 	if shareName == "" {
-		panic("shareName is empty!")
+		return nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
 	}
 	if ms.item == nil {
-		panic("ms.item is nil!")
+		return nil, scerr.InvalidInstanceErrorWithMessage("ms.item cannot be nil!")
 	}
 	ni := shareItem{
 		HostID:    hostID,
@@ -88,7 +92,7 @@ func (ms *Share) Carry(hostID, hostName, shareID, shareName string) *Share {
 	ms.item.Carry(&ni)
 	ms.name = &ni.ShareName
 	ms.id = &ni.ShareID
-	return ms
+	return ms, nil
 }
 
 // Get returns the ID of the host owning the share
@@ -142,7 +146,9 @@ func (ms *Share) ReadByID(id string) error {
 	if err != nil {
 		return err
 	}
-	ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName)
+	if _, err := ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -162,7 +168,9 @@ func (ms *Share) ReadByName(name string) error {
 	if err != nil {
 		return err
 	}
-	ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName)
+	if _, err := ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -249,13 +257,30 @@ func (ms *Share) Release() {
 
 // SaveShare saves the Nas definition in Object Storage
 func SaveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) (*Share, error) {
-	ms := NewShare(svc).Carry(hostID, hostName, shareID, shareName)
+	aShare, err := NewShare(svc)
+	if err != nil {
+		return nil, err
+	}
+	ms, err := aShare.Carry(hostID, hostName, shareID, shareName)
+	if err != nil {
+		return nil, err
+	}
 	return ms, ms.Write()
 }
 
 // RemoveShare removes the share definition from Object Storage
 func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) error {
-	return NewShare(svc).Carry(hostID, hostName, shareID, shareName).Delete()
+	aShare, err := NewShare(svc)
+	if err != nil {
+		return err
+	}
+
+	aShare, err = aShare.Carry(hostID, hostName, shareID, shareName)
+	if err != nil {
+		return err
+	}
+
+	return aShare.Delete()
 }
 
 // LoadShare returns the name of the host owing the share 'ref', read from Object Storage
@@ -274,7 +299,10 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ms := NewShare(svc)
+	ms, err := NewShare(svc)
+	if err != nil {
+		return "", err
+	}
 
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {

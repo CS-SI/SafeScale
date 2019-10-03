@@ -42,10 +42,15 @@ type Host struct {
 }
 
 // NewHost creates an instance of api.Host
-func NewHost(svc iaas.Service) *Host {
-	return &Host{
-		item: metadata.NewItem(svc, hostsFolderName),
+func NewHost(svc iaas.Service) (*Host, error) {
+	aHost, err := metadata.NewItem(svc, hostsFolderName)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Host{
+		item: aHost,
+	}, nil
 }
 
 // Carry links an host instance to the Metadata instance
@@ -223,7 +228,10 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
 
-	mh = NewHost(svc)
+	mh, err = NewHost(svc)
+	if err != nil {
+		return nil, err
+	}
 	err = mh.Carry(host).Write()
 	if err != nil {
 		return nil, err
@@ -263,7 +271,10 @@ func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
 
 	// Second deletes host metadata
-	mh := NewHost(svc)
+	mh, err := NewHost(svc)
+	if err != nil {
+		return err
+	}
 	return mh.Carry(host).Delete()
 }
 
@@ -284,7 +295,10 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
 
 	// We first try looking for host by ID from metadata
-	mh = NewHost(svc)
+	mh, err = NewHost(svc)
+	if err != nil {
+		return nil, err
+	}
 
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {

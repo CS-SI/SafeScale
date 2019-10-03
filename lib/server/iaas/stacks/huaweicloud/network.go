@@ -636,7 +636,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gwname), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,

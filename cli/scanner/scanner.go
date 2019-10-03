@@ -269,7 +269,7 @@ func RunScanner(targetedTenant string) {
 			fmt.Printf("Error working with tenant %s\n", tenantName)
 		}
 		if err := collect(tenantName); err != nil {
-			log.Warn(fmt.Printf("Failed to save scanned info from tenant %s", tenantName))
+			log.Warn(fmt.Printf("failed to save scanned info from tenant %s", tenantName))
 		}
 	}
 }
@@ -591,7 +591,7 @@ func main() {
 	fmt.Println("Are you sure ? [y]es [N]o: ")
 	text, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("Failed to read the input : ", err.Error())
+		fmt.Println("failed to read the input : ", err.Error())
 		text = "n"
 	}
 	if strings.TrimRight(text, "\n") != "y" {

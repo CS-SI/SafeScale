@@ -143,11 +143,11 @@ func (handler *NetworkHandler) Create(
 				if derr != nil {
 					switch derr.(type) {
 					case scerr.ErrNotFound:
-						logrus.Errorf("Failed to delete network, resource not found: %+v", derr)
+						logrus.Errorf("failed to delete network, resource not found: %+v", derr)
 					case scerr.ErrTimeout:
-						logrus.Errorf("Failed to delete network, timeout: %+v", derr)
+						logrus.Errorf("failed to delete network, timeout: %+v", derr)
 					default:
-						logrus.Errorf("Failed to delete network, other reason: %+v", derr)
+						logrus.Errorf("failed to delete network, other reason: %+v", derr)
 					}
 					err = scerr.AddConsequence(err, derr)
 				}
@@ -173,7 +173,7 @@ func (handler *NetworkHandler) Create(
 				if newNetwork != nil {
 					derr := handler.service.DeleteVIP(newNetwork.VIP)
 					if derr != nil {
-						logrus.Errorf("Failed to delete VIP: %+v", derr)
+						logrus.Errorf("failed to delete VIP: %+v", derr)
 						err = scerr.AddConsequence(err, derr)
 					}
 				}
@@ -193,7 +193,7 @@ func (handler *NetworkHandler) Create(
 			if mn != nil {
 				derr := mn.Delete()
 				if derr != nil {
-					logrus.Errorf("Failed to delete network metadata: %+v", derr)
+					logrus.Errorf("failed to delete network metadata: %+v", derr)
 					err = scerr.AddConsequence(err, derr)
 				}
 			}
@@ -706,7 +706,10 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*r
 		return handler.service.ListNetworks()
 	}
 
-	mn := metadata.NewNetwork(handler.service)
+	mn, err := metadata.NewNetwork(handler.service)
+	if err != nil {
+		return nil, err
+	}
 	err = mn.Browse(func(network *resources.Network) error {
 		netList = append(netList, network)
 		return nil
@@ -807,11 +810,11 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			if err != nil {
 				switch err.(type) {
 				case scerr.ErrNotFound:
-					logrus.Errorf("Failed to delete primary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
+					logrus.Errorf("failed to delete primary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
 				case scerr.ErrTimeout:
-					logrus.Errorf("Failed to delete primary gateway, timeout: %s", openstack.ProviderErrorToString(err))
+					logrus.Errorf("failed to delete primary gateway, timeout: %s", openstack.ProviderErrorToString(err))
 				default:
-					logrus.Errorf("Failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
+					logrus.Errorf("failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
 				}
 			}
 

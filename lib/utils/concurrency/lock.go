@@ -60,7 +60,7 @@ func (tm *taskedLock) RLock(task Task) {
 	}
 
 	tracer := NewTracer(task, "", Trace.Locks)
-	defer tracer.GoingIn().OnExitTrace()
+	defer tracer.GoingIn().OnExitTrace()()
 
 	tid := task.GetID()
 

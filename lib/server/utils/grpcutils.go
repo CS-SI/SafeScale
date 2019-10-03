@@ -31,7 +31,7 @@ func GetConnection(host string, port int) *grpc.ClientConn {
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("Failed to connect to safescaled (%s:%d): %v", host, port, err)
+		log.Fatalf("failed to connect to safescaled (%s:%d): %v", host, port, err)
 	}
 	return conn
 }

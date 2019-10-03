@@ -159,7 +159,7 @@ func (handler *ShareHandler) Create(
 		if err != nil {
 			err2 := nfsServer.RemoveShare(sharePath)
 			if err2 != nil {
-				log.Warn("Failed to RemoveShare")
+				log.Warn("failed to RemoveShare")
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
@@ -202,12 +202,12 @@ func (handler *ShareHandler) Create(
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to set shares metadata of host %s", hostName)
+				log.Warnf("failed to set shares metadata of host %s", hostName)
 				err = scerr.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
-				log.Warnf("Failed to save metadata of host %s", hostName)
+				log.Warnf("failed to save metadata of host %s", hostName)
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
@@ -220,7 +220,7 @@ func (handler *ShareHandler) Create(
 		if err != nil {
 			derr := ms.Delete()
 			if derr != nil {
-				log.Warnf("Failed to delete metadata of share '%s'", newShare.Name)
+				log.Warnf("failed to delete metadata of share '%s'", newShare.Name)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
@@ -333,7 +333,10 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	shares := map[string]map[string]*propsv1.HostShare{}
 
 	var servers []string
-	ms := metadata.NewShare(handler.service)
+	ms, err := metadata.NewShare(handler.service)
+	if err != nil {
+		return nil, err
+	}
 	err = ms.Browse(func(hostName string, shareID string) error {
 		servers = append(servers, hostName)
 		return nil
@@ -548,12 +551,12 @@ func (handler *ShareHandler) Mount(
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
+				log.Warnf("failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
 				err = scerr.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
-				log.Warnf("Failed to save host %s metadatas : %s", server.Name, err2.Error())
+				log.Warnf("failed to save host %s metadatas : %s", server.Name, err2.Error())
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
@@ -577,12 +580,12 @@ func (handler *ShareHandler) Mount(
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
+				log.Warnf("failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
 				err = scerr.AddConsequence(err, err2)
 			}
 			_, err2 = metadata.SaveHost(handler.service, target)
 			if err2 != nil {
-				log.Warnf("Failed to save host '%s' metadata : %s", hostName, err2.Error())
+				log.Warnf("failed to save host '%s' metadata : %s", hostName, err2.Error())
 				err = scerr.AddConsequence(err, err2)
 			}
 		}

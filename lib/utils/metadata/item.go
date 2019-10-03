@@ -37,12 +37,19 @@ type Item struct {
 type ItemDecoderCallback func([]byte) (serialize.Serializable, error)
 
 // NewItem creates a new item with 'name' and in 'path'
-func NewItem(svc iaas.Service, path string) *Item {
-	return &Item{
-		folder:  NewFolder(svc, path),
+func NewItem(svc iaas.Service, path string) (*Item, error) {
+	fold, err := NewFolder(svc, path)
+	if err != nil {
+		return nil, err
+	}
+
+	theItem := &Item{
+		folder:  fold,
 		payload: nil,
 		lock:    &sync.Mutex{},
 	}
+
+	return theItem, nil
 }
 
 // GetService returns the service used by Item

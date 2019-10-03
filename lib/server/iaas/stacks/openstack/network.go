@@ -76,7 +76,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Checks if CIDR is valid...
 	_, _, err = net.ParseCIDR(req.CIDR)
@@ -141,7 +141,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		return nil, scerr.InvalidParameterError("name", "can't be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
@@ -172,7 +172,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 		return nil, scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// If not found, we look for any network from provider
 	// 1st try with id
@@ -216,7 +216,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*resources.Network
@@ -267,11 +267,11 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
-		log.Errorf("Failed to delete network: %+v", err)
+		log.Errorf("failed to delete network: %+v", err)
 		if strings.Contains(err.Error(), "Resource not found") {
 			log.Errorf("Inconsistent network data !!")
 		}
@@ -317,7 +317,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	userData = userdata.NewContent()
 
@@ -388,7 +388,7 @@ func (s *Stack) DeleteGateway(id string) error {
 		return scerr.InvalidParameterError("id", "can't be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	return s.DeleteHost(id)
 }

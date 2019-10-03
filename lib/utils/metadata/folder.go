@@ -42,9 +42,9 @@ type Folder struct {
 type FolderDecoderCallback func([]byte) error
 
 // NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
-func NewFolder(svc iaas.Service, path string) *Folder {
+func NewFolder(svc iaas.Service, path string) (*Folder, error) {
 	if svc == nil {
-		panic("svc is nil!")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil!")
 	}
 	cryptKey := svc.GetMetadataKey()
 	crypto := cryptKey != nil && len(cryptKey) > 0
@@ -56,7 +56,7 @@ func NewFolder(svc iaas.Service, path string) *Folder {
 	if crypto {
 		f.cryptKey = cryptKey
 	}
-	return f
+	return f, nil
 }
 
 // GetService returns the service used by the folder
