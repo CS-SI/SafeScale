@@ -35,7 +35,7 @@ type jobManager struct {
 func (c *jobManager) List(timeout time.Duration) (*pb.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewJobManagerServiceClient(c.session.connection)
+	service := pb.NewJobServiceClient(c.session.connection)
 	ctx := utils.GetContext(false)
 
 	return service.List(ctx, &google_protobuf.Empty{})
@@ -45,7 +45,7 @@ func (c *jobManager) List(timeout time.Duration) (*pb.JobList, error) {
 func (c *jobManager) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewJobManagerServiceClient(c.session.connection)
+	service := pb.NewJobServiceClient(c.session.connection)
 	ctx := utils.GetContext(false)
 
 	_, err := service.Stop(ctx, &pb.JobDefinition{Uuid: uuid})

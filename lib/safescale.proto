@@ -432,7 +432,7 @@ message JobList{
     repeated JobDefinition list = 1;
 }
 
-service JobManagerService{
+service JobService{
     rpc Stop(JobDefinition) returns (google.protobuf.Empty){}
     rpc List(google.protobuf.Empty) returns (JobList){}
 }
