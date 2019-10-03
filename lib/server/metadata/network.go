@@ -49,10 +49,14 @@ type Network struct {
 }
 
 // NewNetwork creates an instance of network.Metadata
-func NewNetwork(svc iaas.Service) *Network {
-	return &Network{
-		item: metadata.NewItem(svc, networksFolderName),
+func NewNetwork(svc iaas.Service) (*Network, error) {
+	aNet, err := metadata.NewItem(svc, networksFolderName)
+	if err != nil {
+		return nil, err
 	}
+	return &Network{
+		item: aNet,
+	}, nil
 }
 
 // GetService returns the provider service used
@@ -374,7 +378,10 @@ func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err err
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	mn = NewNetwork(svc)
+	mn, err = NewNetwork(svc)
+	if err != nil {
+		return nil, err
+	}
 	return mn, mn.Carry(net).Write()
 }
 
@@ -391,7 +398,12 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	return NewNetwork(svc).Carry(net).Delete()
+	aNet, err := NewNetwork(svc)
+	if err != nil {
+		return err
+	}
+
+	return aNet.Carry(net).Delete()
 }
 
 // LoadNetwork gets the Network definition from Object Storage
@@ -410,7 +422,10 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	mn = NewNetwork(svc)
+	mn, err = NewNetwork(svc)
+	if err != nil {
+		return nil, err
+	}
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			innerErr := mn.ReadByReference(ref)
@@ -452,7 +467,10 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	network := NewNetwork(svc)
+	network, err := NewNetwork(svc)
+	if err != nil {
+		return nil, err
+	}
 	err = network.ReadByID(networkID)
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); ok {
@@ -467,12 +485,15 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (mg *Gateway) Carry(host *resources.Host) *Gateway {
+func (mg *Gateway) Carry(host *resources.Host) (gw *Gateway, err error) {
 	if mg.host == nil {
-		mg.host = NewHost(mg.network.GetService())
+		mg.host, err = NewHost(mg.network.GetService())
+		if err != nil {
+			return nil, err
+		}
 	}
 	mg.host.Carry(host)
-	return mg
+	return mg, nil
 }
 
 // Get returns the *resources.Host linked to the metadata
@@ -510,7 +531,10 @@ func (mg *Gateway) Read() (err error) {
 		return err
 	}
 	if mg.host == nil {
-		mg.host = NewHost(mg.network.GetService())
+		mg.host, err = NewHost(mg.network.GetService())
+		if err != nil {
+			return err
+		}
 	}
 	err = mg.host.ReadByID(mg.network.Get().GatewayID)
 	if err != nil {
@@ -642,7 +666,11 @@ func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *
 	}
 
 	// Update network with gateway info
-	mn := NewNetwork(svc)
+	mn, err := NewNetwork(svc)
+	if err != nil {
+		return nil, err
+	}
+
 	err = mn.ReadByID(networkID)
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); ok {
@@ -657,5 +685,9 @@ func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *
 	}
 
 	// write gateway
-	return mg, mg.Carry(host).Write()
+	aGw, err := mg.Carry(host)
+	if err != nil {
+		return nil, err
+	}
+	return mg, aGw.Write()
 }

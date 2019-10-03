@@ -419,7 +419,7 @@ func (sc *SSHCommand) Display() string {
 func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
@@ -462,7 +462,7 @@ func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
 func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) (int, string, string, error) {
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 
 	// if strings.Contains(sc.Display(), "ENDSSH") {
 	// 	defer utils.Stopwatch{}.OnExitLogWithLevel(
@@ -668,7 +668,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		return "", scerr.InvalidParameterError("ssh.Host", "can't be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), true).GoingIn().OnExitTrace()()
 
 	// log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
 	defer scerr.OnExitTraceError(

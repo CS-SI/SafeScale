@@ -139,7 +139,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 // GetService returns the service from the provider
 func (c *Controller) GetService(task concurrency.Task) iaas.Service {
 	var err error
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
 
 	if c == nil {
 		err = scerr.InvalidInstanceError()
@@ -158,7 +158,7 @@ func (c *Controller) GetIdentity(task concurrency.Task) identity.Identity {
 	}
 
 	var err error
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
 
 	if c == nil {
 		err = scerr.InvalidInstanceError()
@@ -176,7 +176,7 @@ func (c *Controller) GetProperties(task concurrency.Task) *serialize.JSONPropert
 		task = concurrency.RootTask()
 	}
 	var err error
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
 
 	if c == nil {
 		err = scerr.InvalidInstanceError()
@@ -195,7 +195,7 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.N
 		task = concurrency.RootTask()
 	}
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
 
 	if c == nil {
 		return config, scerr.InvalidInstanceError()
@@ -234,7 +234,7 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
 		task = concurrency.RootTask()
 	}
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
 
 	var count uint
 
@@ -433,7 +433,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 	}
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true)
-	defer tracer.GoingIn().OnExitTrace()
+	defer tracer.GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.RLock(task)
@@ -661,7 +661,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	}
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%d)", count), true)
-	defer tracer.GoingIn().OnExitTrace()
+	defer tracer.GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.RLock(task)

@@ -57,7 +57,7 @@ func generateUUID(store bool) string {
 	defer mutexContextManager.Unlock()
 	newUUID, err := uuid.NewV4()
 	if err != nil {
-		panic("Failed to generate UUID")
+		panic("failed to generate UUID")
 	}
 	if store {
 		uuidSet = true

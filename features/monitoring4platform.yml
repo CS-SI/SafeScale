@@ -290,7 +290,7 @@ feature:
                                         host=${!var}
                                         echo "Alert 'gateway_down' received for gateway '$host'. Restarting gateway '$host'..."
                                         restart_host "$host"
-                                        [ $? -eq 0 ] && echo "Gateway '$host' restarted." || echo "Failed to restart gateway '$host'!"
+                                        [ $? -eq 0 ] && echo "Gateway '$host' restarted." || echo "failed to restart gateway '$host'!"
                                         ;;
                                     *)
                                         echo "Unknown alert '$alert' received."

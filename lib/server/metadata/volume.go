@@ -42,12 +42,16 @@ type Volume struct {
 }
 
 // NewVolume creates an instance of metadata.Volume
-func NewVolume(svc iaas.Service) *Volume {
+func NewVolume(svc iaas.Service) (*Volume, error) {
+	aVol, err := metadata.NewItem(svc, volumesFolderName)
+	if err != nil {
+		return nil, err
+	}
 	return &Volume{
-		item: metadata.NewItem(svc, volumesFolderName),
+		item: aVol,
 		name: nil,
 		id:   nil,
-	}
+	}, nil
 }
 
 // Carry links a Volume instance to the Metadata instance
@@ -181,7 +185,10 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) error {
 
 // SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc iaas.Service, volume *resources.Volume) (*Volume, error) {
-	mv := NewVolume(svc)
+	mv, err := NewVolume(svc)
+	if err != nil {
+		return nil, err
+	}
 	return mv, mv.Carry(volume).Write()
 }
 
@@ -210,7 +217,10 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	mv = NewVolume(svc)
+	mv, err = NewVolume(svc)
+	if err != nil {
+		return nil, err
+	}
 
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {

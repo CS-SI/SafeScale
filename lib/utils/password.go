@@ -55,6 +55,6 @@ func init() {
 		Symbols: "-+*/.,;:()_",
 	})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create password generator: %v!", err))
+		panic(fmt.Sprintf("failed to create password generator: %v!", err))
 	}
 }

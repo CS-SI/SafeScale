@@ -441,11 +441,11 @@ func (handler *HostHandler) Create(
 			if derr != nil {
 				switch derr.(type) {
 				case scerr.ErrNotFound:
-					log.Errorf("Failed to delete host '%s', resource not found: %v", host.Name, derr)
+					log.Errorf("failed to delete host '%s', resource not found: %v", host.Name, derr)
 				case scerr.ErrTimeout:
-					log.Errorf("Failed to delete host '%s', timeout: %v", host.Name, derr)
+					log.Errorf("failed to delete host '%s', timeout: %v", host.Name, derr)
 				default:
-					log.Errorf("Failed to delete host '%s', other reason: %v", host.Name, derr)
+					log.Errorf("failed to delete host '%s', other reason: %v", host.Name, derr)
 				}
 			}
 			err = scerr.AddConsequence(err, derr)
@@ -461,7 +461,10 @@ func (handler *HostHandler) Create(
 	}
 
 	// Updates host metadata
-	mh := metadata.NewHost(handler.service)
+	mh, err := metadata.NewHost(handler.service)
+	if err != nil {
+		return nil, err
+	}
 	err = mh.Carry(host).Write()
 	if err != nil {
 		return nil, err
@@ -769,7 +772,10 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 		return handler.service.ListHosts()
 	}
 
-	m := metadata.NewHost(handler.service)
+	m, err := metadata.NewHost(handler.service)
+	if err != nil {
+		return nil, err
+	}
 	err = m.Browse(func(host *resources.Host) error {
 		hosts = append(hosts, host)
 		return nil

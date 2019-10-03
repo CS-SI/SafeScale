@@ -74,7 +74,7 @@ func (s *Stack) getStoragePoolByPath(path string) (*libvirt.StoragePool, error) 
 	for _, storagePool := range storagePools {
 		storagePoolXML, err := storagePool.GetXMLDesc(0)
 		if err != nil {
-			return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the storage pool : %s", err.Error()))
+			return nil, fmt.Errorf(fmt.Sprintf("failed get xml description of the storage pool : %s", err.Error()))
 		}
 		storagePoolDescription := &libvirtxml.StoragePool{}
 		err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
@@ -133,7 +133,7 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*resources.V
 
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the volume : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error()))
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -157,14 +157,14 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the domain : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error()))
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 
 	volumeXML, err := volume.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the domain : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error()))
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -221,7 +221,7 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%d)", request.Name, request.Size), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%d)", request.Name, request.Size), true).GoingIn().OnExitTrace()()
 
 	//volume speed is ignored
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
@@ -240,7 +240,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 
 	storagePoolXML, err := storagePool.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the storage pool : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("failed get xml description of the storage pool : %s", err.Error()))
 	}
 	storagePoolDescription := &libvirtxml.StoragePool{}
 	err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
@@ -270,7 +270,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).GoingIn().OnExitTrace()()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
 	if err != nil {
@@ -287,7 +287,7 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 
 //ListVolumes return the list of all volume known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
 	if err != nil {
@@ -312,7 +312,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(ref string) error {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).GoingIn().OnExitTrace()()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
 	if err != nil {
@@ -332,7 +332,7 @@ func (s *Stack) DeleteVolume(ref string) error {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s'", request.Name, request.VolumeID, request.HostID), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s'", request.Name, request.VolumeID, request.HostID), true).GoingIn().OnExitTrace()()
 
 	_, domain, err := s.getHostAndDomainFromRef(request.HostID)
 	if err != nil {
@@ -340,7 +340,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	}
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return "", fmt.Errorf(fmt.Sprintf("Failed get xml description of the volume : %s", err.Error()))
+		return "", fmt.Errorf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error()))
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
@@ -351,7 +351,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	}
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return "", fmt.Errorf(fmt.Sprintf("Failed get xml description of the volume : %s", err.Error()))
+		return "", fmt.Errorf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error()))
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -388,7 +388,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).GoingIn().OnExitTrace()()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {
@@ -410,7 +410,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 // DeleteVolumeAttachment ...
 func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).GoingIn().OnExitTrace()()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {
@@ -424,14 +424,14 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Failed get xml description of the domain : %s", err.Error()))
+		return fmt.Errorf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error()))
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Failed get xml description of the domain : %s", err.Error()))
+		return fmt.Errorf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error()))
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -458,7 +458,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", serverID), true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", serverID), true).GoingIn().OnExitTrace()()
 
 	var volumes []*libvirt.StorageVol
 	var volumeAttachments []resources.VolumeAttachment
@@ -470,7 +470,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the domain : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error()))
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)

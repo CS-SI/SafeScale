@@ -156,8 +156,8 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	v := viper.New()
 	v.AddConfigPath(".")
@@ -204,8 +204,8 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err err
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var feat Feature
 	if _, ok := allEmbeddedMap[name]; !ok {
@@ -285,8 +285,8 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 	}
 
 	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// cacheKey := f.DisplayName() + "@" + t.Name()
 	// if anon, ok := checkCache.Get(cacheKey); ok {
@@ -337,8 +337,8 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 	}
 
 	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	methods := t.Methods()
 	var (
@@ -411,8 +411,8 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 	}
 
 	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	results := Results{}
 	methods := t.Methods()

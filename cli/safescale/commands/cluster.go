@@ -101,7 +101,7 @@ func extractClusterArgument(c *cli.Context) error {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 				}
 			} else {
-				msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
+				msg := fmt.Sprintf("failed to query for cluster '%s': %s\n", clusterName, err.Error())
 				return clitools.ExitOnRPC(msg)
 			}
 		} else {
@@ -124,7 +124,7 @@ var clusterListCommand = cli.Command{
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		list, err := cluster.List()
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("Failed to get cluster list: %v", err)))
+			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("failed to get cluster list: %v", err)))
 		}
 
 		var formatted []interface{}
@@ -856,7 +856,7 @@ var clusterShrinkCommand = cli.Command{
 		for i := uint(0); i < count; i++ {
 			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster)
 			if err != nil {
-				msgs = append(msgs, fmt.Sprintf("Failed to delete node #%d: %s", i+1, err.Error()))
+				msgs = append(msgs, fmt.Sprintf("failed to delete node #%d: %s", i+1, err.Error()))
 			}
 		}
 		if len(msgs) > 0 {
@@ -967,7 +967,7 @@ func executeCommand(command string) error {
 	for i, m := range masters {
 		retcode, stdout, stderr, err := safescalessh.Run(m, command, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
+			_, _ = fmt.Fprintf(os.Stderr, "failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
 				_, _ = fmt.Fprintln(os.Stderr, "Trying another master...")
 				continue
@@ -1047,7 +1047,7 @@ var clusterAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'.\n", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
@@ -1073,7 +1073,7 @@ var clusterAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to install feature '%s' on cluster '%s'", featureName, clusterName)
+			msg := fmt.Sprintf("failed to install feature '%s' on cluster '%s'", featureName, clusterName)
 			if Debug || Verbose {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
@@ -1111,7 +1111,7 @@ var clusterCheckFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'.\n", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
@@ -1175,7 +1175,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'.\n", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
@@ -1203,7 +1203,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to delete feature '%s' from cluster '%s'", featureName, clusterName)
+			msg := fmt.Sprintf("failed to delete feature '%s' from cluster '%s'", featureName, clusterName)
 			if Verbose || Debug {
 				msg += fmt.Sprintf(":\n%s\n", results.AllErrorMessages())
 			}
@@ -1271,7 +1271,7 @@ var clusterNodeListCommand = cli.Command{
 		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
-				msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
+				msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 				//fmt.Println(msg)
 				log.Warnln(msg)
 				continue
@@ -1501,7 +1501,7 @@ var clusterMasterListCommand = cli.Command{
 		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
-				msg := fmt.Sprintf("Failed to get data for master '%s': %s. Ignoring.", i, err.Error())
+				msg := fmt.Sprintf("failed to get data for master '%s': %s. Ignoring.", i, err.Error())
 				fmt.Println(msg)
 				log.Warnln(msg)
 				continue

@@ -58,10 +58,10 @@ func RebrandCommand(command string) string {
 // 	if err != nil {
 // 		output, _, err := system.ExtractRetCode(err)
 // 		if err != nil {
-// 			msg := fmt.Sprintf("Failed to extract return code: %s", err.Error())
+// 			msg := fmt.Sprintf("failed to extract return code: %s", err.Error())
 // 			return cli.NewExitError(msg, int(ExitCode.Run))
 // 		}
-// 		msg := fmt.Sprintf("Failed to execute command: %s", output)
+// 		msg := fmt.Sprintf("failed to execute command: %s", output)
 // 		return cli.NewExitError(msg, int(ExitCode.Run))
 // 	}
 // 	return nil
@@ -110,7 +110,7 @@ func extractClusterArgument(c *cli.Context) error {
 				return cli.NewExitError(msg, int(ExitCode.NotFound))
 			}
 
-			msg := fmt.Sprintf("Failed to get cluster '%s' information: %s\n", clusterName, err.Error())
+			msg := fmt.Sprintf("failed to get cluster '%s' information: %s\n", clusterName, err.Error())
 			return cli.NewExitError(msg, int(ExitCode.RPC))
 		}
 		if c.Command.HasName("create") {

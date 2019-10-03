@@ -40,8 +40,13 @@ type Metadata struct {
 
 // NewMetadata creates a new Cluster Controller metadata
 func NewMetadata(svc iaas.Service) (*Metadata, error) {
+	meta, err := metadata.NewItem(svc, clusterFolderName)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Metadata{
-		item: metadata.NewItem(svc, clusterFolderName),
+		item: meta,
 		// lock: &sync.Mutex{},
 	}, nil
 }
@@ -60,7 +65,7 @@ func (m *Metadata) Written() bool {
 func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 	var err error
 	tracer := concurrency.NewTracer(task, "", false)
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {
 		err = scerr.InvalidInstanceError()
@@ -179,7 +184,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 // Get returns the content of the metadata
 func (m *Metadata) Get() (_ *Controller, err error) {
 	tracer := concurrency.NewTracer(nil, "", false)
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {
 		return nil, scerr.InvalidInstanceError()

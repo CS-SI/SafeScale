@@ -118,7 +118,7 @@ func UseService(tenantName string) (Service, error) {
 		svcProvider = provider
 		svc, found = allProviders[provider]
 		if !found {
-			log.Errorf("Failed to find client '%s' for tenant '%s'", svcProvider, name)
+			log.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
 			continue
 		}
 

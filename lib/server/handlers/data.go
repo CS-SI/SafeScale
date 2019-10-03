@@ -246,7 +246,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 				_, err := bucket.WriteObject(shardName, bytes.NewReader(encryptedShards[j]), int64(len(encryptedShards[j])), nil)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
-					log.Errorf("Failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
+					log.Errorf("failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
 				}
 				wg.Done()
 			}(j)
@@ -309,7 +309,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		// Suppress local file if Get didn't succeed
 		if err != nil {
 			if derr := os.Remove(fileLocalPath); derr != nil {
-				log.Errorf("Failed to delete file '%s': %s", fileLocalPath, derr.Error())
+				log.Errorf("failed to delete file '%s': %s", fileLocalPath, derr.Error())
 			}
 		} else {
 			cleanErr := file.Close()
@@ -379,7 +379,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 					_, err = bucket.ReadObject(shardName, &encryptedShards[j], 0, 0)
 					if err != nil {
 						errChan <- fmt.Errorf("failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
-						log.Errorf("Failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
+						log.Errorf("failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
 					}
 				}
 				wg.Done()
@@ -485,7 +485,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err er
 			shardName, bucketName := chunkGroup.GetStorageInfo(i)
 			err = bucketMap[bucketName].DeleteObject(shardName)
 			if err != nil {
-				log.Warnf("Failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
+				log.Warnf("failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
 			}
 			wg.Done()
 		}(i)
@@ -495,11 +495,11 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err er
 	for _, bucketName := range chunkGroup.GetBucketNames() {
 		err = bucketMap[bucketName].DeleteObject(metadataFileName)
 		if err != nil {
-			log.Warnf("Failed to delete chunkGroup '%s' from bucket '%s'", metadataFileName, bucketName)
+			log.Warnf("failed to delete chunkGroup '%s' from bucket '%s'", metadataFileName, bucketName)
 		}
 		err = bucketMap[bucketName].DeleteObject(keyFileName)
 		if err != nil {
-			log.Warnf("Failed to delete keyInfo '%s' from bucket '%s'", keyFileName, bucketName)
+			log.Warnf("failed to delete keyInfo '%s' from bucket '%s'", keyFileName, bucketName)
 		}
 	}
 

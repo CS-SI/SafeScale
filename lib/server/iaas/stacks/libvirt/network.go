@@ -31,9 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	libvirt "github.com/libvirt/libvirt-go"
+	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -42,7 +41,7 @@ func infoFromCidr(cidr string) (string, string, string, string, error) {
 	if err != nil {
 		return "", "", "", "", fmt.Errorf("failed to parse cidr : %s", err.Error())
 	} else if IPNet.Mask[3] >= 63 {
-		return "", "", "", "", fmt.Errorf("Please use a wider network range")
+		return "", "", "", "", fmt.Errorf("please use a wider network range")
 	}
 
 	mask := fmt.Sprintf("%d.%d.%d.%d", IPNet.Mask[0], IPNet.Mask[1], IPNet.Mask[2], IPNet.Mask[3])
@@ -62,7 +61,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 			if errCode == 43 {
 				return nil, resources.ResourceNotFoundError("network", ref)
 			}
-			return nil, fmt.Errorf(fmt.Sprintf("Failed to fetch network from ref : %s", err.Error()))
+			return nil, fmt.Errorf(fmt.Sprintf("failed to fetch network from ref : %s", err.Error()))
 		}
 	}
 
@@ -72,12 +71,12 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.Network, error) {
 	libvirtNetworkXML, err := libvirtNetwork.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed get network's xml description  : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("failed get network's xml description  : %s", err.Error()))
 	}
 	networkDescription := &libvirtxml.Network{}
 	err = xml.Unmarshal([]byte(libvirtNetworkXML), networkDescription)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed get Unmarshal networks's xml description  : %s", err.Error()))
+		return nil, fmt.Errorf(fmt.Sprintf("failed get Unmarshal networks's xml description  : %s", err.Error()))
 	}
 
 	var ipVersion IPVersion.Enum
@@ -124,7 +123,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	name := req.Name
 	ipVersion := req.IPVersion
@@ -173,9 +172,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	defer func(*libvirt.Network) {
 		if err != nil {
 			if err := libvirtNetwork.Undefine(); err != nil {
-				fmt.Printf("Failed undefining network %s : %s\n", name, err.Error())
+				fmt.Printf("failed undefining network %s : %s\n", name, err.Error())
 				if err := libvirtNetwork.Destroy(); err != nil {
-					fmt.Printf("Failed to destroy network %s : %s\n", name, err.Error())
+					fmt.Printf("failed to destroy network %s : %s\n", name, err.Error())
 				}
 			}
 		}
@@ -200,7 +199,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 // GetNetwork returns the network identified by ref (id or name)
 func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
 	if err != nil {
@@ -227,13 +226,13 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 
 // GetNetworkByName returns the network identified by ref (id or name)
 func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 	return s.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	var networks []*resources.Network
 
@@ -244,7 +243,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for _, libvirtNetwork := range libvirtNetworks {
 		network, err := getNetworkFromLibvirtNetwork(&libvirtNetwork)
 		if err != nil {
-			return nil, fmt.Errorf(fmt.Sprintf("Failed to get network from libvirtNetwork : %s", err.Error()))
+			return nil, fmt.Errorf(fmt.Sprintf("failed to get network from libvirtNetwork : %s", err.Error()))
 		}
 
 		networks = append(networks, network)
@@ -255,7 +254,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(ref string) error {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
 	if err != nil {
@@ -283,7 +282,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	network := req.Network
 	templateID := req.TemplateID
@@ -322,7 +321,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
 func (s *Stack) DeleteGateway(ref string) error {
-	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()
+	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	return s.DeleteHost(ref)
 }
