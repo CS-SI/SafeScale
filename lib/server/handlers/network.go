@@ -155,6 +155,14 @@ func (handler *NetworkHandler) Create(
 		}
 	}()
 
+	caps := handler.service.GetCapabilities()
+	if failover && caps.PrivateVirtualIP {
+		logrus.Infof("Provider support private Virtual IP, honoring the failover setup for gateways.")
+	} else {
+		logrus.Warningf("Provider doesn't support private Virtual IP, can't set up high availability of network default route.")
+		failover = false
+	}
+
 	// Creates VIP for gateways if asked for
 	if failover {
 		network.VIP, err = handler.service.CreateVIP(network.ID, fmt.Sprintf("for gateways of network %s", network.Name))
@@ -471,13 +479,14 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 			logrus.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
 			derr := handler.service.DeleteHost(gw.ID)
 			if derr != nil {
+				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
 				case scerr.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete gateway '%s', resource not found: %v", request.Name, derr)
+					logrus.Errorf(msgRoot+", resource not found: %v", request.Name, derr)
 				case scerr.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete gateway '%s', timeout: %v", request.Name, derr)
+					logrus.Errorf(msgRoot+", timeout: %v", request.Name, derr)
 				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", request.Name, derr)
+					logrus.Errorf(msgRoot+": %v", request.Name, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			} else {
