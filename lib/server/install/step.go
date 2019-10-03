@@ -273,7 +273,10 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	)()
 
 	if is.Serial || s.Serialize {
-		subtask := concurrency.NewTask(is.Worker.feature.task)
+		subtask, err := concurrency.NewTask(is.Worker.feature.task)
+		if err != nil {
+			return nil, err
+		}
 
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
@@ -288,7 +291,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			}
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
 			results[h.Name] = result.(stepResult)
-			subtask.Reset()
+			_, _ = subtask.Reset() // FIXME Later
 
 			if !results[h.Name].Successful() {
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
@@ -319,10 +322,19 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			if err != nil {
 				return nil, err
 			}
-			subtask := concurrency.NewTask(is.Worker.feature.task).Start(is.taskRunOnHost, data.Map{
+			subtask, err := concurrency.NewTask(is.Worker.feature.task)
+			if err != nil {
+				return nil, err
+			}
+
+			subtask, err = subtask.Start(is.taskRunOnHost, data.Map{
 				"host":      h,
 				"variables": cloneV,
 			})
+			if err != nil {
+				return nil, err
+			}
+
 			subtasks[h.Name] = subtask
 		}
 		for k, s := range subtasks {

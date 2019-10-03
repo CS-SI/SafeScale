@@ -68,7 +68,12 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 	}
 
 	// Check if reverseproxy feature is installed on host
-	rp, err := NewEmbeddedFeature(concurrency.VoidTask(), "edgeproxy4network")
+
+	voidtask, err := concurrency.VoidTask()
+	if err != nil {
+		return nil, err
+	}
+	rp, err := NewEmbeddedFeature(voidtask, "edgeproxy4network")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find a feature called 'edgeproxy4network'")
 	}

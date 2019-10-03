@@ -57,8 +57,8 @@ type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 type Task interface {
 	Abort()
 	Aborted() bool
-	ForceID(string) Task
-	GetID() string
+	ForceID(string) (Task, error)
+	GetID() (string, error)
 	GetSignature() string
 	GetStatus() TaskStatus
 	GetContext() context.Context
@@ -66,11 +66,11 @@ type Task interface {
 	RLock(TaskedLock)
 	Unlock(TaskedLock)
 	RUnlock(TaskedLock)
-	New() Task
-	Reset() Task
+	New() (Task, error)
+	Reset() (Task, error)
 	// GetResult() TaskResult
 	Run(TaskAction, TaskParameters) (TaskResult, error)
-	Start(TaskAction, TaskParameters) Task
+	Start(TaskAction, TaskParameters) (Task, error)
 	// StoreResult(TaskParameters)
 	TryWait() (bool, TaskResult, error)
 	Wait() (TaskResult, error)
@@ -111,26 +111,18 @@ func RootTask() Task {
 }
 
 // VoidTask is a new task that do nothing
-func VoidTask() Task {
+func VoidTask() (Task, error) {
 	return NewTask(nil)
 }
 
 // NewTask ...
-func NewTask(parentTask Task) Task {
-	task, err := newTask(context.TODO(), parentTask)
-	if err != nil {
-		panic(err)
-	}
-	return task
+func NewTask(parentTask Task) (Task, error) {
+	return newTask(context.TODO(), parentTask)
 }
 
 // NewTaskWithContext ...
-func NewTaskWithContext(ctx context.Context) Task {
-	task, err := newTask(ctx, nil)
-	if err != nil {
-		panic(err)
-	}
-	return task
+func NewTaskWithContext(ctx context.Context) (Task, error) {
+	return newTask(ctx, nil)
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
@@ -169,23 +161,24 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 	close(t.doneCh)
 	close(t.finishCh)
 
-	t.sig = fmt.Sprintf("{task %s}", t.GetID())
+	tid, _ := t.GetID() // FIXME Later
+	t.sig = fmt.Sprintf("{task %s}", tid)
 
 	return &t, nil
 }
 
 // GetID returns an unique id for the task
-func (t *task) GetID() string {
+func (t *task) GetID() (string, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.id == "" {
 		u, err := uuid.NewV4()
 		if err != nil {
-			panic(fmt.Sprintf("failed to create a new task: %v", err))
+			return "", fmt.Errorf("failed to create a new task: %v", err)
 		}
 		t.id = u.String()
 	}
-	return t.id
+	return t.id, nil
 }
 
 // GetSignature builds the "signature" of the task passed as parameter,
@@ -208,27 +201,29 @@ func (t *task) GetContext() context.Context {
 
 // ForceID allows to specify task ID. The unicity of the ID through all the tasks
 // becomes the responsability of the developer...
-func (t *task) ForceID(id string) Task {
+func (t *task) ForceID(id string) (Task, error) {
 	if id == "" {
-		panic("Invalid parameter 'id': can't be empty string!")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty!")
 	}
 	if id == "0" {
-		panic("Invalid parameter 'id': can't be '0', reserved for root task!")
+		return nil, scerr.InvalidParameterError("id", "cannot be '0', reserved for root task!")
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	t.id = id
-	return t
+	return t, nil
 }
 
 // Start runs in goroutine the function with parameters
-func (t *task) Start(action TaskAction, params TaskParameters) Task {
+func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
+	tid, _ := t.GetID() // FIXME Later
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	if t.status != READY {
-		panic(fmt.Sprintf("Can't start task '%s': not ready!", t.GetID()))
+		return nil, fmt.Errorf("Can't start task '%s': not ready!", tid)
 	}
 	if action == nil {
 		t.status = DONE
@@ -239,7 +234,7 @@ func (t *task) Start(action TaskAction, params TaskParameters) Task {
 		t.finishCh = make(chan struct{}, 1)
 		go t.controller(action, params)
 	}
-	return t
+	return t, nil
 }
 
 // controller controls the start, termination and possibly aboprtion of the action
@@ -290,11 +285,18 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 
 // Run starts task, waits its completion then return the error code
 func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error) {
-	return t.Start(action, params).Wait()
+	stask, err := t.Start(action, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return stask.Wait()
 }
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (t *task) Wait() (TaskResult, error) {
+	tid, _ := t.GetID() // FIXME Later
+
 	status := t.GetStatus()
 	if status == DONE {
 		return t.result, t.err
@@ -303,7 +305,7 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, t.err
 	}
 	if status != RUNNING {
-		return nil, fmt.Errorf("can't wait task '%s': not running (%d)", t.GetID(), status)
+		return nil, fmt.Errorf("can't wait task '%s': not running (%d)", tid, status)
 	}
 	<-t.finishCh
 
@@ -321,6 +323,8 @@ func (t *task) Wait() (TaskResult, error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If task still running, returns (false, nil)
 func (t *task) TryWait() (bool, TaskResult, error) {
+	tid, _ := t.GetID() // FIXME Later
+
 	status := t.GetStatus()
 	if status == DONE {
 		return true, t.result, t.err
@@ -329,7 +333,7 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fmt.Errorf("can't wait task '%s': not running", t.GetID())
+		return false, nil, fmt.Errorf("can't wait task '%s': not running", tid)
 	}
 	if len(t.finishCh) == 1 {
 		_, err := t.Wait()
@@ -343,6 +347,8 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If duration elapsed (meaning the task is still running after duration), returns (false, utils.ErrTimeout)
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
+	tid, _ := t.GetID() // FIXME Later
+
 	status := t.GetStatus()
 	if status == DONE {
 		return true, t.result, t.err
@@ -351,13 +357,13 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fmt.Errorf("can't wait task '%s': not running", t.GetID())
+		return false, nil, fmt.Errorf("can't wait task '%s': not running", tid)
 	}
 
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", t.GetID()), duration, nil)
+			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
 		default:
 			ok, result, err := t.TryWait()
 			if ok {
@@ -370,10 +376,12 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 }
 
 // Reset resets the task for reuse
-func (t *task) Reset() Task {
+func (t *task) Reset() (Task, error) {
+	tid, _ := t.GetID() // FIXME Later
+
 	status := t.GetStatus()
 	if status == RUNNING {
-		panic(fmt.Sprintf("Can't reset task '%s': task running!", t.GetID()))
+		return nil, fmt.Errorf("Can't reset task '%s': task running!", tid)
 	}
 
 	t.lock.Lock()
@@ -382,7 +390,7 @@ func (t *task) Reset() Task {
 	t.status = READY
 	t.err = nil
 	t.result = nil
-	return t
+	return t, nil
 }
 
 // // GetResult returns the result of the task action
@@ -429,9 +437,8 @@ func (t *task) StoreResult(result TaskParameters) {
 }
 
 // New creates a subtask from current task
-func (t *task) New() Task {
-	theTask, _ := newTask(context.TODO(), t)
-	return theTask
+func (t *task) New() (Task, error) {
+	return newTask(context.TODO(), t)
 }
 
 // Lock locks the TaskedLock

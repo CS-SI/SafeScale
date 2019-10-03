@@ -766,10 +766,10 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 
 		for _, h := range hosts {
-			tP := w.feature.task.New()
+			tP, _ := w.feature.task.New() // FIXME Later
 			primaryGatewayVariables["HostIP"] = h.PrivateIp
 			primaryGatewayVariables["Hostname"] = h.Name
-			tP.Start(asyncApplyProxyRule, data.Map{
+			_, _ = tP.Start(asyncApplyProxyRule, data.Map{ // FIXME Later
 				"ctrl": primaryKongController,
 				"rule": rule,
 				"vars": &primaryGatewayVariables,
@@ -777,10 +777,10 @@ func (w *worker) setReverseProxy() (err error) {
 
 			var errS error
 			if secondaryKongController != nil {
-				tS := w.feature.task.New()
+				tS, _ := w.feature.task.New() // FIXME Later
 				secondaryGatewayVariables["HostIP"] = h.PrivateIp
 				secondaryGatewayVariables["Hostname"] = h.Name
-				tS.Start(asyncApplyProxyRule, data.Map{
+				_, _ = tS.Start(asyncApplyProxyRule, data.Map{ // FIXME Later
 					"ctrl": secondaryKongController,
 					"rule": rule,
 					"vars": &secondaryGatewayVariables,
