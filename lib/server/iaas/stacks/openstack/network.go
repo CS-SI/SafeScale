@@ -19,7 +19,6 @@ package openstack
 import (
 	"fmt"
 	"net"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -150,7 +149,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	})
 	if r.Err != nil {
 		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
-			return nil, resources.ResourceAccessDeniedError("network", name)
+			return nil, resources.ResourceForbiddenError("network", name)
 		}
 		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
 	}
@@ -271,10 +270,13 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
-		log.Errorf("failed to delete network: %+v", err)
-		if strings.Contains(err.Error(), "Resource not found") {
-			log.Errorf("Inconsistent network data !!")
+		err = TranslateError(err)
+		switch err.(type) {
+		case scerr.ErrNotFound:
+		default:
+			log.Errorf("failed to delete network: %+v", err)
 		}
+		return err
 	}
 
 	sns, err := s.listSubnets(id)
