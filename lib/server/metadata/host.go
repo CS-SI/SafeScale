@@ -115,7 +115,7 @@ func (mh *Host) ReadByID(id string) (err error) {
 
 	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	host := resources.NewHost()
 	err = mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
@@ -147,7 +147,7 @@ func (mh *Host) ReadByName(name string) (err error) {
 
 	tracer := concurrency.NewTracer(nil, "("+name+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	host := resources.NewHost()
 	err = mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
@@ -176,7 +176,7 @@ func (mh *Host) Delete() (err error) {
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	// FIXME Merge errors
 	err1 := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
@@ -203,7 +203,7 @@ func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	return mh.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
 		host := resources.NewHost()
@@ -226,7 +226,7 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	mh, err = NewHost(svc)
 	if err != nil {
@@ -268,7 +268,7 @@ func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	// Second deletes host metadata
 	mh, err := NewHost(svc)
@@ -292,7 +292,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 
 	tracer := concurrency.NewTracer(nil, "("+ref+")", true)
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	// We first try looking for host by ID from metadata
 	mh, err = NewHost(svc)
