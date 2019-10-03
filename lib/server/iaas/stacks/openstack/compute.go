@@ -224,35 +224,45 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	opts := flavors.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
-	pager := flavors.ListDetail(s.ComputeClient, opts)
-
-	var flvList []resources.HostTemplate
+	var (
+		flvList []resources.HostTemplate
+		pager   pagination.Pager
+	)
 
 	// Define an anonymous function to be executed on each page's iteration
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		flavorList, err := flavors.ExtractFlavors(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, flv := range flavorList {
-
-			flvList = append(flvList, resources.HostTemplate{
-				Cores:    flv.VCPUs,
-				RAMSize:  float32(flv.RAM) / 1000.0,
-				DiskSize: flv.Disk,
-				ID:       flv.ID,
-				Name:     flv.Name,
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			pager = flavors.ListDetail(s.ComputeClient, opts)
+			return pager.EachPage(func(page pagination.Page) (bool, error) {
+				flavorList, err := flavors.ExtractFlavors(page)
+				if err != nil {
+					return false, err
+				}
+				for _, flv := range flavorList {
+					flvList = append(flvList, resources.HostTemplate{
+						Cores:    flv.VCPUs,
+						RAMSize:  float32(flv.RAM) / 1000.0,
+						DiskSize: flv.Disk,
+						ID:       flv.ID,
+						Name:     flv.Name,
+					})
+				}
+				return true, nil
 			})
-
-		}
-		return true, nil
-	})
-	if (len(flvList) == 0) || (err != nil) {
-		if err != nil {
+		},
+		time.Minute*2,
+	)
+	if err != nil {
+		switch err.(type) {
+		case scerr.ErrTimeout:
+			return nil, err
+		default:
+			spew.Dump(pager.Err)
 			return nil, scerr.Wrap(err, fmt.Sprintf("error listing templates"))
 		}
-		logrus.Debugf("Template list empty !")
+	}
+	if len(flvList) == 0 {
+		logrus.Debugf("Template list empty.")
 	}
 	return flvList, nil
 }
@@ -1043,9 +1053,9 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	switch hostParam := hostParam.(type) {
 	case string:
 		host = resources.NewHost()
-		host.ID = hostParam
+		host.ID = hostParam.(string)
 	case *resources.Host:
-		host = hostParam
+		host = hostParam.(*resources.Host)
 	}
 	if host == nil {
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")
