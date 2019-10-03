@@ -85,7 +85,7 @@ func (t *Tracer) GoingIn() *Tracer {
 		return t
 	}
 	if t.sw != nil {
-		(*t.sw).Start()
+		t.sw.Start()
 	}
 	if t.enabled {
 		t.inDone = true
@@ -113,13 +113,13 @@ func (t *Tracer) GoingOut() *Tracer {
 		return t
 	}
 	if t.sw != nil {
-		(*t.sw).Stop()
+		t.sw.Stop()
 	}
 	if t.enabled {
 		t.outDone = true
 		msg := t.GoingOutMessage()
 		if t.sw != nil {
-			msg += " (duration: " + (*t.sw).String() + ")"
+			msg += " (duration: " + t.sw.String() + ")"
 		}
 		logrus.Tracef(msg)
 	}
