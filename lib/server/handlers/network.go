@@ -274,7 +274,11 @@ func (handler *NetworkHandler) Create(
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
 	primaryRequest.Name = primaryGatewayName
-	primaryTask := concurrency.NewTaskWithContext(ctx).Start(handler.createGateway, data.Map{
+	primaryTask, err := concurrency.NewTaskWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	primaryTask, err = primaryTask.Start(handler.createGateway, data.Map{
 		"request": primaryRequest,
 		"sizing":  sizing,
 	})
@@ -283,10 +287,17 @@ func (handler *NetworkHandler) Create(
 	if failover {
 		secondaryRequest := gwRequest
 		secondaryRequest.Name = secondaryGatewayName
-		secondaryTask = concurrency.NewTaskWithContext(ctx).Start(handler.createGateway, data.Map{
+		secondaryTask, err = concurrency.NewTaskWithContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		secondaryTask, err = secondaryTask.Start(handler.createGateway, data.Map{
 			"request": secondaryRequest,
 			"sizing":  sizing,
 		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	primaryResult, primaryErr := primaryTask.Wait()
@@ -374,9 +385,23 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// Starts gateway(s) installation
-	primaryTask = primaryTask.Reset().Start(handler.waitForInstallPhase1OnGateway, primaryGateway)
+	primaryTask, err = primaryTask.Reset()
+	if err != nil {
+		return nil, err
+	}
+	primaryTask, err = primaryTask.Start(handler.waitForInstallPhase1OnGateway, primaryGateway)
+	if err != nil {
+		return nil, err
+	}
 	if failover && secondaryTask != nil {
-		secondaryTask = secondaryTask.Reset().Start(handler.waitForInstallPhase1OnGateway, secondaryGateway)
+		secondaryTask, err = secondaryTask.Reset()
+		if err != nil {
+			return nil, err
+		}
+		secondaryTask, err = secondaryTask.Start(handler.waitForInstallPhase1OnGateway, secondaryGateway)
+		if err != nil {
+			return nil, err
+		}
 	}
 	_, primaryErr = primaryTask.Wait()
 	if primaryErr != nil {
@@ -411,15 +436,29 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// Starts gateway(s) installation
-	primaryTask = primaryTask.Reset().Start(handler.installPhase2OnGateway, data.Map{
+	primaryTask, err = primaryTask.Reset()
+	if err != nil {
+		return nil, err
+	}
+	primaryTask, err = primaryTask.Start(handler.installPhase2OnGateway, data.Map{
 		"host":     primaryGateway,
 		"userdata": primaryUserdata,
 	})
+	if err != nil {
+		return nil, err
+	}
 	if failover && secondaryTask != nil {
-		secondaryTask = secondaryTask.Reset().Start(handler.installPhase2OnGateway, data.Map{
+		secondaryTask, err = secondaryTask.Reset()
+		if err != nil {
+			return nil, err
+		}
+		secondaryTask, err = secondaryTask.Start(handler.installPhase2OnGateway, data.Map{
 			"host":     secondaryGateway,
 			"userdata": secondaryUserdata,
 		})
+		if err != nil {
+			return nil, err
+		}
 	}
 	_, primaryErr = primaryTask.Wait()
 	if primaryErr != nil {

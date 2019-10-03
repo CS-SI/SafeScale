@@ -715,12 +715,19 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
-		subtask := task.New().Start(c.foreman.taskCreateNode, data.Map{
+		subtask, err := task.New()
+		if err != nil {
+			return nil, err
+		}
+		subtask, err = subtask.Start(c.foreman.taskCreateNode, data.Map{
 			"index":   i + 1,
 			"type":    nodeType,
 			"nodeDef": nodeDef,
 			"timeout": timeout,
 		})
+		if err != nil {
+			return nil, err
+		}
 		subtasks = append(subtasks, subtask)
 	}
 	for _, s := range subtasks {
@@ -1126,7 +1133,14 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if length > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < length; i++ {
-			subtask := task.New().Start(deleteNodeFunc, list[i])
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+			subtask, err = subtask.Start(deleteNodeFunc, list[i])
+			if err != nil {
+				return err
+			}
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
@@ -1143,7 +1157,15 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if len(list) > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < length; i++ {
-			subtask := task.New().Start(deleteMasterFunc, list[i])
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+
+			subtask, err = subtask.Start(deleteMasterFunc, list[i])
+			if err != nil {
+				return err
+			}
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
@@ -1266,19 +1288,26 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	}
 
 	// Stop nodes
-	taskGroup := concurrency.NewTaskGroup(task)
+	taskGroup, err := concurrency.NewTaskGroup(task)
+	if err != nil {
+		return err
+	}
+
+	// FIXME Log errors and introduce status
+
 	for _, n := range nodes {
-		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
 	}
 	// Stop masters
 	for _, n := range masters {
-		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
 	}
 	// Stop gateway(s)
-	_ = taskGroup.Start(c.asyncStopHost, gatewayID)
+	_, _ = taskGroup.Start(c.asyncStopHost, gatewayID)
 	if secondaryGatewayID != "" {
-		_ = taskGroup.Start(c.asyncStopHost, secondaryGatewayID)
+		_, _ = taskGroup.Start(c.asyncStopHost, secondaryGatewayID)
 	}
+
 	_, err = taskGroup.Wait()
 	if err != nil {
 		return err
@@ -1367,18 +1396,21 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	}
 
 	// Start gateway(s)
-	taskGroup := concurrency.NewTaskGroup(task)
-	_ = taskGroup.Start(c.asyncStartHost, gatewayID)
+	taskGroup, err := concurrency.NewTaskGroup(task)
+	if err != nil {
+		return err
+	}
+	_, _ = taskGroup.Start(c.asyncStartHost, gatewayID)
 	if secondaryGatewayID != "" {
-		_ = taskGroup.Start(c.asyncStartHost, secondaryGatewayID)
+		_, _ = taskGroup.Start(c.asyncStartHost, secondaryGatewayID)
 	}
 	// Start masters
 	for _, n := range masters {
-		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
 	}
 	// Start nodes
 	for _, n := range nodes {
-		_ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
 	}
 	_, err = taskGroup.Wait()
 	if err != nil {
