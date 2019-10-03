@@ -2,8 +2,10 @@ package retry
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // ErrTimeout is an alias for utils.ErrTimeout
@@ -11,7 +13,7 @@ type ErrTimeout = scerr.ErrTimeout
 
 // TimeoutError ...
 func TimeoutError(limit time.Duration, err error) scerr.ErrTimeout {
-	msg := fmt.Sprintf("retries timed out after %s", limit)
+	msg := fmt.Sprintf("retries timed out after %s", temporal.FormatDuration(limit))
 	return scerr.TimeoutError(msg, limit, err)
 }
 

@@ -449,7 +449,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, retryErr
 	}
 	if desistError != nil {
-		return nil, userData, resources.ResourceAccessDeniedError(request.ResourceName, fmt.Sprintf("error creating host: %s", desistError.Error()))
+		return nil, userData, resources.ResourceForbiddenError(request.ResourceName, fmt.Sprintf("error creating host: %s", desistError.Error()))
 	}
 
 	logrus.Debugf("host resource created.")
