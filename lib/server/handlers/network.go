@@ -591,7 +591,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gw.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer temporal.Stopwatch{}.OnExitLogInfo(
+	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting configuration phase 2 on the gateway '%s'...", gw.Name),
 		fmt.Sprintf("Ending configuration phase 2 on the gateway '%s'", gw.Name),
 	)()

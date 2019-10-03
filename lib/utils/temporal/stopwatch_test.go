@@ -23,7 +23,7 @@ import (
 )
 
 func TestFormatDuration(t *testing.T) {
-	stowa := Stopwatch{}
+	stowa := NewStopwatch()
 
 	res := FormatDuration(stowa.Duration())
 	if !strings.Contains(res, "00h00m00.001s") {
@@ -32,7 +32,7 @@ func TestFormatDuration(t *testing.T) {
 }
 
 func TestStopDuration(t *testing.T) {
-	stowa := Stopwatch{}
+	stowa := NewStopwatch()
 
 	stowa.Stop()
 	stowa.Stop()
@@ -44,7 +44,7 @@ func TestStopDuration(t *testing.T) {
 }
 
 func TestStartStopDuration(t *testing.T) {
-	stowa := Stopwatch{}
+	stowa := NewStopwatch()
 
 	stowa.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -57,7 +57,7 @@ func TestStartStopDuration(t *testing.T) {
 }
 
 func TestStartStopDurationAgain(t *testing.T) {
-	stowa := Stopwatch{}
+	stowa := NewStopwatch()
 
 	stowa.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -69,13 +69,13 @@ func TestStartStopDurationAgain(t *testing.T) {
 	stowa.Stop()
 
 	res := FormatDuration(stowa.Duration())
-	if !strings.Contains(res, "0.010 ms") {
+	if !strings.Contains(res, "0.010s") {
 		t.Errorf("This should be 10 ms and it isn't: %s", res)
 	}
 }
 
 func TestStartStopDurationWithPause(t *testing.T) {
-	stowa := Stopwatch{}
+	stowa := NewStopwatch()
 
 	stowa.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -87,7 +87,7 @@ func TestStartStopDurationWithPause(t *testing.T) {
 	stowa.Stop()
 
 	res := FormatDuration(stowa.Duration())
-	if !strings.Contains(res, "0.030 ms") {
+	if !strings.Contains(res, "0.030s") {
 		t.Errorf("This should be 30 ms and it isn't: %s", res)
 	}
 }
