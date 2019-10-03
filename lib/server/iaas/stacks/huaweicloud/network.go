@@ -278,7 +278,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	})
 	if r.Err != nil {
 		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
-			return nil, resources.ResourceAccessDeniedError("network", name)
+			return nil, resources.ResourceForbiddenError("network", name)
 		}
 		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
 	}
@@ -468,7 +468,8 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
+
+		return nil, fmt.Errorf("error requesting subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	subnet, err := respCreate.Extract()
 	if err != nil {

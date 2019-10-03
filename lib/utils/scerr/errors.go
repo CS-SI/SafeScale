@@ -34,14 +34,14 @@ import (
 
 var removePart atomic.Value
 
+type consequencer interface {
+	Consequences() []error
+	AddConsequence(error) error
+	Error() string
+}
+
 // AddConsequence adds an error 'err' to the list of consequences
 func AddConsequence(err error, cons error) error {
-	type consequencer interface {
-		Consequences() []error
-		AddConsequence(error) error
-		Error() string
-	}
-
 	if err != nil {
 		conseq, ok := err.(consequencer)
 		if ok {
@@ -58,12 +58,6 @@ func AddConsequence(err error, cons error) error {
 
 // Consequences returns the list of consequences
 func Consequences(err error) []error {
-	type consequencer interface {
-		Consequences() []error
-		AddConsequence(error) error
-		Error() string
-	}
-
 	if err != nil {
 		conseq, ok := err.(consequencer)
 		if ok {
@@ -198,12 +192,12 @@ func (e ErrCore) Error() string {
 	return msgFinal
 }
 
+type causer interface {
+	Cause() error
+}
+
 // Cause returns the cause of an error if it implements the causer interface
 func Cause(err error) (resp error) {
-	type causer interface {
-		Cause() error
-	}
-
 	resp = err
 
 	for err != nil {
@@ -332,20 +326,42 @@ func InvalidRequestError(msg string) ErrInvalidRequest {
 	}
 }
 
-// ErrAccessDenied ...
-type ErrAccessDenied struct {
+// ErrUnauthorized when action is done without being authenticated first
+type ErrUnauthorized struct {
 	ErrCore
 }
 
 // AddConsequence adds an error 'err' to the list of consequences
-func (e ErrAccessDenied) AddConsequence(err error) error {
+func (e ErrUnauthorized) AddConsequence(err error) error {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
 	return e
 }
 
-// AccessDeniedError creates a ErrAccessDenied error
-func AccessDeniedError(msg string) ErrAccessDenied {
-	return ErrAccessDenied{
+// UnauthorizedError creates a ErrUnauthorized error
+func UnauthorizedError(msg string) ErrUnauthorized {
+	return ErrUnauthorized{
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
+// ErrForbidden when action is not allowed.
+type ErrForbidden struct {
+	ErrCore
+}
+
+// AddConsequence adds an error 'err' to the list of consequences
+func (e ErrForbidden) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// ForbiddenError creates a ErrForbidden error
+func ForbiddenError(msg string) ErrForbidden {
+	return ErrForbidden{
 		ErrCore: ErrCore{
 			Message:      msg,
 			cause:        nil,
@@ -390,6 +406,28 @@ func (e ErrOverflow) AddConsequence(err error) error {
 // OverflowError creates a ErrOverflow error
 func OverflowError(msg string) ErrOverflow {
 	return ErrOverflow{
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
+// ErrOverload when action can't be honored because provider is overloaded (ie too many requests occured in a given time).
+type ErrOverload struct {
+	ErrCore
+}
+
+// AddConsequence adds an error 'err' to the list of consequences
+func (e ErrOverload) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// OverloadError creates a ErrOverload error
+func OverloadError(msg string) ErrOverload {
+	return ErrOverload{
 		ErrCore: ErrCore{
 			Message:      msg,
 			cause:        nil,

@@ -198,6 +198,7 @@ func (m *Metadata) Get() (_ *Controller, err error) {
 	return nil, scerr.NotFoundError("missing cluster content in metadata")
 }
 
+// OK ...
 func (m *Metadata) OK() bool {
 	if m == nil {
 		return false

@@ -268,25 +268,38 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	nodesDefault.ImageId = imageID
 	nodesDef := complementHostDefinition(req.NodesDef, *nodesDefault)
 
-	// Creates network
-	logrus.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
-	req.Name = strings.ToLower(req.Name)
-	networkName := "net-" + req.Name
-	sizing := srvutils.FromPBHostDefinitionToPBGatewayDefinition(*gatewaysDef)
-	gwFailoverDisabled := req.Complexity == Complexity.Small
+	// Initialize service to use
+	clientInstance := client.New()
+	tenant, err := clientInstance.Tenant.Get(temporal.GetExecutionTimeout())
+	if err != nil {
+		return err
+	}
+	svc, err := iaas.UseService(tenant.Name)
+	if err != nil {
+		return err
+	}
+
+	// Determine if Gateway Failover must be set
+	caps := svc.GetCapabilities()
+	gwFailoverDisabled := req.Complexity == Complexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {
 			gwFailoverDisabled = true
 			break
 		}
 	}
+
+	// Creates network
+	logrus.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
+	req.Name = strings.ToLower(req.Name)
+	networkName := "net-" + req.Name
+	sizing := srvutils.FromPBHostDefinitionToPBGatewayDefinition(*gatewaysDef)
 	def := pb.NetworkDefinition{
 		Name:     networkName,
 		Cidr:     req.CIDR,
 		Gateway:  &sizing,
 		FailOver: !gwFailoverDisabled,
 	}
-	clientInstance := client.New()
 	clientNetwork := clientInstance.Network
 	network, err := clientNetwork.Create(def, temporal.GetExecutionTimeout())
 	if err != nil {
@@ -310,15 +323,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		kpName                           string
 		primaryGateway, secondaryGateway *resources.Host
 	)
-
-	tenant, err := clientInstance.Tenant.Get(temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	svc, err := iaas.UseService(tenant.Name)
-	if err != nil {
-		return err
-	}
 
 	// Loads primary gateway metadata
 	primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
@@ -1415,7 +1419,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 		}
 	}
 
-	logrus.Debugf("[%s] configuration successful in [%s].", gw.Name, (*tracer.Stopwatch()).String()) // FIXME Ouch
+	logrus.Debugf("[%s] configuration successful in [%s].", gw.Name, tracer.Stopwatch().String())
 	return nil, nil
 }
 

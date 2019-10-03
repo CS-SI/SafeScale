@@ -37,7 +37,7 @@ type Tracer struct {
 	enabled      bool
 	inDone       bool
 	outDone      bool
-	sw           *temporal.Stopwatch
+	sw           temporal.Stopwatch
 }
 
 // NewTracer creates a new Tracer instance
@@ -74,8 +74,7 @@ func (t *Tracer) GoingInMessage() string {
 // GoingOut will add the elapsed time in the log message (if it has to be logged...).
 func (t *Tracer) WithStopwatch() *Tracer {
 	if t.sw == nil {
-		swa := temporal.NewStopwatch()
-		t.sw = &swa
+		t.sw = temporal.NewStopwatch()
 	}
 	return t
 }
@@ -86,7 +85,7 @@ func (t *Tracer) GoingIn() *Tracer {
 		return t
 	}
 	if t.sw != nil {
-		(*t.sw).Start()
+		t.sw.Start()
 	}
 	if t.enabled {
 		t.inDone = true
@@ -114,13 +113,13 @@ func (t *Tracer) GoingOut() *Tracer {
 		return t
 	}
 	if t.sw != nil {
-		(*t.sw).Stop()
+		t.sw.Stop()
 	}
 	if t.enabled {
 		t.outDone = true
 		msg := t.GoingOutMessage()
 		if t.sw != nil {
-			msg += " (duration: " + (*t.sw).String() + ")"
+			msg += " (duration: " + t.sw.String() + ")"
 		}
 		logrus.Tracef(msg)
 	}
@@ -129,7 +128,7 @@ func (t *Tracer) GoingOut() *Tracer {
 
 // TraceMessage returns a string containing a trace message
 func (t *Tracer) TraceMessage(format string, a ...interface{}) string {
-	root := fmt.Sprintf(blockquoteGeneration(t.generation)+"---%s %s: ", t.taskSig, t.inOutMessage)
+	root := fmt.Sprintf(blockquoteGeneration(t.generation)+"---%s: ", t.inOutMessage)
 	return root + fmt.Sprintf(format, a...)
 }
 
@@ -142,7 +141,7 @@ func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
 }
 
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
-func (t *Tracer) Stopwatch() *temporal.Stopwatch {
+func (t *Tracer) Stopwatch() temporal.Stopwatch {
 	return t.sw
 }
 
