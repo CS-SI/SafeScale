@@ -33,7 +33,7 @@ import (
 )
 
 // JobManagerHandler ...
-var JobManagerHandler = handlers.NewJobManagerHandler
+var JobManagerHandler = handlers.NewJobHandler
 
 // JobManagerListener service server gRPC
 type JobManagerListener struct{}

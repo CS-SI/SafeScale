@@ -97,7 +97,7 @@ func work() {
 	pb.RegisterDataServiceServer(s, &listeners.DataListener{})
 	pb.RegisterHostServiceServer(s, &listeners.HostListener{})
 	pb.RegisterImageServiceServer(s, &listeners.ImageListener{})
-	pb.RegisterJobManagerServiceServer(s, &listeners.JobManagerListener{})
+	pb.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
 	pb.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
 	pb.RegisterShareServiceServer(s, &listeners.ShareListener{})
 	pb.RegisterSshServiceServer(s, &listeners.SSHListener{})

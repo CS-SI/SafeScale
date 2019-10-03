@@ -36,8 +36,8 @@ type JobManagerHandler struct {
 	service iaas.Service
 }
 
-// NewJobManagerHandler creates a Volume service
-func NewJobManagerHandler(svc iaas.Service) JobManagerAPI {
+// NewJobHandler creates a Volume service
+func NewJobHandler(svc iaas.Service) JobManagerAPI {
 	return &JobManagerHandler{
 		service: svc,
 	}
