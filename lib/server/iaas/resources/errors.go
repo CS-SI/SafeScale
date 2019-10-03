@@ -18,8 +18,9 @@ package resources
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ResourceNotFoundError creates a ErrNotFound error
@@ -62,9 +63,9 @@ func ResourceInvalidRequestError(resource, reason string) scerr.ErrInvalidReques
 	return scerr.InvalidRequestError(msgFinal)
 }
 
-// ResourceAccessDeniedError creates a ErrResourceAccessDenied error
-func ResourceAccessDeniedError(resource, name string) scerr.ErrAccessDenied {
+// ResourceForbiddenError creates a ErrResourceForbidden error
+func ResourceForbiddenError(resource, name string) scerr.ErrForbidden {
 	msgFinal := fmt.Sprintf("access to %s resource '%s' is denied", resource, name)
 
-	return scerr.AccessDeniedError(msgFinal)
+	return scerr.ForbiddenError(msgFinal)
 }

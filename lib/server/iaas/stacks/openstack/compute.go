@@ -1050,7 +1050,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	}
 
 	var host *resources.Host
-	switch hostParam := hostParam.(type) {
+	switch hostParam.(type) {
 	case string:
 		host = resources.NewHost()
 		host.ID = hostParam.(string)
