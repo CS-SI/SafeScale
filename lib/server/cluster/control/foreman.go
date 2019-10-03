@@ -161,7 +161,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Wants to inform about the duration of the operation
-	defer temporal.Stopwatch{}.OnExitLogInfo(
+	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
 	)()

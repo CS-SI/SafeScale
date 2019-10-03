@@ -112,7 +112,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer temporal.Stopwatch{}.OnExitLogInfo(
+	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
 	)()

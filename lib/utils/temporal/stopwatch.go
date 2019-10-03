@@ -26,18 +26,41 @@ import (
 
 const outputStopwatchTemplate = "%s (elapsed: %s)"
 
-// Stopwatch allows to time duration
-type Stopwatch struct {
+// Stopwatch interface to expose methods available for a stopwatch
+type Stopwatch interface {
+	// Start starts the stopwatch, either for the first time or after a Pause()
+	Start()
+	// Stop stops definitively the stopwatch, disabling the ability to start it again
+	Stop()
+	// Pause stops temporarily the stopwatch, allowing to start it again, suming up the time intervals
+	Pause()
+	// Duration returns the current elapsed time measured by the Stopwatch
+	Duration() time.Duration
+	// String returns a printable representation of the current elapsed time
+	String() string
+	// OnExitLogWithLevel returns a function that will log start and end of Stopwatch, intended tto be used with defer
+	OnExitLogWithLevel(in, out string, level logrus.Level) func()
+	// OnExitLogInfo
+	OnExitLogInfo(in, out string) func()
+}
+
+// stopwatch is the implementation satisfying interface Stopwatch
+type stopwatch struct {
 	start    time.Time
 	running  bool
 	stopped  bool
 	duration time.Duration
 }
 
+// NewStopwatch creates a object satisfying interface Stopwatch
+func NewStopwatch() Stopwatch {
+	return &stopwatch{}
+}
+
 // We need Stopwatch pointer receivers in order to change the underlying struct
 
 // Start starts the Stopwatch
-func (sw *Stopwatch) Start() {
+func (sw *stopwatch) Start() {
 	if !sw.running && !sw.stopped {
 		sw.start = time.Now()
 		sw.running = true
@@ -45,7 +68,7 @@ func (sw *Stopwatch) Start() {
 }
 
 // Stop stops the Stopwatch
-func (sw *Stopwatch) Stop() {
+func (sw *stopwatch) Stop() {
 	sw.stopped = true
 	if sw.running {
 		sw.duration += time.Since(sw.start)
@@ -54,7 +77,7 @@ func (sw *Stopwatch) Stop() {
 }
 
 // Pause pauses the Stopwatch, which can then unpause by calling Start again
-func (sw *Stopwatch) Pause() {
+func (sw *stopwatch) Pause() {
 	if sw.stopped {
 		return
 	}
@@ -67,7 +90,7 @@ func (sw *Stopwatch) Pause() {
 }
 
 // Duration returns the time elapsed since the Stopwatch has been started
-func (sw Stopwatch) Duration() time.Duration {
+func (sw *stopwatch) Duration() time.Duration {
 	if sw.stopped {
 		return sw.duration
 	}
@@ -78,13 +101,13 @@ func (sw Stopwatch) Duration() time.Duration {
 }
 
 // String returns a string representation of duration
-func (sw Stopwatch) String() string {
+func (sw *stopwatch) String() string {
 	return FormatDuration(sw.Duration())
 }
 
 // OnExitLogWithLevel logs 'in' with log level 'level', then returns a function (to be used with defer for example)
 // that will log 'out' + elapsed time
-func (sw Stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func() {
+func (sw *stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func() {
 	if in == "" && out == "" {
 		return func() {}
 	}
@@ -103,7 +126,7 @@ func (sw Stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func(
 }
 
 // OnExitLogInfo logs 'in' in Info level then returns a function that will log 'out' with elapsed time
-func (sw Stopwatch) OnExitLogInfo(in, out string) func() {
+func (sw *stopwatch) OnExitLogInfo(in, out string) func() {
 	return sw.OnExitLogWithLevel(in, out, logrus.InfoLevel)
 }
 
