@@ -96,20 +96,21 @@ func (ms *Share) Carry(hostID, hostName, shareID, shareName string) (*Share, err
 }
 
 // Get returns the ID of the host owning the share
-func (ms *Share) Get() string {
+func (ms *Share) Get() (string, error) {
 	if ms.item == nil {
-		panic("ms.item is nil!")
+		return "", scerr.InvalidInstanceErrorWithMessage("ms.item is nil!")
 	}
 	if ei, ok := ms.item.Get().(*shareItem); ok {
-		return ei.HostName
+		return ei.HostName, nil
 	}
-	panic("invalid content in metadata!")
+
+	return "", scerr.InvalidInstanceErrorWithMessage("invalid content in metadata!")
 }
 
 // Write updates the metadata corresponding to the share in the Object Storage
 func (ms *Share) Write() error {
 	if ms.item == nil {
-		panic("ms.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("ms.item is nil!")
 	}
 	err := ms.item.WriteInto(ByIDFolderName, *ms.id)
 	if err != nil {
@@ -133,7 +134,7 @@ func (ms *Share) ReadByReference(id string) (err error) {
 // ReadByID reads the metadata of an export identified by ID from Object Storage
 func (ms *Share) ReadByID(id string) error {
 	if ms.item == nil {
-		panic("ms.item is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("ms.item is nil!")
 	}
 	var si shareItem
 	err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
@@ -155,7 +156,7 @@ func (ms *Share) ReadByID(id string) error {
 // ReadByName reads the metadata of a nas identified by name
 func (ms *Share) ReadByName(name string) error {
 	if ms.item == nil {
-		panic("ms.name is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("ms.item is nil!")
 	}
 	var si shareItem
 	err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
@@ -327,7 +328,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 		return "", retryErr
 	}
 
-	return ms.Get(), nil
+	return ms.Get()
 }
 
 // // MountNas add the client nas to the Nas definition from Object Storage

@@ -35,7 +35,10 @@ func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.List(ctx, &google_protobuf.Empty{})
 
@@ -46,7 +49,10 @@ func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.Get(ctx, &google_protobuf.Empty{})
 }
@@ -56,9 +62,12 @@ func (t *tenant) Set(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Set(ctx, &pb.TenantName{Name: name})
+	_, err = service.Set(ctx, &pb.TenantName{Name: name})
 	return err
 }
 
@@ -67,7 +76,10 @@ func (t *tenant) StorageList(timeout time.Duration) (*pb.TenantList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.StorageList(ctx, &google_protobuf.Empty{})
 }
@@ -77,7 +89,10 @@ func (t *tenant) StorageGet(timeout time.Duration) (*pb.TenantNameList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.StorageGet(ctx, &google_protobuf.Empty{})
 }
@@ -87,8 +102,11 @@ func (t *tenant) StorageSet(names []string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.StorageSet(ctx, &pb.TenantNameList{Names: names})
+	_, err = service.StorageSet(ctx, &pb.TenantNameList{Names: names})
 	return err
 }

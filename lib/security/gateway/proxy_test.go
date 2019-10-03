@@ -22,7 +22,7 @@ import (
 )
 
 func Clean() {
-	db := model.NewDataAccess("sqlite3", "/tmp/safe-security.db").Get()
+	db, _ := model.NewDataAccess("sqlite3", "/tmp/safe-security.db").Get()
 	defer func() {
 		_ = db.Close()
 	}()
@@ -30,7 +30,12 @@ func Clean() {
 }
 func runTestService() {
 	da := model.NewDataAccess("sqlite3", "/tmp/safe-security.db")
-	db := da.Get().Debug()
+	dbg, err := da.Get()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	db := dbg.Debug()
 	defer func() {
 		_ = db.Close()
 	}()

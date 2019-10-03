@@ -330,7 +330,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 		return err
 	}
-	primaryGateway = primaryGatewayMetadata.Get()
+	primaryGateway, err = primaryGatewayMetadata.Get()
+	if err != nil {
+		return err
+	}
 	err = clientInstance.SSH.WaitReady(primaryGateway.ID, temporal.GetExecutionTimeout())
 	if err != nil {
 		return client.DecorateError(err, "wait for remote ssh service to be ready", false)
@@ -347,7 +350,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			}
 			return err
 		}
-		secondaryGateway = secondaryGatewayMetadata.Get()
+		secondaryGateway, err = secondaryGatewayMetadata.Get()
+		if err != nil {
+			return err
+		}
 		err = clientInstance.SSH.WaitReady(primaryGateway.ID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return client.DecorateError(err, "wait for remote ssh service to be ready", false)

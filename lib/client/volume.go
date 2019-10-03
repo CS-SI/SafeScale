@@ -37,7 +37,10 @@ func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.List(ctx, &pb.VolumeListRequest{All: all})
 
@@ -48,7 +51,10 @@ func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, er
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.Inspect(ctx, &pb.Reference{Name: name})
 
@@ -59,7 +65,10 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
 	var (
 		mutex sync.Mutex
@@ -96,7 +105,10 @@ func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Vol
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.Create(ctx, &def)
 
@@ -107,9 +119,12 @@ func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Attach(ctx, &def)
+	_, err = service.Attach(ctx, &def)
 	return err
 
 }
@@ -119,9 +134,12 @@ func (v *volume) Detach(volumeName string, hostName string, timeout time.Duratio
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Detach(ctx, &pb.VolumeDetachment{
+	_, err = service.Detach(ctx, &pb.VolumeDetachment{
 		Volume: &pb.Reference{Name: volumeName},
 		Host:   &pb.Reference{Name: hostName},
 	})

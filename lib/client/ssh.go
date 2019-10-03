@@ -63,7 +63,10 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	_, cancel := utils.GetTimeoutContext(executionTimeout)
+	_, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	if err != nil {
+		return -1, "", "", err
+	}
 	defer cancel()
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
@@ -209,7 +212,10 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		connectionTimeout = executionTimeout
 	}
 
-	_, cancel := utils.GetTimeoutContext(executionTimeout)
+	_, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	if err != nil {
+		return -1, "", "", err
+	}
 	defer cancel()
 
 	var (
@@ -249,7 +255,10 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 	// defer conn.Close()
 	s.session.Connect()
 	defer s.session.Disconnect()
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 	service := pb.NewHostServiceClient(s.session.connection)
 
 	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})

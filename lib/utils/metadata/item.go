@@ -93,7 +93,7 @@ func (i *Item) Get() interface{} {
 // DeleteFrom removes a metadata from a folder
 func (i *Item) DeleteFrom(path string, name string) error {
 	if name == "" {
-		panic("name is empty!")
+		return scerr.InvalidParameterError("name", "cannot be emtpy!")
 	}
 	if path == "" {
 		path = "."

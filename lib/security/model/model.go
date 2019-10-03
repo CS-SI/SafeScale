@@ -53,17 +53,20 @@ func NewDataAccess(dialect, dsn string) *DataAccess {
 }
 
 //Get returns database access
-func (da *DataAccess) Get() *gorm.DB {
+func (da *DataAccess) Get() (*gorm.DB, error) {
 	db, err := gorm.Open(da.dialect, da.dsn)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return db
+	return db, nil
 }
 
 //GetUserAccessPermissionsByService get user access permission by service
-func (da *DataAccess) GetUserAccessPermissionsByService(email, serviceName string) []AccessPermission {
-	db := da.Get()
+func (da *DataAccess) GetUserAccessPermissionsByService(email, serviceName string) (permissions []AccessPermission, err error) {
+	db, err := da.Get()
+	if err != nil {
+		return permissions, err
+	}
 	defer func() {
 		clErr := db.Close()
 		if clErr != nil {
@@ -72,49 +75,56 @@ func (da *DataAccess) GetUserAccessPermissionsByService(email, serviceName strin
 	}()
 	var service Service
 	if db.Where(&Service{Name: serviceName}).Take(&service).Error != nil {
-		return nil
+		return permissions, err
 	}
 	var user User
 	if db.Where(&User{Email: email}).Take(&user).Error != nil {
-		return nil
+		return permissions, err
 	}
 	var roles []Role
 	if db.Model(&user).Where(&Role{ServiceID: service.ID}).Preload("AccessPermissions").Related(&roles, "Roles").Error != nil {
-		return nil
+		return permissions, err
 	}
-	var permissions []AccessPermission
+
 	for _, role := range roles {
 		permissions = append(permissions, role.AccessPermissions...)
 	}
-	return permissions
+
+	return permissions, err
 }
 
 //GetServiceByName get service by name
-func (da *DataAccess) GetServiceByName(name string) *Service {
-	db := da.Get()
+func (da *DataAccess) GetServiceByName(name string) (srv *Service, err error) {
+	db, err := da.Get()
+	if err != nil {
+		return nil, err
+	}
 	defer func() {
 		clErr := db.Close()
 		if clErr != nil {
 			log.Error(clErr)
 		}
 	}()
-	var srv Service
+
 	if db.Where(&Service{Name: name}).Take(&srv).Error != nil {
-		return nil
+		return nil, nil
 	}
-	return &srv
+	return srv, nil
 }
 
 //Init initialize the database: drop tables if exists and create new empty ones
-func (da *DataAccess) Init() error {
-	db := da.Get()
+func (da *DataAccess) Init() (err error) {
+	db, err := da.Get()
+	if err != nil {
+		return err
+	}
 	defer func() {
 		clErr := db.Close()
 		if clErr != nil {
 			log.Error(clErr)
 		}
 	}()
-	err := db.DropTableIfExists(&Service{}, &Role{}, &AccessPermission{}, &User{}).Error
+	err = db.DropTableIfExists(&Service{}, &Role{}, &AccessPermission{}, &User{}).Error
 	if err != nil {
 		return err
 	}

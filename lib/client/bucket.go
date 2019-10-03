@@ -38,7 +38,10 @@ func (c *bucket) List(timeout time.Duration) (*pb.BucketList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.List(ctx, &google_protobuf.Empty{})
 }
@@ -49,9 +52,12 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 	defer c.session.Disconnect()
 
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Create(ctx, &pb.Bucket{Name: name})
+	_, err = service.Create(ctx, &pb.Bucket{Name: name})
 	return err
 }
 
@@ -60,7 +66,10 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
 	var (
 		wg   sync.WaitGroup
@@ -95,7 +104,10 @@ func (c *bucket) Inspect(name string, timeout time.Duration) (*pb.BucketMounting
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.Inspect(ctx, &pb.Bucket{Name: name})
 }
@@ -105,9 +117,12 @@ func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dur
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Mount(ctx, &pb.BucketMountingPoint{
+	_, err = service.Mount(ctx, &pb.BucketMountingPoint{
 		Bucket: bucketName,
 		Host: &pb.Reference{
 			Name: hostName,
@@ -122,9 +137,12 @@ func (c *bucket) Unmount(bucketName, hostName string, timeout time.Duration) err
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Unmount(ctx, &pb.BucketMountingPoint{
+	_, err = service.Unmount(ctx, &pb.BucketMountingPoint{
 		Bucket: bucketName,
 		Host:   &pb.Reference{Name: hostName},
 	})

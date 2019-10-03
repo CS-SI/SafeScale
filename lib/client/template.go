@@ -34,7 +34,10 @@ func (t *template) List(all bool, timeout time.Duration) (*pb.TemplateList, erro
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTemplateServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 	return service.List(ctx, &pb.TemplateListRequest{All: all})
 
 }

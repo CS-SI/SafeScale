@@ -35,9 +35,12 @@ func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Create(ctx, &def)
+	_, err = service.Create(ctx, &def)
 	if err != nil {
 		return DecorateError(err, "creation of share", true)
 	}
@@ -49,9 +52,12 @@ func (n *share) Delete(name string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Delete(ctx, &pb.Reference{Name: name})
+	_, err = service.Delete(ctx, &pb.Reference{Name: name})
 	if err != nil {
 		return DecorateError(err, "deletion of share", true)
 	}
@@ -63,7 +69,10 @@ func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	list, err := service.List(ctx, &google_protobuf.Empty{})
 	if err != nil {
@@ -77,9 +86,12 @@ func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error 
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Mount(ctx, &def)
+	_, err = service.Mount(ctx, &def)
 	if err != nil {
 		return DecorateError(err, "mount of share", true)
 	}
@@ -91,9 +103,12 @@ func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) erro
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Unmount(ctx, &def)
+	_, err = service.Unmount(ctx, &def)
 	if err != nil {
 		return DecorateError(err, "unmount of share", true)
 	}
@@ -105,7 +120,10 @@ func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareMountList,
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	list, err := service.Inspect(ctx, &pb.Reference{Name: name})
 	if err != nil {

@@ -78,7 +78,10 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		if err != nil {
 			return nil, err
 		}
-		host = mh.Get()
+		host, err = mh.Get()
+		if err != nil {
+			return nil, err
+		}
 	case *resources.Host:
 		host = hostParam
 		if host.Name != "" {

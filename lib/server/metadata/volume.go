@@ -55,9 +55,9 @@ func NewVolume(svc iaas.Service) (*Volume, error) {
 }
 
 // Carry links a Volume instance to the Metadata instance
-func (mv *Volume) Carry(volume *resources.Volume) *Volume {
+func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
 	if volume == nil {
-		panic("volume is nil!")
+		return nil, scerr.InvalidParameterError("volume", "cannot be nil!")
 	}
 	if volume.Properties == nil {
 		volume.Properties = serialize.NewJSONProperties("resources")
@@ -65,18 +65,18 @@ func (mv *Volume) Carry(volume *resources.Volume) *Volume {
 	mv.item.Carry(volume)
 	mv.name = &volume.Name
 	mv.id = &volume.ID
-	return mv
+	return mv, nil
 }
 
 // Get returns the Volume instance linked to metadata
-func (mv *Volume) Get() *resources.Volume {
+func (mv *Volume) Get() (*resources.Volume, error) {
 	if mv.item == nil {
-		panic("mv.item is nil!")
+		return nil, scerr.InvalidInstanceErrorWithMessage("mv.item is nil!")
 	}
 	if volume, ok := mv.item.Get().(*resources.Volume); ok {
-		return volume
+		return volume, nil
 	}
-	panic("invalid content in volume metadata")
+	return nil, scerr.InvalidInstanceErrorWithMessage("invalid content in volume metadata")
 }
 
 // Write updates the metadata corresponding to the volume in the Object Storage
@@ -133,7 +133,11 @@ func (mv *Volume) ReadByID(id string) error {
 		return err
 	}
 
-	mv.Carry(volume)
+	_, err = mv.Carry(volume)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -151,7 +155,11 @@ func (mv *Volume) ReadByName(name string) error {
 		return err
 	}
 
-	mv.Carry(volume)
+	_, err = mv.Carry(volume)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -184,12 +192,23 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) error {
 }
 
 // SaveVolume saves the Volume definition in Object Storage
-func SaveVolume(svc iaas.Service, volume *resources.Volume) (*Volume, error) {
-	mv, err := NewVolume(svc)
+func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err error) {
+	mv, err = NewVolume(svc)
 	if err != nil {
 		return nil, err
 	}
-	return mv, mv.Carry(volume).Write()
+
+	vo, err := mv.Carry(volume)
+	if err != nil {
+		return nil, err
+	}
+
+	err = vo.Write()
+	if err != nil {
+		return nil, err
+	}
+
+	return mv, nil
 }
 
 // RemoveVolume removes the Volume definition from Object Storage
