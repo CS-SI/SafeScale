@@ -42,8 +42,8 @@ type DataListener struct{}
 // List will returns all the files from one or several ObjectStorages
 func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl *pb.FileList, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -70,8 +70,8 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl 
 func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -98,8 +98,8 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 func (s *DataListener) Get(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -122,12 +122,12 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (empty *google_prot
 	return &google_protobuf.Empty{}, nil
 }
 
-// Delete remove a file from one or several ObjectStorages
+// Delete remove a file from one or several Object Storages
 func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

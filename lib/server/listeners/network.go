@@ -52,18 +52,16 @@ type NetworkListener struct{}
 // Create a new network
 func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) (net *pb.Network, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	networkName := in.GetName()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create network "+networkName); err == nil {
@@ -121,17 +119,15 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 // List existing networks
 func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (rv *pb.NetworkList, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	log.Infof("Listeners: network list")
 
@@ -164,12 +160,10 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *pb.Network, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -177,8 +171,8 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err == nil {
@@ -206,12 +200,10 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 // Delete a network
 func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *google_protobuf.Empty, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -219,8 +211,8 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err == nil {
