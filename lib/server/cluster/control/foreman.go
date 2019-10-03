@@ -1349,7 +1349,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 		}
 	}
 
-	logrus.Debugf("[%s] configuration successful in [%s].", gw.Name, tracer.Stopwatch().String())
+	logrus.Debugf("[%s] configuration successful in [%s].", gw.Name, (*tracer.Stopwatch()).String()) // FIXME Ouch
 	return nil, nil
 }
 
