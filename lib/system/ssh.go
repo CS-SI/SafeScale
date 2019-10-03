@@ -465,7 +465,7 @@ func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) 
 	defer tracer.OnExitTrace()
 
 	// if strings.Contains(sc.Display(), "ENDSSH") {
-	// 	defer utils.Stopwatch{}.OnExitLogWithLevel(
+	// 	defer utils.NewStopwatch().OnExitLogWithLevel(
 	// 		fmt.Sprintf("Running command with timeout of %s:\n%s", timeout, sc.Display()),
 	// 		fmt.Sprintf("Command run: [%s]", sc.Display()),
 	// 		log.DebugLevel,

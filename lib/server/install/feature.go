@@ -358,7 +358,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	defer temporal.Stopwatch{}.OnExitLogInfo(
+	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 	)()
@@ -429,7 +429,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 
-	defer temporal.Stopwatch{}.OnExitLogInfo(
+	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending removal of feature '%s' from %s '%s'", f.DisplayName(), t.Type(), t.Name()),
 	)()

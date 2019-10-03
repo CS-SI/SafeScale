@@ -415,7 +415,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 	for _, k := range order {
 		_, stepErr, continuation, breaking := func() (res Results, inner error, cont bool, brea bool) {
 			defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), k), &inner)
-			defer temporal.Stopwatch{}.OnExitLogWithLevel(
+			defer temporal.NewStopwatch().OnExitLogWithLevel(
 				fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), k),
 				fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), k),
 				logrus.DebugLevel,
