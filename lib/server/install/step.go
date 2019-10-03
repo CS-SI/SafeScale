@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -266,9 +267,10 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	nHosts := len(hosts)
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
-		fmt.Sprintf("Starting step '%s' on %d hosts...", is.Name, len(hosts)),
-		fmt.Sprintf("Ending step '%s' on %d hosts", is.Name, len(hosts)),
+		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, utils.Plural(nHosts)),
+		fmt.Sprintf("Ending step '%s' on %d host%s", is.Name, len(hosts), utils.Plural(nHosts)),
 		log.DebugLevel,
 	)()
 
@@ -276,7 +278,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 		subtask := concurrency.NewTask(is.Worker.feature.task)
 
 		for _, h := range hosts {
-			log.Debugf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
@@ -292,16 +294,16 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 			if !results[h.Name].Successful() {
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
-					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
+					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
-					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
+					tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
 			} else {
-				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done",
+				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
 					is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
 					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
@@ -309,7 +311,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	} else {
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
-			log.Debugf("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
@@ -328,23 +330,24 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 		for k, s := range subtasks {
 			result, err := s.Wait()
 			if err != nil {
-				log.Warnf("%s(%s):step(%s)@%s finished in [%s]: fail to recover result", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime)))
+				log.Warn(tracer.TraceMessage(": %s(%s):step(%s)@%s finished after %s, but failed to recover result",
+					is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
 				continue
 			}
 			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
-					log.Debugf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
+					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
-					log.Errorf("%s(%s):step(%s)@%s finished in [%s]: fail: %s",
+					tracer.Trace(": %s(%s):step(%s)@%s failed in %s: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
 			} else {
-				log.Debugf("%s(%s):step(%s)@%s finished in [%s]: done",
+				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
 					is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
 					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
