@@ -81,12 +81,18 @@ func authenticate(token string) (string, int) {
 func authorize(email, service, resource, method string) bool {
 
 	da := model.NewDataAccess(cfg.DatabaseDialect, cfg.DatabaseDSN)
-	srv := da.GetServiceByName(service)
+	srv, err := da.GetServiceByName(service)
+	if err != nil {
+		return false
+	}
 	if srv == nil {
 		return false
 	}
 
-	permissions := da.GetUserAccessPermissionsByService(email, service)
+	permissions, err := da.GetUserAccessPermissionsByService(email, service)
+	if err != nil {
+		return false
+	}
 
 	for _, permission := range permissions {
 		pattern := permission.ResourcePattern
@@ -104,7 +110,10 @@ func authorize(email, service, resource, method string) bool {
 
 func getServiceURL(service, resource string) (*url.URL, error) {
 	da := model.NewDataAccess(cfg.DatabaseDialect, cfg.DatabaseDSN)
-	srv := da.GetServiceByName(service)
+	srv, err := da.GetServiceByName(service)
+	if err != nil {
+		return nil, err
+	}
 	if srv == nil {
 		return nil, fmt.Errorf("no route define to serve resource %s from service %s", service, resource)
 	}

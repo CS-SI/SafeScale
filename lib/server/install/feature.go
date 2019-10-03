@@ -316,7 +316,10 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 	}
 
 	// Inits implicit parameters
-	f.setImplicitParameters(t, myV)
+	err = f.setImplicitParameters(t, myV)
+	if err != nil {
+		return nil, err
+	}
 
 	// Checks required parameters have value
 	err = checkParameters(f, myV)
@@ -370,7 +373,10 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 	}
 
 	// Inits implicit parameters
-	f.setImplicitParameters(t, myV)
+	err = f.setImplicitParameters(t, myV)
+	if err != nil {
+		return nil, err
+	}
 
 	// Checks required parameters have value
 	err = checkParameters(f, myV)
@@ -441,7 +447,10 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 	}
 
 	// Inits implicit parameters
-	f.setImplicitParameters(t, myV)
+	err = f.setImplicitParameters(t, myV)
+	if err != nil {
+		return nil, err
+	}
 
 	// Checks required parameters have value
 	err = checkParameters(f, myV)
@@ -497,7 +506,7 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 }
 
 // setImplicitParameters configures parameters that are implicitly defined, based on target
-func (f *Feature) setImplicitParameters(t Target, v Variables) {
+func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 	hT, cT, nT := determineContext(t)
 	if cT != nil {
 		cluster := cT.cluster
@@ -542,7 +551,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		}
 
 		if host == nil {
-			panic("nil host in feature") // FIXME No more panics
+			return scerr.InvalidInstanceErrorWithMessage("nil host in feature")
 		}
 
 		// v["Hostname"] = host.Name
@@ -558,4 +567,6 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 			v["Username"] = "safescale"
 		}
 	}
+
+	return nil
 }

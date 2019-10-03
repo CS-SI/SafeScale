@@ -672,7 +672,11 @@ func (handler *NetworkHandler) deleteGateway(gw *resources.Host) (err error) {
 }
 
 func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) (err error) {
-	name := m.Get().Name
+	mm, err := m.Get()
+	if err != nil {
+		return err
+	}
+	name := mm.Name
 	logrus.Warnf("Cleaning up on failure, deleting gateway '%s' metadata", name)
 	derr := m.Delete()
 	if derr != nil {
@@ -732,7 +736,8 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network
 	if err != nil {
 		return nil, err
 	}
-	return mn.Get(), nil
+
+	return mn.Get()
 }
 
 // Delete deletes network referenced by ref
@@ -757,7 +762,10 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 		}
 		return err
 	}
-	network := mn.Get()
+	network, err := mn.Get()
+	if err != nil {
+		return err
+	}
 
 	// Check if hosts are still attached to network according to metadata
 	var errorMsg string
@@ -800,7 +808,11 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			logrus.Error(err)
 		} else {
 			if network.VIP != nil {
-				err = handler.service.UnbindHostFromVIP(network.VIP, mh.Get())
+				mhm, merr := mh.Get()
+				if merr != nil {
+					return merr
+				}
+				err = handler.service.UnbindHostFromVIP(network.VIP, mhm)
 				if err != nil {
 					logrus.Errorf("failed to unbind primary gateway from VIP: %v", err)
 				}
@@ -830,7 +842,12 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			logrus.Error(err)
 		} else {
 			if network.VIP != nil {
-				err = handler.service.UnbindHostFromVIP(network.VIP, mh.Get())
+				mhm, merr := mh.Get()
+				if merr != nil {
+					return merr
+				}
+
+				err = handler.service.UnbindHostFromVIP(network.VIP, mhm)
 				if err != nil {
 					logrus.Errorf("failed to unbind secondary gateway from VIP: %v", err)
 				}
@@ -866,10 +883,16 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	defer func() {
 		if err != nil {
 			// Delete metadata if there
-			if mn.Get() != nil {
-				derr := mn.Delete()
-				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
+			mnm, nerr := mn.Get()
+			if nerr != nil {
+				err = scerr.AddConsequence(err, nerr)
+			}
+			if nerr == nil {
+				if mnm != nil {
+					derr := mn.Delete()
+					if derr != nil {
+						err = scerr.AddConsequence(err, derr)
+					}
 				}
 			}
 		}
@@ -912,7 +935,12 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	}
 
 	// Delete network metadata if there
-	if mn.Get() != nil {
+	mnm, err := mn.Get()
+	if err != nil {
+		return err
+	}
+
+	if mnm != nil {
 		err = mn.Delete()
 		if err != nil {
 			return err

@@ -36,13 +36,13 @@ type Key [32]byte
 // with spaces.
 // If text is not nil and not empty, and the length of text us greater than 32, the 32 first bytes
 // are used as key.
-func NewEncryptionKey(text []byte) *Key {
+func NewEncryptionKey(text []byte) (*Key, error) {
 	key := Key{}
 	nBytes := len(text)
 	if len(text) == 0 {
 		_, err := io.ReadFull(rand.Reader, key[:])
 		if err != nil {
-			panic(fmt.Sprintf("can't read enough random bytes (you should consider to stop using this computer): %v", err))
+			return nil, fmt.Errorf("can't read enough random bytes (you should consider to stop using this computer): %v", err)
 		}
 	} else {
 		n := nBytes
@@ -56,7 +56,7 @@ func NewEncryptionKey(text []byte) *Key {
 			key[i] = ' '
 		}
 	}
-	return &key
+	return &key, nil
 }
 
 // Encrypt encrypts data using 256-bit AES-GCM.  This both hides the content of

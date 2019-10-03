@@ -35,9 +35,12 @@ func (c *data) Push(localFilePath string, fileName string, timeout time.Duration
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewDataServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Push(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
+	_, err = service.Push(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
 	return err
 }
 
@@ -46,9 +49,12 @@ func (c *data) Get(localFilePath string, fileName string, timeout time.Duration)
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewDataServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Get(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
+	_, err = service.Get(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
 	return err
 }
 
@@ -57,7 +63,10 @@ func (c *data) List(timeout time.Duration) (*pb.FileList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewDataServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.List(ctx, &google_protobuf.Empty{})
 
@@ -68,8 +77,11 @@ func (c *data) Delete(fileName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewDataServiceClient(c.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-	_, err := service.Delete(ctx, &pb.File{Name: fileName})
+	_, err = service.Delete(ctx, &pb.File{Name: fileName})
 	return err
 }

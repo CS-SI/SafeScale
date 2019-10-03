@@ -116,7 +116,10 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 			return err
 		}
 	}
-	volume := mv.Get()
+	volume, err := mv.Get()
+	if err != nil {
+		return err
+	}
 
 	err = volume.Properties.LockForRead(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
 		volumeAttachmentsV1 := v.(*propsv1.VolumeAttachments)
@@ -190,7 +193,10 @@ func (handler *VolumeHandler) Inspect(
 		}
 		return nil, nil, err
 	}
-	volume = mv.Get()
+	volume, err = mv.Get()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	mounts = map[string]*propsv1.HostLocalMount{}
 	hostSvc := NewHostHandler(handler.service)

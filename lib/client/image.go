@@ -34,7 +34,10 @@ func (img *image) List(all bool, timeout time.Duration) (*pb.ImageList, error) {
 	img.session.Connect()
 	defer img.session.Disconnect()
 	service := pb.NewImageServiceClient(img.session.connection)
-	ctx := utils.GetContext(true)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
 	return service.List(ctx, &pb.ImageListRequest{All: all})
 }

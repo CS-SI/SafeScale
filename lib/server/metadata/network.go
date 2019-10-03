@@ -65,20 +65,20 @@ func (m *Network) GetService() iaas.Service {
 }
 
 // GetPath returns the path in Object Storage where the item is stored
-func (m *Network) GetPath() string {
+func (m *Network) GetPath() (string, error) {
 	if m.item == nil {
-		panic("m.item is nil!")
+		return "", scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
 	}
-	return m.item.GetPath()
+	return m.item.GetPath(), nil
 }
 
 // Carry links a Network instance to the Metadata instance
-func (m *Network) Carry(network *resources.Network) *Network {
+func (m *Network) Carry(network *resources.Network) (*Network, error) {
 	if network == nil {
-		panic("network parameter is nil!")
+		return nil, scerr.InvalidParameterError("network", "cannot be nil!")
 	}
 	if m.item == nil {
-		panic("m.item is nil!")
+		return nil, scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
 	}
 	if network.Properties == nil {
 		network.Properties = serialize.NewJSONProperties("resources")
@@ -87,15 +87,15 @@ func (m *Network) Carry(network *resources.Network) *Network {
 	m.id = &network.ID
 	m.name = &network.Name
 	//m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
-	return m
+	return m, nil
 }
 
 // Get returns the resources.Network instance linked to metadata
-func (m *Network) Get() *resources.Network {
+func (m *Network) Get() (*resources.Network, error) {
 	if m.item == nil {
-		panic("m.item is nil!")
+		return nil, scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
 	}
-	return m.item.Get().(*resources.Network)
+	return m.item.Get().(*resources.Network), nil
 }
 
 // Write updates the metadata corresponding to the network in the Object Storage
@@ -285,7 +285,10 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	network := m.Get()
+	network, err := m.Get()
+	if err != nil {
+		return err
+	}
 	return network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		networkHostsV1.ByID[host.ID] = host.Name
@@ -307,7 +310,10 @@ func (m *Network) DetachHost(hostID string) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	network := m.Get()
+	network, err := m.Get()
+	if err != nil {
+		return err
+	}
 	err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		hostName, found := networkHostsV1.ByID[hostID]
@@ -333,7 +339,10 @@ func (m *Network) ListHosts() (list []*resources.Host, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	network := m.Get()
+	network, err := m.Get()
+	if err != nil {
+		return nil, err
+	}
 	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		for id := range networkHostsV1.ByID {
@@ -342,7 +351,11 @@ func (m *Network) ListHosts() (list []*resources.Host, err error) {
 				return err
 			}
 			if mh != nil {
-				list = append(list, mh.Get())
+				mhm, merr := mh.Get()
+				if merr != nil {
+					return merr
+				}
+				list = append(list, mhm)
 			} else {
 				log.Warnf("Host metadata for '%s' not found!", id)
 			}
@@ -382,7 +395,13 @@ func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err err
 	if err != nil {
 		return nil, err
 	}
-	return mn, mn.Carry(net).Write()
+
+	mnm, err := mn.Carry(net)
+	if err != nil {
+		return nil, err
+	}
+
+	return mn, mnm.Write()
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
@@ -403,7 +422,12 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
 		return err
 	}
 
-	return aNet.Carry(net).Delete()
+	aNetm, err := aNet.Carry(net)
+	if err != nil {
+		return err
+	}
+
+	return aNetm.Delete()
 }
 
 // LoadNetwork gets the Network definition from Object Storage
@@ -492,23 +516,34 @@ func (mg *Gateway) Carry(host *resources.Host) (gw *Gateway, err error) {
 			return nil, err
 		}
 	}
-	mg.host.Carry(host)
+
+	_, err = mg.host.Carry(host)
+	if err != nil {
+		return nil, err
+	}
+
 	return mg, nil
 }
 
 // Get returns the *resources.Host linked to the metadata
-func (mg *Gateway) Get() *resources.Host {
+func (mg *Gateway) Get() (*resources.Host, error) {
 	if mg.host == nil {
-		panic("mg.host is nil!")
+		return nil, scerr.InvalidInstanceErrorWithMessage("mg.host is nil!")
 	}
-	return mg.host.Get()
+
+	mgm, err := mg.host.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	return mgm, nil
 }
 
 // Write updates the metadata corresponding to the network in the Object Storage
 // A Gateway is a particular host : we want it listed in hosts, but not listed as attached to the network
 func (mg *Gateway) Write() error {
 	if mg.host == nil {
-		panic("mg.host is nil!")
+		return scerr.InvalidInstanceErrorWithMessage("mg.host is nil!")
 	}
 	return mg.host.Write()
 }
@@ -536,7 +571,13 @@ func (mg *Gateway) Read() (err error) {
 			return err
 		}
 	}
-	err = mg.host.ReadByID(mg.network.Get().GatewayID)
+
+	mgm, err := mg.network.Get()
+	if err != nil {
+		return err
+	}
+
+	err = mg.host.ReadByID(mgm.GatewayID)
 	if err != nil {
 		return err
 	}
@@ -581,7 +622,13 @@ func (mg *Gateway) Delete() (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mg.network.Acquire()
-	mg.network.Get().GatewayID = ""
+
+	mgm, err := mg.network.Get()
+	if err != nil {
+		return err
+	}
+
+	mgm.GatewayID = ""
 	err = mg.network.Write()
 	mg.network.Release()
 	if err != nil {
@@ -678,7 +725,13 @@ func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *
 		}
 		return nil, err
 	}
-	mn.Get().GatewayID = host.ID
+
+	mnm, err := mn.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	mnm.GatewayID = host.ID
 	err = mn.Write()
 	if err != nil {
 		return nil, err

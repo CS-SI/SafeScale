@@ -157,13 +157,13 @@ type Shard struct {
 }
 
 // NewShard return a new Shard
-func NewShard(bucket objectstorage.Bucket) *Shard {
+func NewShard(bucket objectstorage.Bucket) (*Shard, error) {
 	var name string
 	var err error
 
 	for i := 0; ; i++ {
 		if i > 10 {
-			panic(fmt.Sprintf("Issue on random shard name generations (or extremely++ unlucky)  : %v", err))
+			return nil, fmt.Errorf("Issue on random shard name generations (or extremely++ unlucky)  : %v", err)
 		}
 		// To be accepted by a maximum of objects storage providers, passwords should be generated without symbols
 		if name, err = generateAesPassword(false); err != nil {
@@ -179,7 +179,7 @@ func NewShard(bucket objectstorage.Bucket) *Shard {
 		Name:       name,
 		BucketName: bucket.GetName(),
 	}
-	return &shard
+	return &shard, nil
 }
 
 // GetStorageInfo return the name and bucket name of the shard
@@ -320,8 +320,8 @@ func (cg *ChunkGroup) GetNbBatchs() int {
 	return int(math.Ceil(float64(cg.NbDataShards) / float64(cg.NbDataShardsPerBatch)))
 }
 
-//InitShards initalize the shard array and return the number of data shards and parity shards
-func (cg *ChunkGroup) InitShards(chunkSize int, maxBatchSize int, ratioNumerator int, ratioDenominator int, bucketGenerator *BucketGenerator) (int, int, error) {
+//InitShards initialize the shard array and return the number of data shards and parity shards
+func (cg *ChunkGroup) InitShards(chunkSize int, maxBatchSize int, ratioNumerator int, ratioDenominator int, bucketGenerator *BucketGenerator) (dataShards int, parityShards int, err error) {
 	cg.ChunkSize = chunkSize
 	cg.PaddingSize = chunkSize - int(cg.FileSize%int64(chunkSize))
 
@@ -337,7 +337,10 @@ func (cg *ChunkGroup) InitShards(chunkSize int, maxBatchSize int, ratioNumerator
 
 	cg.Shards = make([]*Shard, cg.NbDataShards+cg.NbParityShards)
 	for i := range cg.Shards {
-		cg.Shards[i] = NewShard(bucketGenerator.Next())
+		cg.Shards[i], err = NewShard(bucketGenerator.Next())
+		if err != nil {
+			return 0, 0, err
+		}
 	}
 
 	// determine batch size:

@@ -89,7 +89,13 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	if mh == nil {
 		return resources.ResourceNotFoundError("host", ref)
 	}
-	id := mh.Get().ID
+
+	mhm, err := mh.Get()
+	if err != nil {
+		return err
+	}
+
+	id := mhm.ID
 	err = handler.service.StartHost(id)
 	if err != nil {
 		switch err.(type) {
@@ -126,7 +132,13 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	if mh == nil {
 		return resources.ResourceNotFoundError("host", ref)
 	}
-	id := mh.Get().ID
+
+	mhm, err := mh.Get()
+	if err != nil {
+		return err
+	}
+
+	id := mhm.ID
 	err = handler.service.StopHost(id)
 	if err != nil {
 		switch err.(type) {
@@ -162,7 +174,12 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	if mh == nil {
 		return fmt.Errorf("host '%s' not found", ref)
 	}
-	id := mh.Get().ID
+	mhm, err := mh.Get()
+	if err != nil {
+		return err
+	}
+
+	id := mhm.ID
 	err = handler.service.RebootHost(id)
 	if err != nil {
 		switch err.(type) {
@@ -206,7 +223,12 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 		return nil, resources.ResourceNotFoundError("host", ref)
 	}
 
-	id := mh.Get().ID
+	mhm, err := mh.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	id := mhm.ID
 	hostSizeRequest := resources.SizingRequirements{
 		MinDiskSize: disk,
 		MinRAMSize:  ram,
@@ -216,7 +238,10 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	}
 
 	// TODO RESIZE 1st check new requirements vs old requirements
-	host := mh.Get()
+	host, err := mh.Get()
+	if err != nil {
+		return nil, err
+	}
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
@@ -340,7 +365,10 @@ func (handler *HostHandler) Create(
 		if mgw == nil {
 			return nil, fmt.Errorf("failed to find gateway of network '%s'", net)
 		}
-		primaryGateway = mgw.Get()
+		primaryGateway, err = mgw.Get()
+		if err != nil {
+			return nil, err
+		}
 		if defaultNetwork.VIP != nil {
 			defaultRouteIP = defaultNetwork.VIP.PrivateIP
 		} else {
@@ -465,7 +493,13 @@ func (handler *HostHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	err = mh.Carry(host).Write()
+
+	ch, err := mh.Carry(host)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ch.Write()
 	if err != nil {
 		return nil, err
 	}
@@ -549,7 +583,12 @@ func (handler *HostHandler) Create(
 			if len(networks) > 0 {
 				mgw, err := metadata.LoadGateway(handler.service, defaultNetworkID)
 				if err == nil {
-					gatewayID = mgw.Get().ID
+					mgwm, merr := mgw.Get()
+					if merr != nil {
+						return merr
+					}
+
+					gatewayID = mgwm.ID
 				}
 			}
 		}
@@ -560,7 +599,10 @@ func (handler *HostHandler) Create(
 			if err != nil {
 				return err
 			}
-			network := mn.Get()
+			network, err := mn.Get()
+			if err != nil {
+				return err
+			}
 			hostNetworkV1.NetworksByID[network.ID] = network.Name
 			hostNetworkV1.NetworksByName[network.Name] = network.ID
 		}
@@ -816,7 +858,10 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 		return nil, err
 	}
 
-	host = mh.Get()
+	host, err = mh.Get()
+	if err != nil {
+		return nil, err
+	}
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
@@ -848,7 +893,10 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		return err
 	}
 
-	host := mh.Get()
+	host, err := mh.Get()
+	if err != nil {
+		return err
+	}
 	// Don't remove a host having shares that are currently remotely mounted
 	var shares map[string]*propsv1.HostShare
 	err = host.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {

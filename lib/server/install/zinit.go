@@ -18,8 +18,8 @@ package install
 
 import (
 	"fmt"
-
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -63,8 +63,9 @@ func init() {
 		for k := range installers {
 			method, err := Method.Parse(k)
 			if err != nil {
-				panic(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install method '%s' unknown!",
+				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install method '%s' unknown!",
 					item.DisplayName(), item.DisplayFilename(), k))
+				continue
 			}
 			if _, found := availableEmbeddedMap[method]; !found {
 				availableEmbeddedMap[method] = map[string]*Feature{

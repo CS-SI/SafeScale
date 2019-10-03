@@ -54,9 +54,9 @@ func NewHost(svc iaas.Service) (*Host, error) {
 }
 
 // Carry links an host instance to the Metadata instance
-func (mh *Host) Carry(host *resources.Host) *Host {
+func (mh *Host) Carry(host *resources.Host) (*Host, error) {
 	if host == nil {
-		panic("host is nil!")
+		return nil, scerr.InvalidParameterError("host", "cannot be nil!")
 	}
 	if host.Properties == nil {
 		host.Properties = serialize.NewJSONProperties("resources")
@@ -64,15 +64,17 @@ func (mh *Host) Carry(host *resources.Host) *Host {
 	mh.item.Carry(host)
 	mh.name = &host.Name
 	mh.id = &host.ID
-	return mh
+	return mh, nil
 }
 
 // Get returns the Network instance linked to metadata
-func (mh *Host) Get() *resources.Host {
+func (mh *Host) Get() (*resources.Host, error) {
 	if mh.item == nil {
-		panic("m.item is nil!")
+		return nil, scerr.InvalidInstanceErrorWithMessage("mh.item cannot be nil!")
 	}
-	return mh.item.Get().(*resources.Host)
+
+	gh := mh.item.Get().(*resources.Host)
+	return gh, nil
 }
 
 // Write updates the metadata corresponding to the host in the Object Storage
@@ -232,7 +234,13 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = mh.Carry(host).Write()
+
+	ch, err := mh.Carry(host)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ch.Write()
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +283,13 @@ func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 	if err != nil {
 		return err
 	}
-	return mh.Carry(host).Delete()
+
+	ch, err := mh.Carry(host)
+	if err != nil {
+		return err
+	}
+
+	return ch.Delete()
 }
 
 // LoadHost gets the host definition from Object Storage

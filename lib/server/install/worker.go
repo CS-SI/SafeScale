@@ -714,7 +714,10 @@ func (w *worker) setReverseProxy() (err error) {
 		return err
 	}
 
-	network := mn.Get()
+	network, err := mn.Get()
+	if err != nil {
+		return err
+	}
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
 		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())

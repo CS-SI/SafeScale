@@ -9,7 +9,7 @@ import (
 )
 
 func Clean() {
-	db := model.NewDataAccess("sqlite3", "/tmp/test.db").Get()
+	db, _ := model.NewDataAccess("sqlite3", "/tmp/test.db").Get()
 	defer func() {
 		_ = db.Close()
 	}()
@@ -19,7 +19,10 @@ func Clean() {
 func TestModel(t *testing.T) {
 	Clean()
 	da := model.NewDataAccess("sqlite3", "/tmp/test.db")
-	db := da.Get().Debug()
+	dag, err := da.Get()
+	assert.Nil(t, err)
+
+	db := dag.Debug()
 	defer func() {
 		_ = db.Close()
 	}()
@@ -56,7 +59,8 @@ func TestModel(t *testing.T) {
 	var roles []model.Role
 	assert.Nil(t, db.Model(&usr1).Where(&model.Role{ServiceID: srv1.ID}).Preload("AccessPermissions").Related(&roles, "Roles").Error)
 	assert.Equal(t, 1, len(roles))
-	perms := da.GetUserAccessPermissionsByService("user@c-s.fr", "srv1")
+	perms, err := da.GetUserAccessPermissionsByService("user@c-s.fr", "srv1")
+	assert.Nil(t, err)
 	fmt.Println(perms)
 
 }

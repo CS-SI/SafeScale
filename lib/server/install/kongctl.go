@@ -80,7 +80,10 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		if err != nil {
 			return nil, err
 		}
-		addressedGateway = mh.Get()
+		addressedGateway, err = mh.Get()
+		if err != nil {
+			return nil, err
+		}
 		if addressedGateway == nil {
 			return nil, fmt.Errorf("error getting data of primary gateway")
 		}
@@ -92,7 +95,11 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		if err != nil {
 			return nil, err
 		}
-		addressedGateway = mh.Get()
+		addressedGateway, err = mh.Get()
+		if err != nil {
+			return nil, err
+		}
+
 		if addressedGateway == nil {
 			return nil, fmt.Errorf("error getting data of secondary gateway")
 		}
