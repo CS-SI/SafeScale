@@ -166,7 +166,11 @@ func main() {
 			utils.Verbose = true
 		}
 		if c.GlobalBool("debug") {
-			log.SetLevel(log.DebugLevel)
+			if c.GlobalBool("verbose") {
+				log.SetLevel(log.TraceLevel)
+			} else {
+				log.SetLevel(log.DebugLevel)
+			}
 			utils.Debug = true
 		}
 		return nil
