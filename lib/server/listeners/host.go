@@ -68,20 +68,20 @@ type StoredCPUInfo struct {
 func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.InvalidParameterError("ref", "can't be empty string")
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "can't be empty string").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
-		return empty, fmt.Errorf("failed to register the process : %s", err.Error())
+		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -104,16 +104,16 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.InvalidParameterError("ref", "can't be empty string")
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "can't be empty string").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop Host "+ref); err == nil {
@@ -140,16 +140,16 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.InvalidParameterError("ref", "can't be empty string")
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "can't be empty string").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -176,13 +176,13 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 // List lists hosts managed by SafeScale only, or all hosts.
 func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb.HostList, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	all := in.GetAll()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -214,16 +214,16 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 // Create creates a new host
 func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb.Host, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	name := in.GetName()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create Host "+in.GetName()); err == nil {
@@ -272,16 +272,16 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 // Resize an host
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb.Host, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	name := in.GetName()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Resize Host "+name); err == nil {
@@ -313,10 +313,10 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 // Status returns the status of a host (running or stopped mainly)
 func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.HostStatus, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -324,8 +324,8 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Status of Host "+in.GetName()); err == nil {
@@ -349,10 +349,10 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 // Inspect an host
 func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Host, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -360,8 +360,8 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect Host "+in.GetName()); err == nil {
@@ -386,10 +386,10 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "can't be nil")
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -397,8 +397,8 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete Host "+in.GetName()); err == nil {
@@ -423,10 +423,10 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 // SSH returns ssh parameters to access an host
 func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshConfig, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -434,8 +434,8 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH config of Host "+in.GetName()); err == nil {

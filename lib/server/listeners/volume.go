@@ -53,18 +53,16 @@ type VolumeListener struct{}
 // List the available volumes
 func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ *pb.VolumeList, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	all := in.GetAll()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -96,12 +94,10 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 // Create a new volume
 func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_ *pb.Volume, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	name := in.GetName()
 	speed := in.GetSpeed()
@@ -109,13 +105,12 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
-		// FIXME: return a status.Errorf
-		return nil, fmt.Errorf("failed to register the process : %s", err.Error())
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
 	}
 	defer srvutils.JobDeregister(ctx)
 
@@ -139,12 +134,10 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *google_protobuf.Empty, err error) {
 	empty := &google_protobuf.Empty{}
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return empty, scerr.InvalidInstanceError()
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return empty, scerr.InvalidParameterError("in", "can't be nil")
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
@@ -167,14 +160,13 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr), true)
-	defer tracer.WithStopwatch().GoingIn().OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	err = srvutils.JobRegister(ctx, cancelFunc, "Volumes Attach "+volumeRef+" to host "+hostRef)
 	if err != nil {
-		// FIXME: return a status.Errorf
-		return empty, fmt.Errorf("failed to register the process : %s", err.Error())
+		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
 	}
 	defer srvutils.JobDeregister(ctx)
 
@@ -197,12 +189,10 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_ *google_protobuf.Empty, err error) {
 	empty := &google_protobuf.Empty{}
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return empty, scerr.InvalidInstanceError()
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return empty, scerr.InvalidParameterError("in", "can't be nil")
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
@@ -214,8 +204,8 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -243,12 +233,10 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *google_protobuf.Empty, err error) {
 	empty := &google_protobuf.Empty{}
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return empty, scerr.InvalidInstanceError()
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return empty, scerr.InvalidParameterError("in", "can't be nil")
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -256,8 +244,8 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -283,12 +271,10 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 // Inspect a volume
 func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.VolumeInfo, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidInstanceError()
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		// FIXME: return a status.Errorf
-		return nil, scerr.InvalidParameterError("in", "can't be nil")
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -296,8 +282,8 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
