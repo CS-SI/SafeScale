@@ -35,6 +35,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 const (
@@ -239,22 +240,44 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 
 		// Create upstream if it doesn't exist
 		url += ruleName
-		create := false
-		_, _, err = k.get(ruleName, url)
+		// create := false
+		// _, _, err = k.get(ruleName, url)
+		// if err != nil {
+		// 	if _, ok := err.(utils.ErrNotFound); !ok {
+		// 		return "", err
+		// 	}
+		// 	create = true
+		// }
+
+		// Separate upstream options from target settings
+		unjsoned := data.Map{}
+		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
-			if _, ok := err.(scerr.ErrNotFound); !ok {
-				return "", err
-			}
-			create = true
+			return ruleName, fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
-		if create {
-			err = k.createUpstream(ruleName, values)
-			if err != nil {
-				return "", err
+		options := data.Map{}
+		target := data.Map{}
+		for k, v := range unjsoned {
+			if k == "target" || k == "weight" {
+				target[k] = v
+				continue
 			}
+			if k == "tags" {
+				target[k] = v
+			}
+			options[k] = v
 		}
 
+		// if create {
+		err = k.createUpstream(ruleName, options, values)
+		if err != nil {
+			return ruleName, err
+		}
+		// }
+
 		// Now ready to add target to upstream
+		jsoned, _ := json.Marshal(&target)
+		content = string(jsoned)
 		url += "/targets"
 		_, _, err = k.post(ruleName, url, content, values, false)
 		if err != nil {
@@ -281,10 +304,9 @@ func (k *KongController) realizeRuleData(content string, v Variables) (string, e
 	return dataBuffer.String(), nil
 }
 
-func (k *KongController) createUpstream(name string, v *Variables) error {
-	upstreamData := map[string]string{"name": name}
-	jsoned, _ := json.Marshal(&upstreamData)
-	response, _, err := k.post(name, "upstreams/", string(jsoned), v, true)
+func (k *KongController) createUpstream(name string, options data.Map, v *Variables) error {
+	jsoned, _ := json.Marshal(&options)
+	response, _, err := k.put(name, "upstreams/"+name, string(jsoned), v, true)
 	if response == nil && err != nil {
 		return err
 	}
