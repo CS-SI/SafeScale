@@ -100,7 +100,6 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			// FIXME Retrieve Cause
 			return -1, "", "", retryErr
 		}
 		return -1, "", "", retryErr
