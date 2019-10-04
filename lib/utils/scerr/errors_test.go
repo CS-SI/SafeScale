@@ -53,7 +53,7 @@ func TestLogErrorWithLevelChaos(t *testing.T) {
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
 
-	if !strings.Contains(string(out), "WITH ERROR") {
+	if !strings.Contains(string(out), errorOccurred) {
 		t.Fail()
 	}
 }
@@ -72,7 +72,7 @@ func TestLogErrorWithLevelOrder(t *testing.T) {
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
 
-	if strings.Contains(string(out), "WITH ERROR") {
+	if strings.Contains(string(out), errorOccurred) {
 		t.Fail()
 	}
 }
