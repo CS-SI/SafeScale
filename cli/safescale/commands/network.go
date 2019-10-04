@@ -128,6 +128,11 @@ var networkInspect = cli.Command{
 				mapped["secondary_gateway_name"] = "<unknown>"
 			}
 		}
+		// Removed entry virtual_ip if empty
+		if len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+			delete(mapped, "virtual_ip")
+		}
+
 		return clitools.SuccessResponse(mapped)
 	},
 }
