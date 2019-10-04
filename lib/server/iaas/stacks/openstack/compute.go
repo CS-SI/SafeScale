@@ -654,7 +654,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 				net, err := s.GetNetworkByName(netname)
 				if err != nil {
-					logrus.Debugf("failed to get data for network '%s'", netname)
+					logrus.Debugf("failed to get data for network '%s'", netname) // FIXME complementHost should be a failure
 					continue
 				}
 				networksByID[net.ID] = ""
@@ -685,9 +685,9 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				if err != nil {
 					switch err.(type) {
 					case scerr.ErrNotFound:
-						logrus.Errorf(err.Error())
+						logrus.Errorf(err.Error()) // FIXME complementHost should be a failure
 					default:
-						logrus.Errorf("failed to get network '%s': %v", netid, err)
+						logrus.Errorf("failed to get network '%s': %v", netid, err) // FIXME complementHost should be a failure
 					}
 					continue
 				}
