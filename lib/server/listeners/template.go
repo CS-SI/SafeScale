@@ -58,7 +58,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list templates: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list templates: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list templates: no tenant set")
 	}
 
 	handler := TemplateHandler(tenant.Service)

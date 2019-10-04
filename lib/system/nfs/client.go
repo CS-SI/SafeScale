@@ -31,7 +31,7 @@ type Client struct {
 // NewNFSClient creates a new NFS client instance
 func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 	if sshconfig == nil {
-		return nil, fmt.Errorf("invalid parameter: 'sshconfig' can't be nil")
+		return nil, fmt.Errorf("invalid parameter: 'sshconfig' cannot be nil")
 	}
 
 	client := &Client{

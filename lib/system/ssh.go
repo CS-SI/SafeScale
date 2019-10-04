@@ -662,10 +662,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		return "", scerr.InvalidInstanceError()
 	}
 	if phase == "" {
-		return "", scerr.InvalidParameterError("phase", "can't be empty string")
+		return "", scerr.InvalidParameterError("phase", "cannot be empty string")
 	}
 	if ssh.Host == "" {
-		return "", scerr.InvalidParameterError("ssh.Host", "can't be empty string")
+		return "", scerr.InvalidParameterError("ssh.Host", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), true).GoingIn().OnExitTrace()()
