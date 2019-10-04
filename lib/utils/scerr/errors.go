@@ -698,7 +698,8 @@ func getPartToRemove() string {
 // ----------- log helpers ---------------
 
 const (
-	outputErrorTemplate = "%s WITH ERROR [%+v]"
+	errorOccurred       = "ERROR OCCURRED"
+	outputErrorTemplate = "%s " + errorOccurred + ": %+v"
 )
 
 // OnExitLogErrorWithLevel returns a function that will log error with the log level wanted
