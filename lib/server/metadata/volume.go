@@ -71,18 +71,18 @@ func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
 // Get returns the Volume instance linked to metadata
 func (mv *Volume) Get() (*resources.Volume, error) {
 	if mv.item == nil {
-		return nil, scerr.InvalidInstanceErrorWithMessage("mv.item is nil!")
+		return nil, scerr.InvalidInstanceContentError("mv.item", "cannot be nil!")
 	}
 	if volume, ok := mv.item.Get().(*resources.Volume); ok {
 		return volume, nil
 	}
-	return nil, scerr.InvalidInstanceErrorWithMessage("invalid content in volume metadata")
+	return nil, scerr.InvalidInstanceContentError("mv", "invalid content in volume metadata")
 }
 
 // Write updates the metadata corresponding to the volume in the Object Storage
 func (mv *Volume) Write() error {
 	if mv.item == nil {
-		return scerr.InvalidInstanceErrorWithMessage("mv.item cannot be nil!")
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil!")
 	}
 
 	err := mv.item.WriteInto(ByIDFolderName, *mv.id)
@@ -95,7 +95,7 @@ func (mv *Volume) Write() error {
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (mv *Volume) Reload() error {
 	if mv.item == nil {
-		return scerr.InvalidInstanceErrorWithMessage("mv.item cannot be nil!")
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil!")
 	}
 	err := mv.ReadByID(*mv.id)
 	if err != nil {
@@ -194,8 +194,9 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) error {
 // SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err error) {
 	if svc == nil {
-		return nil, utils.InvalidParameterError("svc", "")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
+
 	mv, err = NewVolume(svc)
 	if err != nil {
 		return nil, err

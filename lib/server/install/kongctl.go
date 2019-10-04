@@ -314,8 +314,8 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 			return err
 		}
 	}
-	if data, ok := result["data"].([]interface{}); ok && len(data) > 0 {
-		for _, i := range data {
+	if kongdata, ok := result["data"].([]interface{}); ok && len(kongdata) > 0 {
+		for _, i := range kongdata {
 			plugin := i.(map[string]interface{})
 			if plugin["name"] == "ip-restriction" {
 				ref = plugin["id"].(string)
@@ -324,13 +324,13 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 		}
 	}
 
-	// Build data to submit to kong
-	data := map[string]interface{}{
+	// Build kongdata to submit to kong
+	kongdata := map[string]interface{}{
 		"name":       "ip-restriction",
 		resourceType: map[string]interface{}{"id": resourceID},
 		"config":     sourceControl,
 	}
-	jsoned, _ := json.Marshal(&data)
+	jsoned, _ := json.Marshal(&kongdata)
 
 	// Create or patch plugin ip-restriction
 	if ref == "" {
@@ -347,11 +347,11 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 }
 
 func (k *KongController) buildSourceControlContent(rules map[string]interface{}) string {
-	data := map[string]interface{}{
+	kongdata := map[string]interface{}{
 		"config": rules,
 	}
-	data["name"] = "ip-restriction"
-	jsoned, _ := json.Marshal(&data)
+	kongdata["name"] = "ip-restriction"
+	jsoned, _ := json.Marshal(&kongdata)
 	return string(jsoned)
 }
 

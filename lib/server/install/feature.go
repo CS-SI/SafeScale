@@ -550,7 +550,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 			host = hT.host
 		}
 		if host == nil {
-			return scerr.InvalidParameteError("t", "must be a HostTarget or NodeTarget")
+			return scerr.InvalidParameterError("t", "must be a HostTarget or NodeTarget")
 		}
 
 		// v["Hostname"] = host.Name
