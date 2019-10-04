@@ -104,21 +104,17 @@ var networkInspect = cli.Command{
 		}
 
 		// Convert struct to map using struct to json then json to map
-		jsoned, err := json.Marshal(network)
-		if err != nil {
-
-		}
+		// errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
 		mapped := map[string]interface{}{}
-		err = json.Unmarshal(jsoned, &mapped)
-		if err != nil {
+		jsoned, _ := json.Marshal(network)
+		_ = json.Unmarshal(jsoned, &mapped)
 
-		}
-		// Get gateway(s) information (needs the name)
+		// Get gateway(s) information (needs the name(s) in the output map)
 		var pgw, sgw *pb.Host
 		pgwID := network.GetGatewayId()
 		sgwID := network.GetSecondaryGatewayId()
 		pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())
-		if err != nil {
+		if err == nil {
 			mapped["gateway_name"] = pgw.Name
 		} else {
 			mapped["gateway_name"] = "<unknown>"
@@ -132,7 +128,7 @@ var networkInspect = cli.Command{
 				mapped["secondary_gateway_name"] = "<unknown>"
 			}
 		}
-		return clitools.SuccessResponse(network)
+		return clitools.SuccessResponse(mapped)
 	},
 }
 
