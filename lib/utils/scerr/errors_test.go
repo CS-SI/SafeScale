@@ -2,6 +2,7 @@ package scerr
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -100,5 +101,51 @@ func TestLogErrorWithPanic(t *testing.T) {
 		if !strings.Contains(message, "Ouch") {
 			t.Errorf("Panic should contain panic info...")
 		}
+	}
+}
+
+func lazyDevsWithCaveat() error {
+	return NotImplementedErrorWithReason("LazyDevsWithCaveat() not implemented yet!", "API not ready").WithField("provider", "Juawei")
+}
+
+func lazyDevsPlainAndSimple() error {
+	return NotImplementedError("").WithField("provider", "Juawei")
+}
+
+func moreLazyErrors() error {
+	return NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
+}
+
+func TestWithFields(t *testing.T) {
+	x := lazyDevsWithCaveat()
+	assert.NotNil(t, x)
+
+	errct := x.Error()
+	if !strings.Contains(errct, "Lazy") {
+		t.Errorf("We lost the what ! : %s", errct)
+	}
+	if !strings.Contains(errct, "API not ready") {
+		t.Errorf("We lost the why ! : %s", errct)
+	}
+
+	x = lazyDevsPlainAndSimple()
+	assert.NotNil(t, x)
+
+	errct = x.Error()
+	if !strings.Contains(errct, "lazyDevsPlainAndSimple") {
+		t.Errorf("We lost the function name ! : %s", errct)
+	}
+}
+
+func TestWithFieldsAgain(t *testing.T) {
+	x := moreLazyErrors()
+	assert.NotNil(t, x)
+
+	errct := x.Error()
+	if !strings.Contains(errct, "master-x") {
+		t.Errorf("We lost a key ! : %s", errct)
+	}
+	if !strings.Contains(errct, "OWH") {
+		t.Errorf("We lost a value ! : %s", errct)
 	}
 }
