@@ -96,18 +96,28 @@ func (r *response) Failure(err error) error {
 // Display ...
 func (r *response) Display() {
 	out, err := json.Marshal(r.getDisplayResponse())
-	if err == nil {
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			if r.Status == CmdStatus.FAILURE {
-				log.Error(string(out))
-			} else {
-				log.Warn(string(out))
-			}
-		}
-		fmt.Println(string(out))
-	} else {
+	if err != nil {
 		log.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
+		return
 	}
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if r.Status == CmdStatus.FAILURE {
+			log.Error(string(out))
+		} else {
+			log.Warn(string(out))
+		}
+	}
+
+	// Removed error if it's nil
+	mapped := map[string]interface{}{}
+	_ = json.Unmarshal(out, &mapped)
+	if mapped["error"] == nil {
+		delete(mapped, "error")
+	}
+
+	out, _ = json.Marshal(mapped)
+	fmt.Println(string(out))
 }
 
 // getDisplayResponse ...
