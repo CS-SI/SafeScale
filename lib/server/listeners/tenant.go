@@ -120,7 +120,7 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (tn
 	getCurrentTenant()
 	if currentTenant == nil {
 		log.Info("Can't get tenant: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't get tenant: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot get tenant: no tenant set")
 	}
 	return &pb.TenantName{Name: currentTenant.name}, nil
 }
@@ -132,7 +132,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	name := in.GetName()
 	// FIXME: validate parameters
@@ -251,7 +251,7 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 	getCurrentStorageTenants()
 	if currentStorageTenants == nil {
 		log.Info("Can't get storage tenants: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't get storage tenants: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot get storage tenants: no tenant set")
 	}
 
 	return &pb.TenantNameList{Names: currentStorageTenants.names}, nil
@@ -264,7 +264,7 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()

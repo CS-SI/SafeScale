@@ -148,7 +148,7 @@ key | description | subkeys | values | mandatory
 ----- | ----- | ----- | ----- | -----
 `suitableFor`    | Describe where the feature could be installed | host <br> cluster | - | True
 host    |  Allow the feature to be installed on a single host  | - | true <br> false | True
-cluster    |  Allow the feature to be installed on a cluster flavor   | - |  false (can't be installed on any flavor)<br> any (can be installed on any flavor)<br> boh <br> dcos <br> k8s <br> ohpc <br> swarm <br> *Multiples flavors can be allowed separated with a comma; ex: (swarm,boh)* | True
+cluster    |  Allow the feature to be installed on a cluster flavor   | - |  false (cannot be installed on any flavor)<br> any (can be installed on any flavor)<br> boh <br> dcos <br> k8s <br> ohpc <br> swarm <br> *Multiples flavors can be allowed separated with a comma; ex: (swarm,boh)* | True
 `requirements`   | Describe requirements for the feature to works properly | features <br> clusterSizing | - | False
 features    | Features who should be installed before to start   | -  |  feature_list | False
 clusterSizing    | ? |  ? | ? | False

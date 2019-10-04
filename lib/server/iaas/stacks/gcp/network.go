@@ -287,7 +287,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 		if err != nil {
-			return networks, fmt.Errorf("can't list networks ...: %s", err)
+			return networks, fmt.Errorf("cannot list networks ...: %s", err)
 		}
 
 		for _, nett := range resp.Items {
@@ -306,7 +306,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).PageToken(token).Do()
 		if err != nil {
-			return networks, fmt.Errorf("can't list subnetworks ...: %s", err)
+			return networks, fmt.Errorf("cannot list subnetworks ...: %s", err)
 		}
 
 		for _, nett := range resp.Items {
@@ -432,7 +432,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "can't be nil")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {

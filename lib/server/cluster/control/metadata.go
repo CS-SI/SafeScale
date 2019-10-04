@@ -72,11 +72,11 @@ func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 		return m
 	}
 	if m.item == nil {
-		err = scerr.InvalidParameterError("m.item", "can't be nil")
+		err = scerr.InvalidParameterError("m.item", "cannot be nil")
 		return m
 	}
 	if cluster == nil {
-		err = scerr.InvalidParameterError("cluster", "can't be nil")
+		err = scerr.InvalidParameterError("cluster", "cannot be nil")
 		return m
 	}
 
@@ -91,7 +91,7 @@ func (m *Metadata) Delete() error {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	err := m.item.Delete(m.name)
@@ -149,7 +149,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	// If the metadata object has never been written yet, succeed doing nothing
@@ -190,7 +190,7 @@ func (m *Metadata) Get() (_ *Controller, err error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return nil, scerr.InvalidParameterError("m.item", "can't be nil")
+		return nil, scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 	if p, ok := m.item.Get().(*Controller); ok {
 		return p, nil
@@ -221,7 +221,7 @@ func (m *Metadata) Browse(callback func(*Controller) error) error {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	return m.item.Browse(func(buf []byte) error {

@@ -157,7 +157,7 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 		return tg.result, tg.task.err
 	}
 	if tg.task.status != RUNNING {
-		return nil, fmt.Errorf("can't wait task group '%s': not running", tid)
+		return nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
 	}
 
 	errs := make(map[string]string)
@@ -194,7 +194,7 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
 	tid, _ := tg.GetID() // FIXME Later
 
 	if tg.task.status != RUNNING {
-		return false, nil, fmt.Errorf("can't wait task group '%s': not running", tid)
+		return false, nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
 	}
 	for _, s := range tg.subtasks {
 		ok, _, _ := s.TryWait()
@@ -208,12 +208,12 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
 
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
-// By design, duration can't be less than 1ms.
+// By design, duration cannot be less than 1ms.
 func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	tid, _ := tg.GetID() // FIXME Later
 
 	if tg.task.status != RUNNING {
-		return false, nil, fmt.Errorf("can't wait task '%s': not running", tid)
+		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
 	}
 
 	if duration < time.Millisecond {

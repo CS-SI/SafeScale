@@ -305,7 +305,7 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, t.err
 	}
 	if status != RUNNING {
-		return nil, fmt.Errorf("can't wait task '%s': not running (%d)", tid, status)
+		return nil, fmt.Errorf("cannot wait task '%s': not running (%d)", tid, status)
 	}
 	<-t.finishCh
 
@@ -333,7 +333,7 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fmt.Errorf("can't wait task '%s': not running", tid)
+		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
 	}
 	if len(t.finishCh) == 1 {
 		_, err := t.Wait()
@@ -357,7 +357,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fmt.Errorf("can't wait task '%s': not running", tid)
+		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
 	}
 
 	for {

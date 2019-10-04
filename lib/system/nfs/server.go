@@ -32,7 +32,7 @@ type Server struct {
 // NewServer instantiates a new nfs.Server struct
 func NewServer(sshconfig *system.SSHConfig) (srv *Server, err error) {
 	if sshconfig == nil {
-		return nil, scerr.InvalidParameterError("sshconfig", "can't be nil")
+		return nil, scerr.InvalidParameterError("sshconfig", "cannot be nil")
 	}
 
 	server := Server{
@@ -87,7 +87,7 @@ func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSqu
 		case "krb5p":
 			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5p)
 		default:
-			return fmt.Errorf("can't add the share, %s is not a valid security mode", securityMode)
+			return fmt.Errorf("cannot add the share, %s is not a valid security mode", securityMode)
 		}
 	}
 

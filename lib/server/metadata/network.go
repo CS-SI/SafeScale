@@ -66,19 +66,25 @@ func (m *Network) GetService() iaas.Service {
 
 // GetPath returns the path in Object Storage where the item is stored
 func (m *Network) GetPath() (string, error) {
+	if m == nil {
+		return "", scerr.InvalidInstanceError()
+	}
 	if m.item == nil {
-		return "", scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
+		return "", scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 	return m.item.GetPath(), nil
 }
 
 // Carry links a Network instance to the Metadata instance
 func (m *Network) Carry(network *resources.Network) (*Network, error) {
+	if m == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if network == nil {
-		return nil, scerr.InvalidParameterError("network", "cannot be nil!")
+		return nil, scerr.InvalidParameterError("network", "cannot be nil")
 	}
 	if m.item == nil {
-		return nil, scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
+		return nil, scerr.InvalidParameterError("m.item", "m.item cannot be nil")
 	}
 	if network.Properties == nil {
 		network.Properties = serialize.NewJSONProperties("resources")
@@ -92,8 +98,11 @@ func (m *Network) Carry(network *resources.Network) (*Network, error) {
 
 // Get returns the resources.Network instance linked to metadata
 func (m *Network) Get() (*resources.Network, error) {
+	if m == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if m.item == nil {
-		return nil, scerr.InvalidInstanceErrorWithMessage("m.item is nil!")
+		return nil, scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 	return m.item.Get().(*resources.Network), nil
 }
@@ -104,7 +113,7 @@ func (m *Network) Write() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -161,7 +170,7 @@ func (m *Network) ReadByID(id string) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
@@ -191,10 +200,10 @@ func (m *Network) ReadByName(name string) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "can't be empty string")
+		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+name+")", true).GoingIn()
@@ -224,7 +233,7 @@ func (m *Network) Delete() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -252,10 +261,10 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "can't be nil")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 	if callback == nil {
-		return scerr.InvalidParameterError("callback", "can't be nil")
+		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -278,7 +287,7 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+host.Name+")", true).GoingIn()
@@ -303,7 +312,7 @@ func (m *Network) DetachHost(hostID string) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if hostID == "" {
-		return scerr.InvalidParameterError("hostID", "can't be empty string")
+		return scerr.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "('"+hostID+"')", true).GoingIn()
@@ -381,10 +390,10 @@ func (m *Network) Release() {
 // SaveNetwork saves the Network definition in Object Storage
 func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if net == nil {
-		return nil, scerr.InvalidParameterError("net", "can't be nil")
+		return nil, scerr.InvalidParameterError("net", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -407,10 +416,10 @@ func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err err
 // RemoveNetwork removes the Network definition from Object Storage
 func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
 	if svc == nil {
-		return scerr.InvalidParameterError("svc", "can't be nil")
+		return scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if net == nil {
-		return scerr.InvalidParameterError("net", "can't be nil")
+		return scerr.InvalidParameterError("net", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, "+net.Name+")", true).GoingIn()
@@ -436,10 +445,10 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
 //        If retry times out, return errNotFound
 func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "can't be empty string")
+		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+ref+"')", true).GoingIn()
@@ -481,10 +490,10 @@ type Gateway struct {
 // NewGateway creates an instance of metadata.Gateway
 func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if networkID == "" {
-		return nil, scerr.InvalidParameterError("networkID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
@@ -527,8 +536,11 @@ func (mg *Gateway) Carry(host *resources.Host) (gw *Gateway, err error) {
 
 // Get returns the *resources.Host linked to the metadata
 func (mg *Gateway) Get() (*resources.Host, error) {
+	if mg == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if mg.host == nil {
-		return nil, scerr.InvalidInstanceErrorWithMessage("mg.host is nil!")
+		return nil, scerr.InvalidInstanceContentError("mg.host", "cannot be nil")
 	}
 
 	mgm, err := mg.host.Get()
@@ -543,7 +555,7 @@ func (mg *Gateway) Get() (*resources.Host, error) {
 // A Gateway is a particular host : we want it listed in hosts, but not listed as attached to the network
 func (mg *Gateway) Write() error {
 	if mg.host == nil {
-		return scerr.InvalidInstanceErrorWithMessage("mg.host is nil!")
+		return scerr.InvalidInstanceContentError("mg.host", "cannot be nil")
 	}
 	return mg.host.Write()
 }
@@ -554,7 +566,7 @@ func (mg *Gateway) Read() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if mg.network == nil {
-		return scerr.InvalidParameterError("mg.network", "can't be nil")
+		return scerr.InvalidParameterError("mg.network", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -611,10 +623,10 @@ func (mg *Gateway) Delete() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if mg.network == nil {
-		return scerr.InvalidParameterError("mg.network", "can't be nil")
+		return scerr.InvalidParameterError("mg.network", "cannot be nil")
 	}
 	if mg.host == nil {
-		return scerr.InvalidParameterError("mg.host", "can't be nil")
+		return scerr.InvalidParameterError("mg.host", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -652,10 +664,10 @@ func (mg *Gateway) Release() {
 // LoadGateway returns the metadata of the Gateway of a network
 func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if networkID == "" {
-		return nil, scerr.InvalidParameterError("networkID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
@@ -694,13 +706,13 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 // SaveGateway saves the metadata of a gateway
 func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *Gateway, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "can't be nil")
+		return nil, scerr.InvalidParameterError("host", "cannot be nil")
 	}
 	if networkID == "" {
-		return nil, scerr.InvalidParameterError("networkID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(<iaas.Service>, %s, '%s'", host.Name, networkID), true).GoingIn()

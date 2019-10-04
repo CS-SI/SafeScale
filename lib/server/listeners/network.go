@@ -55,7 +55,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	networkName := in.GetName()
 
@@ -71,7 +71,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		// log.Info("Can't create network: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't create network: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot create network: no tenant set")
 	}
 
 	var (
@@ -122,7 +122,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -139,7 +139,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		// log.Info("Can't list network: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list networks: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list networks: no tenant set")
 	}
 
 	handler := NetworkHandler(tenant.Service)
@@ -163,11 +163,11 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect network: neither name nor id given as reference")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -182,7 +182,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't inspect network: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect network: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: no tenant set")
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
@@ -191,7 +191,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if network == nil {
-		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("can't inspect network '%s': not found", ref))
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect network '%s': not found", ref))
 	}
 
 	return conv.ToPBNetwork(network), nil
@@ -203,11 +203,11 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect network: neither name nor id given as reference")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -222,7 +222,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		// log.Info("Can't delete network: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't delete network: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot delete network: no tenant set")
 	}
 
 	handler := NetworkHandler(currentTenant.Service)

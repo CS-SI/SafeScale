@@ -86,10 +86,10 @@ func (c *Controller) Restore(task concurrency.Task, f Foreman) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "can't be nil")
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if f == nil {
-		return scerr.InvalidParameterError("f", "can't be nil")
+		return scerr.InvalidParameterError("f", "cannot be nil")
 	}
 
 	c.Lock(task)
@@ -104,7 +104,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 		return scerr.InvalidInstanceError()
 	}
 	if f == nil {
-		return scerr.InvalidParameterError("f", "can't be nil")
+		return scerr.InvalidParameterError("f", "cannot be nil")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
@@ -426,7 +426,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 		return nil, scerr.InvalidInstanceError()
 	}
 	if hostID == "" {
-		return nil, scerr.InvalidParameterError("hostID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("hostID", "cannot be empty string")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
@@ -866,7 +866,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 		return scerr.InvalidInstanceError()
 	}
 	if hostID == "" {
-		return scerr.InvalidParameterError("hostID", "can't be empty string")
+		return scerr.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
@@ -970,7 +970,7 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 		return scerr.InvalidInstanceError()
 	}
 	if hostID == "" {
-		return scerr.InvalidParameterError("hostID", "can't be empty string")
+		return scerr.InvalidParameterError("hostID", "cannot be empty string")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
@@ -1020,7 +1020,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 		return scerr.InvalidInstanceError()
 	}
 	if node == nil {
-		return scerr.InvalidParameterError("node", "can't be nil")
+		return scerr.InvalidParameterError("node", "cannot be nil")
 	}
 	if task == nil {
 		task = concurrency.RootTask()

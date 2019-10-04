@@ -159,13 +159,13 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 // UploadFile uploads a file to remote host
 func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) (err error) {
 	if localpath == "" {
-		return scerr.InvalidParameterError("localpath", "can't be empty string")
+		return scerr.InvalidParameterError("localpath", "cannot be empty string")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 	if remotepath == "" {
-		return scerr.InvalidParameterError("remotepath", "can't be empty string")
+		return scerr.InvalidParameterError("remotepath", "cannot be empty string")
 	}
 
 	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
@@ -262,13 +262,13 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 // UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
 func UploadStringToRemoteFile(content string, host *pb.Host, filename string, owner, group, rights string) error {
 	if content == "" {
-		return scerr.InvalidParameterError("content", "can't be empty string")
+		return scerr.InvalidParameterError("content", "cannot be empty string")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 	if filename == "" {
-		return scerr.InvalidParameterError("filename", "can't be empty string")
+		return scerr.InvalidParameterError("filename", "cannot be empty string")
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {

@@ -17,8 +17,9 @@
 package metadata
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -145,10 +146,10 @@ func (i *Item) Read(name string, callback ItemDecoderCallback) error {
 // WriteInto saves the content of Item in a subfolder to the Object Storage
 func (i *Item) WriteInto(path string, name string) error {
 	if i == nil {
-		return scerr.InvalidInstanceErrorWithMessage("i cannot be nil!")
+		return scerr.InvalidInstanceError()
 	}
 	if i.payload == nil {
-		return scerr.InvalidInstanceErrorWithMessage("i.payload cannot be nil!")
+		return scerr.InvalidInstanceContentError("i.payload", "cannot be nil")
 	}
 	data, err := i.payload.Serialize()
 	if err != nil {

@@ -93,7 +93,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 		return nil, scerr.InvalidInstanceError()
 	}
 	if request.Name == "" {
-		return nil, scerr.InvalidParameterError("request.Name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("request.Name", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -175,7 +175,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -241,7 +241,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "("+id+")", true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -284,7 +284,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		return "", scerr.InvalidInstanceError()
 	}
 	if request.Name == "" {
-		return "", scerr.InvalidParameterError("request.Name", "can't be empty string")
+		return "", scerr.InvalidParameterError("request.Name", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "("+request.Name+")", true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -313,10 +313,10 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 		return nil, scerr.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return nil, scerr.InvalidParameterError("serverID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "('"+serverID+"', '"+id+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -339,7 +339,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 		return nil, scerr.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return nil, scerr.InvalidParameterError("serverID", "can't be empty string")
+		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "('"+serverID+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -373,10 +373,10 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return scerr.InvalidParameterError("serverID", "can't be empty string")
+		return scerr.InvalidParameterError("serverID", "cannot be empty string")
 	}
 	if vaID == "" {
-		return scerr.InvalidParameterError("vaID", "can't be empty string")
+		return scerr.InvalidParameterError("vaID", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, "('"+serverID+"', '"+vaID+"')", true).WithStopwatch().GoingIn().OnExitTrace()()

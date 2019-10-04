@@ -72,7 +72,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "can't be empty string").Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -87,7 +87,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't start host: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "can't start host: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot start host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -108,7 +108,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "can't be empty string").Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -123,7 +123,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't stop host: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "can't stop host: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot stop host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -144,7 +144,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "can't be empty string").Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Error())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -160,7 +160,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't reboot host: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "can't reboot host: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot reboot host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -193,7 +193,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list host: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list hosts: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list hosts: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -217,7 +217,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	name := in.GetName()
 
@@ -233,7 +233,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create host: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't create host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot create host: no tenant set")
 	}
 
 	var sizing *resources.SizingRequirements
@@ -275,7 +275,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	name := in.GetName()
 
@@ -291,7 +291,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't resize host: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't resize host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot resize host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -316,11 +316,11 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "can't get host status: neither name nor id given as reference")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -335,7 +335,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't get host status: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't get host status: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -352,11 +352,11 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "can't get host status: neither name nor id given as reference")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -371,13 +371,13 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't inspect host: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, fmt.Sprintf("can't inspect host: %v", err))
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("cannot inspect host: %v", err))
 	}
 	return srvutils.ToPBHost(host), nil
 }
@@ -389,11 +389,11 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, "can't get host status: neither name nor id given as reference")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -408,7 +408,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't delete host: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "can't delete host: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot delete host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
@@ -426,11 +426,11 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "can't get host status: neither name nor id given as reference")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -444,8 +444,8 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("can't delete host: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't ssh host: no tenant set")
+		log.Info("cannot delete host: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot ssh host: no tenant set")
 	}
 
 	handler := HostHandler(currentTenant.Service)

@@ -16,7 +16,7 @@
 
 package handlers
 
-//FIXME: iaas.Service became an interface, so can't be used as before.
+//FIXME: iaas.Service became an interface, so cannot be used as before.
 //       Need to write a service struct satisfying iaas.Service interface
 //       and then initializes an instance of this service struct
 //

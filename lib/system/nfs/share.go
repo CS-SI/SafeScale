@@ -59,7 +59,7 @@ type Share struct {
 //NewShare creates a share struct corresponding to the export of path on server
 func NewShare(server *Server, path string) (*Share, error) {
 	if path == "" {
-		return nil, fmt.Errorf("invalid parameter: 'path' can't be empty")
+		return nil, fmt.Errorf("invalid parameter: 'path' cannot be empty")
 	}
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("invalid parameter: 'path' must be absolute")
