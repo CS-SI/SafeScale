@@ -43,6 +43,10 @@ type Volume struct {
 
 // NewVolume creates an instance of metadata.Volume
 func NewVolume(svc iaas.Service) (*Volume, error) {
+	if svc == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	aVol, err := metadata.NewItem(svc, volumesFolderName)
 	if err != nil {
 		return nil, err
@@ -56,6 +60,12 @@ func NewVolume(svc iaas.Service) (*Volume, error) {
 
 // Carry links a Volume instance to the Metadata instance
 func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
+	if mv == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if mv.item == nil {
+		return nil, scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
 	if volume == nil {
 		return nil, scerr.InvalidParameterError("volume", "cannot be nil!")
 	}
@@ -70,17 +80,23 @@ func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
 
 // Get returns the Volume instance linked to metadata
 func (mv *Volume) Get() (*resources.Volume, error) {
+	if mv == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if mv.item == nil {
-		return nil, scerr.InvalidInstanceContentError("mv.item", "cannot be nil!")
+		return nil, scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	if volume, ok := mv.item.Get().(*resources.Volume); ok {
 		return volume, nil
 	}
-	return nil, scerr.InvalidInstanceContentError("mv", "invalid content in volume metadata")
+	return nil, scerr.InconsistentError("invalid content in volume metadata")
 }
 
 // Write updates the metadata corresponding to the volume in the Object Storage
 func (mv *Volume) Write() error {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
 	if mv.item == nil {
 		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil!")
 	}
@@ -94,8 +110,11 @@ func (mv *Volume) Write() error {
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (mv *Volume) Reload() error {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil!")
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	err := mv.ReadByID(*mv.id)
 	if err != nil {
@@ -109,6 +128,9 @@ func (mv *Volume) Reload() error {
 
 // ReadByReference tries to read with 'ref' as id, then if not found as name
 func (mv *Volume) ReadByReference(ref string) (err error) {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
 	errID := mv.ReadByID(ref)
 	if errID != nil {
 		errName := mv.ReadByName(ref)
@@ -121,6 +143,13 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
 func (mv *Volume) ReadByID(id string) error {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+
 	volume := resources.NewVolume()
 	err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
@@ -143,6 +172,13 @@ func (mv *Volume) ReadByID(id string) error {
 
 // ReadByName reads the metadata of a volume identified by name
 func (mv *Volume) ReadByName(name string) error {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+
 	volume := resources.NewVolume()
 	err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
@@ -164,8 +200,19 @@ func (mv *Volume) ReadByName(name string) error {
 }
 
 // Delete delete the metadata corresponding to the volume
-func (mv *Volume) Delete() error {
-	err := mv.item.DeleteFrom(ByIDFolderName, *mv.id)
+func (mv *Volume) Delete() (err error) {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+
+	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	err = mv.item.DeleteFrom(ByIDFolderName, *mv.id)
 	if err != nil {
 		return err
 	}
@@ -180,7 +227,18 @@ func (mv *Volume) Delete() error {
 }
 
 // Browse walks through volume folder and executes a callback for each entries
-func (mv *Volume) Browse(callback func(*resources.Volume) error) error {
+func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+
+	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	return mv.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
 		volume := resources.NewVolume()
 		err := volume.Deserialize(buf)
@@ -196,6 +254,13 @@ func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err err
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
+	if volume == nil {
+		return nil, scerr.InvalidParameterError("volume", "cannot be nil")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+volume.Name+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mv, err = NewVolume(svc)
 	if err != nil {
@@ -216,7 +281,18 @@ func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err err
 }
 
 // RemoveVolume removes the Volume definition from Object Storage
-func RemoveVolume(svc iaas.Service, volumeID string) error {
+func RemoveVolume(svc iaas.Service, volumeID string) (err error) {
+	if svc == nil {
+		return scerr.InvalidParameterError("svc", "cannot be nil")
+	}
+	if volumeID == "" {
+		return scerr.InvalidParameterError("volumeID", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+volumeID+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	m, err := LoadVolume(svc, volumeID)
 	if err != nil {
 		return err
