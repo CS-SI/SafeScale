@@ -75,10 +75,27 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover covertool convey errcheck goreporter govendor golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
-    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(DEP) $(GOVENDOR); \
-    	  $(GO) version | grep 1.10 > /dev/null || $(GO) get -u  $(GOLANGCI); \
+	@which dep rice protoc-gen-go go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
+    	$(GO) get -u $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(DEP) $(GOVENDOR) $(COVERTOOL); \
     fi
+	@which mockgen > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading mockgen..." && $(GO) get -u  $(MOCKGEN) || true); \
+	fi
+	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading errcheck..." && $(GO) get -u  $(ERRCHECK) || true); \
+	fi
+	@which convey > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading convey..." && $(GO) get -u  $(CONVEY) || true); \
+	fi
+	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading linter..." && $(GO) get -u  $(LINTER) || true); \
+	fi
+	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading stringer..." && $(GO) get -u  $(STRINGER) || true); \
+	fi
+	@which gonangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) version | grep 1.10 > /dev/null || ($(GO) get -u  $(GOLANGCI) || true); \
+	fi
 
 ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
