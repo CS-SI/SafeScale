@@ -183,11 +183,8 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 	(*values)["GatewayIP"] = (*values)["DefaultRouteIP"]
 
 	// Analyzes the rule...
-	var url string
 	switch ruleType {
 	case "service":
-		url = "services/"
-
 		unjsoned := map[string]interface{}{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
@@ -203,6 +200,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		jsoned, _ := json.Marshal(&unjsoned)
 		content := string(jsoned)
 
+		url := "services/" + ruleName
 		response, _, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
 			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
@@ -211,8 +209,6 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":
-		url = "routes/"
-
 		unjsoned := map[string]interface{}{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
@@ -228,6 +224,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		unjsoned["protocols"] = []string{"https"}
 		jsoned, _ := json.Marshal(&unjsoned)
 		content = string(jsoned)
+		url := "routes/" + ruleName
 		response, _, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
 			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
@@ -236,19 +233,6 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "upstream":
-		url = "upstreams/"
-
-		// Create upstream if it doesn't exist
-		url += ruleName
-		// create := false
-		// _, _, err = k.get(ruleName, url)
-		// if err != nil {
-		// 	if _, ok := err.(utils.ErrNotFound); !ok {
-		// 		return "", err
-		// 	}
-		// 	create = true
-		// }
-
 		// Separate upstream options from target settings
 		unjsoned := data.Map{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
@@ -278,7 +262,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		// Now ready to add target to upstream
 		jsoned, _ := json.Marshal(&target)
 		content = string(jsoned)
-		url += "/targets"
+		url := "upstreams/" + ruleName + "/targets"
 		_, _, err = k.post(ruleName, url, content, values, false)
 		if err != nil {
 			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
@@ -414,7 +398,7 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 
 // put updates or creates a rule
 func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
-	cmd := fmt.Sprintf(curlPut, url+name, data)
+	cmd := fmt.Sprintf(curlPut, url, data)
 	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
