@@ -892,9 +892,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
 			if zoneErr != nil {
-				logrus.Tracef("Host successfully created: {%s} with some warnings {%s}", spew.Sdump(server), zoneErr)
+				logrus.Tracef("Host successfully created but can't confirm AZ: %s", zoneErr)
 			} else {
-				logrus.Tracef("Host successfully created: {%s} in zone {%s}", spew.Sdump(server), creationZone)
+				logrus.Tracef("Host successfully created in requested AZ '%s'", creationZone)
 				if creationZone != srvOpts.AvailabilityZone {
 					if srvOpts.AvailabilityZone != "" {
 						logrus.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
