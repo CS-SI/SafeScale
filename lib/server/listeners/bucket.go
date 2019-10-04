@@ -61,7 +61,7 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (b
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		logrus.Info("Can't list buckets: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no tenant set")
 	}
 
 	handler := BucketHandler(tenant.Service)
@@ -89,13 +89,13 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		logrus.Info("Can't create bucket: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't create bucket: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot create bucket: no tenant set")
 	}
 
 	handler := BucketHandler(tenant.Service)
 	err = handler.Create(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "can't create bucket")
+		tbr := scerr.Wrap(err, "cannot create bucket")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
@@ -118,13 +118,13 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		logrus.Info("Can't delete buckets: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't delete bucket: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot delete bucket: no tenant set")
 	}
 
 	handler := BucketHandler(tenant.Service)
 	err = handler.Delete(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "can't delete bucket")
+		tbr := scerr.Wrap(err, "cannot delete bucket")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
@@ -146,17 +146,17 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		logrus.Info("Can't inspect bucket: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect bucket: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect bucket: no tenant set")
 	}
 
 	handler := BucketHandler(tenant.Service)
 	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "can't inspect bucket")
+		tbr := scerr.Wrap(err, "cannot inspect bucket")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 	if resp == nil {
-		return nil, status.Errorf(codes.NotFound, "can't inspect bucket '%s': not found", in.GetName())
+		return nil, status.Errorf(codes.NotFound, "cannot inspect bucket '%s': not found", in.GetName())
 	}
 	return conv.ToPBBucketMountPoint(resp), nil
 }
@@ -177,7 +177,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		logrus.Info("Can't mount buckets: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't mount bucket: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot mount bucket: no tenant set")
 	}
 
 	handler := BucketHandler(tenant.Service)
@@ -205,7 +205,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		logrus.Info("Can't unmount bucket: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't unmount bucket: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot unmount bucket: no tenant set")
 	}
 
 	handler := BucketHandler(tenant.Service)

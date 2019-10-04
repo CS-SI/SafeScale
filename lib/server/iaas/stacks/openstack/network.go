@@ -137,7 +137,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -168,7 +168,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -325,7 +325,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 
 	// Ensure network exists
 	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "can't be nil")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {
@@ -387,7 +387,7 @@ func (s *Stack) DeleteGateway(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -815,10 +815,10 @@ func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
 		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
-		return scerr.InvalidParameterError("vip", "can't be nil")
+		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
@@ -852,10 +852,10 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) erro
 		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
-		return scerr.InvalidParameterError("vip", "can't be nil")
+		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
@@ -890,7 +890,7 @@ func (s *Stack) DeleteVIP(vip *resources.VIP) error {
 		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
-		return scerr.InvalidParameterError("vip", "can't be nil")
+		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
 
 	for _, h := range vip.Hosts {

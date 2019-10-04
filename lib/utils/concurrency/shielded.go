@@ -47,10 +47,10 @@ func (d *Shielded) Clone() *Shielded {
 // 		return nil, scerr.InvalidInstanceError()
 // 	}
 // 	if task == nil {
-// 		return nil, scerr.InvalidParameterError("task", "can't be nil")
+// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 // 	}
 // 	if d.witness == nil {
-// 		return nil, scerr.InvalidParameterError("d.witness", "can't be nil; use concurency.NewShielded() to instanciate")
+// 		return nil, scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
 // 	}
 // 	d.lock.RLock(task)
 // 	return &protector{shielded: d, readLock: true}, nil
@@ -62,13 +62,13 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "can't be nil")
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if inspector == nil {
-		return scerr.InvalidParameterError("inspector", "can't be nil")
+		return scerr.InvalidParameterError("inspector", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "can't be nil; use concurency.NewShielded() to instanciate")
+		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
 	}
 	d.lock.RLock(task)
 	defer d.lock.RUnlock(task)
@@ -83,10 +83,10 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 // 		return nil, scerr.InvalidInstanceError()
 // 	}
 // 	if task == nil {
-// 		return nil, scerr.InvalidParameterError("task", "can't be nil")
+// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 // 	}
 // 	if d.witness == nil {
-// 		return nil, scerr.InvalidParameterError("d.witness", "can't be nil; use concurency.NewData() to instanciate")
+// 		return nil, scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
 // 	}
 
 // 	d.lock.Lock(task)
@@ -99,13 +99,13 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) error {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "can't be nil")
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if alterer == nil {
-		return scerr.InvalidParameterError("alterer", "can't be nil")
+		return scerr.InvalidParameterError("alterer", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "can't be nil; use concurency.NewData() to instanciate")
+		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
 	}
 
 	d.lock.Lock(task)

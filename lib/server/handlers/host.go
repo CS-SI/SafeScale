@@ -305,10 +305,10 @@ func (handler *HostHandler) Create(
 		return nil, scerr.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "can't be nil")
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	var (
@@ -905,7 +905,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 			count := len(share.ClientsByID)
 			if count > 0 {
 				count = len(shares)
-				return fmt.Errorf("can't delete host, exports %d share%s where at least one is used", count, utils.Plural(count))
+				return fmt.Errorf("cannot delete host, exports %d share%s where at least one is used", count, utils.Plural(count))
 			}
 		}
 		return nil
@@ -929,7 +929,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	// Don't remove a host that is a gateway
 	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		if v.(*propsv1.HostNetwork).IsGateway {
-			return fmt.Errorf("can't delete host, it's a gateway that can only be deleted through its network")
+			return fmt.Errorf("cannot delete host, it's a gateway that can only be deleted through its network")
 		}
 		return nil
 	})

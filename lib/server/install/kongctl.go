@@ -62,10 +62,10 @@ type KongController struct {
 // func NewKongController(host *pb.Host) (*KongController, error) {
 func NewKongController(svc iaas.Service, network *resources.Network, addressPrimaryGateway bool) (*KongController, error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if network == nil {
-		return nil, scerr.InvalidParameterError("network", "can't be nil")
+		return nil, scerr.InvalidParameterError("network", "cannot be nil")
 	}
 
 	// Check if reverseproxy feature is installed on host
@@ -95,7 +95,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		}
 	} else {
 		if network.SecondaryGatewayID == "" {
-			return nil, fmt.Errorf("can't address secondary gateway, doesn't exist")
+			return nil, fmt.Errorf("cannot address secondary gateway, doesn't exist")
 		}
 		mh, err := metadata.LoadHost(svc, network.SecondaryGatewayID)
 		if err != nil {

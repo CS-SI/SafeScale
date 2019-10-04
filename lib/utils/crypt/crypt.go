@@ -42,7 +42,7 @@ func NewEncryptionKey(text []byte) (*Key, error) {
 	if len(text) == 0 {
 		_, err := io.ReadFull(rand.Reader, key[:])
 		if err != nil {
-			return nil, fmt.Errorf("can't read enough random bytes (you should consider to stop using this computer): %v", err)
+			return nil, fmt.Errorf("cannot read enough random bytes (you should consider to stop using this computer): %v", err)
 		}
 	} else {
 		n := nBytes

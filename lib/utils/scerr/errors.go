@@ -414,7 +414,7 @@ func OverflowError(msg string) ErrOverflow {
 	}
 }
 
-// ErrOverload when action can't be honored because provider is overloaded (ie too many requests occured in a given time).
+// ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occured in a given time).
 type ErrOverload struct {
 	ErrCore
 }
@@ -449,28 +449,9 @@ func (e ErrNotImplemented) AddConsequence(err error) error {
 
 // NotImplementedError creates a ErrNotImplemented error
 func NotImplementedError(what string) ErrNotImplemented {
-	var msg string
-	if pc, file, line, ok := runtime.Caller(1); ok {
-		if f := runtime.FuncForPC(pc); f != nil {
-			filename := strings.Replace(file, getPartToRemove(), "", 1)
-			if len(what) > 0 {
-				msg = fmt.Sprintf("not implemented yet: %s : %s [%s:%d]", what, filepath.Base(f.Name()), filename, line)
-			} else {
-				msg = fmt.Sprintf("not implemented yet: %s [%s:%d]", filepath.Base(f.Name()), filename, line)
-			}
-		}
-	}
-
-	if len(msg) == 0 {
-		msg = "not implemented yet!"
-		if what != "" {
-			msg += ": " + what
-		}
-	}
-
 	return ErrNotImplemented{
 		ErrCore: ErrCore{
-			Message:      msg,
+			Message:      decorateWithCallTrace("not implemented yet", "", ""),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -505,7 +486,23 @@ func (e ErrList) AddConsequence(err error) error {
 	return e
 }
 
-// ErrInvalidInstance ...
+// ErrRuntimePanic ...
+type ErrRuntimePanic struct {
+	ErrCore
+}
+
+// RuntimePanicError creates a ErrRuntimePanic error
+func RuntimePanicError(msg string) ErrRuntimePanic {
+	return ErrRuntimePanic{
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
+// ErrInvalidInstance has to be used when a method is called from an instance equal to nil
 type ErrInvalidInstance struct {
 	ErrCore
 }
@@ -516,43 +513,11 @@ func (e ErrInvalidInstance) AddConsequence(err error) error {
 	return e
 }
 
-func InvalidInstanceErrorWithMessage(message string) ErrInvalidInstance {
-	var msg string
-	if pc, file, line, ok := runtime.Caller(2); ok {
-		if f := runtime.FuncForPC(pc); f != nil {
-			filename := strings.Replace(file, getPartToRemove(), "", 1)
-			msg = fmt.Sprintf("invalid instance: calling %s() : %s : [%s:%d]\n%s", filepath.Base(f.Name()), message, filename, line, debug.Stack())
-		}
-	}
-	if msg == "" {
-		msg = fmt.Sprintf("invalid instance: %s", message)
-	}
-
-	return ErrInvalidInstance{
-		ErrCore: ErrCore{
-			Message:      msg,
-			cause:        nil,
-			consequences: []error{},
-		},
-	}
-}
-
 // InvalidInstanceError creates a ErrInvalidInstance error
 func InvalidInstanceError() ErrInvalidInstance {
-	var msg string
-	if pc, file, line, ok := runtime.Caller(2); ok {
-		if f := runtime.FuncForPC(pc); f != nil {
-			filename := strings.Replace(file, getPartToRemove(), "", 1)
-			msg = fmt.Sprintf("invalid instance: calling %s() from a nil pointer [%s:%d]\n%s", filepath.Base(f.Name()), filename, line, debug.Stack())
-		}
-	}
-	if msg == "" {
-		msg = fmt.Sprintf("invalid instance: calling from a nil pointer")
-	}
-
 	return ErrInvalidInstance{
 		ErrCore: ErrCore{
-			Message:      msg,
+			Message:      decorateWithCallTrace("invalid instance", "", "calling method from a nil pointer"),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -572,20 +537,84 @@ func (e ErrInvalidParameter) AddConsequence(err error) error {
 
 // InvalidParameterError creates a ErrInvalidParameter error
 func InvalidParameterError(what, why string) ErrInvalidParameter {
-	var msg string
+	return ErrInvalidParameter{
+		ErrCore: ErrCore{
+			Message:      decorateWithCallTrace("invalid parameter", what, why),
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
+func decorateWithCallTrace(prefix, what, why string) string {
+	const missingPrefixMessage = "uncategorized error occured"
+
+	msg := prefix
+	if what != "" {
+		if msg == "" {
+			msg = missingPrefixMessage + " for"
+		}
+		msg += " '" + what + "'"
+	} else {
+		msg = missingPrefixMessage
+	}
+
 	if pc, file, line, ok := runtime.Caller(1); ok {
 		if f := runtime.FuncForPC(pc); f != nil {
 			filename := strings.Replace(file, getPartToRemove(), "", 1)
-			msg = fmt.Sprintf("invalid parameter '%s' in %s: %s [%s:%d]\n%s", what, filepath.Base(f.Name()), why, filename, line, debug.Stack())
+			msg += fmt.Sprintf(" in %s", filepath.Base(f.Name()))
+			if why != "" {
+				msg += ": " + why
+			}
+			msg += fmt.Sprintf(" [%s:%d]", filename, line)
+		}
+	} else {
+		if why != "" {
+			msg += ": " + why
 		}
 	}
-	if msg == "" {
-		msg = fmt.Sprintf("invalid parameter '%s': %s", what, why)
-	}
+	msg += "\n" + string(debug.Stack())
+	return msg
+}
 
-	return ErrInvalidParameter{
+// ErrInvalidInstanceContent has to be used when a property of an instance contains invalid property
+type ErrInvalidInstanceContent struct {
+	ErrCore
+}
+
+// AddConsequence adds an error 'err' to the list of consequences
+func (e ErrInvalidInstanceContent) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// InvalidInstanceContentError ...
+func InvalidInstanceContentError(what, why string) ErrInvalidInstanceContent {
+	return ErrInvalidInstanceContent{
 		ErrCore: ErrCore{
-			Message:      msg,
+			Message:      decorateWithCallTrace("invalid instance content", what, why),
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
+// ErrInconsistent is used when data used is inconsistent
+type ErrInconsistent struct {
+	ErrCore
+}
+
+// AddConsequence adds an error 'err' to the list of consequences
+func (e ErrInconsistent) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// InconsistentError creates a ErrInconsistent error
+func InconsistentError(msg string) ErrInconsistent {
+	return ErrInconsistent{
+		ErrCore: ErrCore{
+			Message:      decorateWithCallTrace(msg, "", ""),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -608,6 +637,10 @@ const (
 // OnExitLogErrorWithLevel returns a function that will log error with the log level wanted
 // Intended to be used with defer for example.
 func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
+	if in == "" {
+		return func() {}
+	}
+
 	logLevelFn, ok := commonlog.LogLevelFnMap[level]
 	if !ok {
 		logLevelFn = logrus.Error
@@ -639,6 +672,15 @@ func OnExitLogError(in string, err *error) func() {
 // Intended to be used with defer for example.
 func OnExitTraceError(in string, err *error) func() {
 	return OnExitLogErrorWithLevel(in, err, logrus.TraceLevel)
+}
+
+// OnPanic returns a function intended to capture panic error and fill the error pointer with a ErrRuntimePanic.
+func OnPanic(err *error) func() {
+	return func() {
+		if x := recover(); x != nil {
+			*err = RuntimePanicError("runtime panic occured")
+		}
+	}
 }
 
 func init() {

@@ -53,7 +53,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	shareName := in.GetName()
 	hostRef := srvutils.GetReference(in.GetHost())
@@ -73,13 +73,13 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't create share: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot create share: no tenant set")
 	}
 
 	handler := ShareHandler(tenant.Service)
 	share, err := handler.Create(ctx, shareName, hostRef, sharePath, in.GetSecurityModes(), in.GetOptions().GetReadOnly(), in.GetOptions().GetRootSquash(), in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(), in.GetOptions().GetCrossMount(), in.GetOptions().GetSubtreeCheck())
 	if err != nil {
-		tbr := scerr.Wrap(err, fmt.Sprintf("can't create share '%s'", shareName))
+		tbr := scerr.Wrap(err, fmt.Sprintf("cannot create share '%s'", shareName))
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 	return convert.ToPBShare(in.GetName(), share), err
@@ -92,7 +92,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	shareName := in.GetName()
 	// FIXME: validate parameters
@@ -109,7 +109,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't delete share: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "can't delete share: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot delete share: no tenant set")
 	}
 
 	handler := ShareHandler(tenant.Service)
@@ -119,13 +119,13 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 		case scerr.ErrNotFound:
 			return empty, status.Errorf(codes.NotFound, err.Error())
 		default:
-			return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
+			return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)).Error())
 		}
 	}
 
 	err = handler.Delete(ctx, shareName)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
+		return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)).Error())
 	}
 	return empty, nil
 }
@@ -148,13 +148,13 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (sl
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list shares: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list shares: no tenant set")
 	}
 
 	handler := ShareHandler(tenant.Service)
 	shares, err := handler.List(ctx)
 	if err != nil {
-		tbr := scerr.Wrap(err, "can't list Shares")
+		tbr := scerr.Wrap(err, "cannot list Shares")
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
@@ -174,7 +174,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
@@ -194,13 +194,13 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't mount share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't mount share: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot mount share: no tenant set")
 	}
 
 	handler := ShareHandler(tenant.Service)
 	mount, err := handler.Mount(ctx, shareRef, hostRef, hostPath, in.GetWithCache())
 	if err != nil {
-		tbr := scerr.Wrap(err, fmt.Sprintf("can't mount share '%s'", shareRef))
+		tbr := scerr.Wrap(err, fmt.Sprintf("cannot mount share '%s'", shareRef))
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 	return convert.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
@@ -213,7 +213,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
@@ -234,13 +234,13 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't mount share: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "can't unmount share: no tenant set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot unmount share: no tenant set")
 	}
 
 	handler := ShareHandler(tenant.Service)
 	err = handler.Unmount(ctx, shareRef, hostRef)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("can't unmount share '%s'", shareRef)).Error())
+		return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot unmount share '%s'", shareRef)).Error())
 	}
 	return empty, nil
 }
@@ -251,7 +251,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	shareRef := srvutils.GetReference(in)
 	// FIXME: validate parameters
@@ -269,13 +269,13 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't inspect share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't inspect share: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect share: no tenant set")
 	}
 
 	handler := ShareHandler(tenant.Service)
 	host, share, mounts, err := handler.Inspect(ctx, shareRef)
 	if err != nil {
-		err := scerr.Wrap(err, fmt.Sprintf("can't inspect share '%s'", shareRef))
+		err := scerr.Wrap(err, fmt.Sprintf("cannot inspect share '%s'", shareRef))
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if host == nil {

@@ -54,7 +54,7 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl 
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
@@ -82,7 +82,7 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
@@ -110,7 +110,7 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (empty *google_prot
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
@@ -138,7 +138,7 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_p
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
 		log.Info("Can't list buckets: no storage tenants set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)

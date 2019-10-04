@@ -31,7 +31,7 @@ type Identity struct {
 	Keypair    *resources.KeyPair `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
 
 	// AdminPassword contains the password of cladm account. This password
-	// is used to connect via Guacamole, but can't be used with SSH
+	// is used to connect via Guacamole, but cannot be used with SSH
 	AdminPassword string `json:"admin_password"`
 }
 

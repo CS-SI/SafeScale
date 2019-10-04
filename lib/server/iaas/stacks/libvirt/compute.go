@@ -151,7 +151,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)

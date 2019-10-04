@@ -776,7 +776,7 @@ func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) 
 // configureCluster configures cluster
 func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (err error) {
 	if params == nil {
-		return scerr.InvalidParameterError("params", "can't be nil")
+		return scerr.InvalidParameterError("params", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
@@ -792,7 +792,7 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		return scerr.InvalidParameterError("params", "must be a data.Map")
 	}
 	if primaryGateway, ok = p["PrimaryGateway"].(*resources.Host); !ok || primaryGateway == nil {
-		return scerr.InvalidParameterError("params", "key 'PrimaryGateway' must be defined and can't be nil")
+		return scerr.InvalidParameterError("params", "key 'PrimaryGateway' must be defined and cannot be nil")
 	}
 	secondaryGateway, ok = p["SecondaryGateway"].(*resources.Host)
 	if !ok {
@@ -1187,7 +1187,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 // installNodeRequirements ...
 func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeType.Enum, pbHost *pb.Host, hostLabel string) (err error) {
 	if b.makers.GetTemplateBox == nil {
-		return scerr.InvalidParameterError("b.makers.GetTemplateBox", "can't be nil")
+		return scerr.InvalidParameterError("b.makers.GetTemplateBox", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
@@ -1353,7 +1353,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 		return result, scerr.InvalidParameterError("params", "must contain a *pb.Host")
 	}
 	if pbGateway == nil {
-		return result, scerr.InvalidParameterError("params", "can't be nil")
+		return result, scerr.InvalidParameterError("params", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(t, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
@@ -1403,7 +1403,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 		return result, scerr.InvalidParameterError("params", "must contain a *pb.Host")
 	}
 	if gw == nil {
-		return result, scerr.InvalidParameterError("params", "can't be nil")
+		return result, scerr.InvalidParameterError("params", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(t, "("+gw.Name+")", false).WithStopwatch().GoingIn()
@@ -1729,7 +1729,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
 	if p == nil {
-		return nil, scerr.InvalidParameterError("params", "can't be nil")
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
 	// FIME: validate parameters
 	index := p["index"].(int)

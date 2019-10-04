@@ -81,10 +81,10 @@ func (handler *NetworkHandler) Create(
 		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be nil")
+		return nil, scerr.InvalidParameterError("name", "cannot be nil")
 	}
 	if failover && gwname != "" {
-		return nil, scerr.InvalidParameterError("gwname", "can't be set if failover is set")
+		return nil, scerr.InvalidParameterError("gwname", "cannot be set if failover is set")
 	}
 
 	tracer := concurrency.NewTracer(
@@ -115,7 +115,7 @@ func (handler *NetworkHandler) Create(
 		return nil, fmt.Errorf("failed to determine if CIDR is not routable: %v", err)
 	}
 	if routable {
-		return nil, fmt.Errorf("can't create such a network, CIDR must be not routable; please choose an appropriate CIDR (RFC1918)")
+		return nil, fmt.Errorf("cannot create such a network, CIDR must be not routable; please choose an appropriate CIDR (RFC1918)")
 	}
 
 	// Create the network
@@ -159,7 +159,7 @@ func (handler *NetworkHandler) Create(
 	if failover && caps.PrivateVirtualIP {
 		logrus.Infof("Provider support private Virtual IP, honoring the failover setup for gateways.")
 	} else {
-		logrus.Warningf("Provider doesn't support private Virtual IP, can't set up high availability of network default route.")
+		logrus.Warningf("Provider doesn't support private Virtual IP, cannot set up high availability of network default route.")
 		failover = false
 	}
 
@@ -839,7 +839,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			if hostsLen == 1 {
 				verb = "is"
 			}
-			errorMsg = fmt.Sprintf("can't delete network '%s': %d host%s %s still attached to it: %s",
+			errorMsg = fmt.Sprintf("cannot delete network '%s': %d host%s %s still attached to it: %s",
 				network.Name, hostsLen, utils.Plural(hostsLen), verb, strings.Join(list, ", "))
 			return resources.ResourceNotAvailableError("network", network.Name)
 		}
@@ -959,10 +959,10 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			logrus.Warnf("network not found on provider side, cleaning up metadata.")
 			return err
 		case scerr.ErrTimeout:
-			logrus.Error("can't delete network due to a timeout")
+			logrus.Error("cannot delete network due to a timeout")
 			waitMore = true
 		default:
-			logrus.Error("can't delete network, other reason")
+			logrus.Error("cannot delete network, other reason")
 		}
 	}
 	if waitMore {

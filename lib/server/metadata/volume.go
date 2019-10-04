@@ -193,6 +193,9 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) error {
 
 // SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err error) {
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "")
+	}
 	mv, err = NewVolume(svc)
 	if err != nil {
 		return nil, err
@@ -226,10 +229,10 @@ func RemoveVolume(svc iaas.Service, volumeID string) error {
 //        If retry times out, return errNotFound
 func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "can't be empty string")
+		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()

@@ -633,7 +633,7 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 	var sizing string
 	if c.IsSet(key) {
 		if c.IsSet("cpu") || c.IsSet("cpufreq") || c.IsSet("gpu") || c.IsSet("ram") || c.IsSet("disk") {
-			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument("can't use simultaneously --sizing and --cpu|--cpufreq|--gpu|--ram|--disk"))
+			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument("cannot use simultaneously --sizing and --cpu|--cpufreq|--gpu|--ram|--disk"))
 		}
 		sizing = c.String(key)
 	} else {

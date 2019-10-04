@@ -138,7 +138,7 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 		return false, scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return false, scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return false, scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -169,7 +169,7 @@ func (l *location) GetBucket(bucketName string) (Bucket, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -192,7 +192,7 @@ func (l *location) CreateBucket(bucketName string) (Bucket, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -214,7 +214,7 @@ func (l *location) DeleteBucket(bucketName string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -232,10 +232,10 @@ func (l *location) GetObject(bucketName string, objectName string) (Object, erro
 		return nil, scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, scerr.InvalidParameterError("objectName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, objectName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -253,10 +253,10 @@ func (l *location) DeleteObject(bucketName, objectName string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return scerr.InvalidParameterError("objectName", "can't be empty string")
+		return scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, objectName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -274,7 +274,7 @@ func (l *location) ListObjects(bucketName string, path, prefix string) ([]string
 		return nil, scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, path, prefix), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -292,7 +292,7 @@ func (l *location) BrowseBucket(bucketName string, path, prefix string, callback
 		return scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, path, prefix), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -310,7 +310,7 @@ func (l *location) ClearBucket(bucketName string, path, prefix string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, path, prefix), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -328,10 +328,10 @@ func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, f
 		return scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return scerr.InvalidParameterError("objectName", "can't be empty string")
+		return scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, objectName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -362,13 +362,13 @@ func (l *location) WriteObject(
 		return nil, scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, scerr.InvalidParameterError("objectName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 	if source == nil {
-		return nil, scerr.InvalidParameterError("source", "can't be nil")
+		return nil, scerr.InvalidParameterError("source", "cannot be nil")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', %d)", bucketName, objectName, size), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -393,10 +393,10 @@ func (l *location) WriteMultiPartObject(
 		return nil, scerr.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, scerr.InvalidParameterError("objectName", "can't be empty string")
+		return nil, scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize), false /*Trace.Location*/).GoingIn().OnExitTrace()()

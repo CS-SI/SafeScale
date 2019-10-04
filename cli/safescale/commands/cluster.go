@@ -836,7 +836,7 @@ var clusterShrinkCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 		if count > present {
-			msg := fmt.Sprintf("can't delete %d node%s, the cluster contains only %d of them", count, countS, present)
+			msg := fmt.Sprintf("cannot delete %d node%s, the cluster contains only %d of them", count, countS, present)
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
 

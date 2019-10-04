@@ -52,7 +52,7 @@ type HostTarget struct {
 // NewHostTarget ...
 func NewHostTarget(host *pb.Host) (Target, error) {
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "can't be nil")
+		return nil, scerr.InvalidParameterError("host", "cannot be nil")
 	}
 	return createHostTarget(host)
 }
@@ -119,7 +119,7 @@ type ClusterTarget struct {
 // NewClusterTarget ...
 func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) (Target, error) {
 	if cluster == nil {
-		return nil, scerr.InvalidParameterError("cluster", "can't be nil")
+		return nil, scerr.InvalidParameterError("cluster", "cannot be nil")
 	}
 	var (
 		index   uint8
@@ -168,7 +168,7 @@ type NodeTarget struct {
 // NewNodeTarget ...
 func NewNodeTarget(host *pb.Host) (Target, error) {
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "can't be nil")
+		return nil, scerr.InvalidParameterError("host", "cannot be nil")
 	}
 	t, err := createHostTarget(host)
 	if err != nil {

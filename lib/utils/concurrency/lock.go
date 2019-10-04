@@ -129,7 +129,7 @@ func (tm *taskedLock) Lock(task Task) {
 	if _, ok := tm.readLocks[tid]; ok {
 		tracer.Trace("Can't Lock, already RLocked")
 		taskID, _ := task.GetID()
-		panic(fmt.Sprintf("can't Lock task '%s': already RLocked", taskID))
+		panic(fmt.Sprintf("cannot Lock task '%s': already RLocked", taskID))
 	}
 	// registers lock for read for the task and actively lock the RWMutex
 	tm.writeLocks[tid] = 1

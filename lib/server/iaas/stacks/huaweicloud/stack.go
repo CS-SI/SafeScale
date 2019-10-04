@@ -48,7 +48,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		return nil, scerr.InvalidParameterError("auth.IdentityEndpoint", "can't be empty string")
+		return nil, scerr.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
 	}
 
 	authOptions := auth

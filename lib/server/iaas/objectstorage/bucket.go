@@ -156,7 +156,7 @@ func (b *bucket) DeleteObject(objectName string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if objectName == "" {
-		return scerr.InvalidParameterError("objectName", "can't be empty string")
+		return scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
