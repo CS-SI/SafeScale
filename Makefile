@@ -33,13 +33,12 @@ LINTER := golang.org/x/lint/golint
 DEP := github.com/golang/dep/cmd/dep
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
-REPORTER := github.com/360EntSecGroup-Skylar/goreporter
 COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
 GOLANGCI := github.com/golangci/golangci-lint/cmd/golangci-lint
 
-DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR)
-NEWDEVDEPSLIST := $(GOLANGCI)
+DEVDEPSLIST := $(RICE) $(PROTOBUF) $(DEP) $(COVER) $(XUNIT) $(COVERTOOL)  $(GOVENDOR)
+NEWDEVDEPSLIST := $(STRINGER) $(GOLANGCI) $(MOCKGEN) $(LINTER) $(CONVEY) $(ERRCHECK)
 
 BUILD_TAGS = ""
 export BUILD_TAGS
@@ -79,19 +78,19 @@ getdevdeps: begin
     	$(GO) get -u $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(DEP) $(GOVENDOR) $(COVERTOOL); \
     fi
 	@which mockgen > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading mockgen..." && $(GO) get -u  $(MOCKGEN) || true); \
+		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading mockgen...\n" && $(GO) get -u  $(MOCKGEN) || true); \
 	fi
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading errcheck..." && $(GO) get -u  $(ERRCHECK) || true); \
+		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u  $(ERRCHECK) || true); \
 	fi
 	@which convey > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading convey..." && $(GO) get -u  $(CONVEY) || true); \
+		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u  $(CONVEY) || true); \
 	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading linter..." && $(GO) get -u  $(LINTER) || true); \
+		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get -u  $(LINTER) || true); \
 	fi
 	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (echo "Downloading stringer..." && $(GO) get -u  $(STRINGER) || true); \
+		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) || true); \
 	fi
 	@which gonangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || ($(GO) get -u  $(GOLANGCI) || true); \
