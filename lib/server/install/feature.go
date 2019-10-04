@@ -21,9 +21,6 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
@@ -32,6 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var (
