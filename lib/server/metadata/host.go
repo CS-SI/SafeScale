@@ -69,8 +69,11 @@ func (mh *Host) Carry(host *resources.Host) (*Host, error) {
 
 // Get returns the Network instance linked to metadata
 func (mh *Host) Get() (*resources.Host, error) {
+	if mh == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if mh.item == nil {
-		return nil, scerr.InvalidInstanceErrorWithMessage("mh.item cannot be nil!")
+		return nil, scerr.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
 	gh := mh.item.Get().(*resources.Host)
@@ -79,8 +82,11 @@ func (mh *Host) Get() (*resources.Host, error) {
 
 // Write updates the metadata corresponding to the host in the Object Storage
 func (mh *Host) Write() (err error) {
+	if mh == nil {
+		return scerr.InvalidInstanceError()
+	}
 	if mh.item == nil {
-		return scerr.InvalidInstanceErrorWithMessage("m.item cannot be nil!")
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "('"+*mh.id+"')", true).GoingIn()
@@ -112,7 +118,7 @@ func (mh *Host) ReadByID(id string) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
@@ -141,10 +147,10 @@ func (mh *Host) ReadByName(name string) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidParameterError("mh.item", "can't be nil")
+		return scerr.InvalidParameterError("mh.item", "cannot be nil")
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "can't be empty string")
+		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+name+")", true).GoingIn()
@@ -173,7 +179,7 @@ func (mh *Host) Delete() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidParameterError("mh.item", "can't be nil")
+		return scerr.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -200,7 +206,7 @@ func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidParameterError("mh.item", "can't be nil")
+		return scerr.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -220,10 +226,10 @@ func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 // SaveHost saves the Host definition in Object Storage
 func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "can't be nil")
+		return nil, scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -268,10 +274,10 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 // RemoveHost removes the host definition from Object Storage
 func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 	if svc == nil {
-		return scerr.InvalidParameterError("svc", "can't be nil")
+		return scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "can't be nil")
+		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -298,10 +304,10 @@ func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 //        If retry times out, return errNotFound
 func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "can't be empty string")
+		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "("+ref+")", true)

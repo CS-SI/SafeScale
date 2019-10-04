@@ -41,7 +41,7 @@ func CIDRToIPv4Range(cidr string) (string, string, error) {
 // CIDRToLongRange converts CIDR to IPv4 range
 func CIDRToLongRange(cidr string) (uint32, uint32, error) {
 	if cidr == "" {
-		return 0, 0, fmt.Errorf("invalid parameter 'cidr': can't be empty string")
+		return 0, 0, fmt.Errorf("invalid parameter 'cidr': cannot be empty string")
 	}
 
 	var (

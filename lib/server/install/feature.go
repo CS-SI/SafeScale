@@ -152,7 +152,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 // with its content
 func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
@@ -200,7 +200,7 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
@@ -549,9 +549,8 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		if hT != nil {
 			host = hT.host
 		}
-
 		if host == nil {
-			return scerr.InvalidInstanceErrorWithMessage("nil host in feature")
+			return scerr.InvalidParameteError("t", "must be a HostTarget or NodeTarget")
 		}
 
 		// v["Hostname"] = host.Name

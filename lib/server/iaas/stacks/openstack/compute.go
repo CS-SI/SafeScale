@@ -162,7 +162,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
@@ -182,7 +182,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
@@ -273,7 +273,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
@@ -307,7 +307,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be nil")
+		return nil, scerr.InvalidParameterError("id", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
@@ -370,7 +370,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -709,7 +709,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -751,7 +751,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, userData, resources.ResourceInvalidRequestError("host creation", "can't create a host without public IP or without attached network")
+		return nil, userData, resources.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// The Default Network is the first of the provided list, by convention
@@ -1183,7 +1183,7 @@ func (s *Stack) DeleteHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -1273,7 +1273,7 @@ func (s *Stack) StopHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -1291,7 +1291,7 @@ func (s *Stack) RebootHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -1314,7 +1314,7 @@ func (s *Stack) StartHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -1333,7 +1333,7 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()

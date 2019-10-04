@@ -49,7 +49,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	host := in.GetHost().GetName()
 	command := in.GetCommand()
@@ -69,7 +69,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		// log.Info("Can't execute ssh command: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't execute ssh command: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot execute ssh command: no tenant set")
 	}
 
 	handler := SSHHandler(tenant.Service)
@@ -90,7 +90,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	source := in.Source
 	dest := in.Destination
@@ -109,7 +109,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		// log.Info("Can't copy by ssh command: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't copy by ssh: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot copy by ssh: no tenant set")
 	}
 
 	handler := SSHHandler(tenant.Service)
@@ -118,7 +118,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if retcode != 0 {
-		return nil, fmt.Errorf("can't copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
+		return nil, fmt.Errorf("cannot copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
 	}
 
 	return &pb.SshResponse{

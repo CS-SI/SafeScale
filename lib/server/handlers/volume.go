@@ -384,12 +384,12 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Check if there is no other device mounted in the path (or in subpath)
 				for _, i := range hostMountsV1.LocalMountsByPath {
 					if strings.Index(i.Path, mountPoint) == 0 {
-						return fmt.Errorf("can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path)
+						return fmt.Errorf("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path)
 					}
 				}
 				for _, i := range hostMountsV1.RemoteMountsByPath {
 					if strings.Index(i.Path, mountPoint) == 0 {
-						return fmt.Errorf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path)
+						return fmt.Errorf("cannot attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path)
 					}
 				}
 
@@ -683,7 +683,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 		// Check the volume is effectively attached
 		attachment, found := hostVolumesV1.VolumesByID[volume.ID]
 		if !found {
-			return fmt.Errorf("can't detach volume '%s': not attached to host '%s'", volumeName, host.Name)
+			return fmt.Errorf("cannot detach volume '%s': not attached to host '%s'", volumeName, host.Name)
 		}
 
 		// Obtain mounts information
@@ -702,13 +702,13 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 					continue
 				}
 				if strings.Index(p, mount.Path) == 0 {
-					return fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
+					return fmt.Errorf("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
 						volume.Name, host.Name, mount.Path, host.Name, p)
 				}
 			}
 			for p := range hostMountsV1.RemoteMountsByPath {
 				if strings.Index(p, mount.Path) == 0 {
-					return fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
+					return fmt.Errorf("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
 						volume.Name, host.Name, mount.Path, host.Name, p)
 				}
 			}
@@ -719,7 +719,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 
 				for _, v := range hostSharesV1.ByID {
 					if strings.Index(v.Path, mount.Path) == 0 {
-						return fmt.Errorf("can't detach volume '%s' from '%s:%s', '%s:%s' is shared",
+						return fmt.Errorf("cannot detach volume '%s' from '%s:%s', '%s:%s' is shared",
 							volume.Name, host.Name, mount.Path, host.Name, v.Path)
 					}
 				}

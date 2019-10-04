@@ -45,7 +45,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "can't be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	uuid := in.Uuid
 	if in.Uuid == "" {

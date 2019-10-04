@@ -113,7 +113,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return scerr.InvalidInstanceError()
 	}
 	if from > to {
-		return scerr.InvalidParameterError("from", "can't be greater than 'to'")
+		return scerr.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", from, to), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -183,10 +183,10 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 		return scerr.InvalidInstanceError()
 	}
 	if source == nil {
-		return scerr.InvalidParameterError("source", "can't be nil")
+		return scerr.InvalidParameterError("source", "cannot be nil")
 	}
 	if o.bucket == nil {
-		return scerr.InvalidParameterError("o.bucket", "can't be nil")
+		return scerr.InvalidParameterError("o.bucket", "cannot be nil")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()

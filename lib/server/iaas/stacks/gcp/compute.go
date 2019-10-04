@@ -90,7 +90,7 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	images, err := s.ListImages()
@@ -157,7 +157,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "can't be empty string")
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	templates, err := s.ListTemplates(true)
@@ -182,7 +182,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
@@ -805,7 +805,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "can't be empty string")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	hosts, err := s.ListHosts()
@@ -828,7 +828,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	service := s.ComputeService
@@ -915,7 +915,7 @@ func (s *Stack) StopHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	service := s.ComputeService
@@ -942,7 +942,7 @@ func (s *Stack) StartHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	service := s.ComputeService
@@ -969,7 +969,7 @@ func (s *Stack) RebootHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "can't be empty string")
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	service := s.ComputeService

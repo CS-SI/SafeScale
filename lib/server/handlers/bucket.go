@@ -70,7 +70,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 		return scerr.InvalidInstanceError()
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "can't be empty string")
+		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()

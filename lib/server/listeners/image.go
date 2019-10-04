@@ -57,7 +57,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		logrus.Info("Can't list images: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "can't list images: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list images: no tenant set")
 	}
 
 	handler := ImageHandler(currentTenant.Service)
