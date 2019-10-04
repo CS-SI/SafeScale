@@ -17,6 +17,8 @@
 package commands
 
 import (
+	"encoding/json"
+
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -100,6 +102,36 @@ var networkInspect = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
 		}
+
+		// Convert struct to map using struct to json then json to map
+		jsoned, err := json.Marshal(network)
+		if err != nil {
+
+		}
+		mapped := map[string]interface{}{}
+		err = json.Unmarshal(jsoned, &mapped)
+		if err != nil {
+
+		}
+		// Get gateway(s) information (needs the name)
+		var pgw, sgw *pb.Host
+		pgwID := network.GetGatewayId()
+		sgwID := network.GetSecondaryGatewayId()
+		pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())
+		if err != nil {
+			mapped["gateway_name"] = pgw.Name
+		} else {
+			mapped["gateway_name"] = "<unknown>"
+		}
+		mapped["gateway_name"] = pgw.Name
+		if network.GetSecondaryGatewayId() != "" {
+			sgw, err = client.New().Host.Inspect(sgwID, temporal.GetExecutionTimeout())
+			if err == nil {
+				mapped["secondary_gateway_name"] = sgw.Name
+			} else {
+				mapped["secondary_gateway_name"] = "<unknown>"
+			}
+		}
 		return clitools.SuccessResponse(network)
 	},
 }
@@ -127,7 +159,7 @@ var networkCreate = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "failover",
-			Usage: "If you want gateways fail-over",
+			Usage: "creates 2 gateways for the network with a VIP used a internal default route",
 		},
 		cli.StringFlag{
 			Name: "S, sizing",
@@ -179,7 +211,7 @@ var networkCreate = cli.Command{
 		netdef := pb.NetworkDefinition{
 			Cidr:     c.String("cidr"),
 			Name:     c.Args().Get(0),
-			FailOver: c.Bool("with-failover"),
+			FailOver: c.Bool("failover"),
 			Gateway: &pb.GatewayDefinition{
 				ImageId: c.String("os"),
 				Name:    c.String("gwname"),
