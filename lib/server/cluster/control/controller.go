@@ -91,6 +91,12 @@ func (c *Controller) Restore(task concurrency.Task, f Foreman) (err error) {
 	if f == nil {
 		return scerr.InvalidParameterError("f", "cannot be nil")
 	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if f == nil {
+		return scerr.InvalidParameterError("f", "cannot be nil")
+	}
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -102,6 +108,9 @@ func (c *Controller) Restore(task concurrency.Task, f Foreman) (err error) {
 func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if f == nil {
+		return scerr.InvalidParameterError("f", "cannot be nil")
 	}
 	if f == nil {
 		return scerr.InvalidParameterError("f", "cannot be nil")

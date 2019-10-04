@@ -251,6 +251,7 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
 
 // SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err error) {
+<<<<<<< HEAD
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -262,6 +263,12 @@ func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err err
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+||||||| ancestor
+=======
+	if svc == nil {
+		return nil, utils.InvalidParameterError("svc", "")
+	}
+>>>>>>> 844ed9f... Better error handling
 	mv, err = NewVolume(svc)
 	if err != nil {
 		return nil, err
