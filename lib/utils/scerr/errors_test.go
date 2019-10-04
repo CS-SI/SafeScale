@@ -76,3 +76,29 @@ func TestLogErrorWithLevelOrder(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func doPanic() {
+	panic("Ouch")
+}
+
+func liveDangerously(panicflag bool) (err error) {
+	defer OnPanic(&err)()
+
+	if panicflag {
+		doPanic()
+	}
+
+	return nil
+}
+
+func TestLogErrorWithPanic(t *testing.T) {
+	err := liveDangerously(true)
+	if err == nil {
+		t.Errorf("Panic error shouldn't go unnoticed")
+	} else {
+		message := err.Error()
+		if !strings.Contains(message, "Ouch") {
+			t.Errorf("Panic should contain panic info...")
+		}
+	}
+}

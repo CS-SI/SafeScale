@@ -547,7 +547,7 @@ func InvalidParameterError(what, why string) ErrInvalidParameter {
 }
 
 func decorateWithCallTrace(prefix, what, why string) string {
-	const missingPrefixMessage = "uncategorized error occured"
+	const missingPrefixMessage = "uncategorized error occurred"
 
 	msg := prefix
 	if what != "" {
@@ -678,7 +678,7 @@ func OnExitTraceError(in string, err *error) func() {
 func OnPanic(err *error) func() {
 	return func() {
 		if x := recover(); x != nil {
-			*err = RuntimePanicError("runtime panic occured")
+			*err = RuntimePanicError(fmt.Sprintf("runtime panic occurred: %+v", x))
 		}
 	}
 }
