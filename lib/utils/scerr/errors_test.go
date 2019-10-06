@@ -17,6 +17,7 @@ func lazyDevs() error {
 
 func TestNotImplementedError(t *testing.T) {
 	what := lazyDevs()
+	assert.NotNil(t, what)
 	whatContent := what.Error()
 	if !strings.Contains(whatContent, "scerr.lazyDevs") {
 		t.Errorf("Expected 'utils.lazyDevs' in error content but found: %s", whatContent)
@@ -114,6 +115,21 @@ func lazyDevsPlainAndSimple() error {
 
 func moreLazyErrors() error {
 	return NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
+}
+
+func TestEnrichedError(t *testing.T) {
+	x := moreLazyErrors()
+	x = WithField(x, "region", "europe1")
+	x = AddConsequence(x, fmt.Errorf("connection lost"))
+
+	errct := x.Error()
+	if !strings.Contains(errct, "europe1") {
+		t.Errorf("Information loss : %s", errct)
+	}
+
+	if !strings.Contains(errct, "connection") {
+		t.Errorf("Information loss : %s", errct)
+	}
 }
 
 func TestWithFields(t *testing.T) {

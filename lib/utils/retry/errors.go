@@ -57,7 +57,7 @@ func (e ErrLimit) Error() string {
 // LimitError ...
 func LimitError(limit uint, err error) ErrLimit {
 	return ErrLimit{
-		ErrCore: scerr.NewErrCore("", err, []error{}),
+		ErrCore: scerr.New("", err, []error{}),
 		limit:   limit,
 	}
 }
@@ -93,6 +93,6 @@ func (e ErrStopRetry) Error() string {
 // StopRetryError ...
 func StopRetryError(message string, err error) ErrStopRetry {
 	return ErrStopRetry{
-		ErrCore: scerr.NewErrCore(message, err, []error{}),
+		ErrCore: scerr.New(message, err, []error{}),
 	}
 }
