@@ -83,7 +83,7 @@ getdevdeps: begin
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u  $(ERRCHECK) || true); \
 	fi
-	@which convey > /dev/null; if [ $$? -ne 0 ]; then \
+	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u  $(CONVEY) || true); \
 	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
