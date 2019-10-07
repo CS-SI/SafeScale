@@ -671,7 +671,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), true).GoingIn().OnExitTrace()()
 
 	defer scerr.OnExitTraceError(
-		fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s minutes", phase, ssh.Host, int(timeout.Minutes())),
+		fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout)),
 		&err,
 	)()
 
