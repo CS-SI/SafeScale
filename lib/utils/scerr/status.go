@@ -7,7 +7,7 @@ type ErrorLike interface {
 	IsError() bool
 }
 
-func iserror(err error) bool {
+func IsError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -31,8 +31,8 @@ type status struct {
 	cause   error
 }
 
-// WrapErr ...
-func WrapErr(err error, msg string) Status {
+// StatusWrapErr ...
+func StatusWrapErr(err error, msg string) Status {
 	return &status{
 		success: false,
 		message: msg,
@@ -48,7 +48,7 @@ func Success(msg string, args ...interface{}) Status {
 	}
 }
 
-// Message ...
+// message ...
 func (me *status) Message() string {
 	return me.message
 }

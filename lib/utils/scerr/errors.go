@@ -126,14 +126,14 @@ type fields map[string]interface{}
 
 // ErrCore ...
 type ErrCore struct {
-	Message      string `json:"message,omitempty"`
-	Causer       error  `json:"cause,omitempty"`
+	message      string
+	causer       error
 	consequences []error
-	Fields       fields `json:"fields,omitempty"`
+	fields       fields
 }
 
 func (e ErrCore) FieldsFormatter() string {
-	j, err := json.Marshal(e.Fields)
+	j, err := json.Marshal(e.fields)
 
 	if err != nil {
 		return ""
@@ -172,17 +172,17 @@ func (e ErrCore) CauseFormatter() string {
 func (e ErrCore) Reset(err error) ErrCore {
 	if err != nil {
 		if cerr, ok := err.(ErrCore); ok {
-			e.Message = cerr.Message
+			e.message = cerr.message
 			e.consequences = cerr.consequences
-			e.Causer = cerr.Causer
+			e.causer = cerr.causer
 		}
 	}
 	return e
 }
 
-// Cause returns an error's Causer
+// Cause returns an error's causer
 func (e ErrCore) Cause() error {
-	return e.Causer
+	return e.causer
 }
 
 // Consequences returns the consequences of current error (detected teardown problems)
@@ -194,27 +194,27 @@ func (e ErrCore) IsError() bool {
 	return true
 }
 
-// Wrap creates a new error with a message 'message' and a Causer error 'Causer'
+// Wrap creates a new error with a message 'message' and a causer error 'causer'
 func Wrap(cause error, message string) consequencer {
 	return New(message, cause, []error{})
 }
 
-// New creates a new error with a message 'message', a Causer error 'Causer' and a list of teardown problems 'consequences'
+// New creates a new error with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
 func New(message string, cause error, consequences []error) ErrCore {
 	if consequences == nil {
 		return ErrCore{
-			Message:      message,
-			Causer:       cause,
+			message:      message,
+			causer:       cause,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		}
 	}
 
 	return ErrCore{
-		Message:      message,
-		Causer:       cause,
+		message:      message,
+		causer:       cause,
 		consequences: consequences,
-		Fields:       make(fields),
+		fields:       make(fields),
 	}
 }
 
@@ -230,8 +230,8 @@ func (e ErrCore) AddConsequence(err error) error {
 }
 
 func (e ErrCore) WithField(key string, content interface{}) ErrCore {
-	if e.Fields != nil {
-		e.Fields[key] = content
+	if e.fields != nil {
+		e.fields[key] = content
 	}
 
 	return e
@@ -239,11 +239,11 @@ func (e ErrCore) WithField(key string, content interface{}) ErrCore {
 
 // Error returns a human-friendly error explanation
 func (e ErrCore) Error() string {
-	msgFinal := e.Message
+	msgFinal := e.message
 
 	msgFinal += e.CauseFormatter()
 
-	if len(e.Fields) > 0 {
+	if len(e.fields) > 0 {
 		msgFinal += "\nWith fields: "
 		msgFinal += e.FieldsFormatter()
 	}
@@ -255,7 +255,7 @@ type causer interface {
 	Cause() error
 }
 
-// Cause returns the Causer of an error if it implements the causer interface
+// Cause returns the causer of an error if it implements the causer interface
 func Cause(err error) (resp error) {
 	resp = err
 
@@ -294,10 +294,10 @@ func (e ErrTimeout) WithField(key string, content interface{}) errorWithField {
 func TimeoutError(msg string, timeout time.Duration, cause error) ErrTimeout {
 	return ErrTimeout{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       cause,
+			message:      msg,
+			causer:       cause,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 		dur: timeout,
 	}
@@ -323,10 +323,10 @@ func (e ErrNotFound) WithField(key string, content interface{}) errorWithField {
 func NotFoundError(msg string) ErrNotFound {
 	return ErrNotFound{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -351,10 +351,10 @@ func (e ErrNotAvailable) WithField(key string, content interface{}) errorWithFie
 func NotAvailableError(msg string) ErrNotAvailable {
 	return ErrNotAvailable{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -379,10 +379,10 @@ func (e ErrDuplicate) WithField(key string, content interface{}) errorWithField 
 func DuplicateError(msg string) ErrDuplicate {
 	return ErrDuplicate{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -407,10 +407,10 @@ func (e ErrInvalidRequest) WithField(key string, content interface{}) errorWithF
 func InvalidRequestError(msg string) ErrInvalidRequest {
 	return ErrInvalidRequest{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -435,10 +435,10 @@ func (e ErrUnauthorized) WithField(key string, content interface{}) errorWithFie
 func UnauthorizedError(msg string) ErrUnauthorized {
 	return ErrUnauthorized{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -463,10 +463,10 @@ func (e ErrForbidden) WithField(key string, content interface{}) errorWithField 
 func ForbiddenError(msg string) ErrForbidden {
 	return ErrForbidden{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -491,10 +491,10 @@ func (e ErrAborted) WithField(key string, content interface{}) errorWithField {
 func AbortedError() ErrAborted {
 	return ErrAborted{
 		ErrCore: ErrCore{
-			Message:      "aborted",
-			Causer:       nil,
+			message:      "aborted",
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -519,10 +519,10 @@ func (e ErrOverflow) WithField(key string, content interface{}) errorWithField {
 func OverflowError(msg string) ErrOverflow {
 	return ErrOverflow{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -547,10 +547,10 @@ func (e ErrOverload) WithField(key string, content interface{}) errorWithField {
 func OverloadError(msg string) ErrOverload {
 	return ErrOverload{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -575,10 +575,10 @@ func (e ErrNotImplemented) WithField(key string, content interface{}) errorWithF
 func NotImplementedError(what string) ErrNotImplemented {
 	return ErrNotImplemented{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("not implemented yet:", what, ""),
-			Causer:       nil,
+			message:      decorateWithCallTrace("not implemented yet:", what, ""),
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -587,10 +587,10 @@ func NotImplementedError(what string) ErrNotImplemented {
 func NotImplementedErrorWithReason(what string, why string) ErrNotImplemented {
 	return ErrNotImplemented{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("not implemented yet:", what, why),
-			Causer:       nil,
+			message:      decorateWithCallTrace("not implemented yet:", what, why),
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -637,10 +637,10 @@ type ErrRuntimePanic struct {
 func RuntimePanicError(msg string) ErrRuntimePanic {
 	return ErrRuntimePanic{
 		ErrCore: ErrCore{
-			Message:      msg,
-			Causer:       nil,
+			message:      msg,
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -665,10 +665,10 @@ func (e ErrInvalidInstance) WithField(key string, content interface{}) errorWith
 func InvalidInstanceError() ErrInvalidInstance {
 	return ErrInvalidInstance{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("invalid instance:", "", "calling method from a nil pointer"),
-			Causer:       nil,
+			message:      decorateWithCallTrace("invalid instance:", "", "calling method from a nil pointer"),
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -693,10 +693,10 @@ func (e ErrInvalidParameter) WithField(key string, content interface{}) errorWit
 func InvalidParameterError(what, why string) ErrInvalidParameter {
 	return ErrInvalidParameter{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("invalid parameter:", what, why),
-			Causer:       nil,
+			message:      decorateWithCallTrace("invalid parameter:", what, why),
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -755,10 +755,10 @@ func (e ErrInvalidInstanceContent) WithField(key string, content interface{}) er
 func InvalidInstanceContentError(what, why string) ErrInvalidInstanceContent {
 	return ErrInvalidInstanceContent{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("invalid instance content:", what, why),
-			Causer:       nil,
+			message:      decorateWithCallTrace("invalid instance content:", what, why),
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
@@ -783,10 +783,10 @@ func (e ErrInconsistent) WithField(key string, content interface{}) errorWithFie
 func InconsistentError(msg string) ErrInconsistent {
 	return ErrInconsistent{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace(msg, "", ""),
-			Causer:       nil,
+			message:      decorateWithCallTrace(msg, "", ""),
+			causer:       nil,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 		},
 	}
 }
