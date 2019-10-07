@@ -165,3 +165,13 @@ func TestWithFieldsAgain(t *testing.T) {
 		t.Errorf("We lost a value ! : %s", errct)
 	}
 }
+
+func TestIsError(t *testing.T) {
+	x := moreLazyErrors()
+	assert.NotNil(t, x)
+
+	iserr := iserror(x)
+	if !iserr {
+		t.Errorf("This should be an error! : %s", x)
+	}
+}

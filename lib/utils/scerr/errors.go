@@ -35,8 +35,8 @@ import (
 
 var removePart atomic.Value
 
-type enriched interface {
-	WithField(key string, content interface{}) enriched
+type errorWithField interface {
+	WithField(key string, content interface{}) errorWithField
 	Error() string
 }
 
@@ -64,7 +64,7 @@ func AddConsequence(err error, cons error) error {
 
 func WithField(err error, key string, content interface{}) error {
 	if err != nil {
-		enrich, ok := err.(enriched)
+		enrich, ok := err.(errorWithField)
 		if ok {
 			if key != "" {
 				nerr := enrich.WithField(key, content)
@@ -190,6 +190,10 @@ func (e ErrCore) Consequences() []error {
 	return e.consequences
 }
 
+func (e ErrCore) IsError() bool {
+	return true
+}
+
 // Wrap creates a new error with a message 'message' and a Causer error 'Causer'
 func Wrap(cause error, message string) consequencer {
 	return New(message, cause, []error{})
@@ -281,7 +285,7 @@ func (e ErrTimeout) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrTimeout) WithField(key string, content interface{}) enriched {
+func (e ErrTimeout) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -310,7 +314,7 @@ func (e ErrNotFound) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrNotFound) WithField(key string, content interface{}) enriched {
+func (e ErrNotFound) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -338,7 +342,7 @@ func (e ErrNotAvailable) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrNotAvailable) WithField(key string, content interface{}) enriched {
+func (e ErrNotAvailable) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -366,7 +370,7 @@ func (e ErrDuplicate) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrDuplicate) WithField(key string, content interface{}) enriched {
+func (e ErrDuplicate) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -394,7 +398,7 @@ func (e ErrInvalidRequest) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrInvalidRequest) WithField(key string, content interface{}) enriched {
+func (e ErrInvalidRequest) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -422,7 +426,7 @@ func (e ErrUnauthorized) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrUnauthorized) WithField(key string, content interface{}) enriched {
+func (e ErrUnauthorized) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -450,7 +454,7 @@ func (e ErrForbidden) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrForbidden) WithField(key string, content interface{}) enriched {
+func (e ErrForbidden) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -478,7 +482,7 @@ func (e ErrAborted) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrAborted) WithField(key string, content interface{}) enriched {
+func (e ErrAborted) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -506,7 +510,7 @@ func (e ErrOverflow) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrOverflow) WithField(key string, content interface{}) enriched {
+func (e ErrOverflow) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -534,7 +538,7 @@ func (e ErrOverload) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrOverload) WithField(key string, content interface{}) enriched {
+func (e ErrOverload) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -562,7 +566,7 @@ func (e ErrNotImplemented) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrNotImplemented) WithField(key string, content interface{}) enriched {
+func (e ErrNotImplemented) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -619,7 +623,7 @@ func (e ErrList) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrList) WithField(key string, content interface{}) enriched {
+func (e ErrList) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -652,7 +656,7 @@ func (e ErrInvalidInstance) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrInvalidInstance) WithField(key string, content interface{}) enriched {
+func (e ErrInvalidInstance) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -680,7 +684,7 @@ func (e ErrInvalidParameter) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrInvalidParameter) WithField(key string, content interface{}) enriched {
+func (e ErrInvalidParameter) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -742,7 +746,7 @@ func (e ErrInvalidInstanceContent) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrInvalidInstanceContent) WithField(key string, content interface{}) enriched {
+func (e ErrInvalidInstanceContent) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
@@ -770,7 +774,7 @@ func (e ErrInconsistent) AddConsequence(err error) error {
 	return e
 }
 
-func (e ErrInconsistent) WithField(key string, content interface{}) enriched {
+func (e ErrInconsistent) WithField(key string, content interface{}) errorWithField {
 	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
 	return e
 }
