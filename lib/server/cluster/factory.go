@@ -170,7 +170,9 @@ func List() ([]api.Cluster, error) {
 		return clusterList, err
 	}
 	err = m.Browse(func(controller *control.Controller) error {
-		clusterList = append(clusterList, controller)
+		if controller.Identity.OK() {
+			clusterList = append(clusterList, controller)
+		}
 		return nil
 	})
 	return clusterList, err

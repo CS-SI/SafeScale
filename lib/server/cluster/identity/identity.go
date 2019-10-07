@@ -25,10 +25,10 @@ import (
 
 // Identity contains the bare minimum information about a cluster
 type Identity struct {
-	Name       string          `json:"name"`       // Name is the name of the cluster
-	Flavor     Flavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
-	Complexity Complexity.Enum `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
-	Keypair    *resources.KeyPair  `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
+	Name       string             `json:"name"`       // Name is the name of the cluster
+	Flavor     Flavor.Enum        `json:"flavor"`     // Flavor tells what kind of cluster it is
+	Complexity Complexity.Enum    `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
+	Keypair    *resources.KeyPair `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
 
 	// AdminPassword contains the password of cladm account. This password
 	// is used to connect via Guacamole, but can't be used with SSH
@@ -57,4 +57,15 @@ func (i *Identity) Replace(p serialize.Property) serialize.Property {
 	i.Keypair = &resources.KeyPair{}
 	*i.Keypair = *src.Keypair
 	return i
+}
+
+func (i *Identity) OK() bool {
+	if i == nil {
+		return false
+	}
+
+	result := true
+	result = result && i.Name != ""
+	result = result && i.Flavor != 0
+	return result
 }
