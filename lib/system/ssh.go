@@ -665,14 +665,13 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		return "", scerr.InvalidParameterError("phase", "cannot be empty string")
 	}
 	if ssh.Host == "" {
-		return "", scerr.InvalidParameterError("ssh.Host", "cannot be empty string")
+		return "", scerr.InvalidInstanceContentError("ssh.Host", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), true).GoingIn().OnExitTrace()()
 
-	// log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
 	defer scerr.OnExitTraceError(
-		fmt.Sprintf("Waiting for remote SSH phase '%s' of host '%s', timeout of %d minutes", phase, ssh.Host, int(timeout.Minutes())),
+		fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout)),
 		&err,
 	)()
 
@@ -708,10 +707,9 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		timeout,
 	)
 	if retryErr != nil {
-		log.Debugf("failure creating host resource phase [%s] [%s] in [%s]: %v", originalPhase, ssh.Host, temporal.FormatDuration(time.Since(begins)), retryErr)
 		return stdout, retryErr
 	}
-	log.Infof("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
+	log.Debugf("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 
