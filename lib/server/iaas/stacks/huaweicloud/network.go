@@ -418,7 +418,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	for _, s := range *subnetworks {
 		_, sDesc, _ := net.ParseCIDR(s.CIDR)
 		if cidrIntersects(networkDesc, sDesc) {
-			return nil, fmt.Errorf("cannot create subnet '%s (%s)', would intersect with '%s (%s)'", name, cidr, s.Name, s.CIDR)
+			return nil, scerr.Wrap(fmt.Errorf("would intersect with '%s (%s)'", s.Name, s.CIDR), "cannot create subnet")
 		}
 	}
 
@@ -468,8 +468,12 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-
-		return nil, fmt.Errorf("error requesting subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
+		err = openstack.TranslateProviderError(err)
+		switch err.(type) {
+		case *scerr.ErrInvalidRequest:
+			return nil, scerr.Wrap(err, "cannot create subnet")
+		}
+		return nil, fmt.Errorf("error requesting subnet %s creation: %s", req.Name, err.Error())
 	}
 	subnet, err := respCreate.Extract()
 	if err != nil {
