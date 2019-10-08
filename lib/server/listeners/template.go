@@ -19,7 +19,6 @@ package listeners
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -42,7 +42,7 @@ type TemplateListener struct{}
 // List available templates
 func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (tl *pb.TemplateList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	all := in.GetAll()
 
@@ -51,20 +51,22 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Teplates List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't list templates: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list templates: no tenant set")
+		msg := "cannot list templates: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := TemplateHandler(tenant.Service)
 	templates, err := handler.List(ctx, all)
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(err, "cannot list templates").ToGRPCStatus()
 	}
 
 	// Map resources.Host to pb.Host

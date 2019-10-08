@@ -40,13 +40,16 @@ var DataHandler = handlers.NewDataHandler
 type DataListener struct{}
 
 // List will returns all the files from one or several ObjectStorages
-func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl *pb.FileList, err error) {
+func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.FileList, err error) {
+	if s == nil {
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Data List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -60,7 +63,7 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl 
 	handler := DataHandler(tenants.StorageServices)
 	fileNames, uploadDates, fileSizes, fileBuckets, err := handler.List(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, scerr.Wrap(err, "cannot list buckets").ToGRPCStatus()
 	}
 
 	return conv.ToPBFileList(fileNames, uploadDates, fileSizes, fileBuckets), nil
@@ -68,84 +71,104 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (fl 
 
 // Push upload a file to one or several ObjectStorages
 func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
+	empty = &google_protobuf.Empty{}
+	if s == nil {
+		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if in == nil {
+		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Data Push"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
-		log.Info("Can't list buckets: no storage tenants set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
+		// log.Info("Can't list buckets: no storage tenants set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
 	err = handler.Push(ctx, in.GetLocalPath(), objectName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return empty, scerr.Wrap(err, "cannot push data").ToGRPCStatus()
 	}
 
-	return &google_protobuf.Empty{}, nil
+	return empty, nil
 }
 
-// Get fetch a file from one or several ObjectStorages
-func (s *DataListener) Get(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
+// Pull fetches a file from one or several ObjectStorages
+func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
+	empty = &google_protobuf.Empty{}
+	if s == nil {
+		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if in == nil {
+		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Data Push"); err == nil {
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Data Pull"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
-		log.Info("Can't list buckets: no storage tenants set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
+		// log.Info("Can't list buckets: no storage tenants set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot pull data: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
 	err = handler.Get(ctx, in.GetLocalPath(), objectName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return empty, scerr.Wrap(err, "cannot pull data").ToGRPCStatus()
 	}
 
-	return &google_protobuf.Empty{}, nil
+	return empty, nil
 }
 
 // Delete remove a file from one or several Object Storages
 func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
+	empty = &google_protobuf.Empty{}
+	if s == nil {
+		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if in == nil {
+		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Data Delete"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenants := GetCurrentStorageTenants()
 	if tenants == nil {
-		log.Info("Can't list buckets: no storage tenants set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
+		return empty, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
 	handler := DataHandler(tenants.StorageServices)
 	err = handler.Delete(ctx, objectName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return empty, scerr.Wrap(err, "cannot delete data").ToGRPCStatus()
 	}
 
-	return &google_protobuf.Empty{}, nil
+	return empty, nil
 }

@@ -327,7 +327,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Loads primary gateway metadata
 	primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			if !ok {
 				return err
 			}
@@ -347,7 +347,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	if !gwFailoverDisabled {
 		secondaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.SecondaryGatewayId)
 		if err != nil {
-			if _, ok := err.(scerr.ErrNotFound); ok {
+			if _, ok := err.(*scerr.ErrNotFound); ok {
 				if !ok {
 					return err
 				}
@@ -1095,7 +1095,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 		pbHost, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
 		if err != nil {
 			// If host seems deleted, consider leaving as a success
-			if _, ok := err.(scerr.ErrNotFound); ok {
+			if _, ok := err.(*scerr.ErrNotFound); ok {
 				continue
 			}
 			return err

@@ -272,7 +272,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	if err != nil {
 		err = TranslateError(err)
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case *scerr.ErrNotFound:
 		default:
 			log.Errorf("failed to delete network: %+v", err)
 		}
@@ -289,7 +289,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		err := s.deleteSubnet(sn.ID)
 		if err != nil {
 			switch err.(type) {
-			case scerr.ErrNotAvailable:
+			case *scerr.ErrNotAvailable:
 				return err
 			default:
 				msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
@@ -301,7 +301,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	err = networks.Delete(s.NetworkClient, id).ExtractErr()
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotAvailable:
+		case *scerr.ErrNotAvailable:
 			return err
 		default:
 			msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
@@ -357,9 +357,9 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
 				default:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
@@ -654,7 +654,7 @@ func (s *Stack) deleteSubnet(id string) error {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			// If we have the last error of the delete try, returns this error
 			if err != nil {
-				if _, ok := err.(scerr.ErrNotAvailable); ok {
+				if _, ok := err.(*scerr.ErrNotAvailable); ok {
 					return err
 				}
 				return resources.TimeoutError(fmt.Sprintf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), err), temporal.GetContextTimeout())

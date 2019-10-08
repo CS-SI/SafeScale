@@ -99,7 +99,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	err = handler.service.StartHost(id)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -109,7 +109,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	err = handler.service.WaitHostState(id, HostState.STARTED, temporal.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -142,7 +142,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	err = handler.service.StopHost(id)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -152,7 +152,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	err = handler.service.WaitHostState(id, HostState.STOPPED, temporal.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -183,7 +183,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	err = handler.service.RebootHost(id)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -197,9 +197,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case scerr.ErrTimeout:
-			return retryErr
-		case scerr.ErrNotFound:
+		case *scerr.ErrTimeout, *scerr.ErrNotFound:
 			return retryErr
 		default:
 			return retryErr
@@ -245,7 +243,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrTimeout, scerr.ErrNotFound:
+		case *scerr.ErrTimeout, *scerr.ErrNotFound:
 			return nil, err
 		default:
 			return nil, err
@@ -274,7 +272,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	newHost, err = handler.service.ResizeHost(id, hostSizeRequest)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrTimeout, scerr.ErrNotFound:
+		case *scerr.ErrTimeout, *scerr.ErrNotFound:
 			return nil, err
 		default:
 			return nil, err
@@ -327,8 +325,8 @@ func (handler *HostHandler) Create(
 	host, err := handler.service.GetHostByName(name)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
-		case scerr.ErrTimeout:
+		case *scerr.ErrNotFound:
+		case *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -348,7 +346,7 @@ func (handler *HostHandler) Create(
 		networkHandler := NewNetworkHandler(handler.service)
 		defaultNetwork, err = networkHandler.Inspect(ctx, net)
 		if err != nil {
-			if _, ok := err.(scerr.ErrNotFound); ok {
+			if _, ok := err.(*scerr.ErrNotFound); ok {
 				return nil, err
 			}
 			return nil, err
@@ -387,7 +385,7 @@ func (handler *HostHandler) Create(
 		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
 		if err != nil {
 			switch err.(type) {
-			case scerr.ErrNotFound, scerr.ErrTimeout:
+			case *scerr.ErrNotFound, *scerr.ErrTimeout:
 				return nil, err
 			default:
 				return nil, err
@@ -415,7 +413,7 @@ func (handler *HostHandler) Create(
 		template, err = handler.service.SelectTemplateByName(templateName)
 		if err != nil {
 			switch err.(type) {
-			case scerr.ErrNotFound, scerr.ErrTimeout:
+			case *scerr.ErrNotFound, *scerr.ErrTimeout:
 				return nil, err
 			default:
 				return nil, err
@@ -434,7 +432,7 @@ func (handler *HostHandler) Create(
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, retryErr
 		default:
 			return nil, retryErr
@@ -455,9 +453,7 @@ func (handler *HostHandler) Create(
 	host, userData, err = handler.service.CreateHost(hostRequest)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrInvalidRequest:
-			return nil, err
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrInvalidRequest, *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -468,9 +464,9 @@ func (handler *HostHandler) Create(
 			derr := handler.service.DeleteHost(host.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					log.Errorf("failed to delete host '%s', resource not found: %v", host.Name, derr)
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					log.Errorf("failed to delete host '%s', timeout: %v", host.Name, derr)
 				default:
 					log.Errorf("failed to delete host '%s', other reason: %v", host.Name, derr)
@@ -771,7 +767,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	network, err = handler.service.GetNetworkByName(resources.SingleHostNetworkName)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrInvalidRequest, *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -790,7 +786,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	network, err = handler.service.CreateNetwork(request)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrInvalidRequest, *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -852,10 +848,10 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, resources.ResourceNotFoundError("host", ref)
 		}
-		return nil, err
+		return nil, scerr.Wrap(err, fmt.Sprintf("failed to load metadata of host [%s]", ref))
 	}
 
 	host, err = mh.Get()
@@ -865,15 +861,15 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrInvalidRequest, *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
-			return nil, err
+			return nil, scerr.Wrap(err, fmt.Sprintf("failed to inspect host [%s]", ref))
 		}
 	}
-
+	// FIXME: this _must not_ happen
 	if host == nil {
-		return nil, fmt.Errorf("failure inspecting host [%s]", ref)
+		return nil, scerr.NewError(fmt.Sprintf("failed to inspect host [%s]", ref), nil, nil)
 	}
 
 	return host, nil
@@ -887,7 +883,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return resources.ResourceNotFoundError("host", ref)
 		}
 		return err
@@ -1013,9 +1009,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	err = handler.service.DeleteHost(host.ID) // FIXME DeleteHost, check retry.ErrTimeout
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case *scerr.ErrNotFound:
 			deleteMetadataOnly = true
-		case scerr.ErrTimeout:
+		case *scerr.ErrTimeout:
 			moreTimeNeeded = true
 		default:
 			return err

@@ -19,10 +19,11 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -223,7 +224,7 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 	defer t.lock.Unlock()
 
 	if t.status != READY {
-		return nil, fmt.Errorf("Can't start task '%s': not ready!", tid)
+		return nil, fmt.Errorf("can't start task '%s': not ready", tid)
 	}
 	if action == nil {
 		t.status = DONE
@@ -262,7 +263,7 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 			// tracer.Trace("receiving abort signal")
 			t.lock.Lock()
 			t.status = ABORTED
-			t.err = scerr.AbortedError()
+			t.err = scerr.AbortedError("", nil)
 			t.lock.Unlock()
 			finish = true
 		}
@@ -381,7 +382,7 @@ func (t *task) Reset() (Task, error) {
 
 	status := t.GetStatus()
 	if status == RUNNING {
-		return nil, fmt.Errorf("Can't reset task '%s': task running!", tid)
+		return nil, fmt.Errorf("can't reset task '%s': task running", tid)
 	}
 
 	t.lock.Lock()

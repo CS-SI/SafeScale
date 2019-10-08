@@ -102,7 +102,7 @@ func (i *Item) DeleteFrom(path string, name string) error {
 
 	err := i.folder.Search(path, name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			// If entry not found, consider a success
 			return nil
 		}

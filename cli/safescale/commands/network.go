@@ -18,6 +18,7 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -26,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -56,6 +58,7 @@ var networkList = cli.Command{
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
 		networks, err := client.New().Network.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
 		}
 		return clitools.SuccessResponse(networks.GetNetworks())
@@ -80,6 +83,7 @@ var networkDelete = cli.Command{
 
 		err := client.New().Network.Delete(networkList, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -100,6 +104,7 @@ var networkInspect = cli.Command{
 
 		network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
 		}
 
@@ -114,21 +119,26 @@ var networkInspect = cli.Command{
 		pgwID := network.GetGatewayId()
 		sgwID := network.GetSecondaryGatewayId()
 		pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())
-		if err == nil {
-			mapped["gateway_name"] = pgw.Name
-		} else {
-			mapped["gateway_name"] = "<unknown>"
+		if err != nil {
+			err = scerr.FromGRPCStatus(err)
+			var what string
+			if network.GetSecondaryGatewayId() != "" {
+				what = "primary"
+			}
+			casted := scerr.Wrap(err, fmt.Sprintf("failed to inspect %s gateway", what))
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(casted.Error())))
 		}
 		mapped["gateway_name"] = pgw.Name
 		if network.GetSecondaryGatewayId() != "" {
 			sgw, err = client.New().Host.Inspect(sgwID, temporal.GetExecutionTimeout())
-			if err == nil {
-				mapped["secondary_gateway_name"] = sgw.Name
-			} else {
-				mapped["secondary_gateway_name"] = "<unknown>"
+			if err != nil {
+				err = scerr.FromGRPCStatus(err)
+				casted := scerr.Wrap(err, "failed to inspect secondary gateway")
+				return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(casted.Error())))
 			}
+			mapped["secondary_gateway_name"] = sgw.Name
 		}
-		// Removed entry virtual_ip if empty
+		// Removed entry 'virtual_ip' if empty
 		if len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
 			delete(mapped, "virtual_ip")
 		}
@@ -221,6 +231,7 @@ var networkCreate = cli.Command{
 		}
 		network, err := client.New().Network.Create(netdef, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 		}
 		return clitools.SuccessResponse(network)

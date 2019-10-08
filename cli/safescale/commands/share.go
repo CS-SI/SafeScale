@@ -29,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -118,6 +119,7 @@ var shareCreate = cli.Command{
 		}
 		err := client.New().Share.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -150,6 +152,7 @@ var shareDelete = cli.Command{
 			defer wg.Done()
 			err := client.New().Share.Delete(aname, temporal.GetExecutionTimeout())
 			if err != nil {
+				err = scerr.FromGRPCStatus(err)
 				errMessage += fmt.Sprintf("error while deleting share %s : %s \n", aname, utils.Capitalize(err.Error()))
 				errs++
 			}
@@ -176,6 +179,7 @@ var shareList = cli.Command{
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		list, err := client.New().Share.List(0)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error()))
 		}
 		return clitools.SuccessResponse(list.ShareList)
@@ -216,6 +220,7 @@ var shareMount = cli.Command{
 		}
 		err := client.New().Share.Mount(def, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -242,6 +247,7 @@ var shareUnmount = cli.Command{
 		}
 		err := client.New().Share.Unmount(def, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -262,6 +268,7 @@ var shareInspect = cli.Command{
 
 		list, err := client.New().Share.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error()))
 		}
 		return clitools.SuccessResponse(list)

@@ -19,11 +19,12 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // TaskGroupResult is a map of the TaskResult of each task
@@ -240,7 +241,7 @@ func (tg *taskGroup) Reset() (Task, error) {
 	tid, _ := tg.GetID() // FIXME Later
 
 	if tg.task.status == RUNNING {
-		return nil, fmt.Errorf("Can't reset task group '%s': group running!", tid)
+		return nil, fmt.Errorf("can't reset task group '%s': group running", tid)
 	}
 
 	tg.task.lock.Lock()

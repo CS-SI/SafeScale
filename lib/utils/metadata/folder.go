@@ -19,8 +19,9 @@ package metadata
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
 
@@ -124,7 +125,7 @@ func (f *Folder) Delete(path string, name string) error {
 func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) error {
 	err := f.Search(path, name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return err
 		}
 
@@ -134,7 +135,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	var buffer bytes.Buffer
 	_, err = f.service.GetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return scerr.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
 		}
 		return err
@@ -143,7 +144,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	if f.crypt {
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			if _, ok := err.(scerr.ErrNotFound); ok {
+			if _, ok := err.(*scerr.ErrNotFound); ok {
 				return scerr.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
 			}
 			return err
@@ -151,7 +152,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	}
 	err = callback(data)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return scerr.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
 		}
 		return err

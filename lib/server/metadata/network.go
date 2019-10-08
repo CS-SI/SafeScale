@@ -144,7 +144,7 @@ func (m *Network) Reload() (err error) {
 
 	err = m.ReadByID(*m.id)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return scerr.NotFoundError(fmt.Sprintf("the metadata of Network '%s' vanished", *m.name))
 		}
 		return err
@@ -463,8 +463,8 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 		func() error {
 			innerErr := mn.ReadByReference(ref)
 			if innerErr != nil {
-				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("no metadata found", innerErr)
+				if _, ok := innerErr.(*scerr.ErrNotFound); ok {
+					return retry.AbortedError("no metadata found", innerErr)
 				}
 				return innerErr
 			}
@@ -506,7 +506,7 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 	}
 	err = network.ReadByID(networkID)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, scerr.NotFoundError("failed to find metadata of network using gateway")
 		}
 		return nil, err
@@ -609,7 +609,7 @@ func (mg *Gateway) Reload() (err error) {
 
 	err = mg.Read()
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return scerr.NotFoundError(fmt.Sprintf("metadata about the gateway of network '%s' doesn't exist anymore", mg.networkID))
 		}
 		return err
@@ -683,8 +683,8 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 		func() error {
 			innerErr := mg.Read()
 			if innerErr != nil {
-				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("", innerErr)
+				if _, ok := innerErr.(*scerr.ErrNotFound); ok {
+					return retry.AbortedError("", innerErr)
 				}
 				return innerErr
 			}
@@ -694,7 +694,7 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
+		if _, ok := retryErr.(*scerr.ErrTimeout); !ok {
 			return nil, scerr.Cause(retryErr)
 		}
 		return nil, retryErr
@@ -732,7 +732,7 @@ func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *
 
 	err = mn.ReadByID(networkID)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, scerr.NotFoundError(fmt.Sprintf("metadata about the network '%s' doesn't exist anymore", networkID))
 		}
 		return nil, err

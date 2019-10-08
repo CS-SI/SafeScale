@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -71,6 +72,7 @@ var dataPush = cli.Command{
 		}
 		err := client.New().Data.Push(localFilePath, fileName, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -102,8 +104,9 @@ var dataGet = cli.Command{
 			localFilePath = utils.AbsPathify(fileName)
 		}
 
-		err := client.New().Data.Get(localFilePath, fileName, temporal.GetExecutionTimeout())
+		err := client.New().Data.Pull(localFilePath, fileName, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -124,6 +127,7 @@ var dataDelete = cli.Command{
 		fileName := c.Args().First()
 		err := client.New().Data.Delete(fileName, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -138,6 +142,7 @@ var dataList = cli.Command{
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", dataCmdName, c.Command.Name, c.Args())
 		filesList, err := client.New().Data.List(temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
 		}
 		return clitools.SuccessResponse(filesList)

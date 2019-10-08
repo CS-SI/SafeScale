@@ -397,7 +397,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					killErr := s.DeleteHost(server.ID)
 					if killErr != nil {
 						switch killErr.(type) {
-						case scerr.ErrTimeout:
+						case *scerr.ErrTimeout:
 							logrus.Error("Timeout cleaning up gcp instance")
 						default:
 							logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
@@ -432,7 +432,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				killErr := s.DeleteHost(host.ID)
 				if killErr != nil {
 					switch killErr.(type) {
-					case scerr.ErrTimeout:
+					case *scerr.ErrTimeout:
 						logrus.Error("Timeout cleaning up gcp instance")
 					default:
 						logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
@@ -462,9 +462,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)

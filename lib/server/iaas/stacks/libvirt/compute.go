@@ -27,9 +27,6 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -37,6 +34,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -862,7 +863,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			networkDefault, err := s.GetNetwork("default")
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					networkDefault, err = s.CreateNetwork(
 						resources.NetworkRequest{
 							Name:      "default",

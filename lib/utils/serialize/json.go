@@ -17,8 +17,9 @@
 package serialize
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
@@ -65,10 +66,11 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 		return scerr.InvalidParameterError("apply", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
-	defer sp.unlock()
+	defer scerr.OnExitTraceError(concurrency.NewTracer(nil, "", false).TraceMessage(""), &err)()
+	// To capture panics that may occur
+	defer scerr.OnPanic(&err)()
+
+	defer sp.unlock() // May panic
 
 	if data, ok := sp.jsonProperty.Data.(Property); ok {
 		clone := data.Clone()
@@ -85,6 +87,8 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 }
 
 // unlock ...
+//
+// May panic; see scerr.OnPanic() to capture it.
 func (sp *SyncedJSONProperty) unlock() {
 	if sp == nil {
 		panic("Calling sp.unlock() with sp==nil!")
@@ -108,6 +112,8 @@ type JSONProperties struct {
 }
 
 // NewJSONProperties creates a new JSonProperties instance
+//
+// May panic; see scerr.OnPanic() to capture it
 func NewJSONProperties(module string) *JSONProperties {
 	if module == "" {
 		panic("module is empty!")
@@ -131,6 +137,8 @@ func (x *JSONProperties) Lookup(key string) bool {
 // Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
 // If no extension exists corresponding to the key, an empty extension is created (in other words, this call
 // cannot fail because a key doesn't exist).
+//
+// May panic; see scerr.OnPanic() to capture it
 func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 	if x == nil {
 		panic("Calling utils.serialize.JSONProperties::LockForRead() from nil pointer!")
@@ -169,6 +177,8 @@ func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 // Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
 // If no extension exists corresponding to the key, an empty one is created (in other words, this call
 // cannot fail because a key doesn't exist).
+//
+// May panic; see scerr.OnPanic() to capture it.
 func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
 	if x == nil {
 		panic("Calling x.LockForWrite() with x==nil!")
@@ -204,6 +214,8 @@ func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
+//
+// May panic; see scerr.OnPanic() to capture it.
 func (x *JSONProperties) SetModule(module string) {
 	if module != "" && x.module == module {
 		return

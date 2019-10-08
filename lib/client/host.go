@@ -61,8 +61,8 @@ func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
 		return nil, err
 	}
 
-	return service.Inspect(ctx, &pb.Reference{Name: name})
-
+	host, err := service.Inspect(ctx, &pb.Reference{Name: name})
+	return host, err
 }
 
 // Get host status

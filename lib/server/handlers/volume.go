@@ -109,7 +109,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case *scerr.ErrNotFound:
 			return resources.ResourceNotFoundError("volume", ref)
 		default:
 			logrus.Debugf("failed to delete volume: %+v", err)
@@ -140,9 +140,9 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	err = handler.service.DeleteVolume(volume.ID)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case *scerr.ErrNotFound:
 			logrus.Warnf("Unable to find the volume on provider side, cleaning up metadata")
-		case scerr.ErrInvalidRequest, scerr.ErrTimeout:
+		case *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
 			return err
 		default:
 			return err
@@ -188,7 +188,7 @@ func (handler *VolumeHandler) Inspect(
 
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, nil, resources.ResourceNotFoundError("volume", ref)
 		}
 		return nil, nil, err
@@ -258,7 +258,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	})
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrInvalidRequest, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -272,9 +272,9 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 			derr := handler.service.DeleteVolume(newVolume.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete volume '%s': %v", newVolume.Name, derr)
@@ -325,7 +325,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return err
 		}
 		return err
@@ -407,7 +407,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				})
 				if err != nil {
 					switch err.(type) {
-					case scerr.ErrNotFound, scerr.ErrInvalidRequest, scerr.ErrTimeout:
+					case *scerr.ErrNotFound, *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
 						return err
 					default:
 						return err
@@ -419,9 +419,9 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)
 						if derr != nil {
 							switch derr.(type) {
-							case scerr.ErrNotFound:
+							case *scerr.ErrNotFound:
 								logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-							case scerr.ErrTimeout:
+							case *scerr.ErrTimeout:
 								logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							default:
 								logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
@@ -521,9 +521,9 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
 			if derr != nil {
 				switch derr.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
@@ -662,7 +662,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	// Load volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			return err
 		}
 		return resources.ResourceNotFoundError("volume", volumeName)
@@ -745,7 +745,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				err = handler.service.DeleteVolumeAttachment(host.ID, attachment.AttachID)
 				if err != nil {
 					switch err.(type) {
-					case scerr.ErrNotFound, scerr.ErrInvalidRequest, scerr.ErrTimeout:
+					case *scerr.ErrNotFound, *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
 						return err
 					default:
 						return err

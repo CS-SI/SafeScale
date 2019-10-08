@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/urfave/cli"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -33,6 +32,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -73,6 +73,7 @@ var hostStart = cli.Command{
 		hostRef := c.Args().First()
 		err := client.New().Host.Start(hostRef, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -92,6 +93,7 @@ var hostStop = cli.Command{
 		hostRef := c.Args().First()
 		err := client.New().Host.Stop(hostRef, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -112,6 +114,7 @@ var hostReboot = cli.Command{
 		hostRef := c.Args().First()
 		err := client.New().Host.Reboot(hostRef, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -131,6 +134,7 @@ var hostList = cli.Command{
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
 		hosts, err := client.New().Host.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
 		}
 		jsoned, _ := json.Marshal(hosts.GetHosts())
@@ -161,7 +165,8 @@ var hostInspect = cli.Command{
 		}
 		resp, err := client.New().Host.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error())))
+			err = scerr.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(resp)
 	},
@@ -179,6 +184,7 @@ var hostStatus = cli.Command{
 		}
 		resp, err := client.New().Host.Status(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
@@ -278,6 +284,7 @@ var hostCreate = cli.Command{
 		}
 		resp, err := client.New().Host.Create(*def, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
@@ -338,6 +345,7 @@ var hostResize = cli.Command{
 		}
 		resp, err := client.New().Host.Resize(def, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
@@ -361,6 +369,7 @@ var hostDelete = cli.Command{
 
 		err := client.New().Host.Delete(hostList, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -379,6 +388,7 @@ var hostSSH = cli.Command{
 		}
 		resp, err := client.New().Host.SSHConfig(c.Args().First())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh config of host", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
@@ -438,6 +448,7 @@ var hostAddFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -448,6 +459,7 @@ var hostAddFeatureCommand = cli.Command{
 		}
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -480,6 +492,7 @@ var hostListFeaturesCommand = cli.Command{
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
 		features, err := install.ListFeatures("host")
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		return clitools.SuccessResponse(features)
@@ -514,6 +527,7 @@ var hostCheckFeatureCommand = cli.Command{
 
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
@@ -533,6 +547,7 @@ var hostCheckFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -543,6 +558,7 @@ var hostCheckFeatureCommand = cli.Command{
 		}
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -585,6 +601,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
@@ -604,6 +621,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -614,6 +632,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		}
 		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}

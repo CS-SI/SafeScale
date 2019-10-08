@@ -110,8 +110,7 @@ func (s *Session) Disconnect() {
 	}
 }
 
-// DecorateError changes the error to something more comprehensible when
-// timeout occurred
+// DecorateError changes the error to something more comprehensible
 func DecorateError(err error, action string, maySucceed bool) error {
 	if IsTimeoutError(err) {
 		msg := "%s took too long (> %v) to respond"
@@ -120,16 +119,17 @@ func DecorateError(err error, action string, maySucceed bool) error {
 		}
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
 	}
-	msg := err.Error()
-	if strings.Contains(msg, "desc = ") {
-		pos := strings.Index(msg, "desc = ") + 7
-		msg = msg[pos:]
 
-		if strings.Index(msg, " :") == 0 {
-			msg = msg[2:]
-		}
-		return fmt.Errorf(msg)
-	}
+	// msg := err.Error()
+	// if strings.Contains(msg, "desc = ") {
+	// 	pos := strings.Index(msg, "desc = ") + 7
+	// 	msg = msg[pos:]
+
+	// 	if strings.Index(msg, " :") == 0 {
+	// 		msg = msg[2:]
+	// 	}
+	// 	return fmt.Errorf(msg)
+	// }
 	return err
 }
 

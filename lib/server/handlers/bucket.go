@@ -201,7 +201,7 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 	// Check bucket existence
 	_, err = handler.Inspect(ctx, bucketName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return err
 		}
 		return err
@@ -211,7 +211,7 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 	hostHandler := NewHostHandler(handler.service)
 	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return err
 		}
 		return err

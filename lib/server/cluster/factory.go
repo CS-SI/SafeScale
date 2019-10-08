@@ -52,10 +52,10 @@ func Load(task concurrency.Task, name string) (api.Cluster, error) {
 	}
 	err = m.Read(task, name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, err
 		}
-		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
+		return nil, fmt.Errorf("failed to get metadata for cluster '%s': %s", name, err.Error())
 	}
 	controller, err := m.Get()
 	if err != nil {

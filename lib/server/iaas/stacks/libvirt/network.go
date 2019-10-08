@@ -21,12 +21,13 @@ package local
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"math"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
@@ -141,7 +142,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	libvirtNetwork, err := getNetworkFromRef(name, s.LibvirtService)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 	}

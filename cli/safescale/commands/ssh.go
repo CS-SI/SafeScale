@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -80,6 +81,7 @@ var sshRun = cli.Command{
 		}
 		retcode, stdout, stderr, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
@@ -124,6 +126,7 @@ var sshCopy = cli.Command{
 		}
 		retcode, _, _, err := client.New().SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
 		}
 		if retcode != 0 {
@@ -145,6 +148,7 @@ var sshConnect = cli.Command{
 		}
 		err := client.New().SSH.Connect(c.Args().Get(0), 0)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh connect", false).Error()))
 		}
 		return nil
@@ -194,6 +198,7 @@ var sshTunnel = cli.Command{
 		//c.GlobalInt("port") is the grpc port aka. 50051
 		err := client.New().SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh tunnel", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -246,6 +251,7 @@ var sshClose = cli.Command{
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
 		err := client.New().SSH.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh close", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
