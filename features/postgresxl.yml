@@ -97,7 +97,7 @@ feature:
                             startup = act
                             listen_addresses = '*'
                             nodename = gtmmaster
-                            port = {{ .GtmNodePort }}}}
+                            port = {{ .GtmNodePort }}
                             synchronous_backup = true
                             EOF
 
@@ -227,8 +227,8 @@ feature:
                                         initgtm -Z gtm_proxy -D \${PGSQL_DATA}
                                         ;;
                                     coordinator|data)
-                                        # initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=scram-sha-256 --username=postgres --pwfile=/run/secrets/safescale.postgresxl.password
-                                        initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=md5 --username=postgres --pwfile=/run/secrets/safescale.postgresxl.password
+                                        # initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=scram-sha-256 --username=postgres --pwfile=/run/secrets/postgresxl.password
+                                        initdb -D \${PGSQL_DATA} --nodename \$NODENAME --auth=md5 --username=postgres --pwfile=/run/secrets/postgresxl.password
                                         ;;
                                 esac
                             fi
@@ -660,7 +660,7 @@ feature:
                         run: |
                             docker network rm postgresxl_net || true
                             sfRemoveDockerImage postgresxl:latest
-                            docker secret rm postgresxl.password &>/dev/null
+                            sfRetry 5m 5 "docker secret rm postgresxl.password &>/dev/null"
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
                             rm -rf ${SF_ETCDIR}/postgresxl ${SF_LOGDIR}/postgresxl
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then
