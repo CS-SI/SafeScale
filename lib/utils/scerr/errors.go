@@ -484,22 +484,31 @@ func AbortedError(msg string, err error) *ErrAborted {
 // ErrOverflow is used when a limit is reached
 type ErrOverflow struct {
 	*errCore
+	limit uint
 }
 
 // OverflowError creates a ErrOverflow error
-func OverflowError(msg string) *ErrOverflow {
+func OverflowError(msg string, limit uint, err error) *ErrOverflow {
+	if limit > 0 {
+		limitMsg := fmt.Sprintf("(limit reached: %d)", limit)
+		if msg != "" {
+			msg += " "
+		}
+		msg += limitMsg
+	}
 	return &ErrOverflow{
 		errCore: &errCore{
 			Message:      msg,
-			Causer:       nil,
+			Causer:       err,
 			consequences: []error{},
 			Fields:       make(fields),
 			grpcCode:     codes.OutOfRange,
 		},
+		limit: limit,
 	}
 }
 
-// ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occured in a given time).
+// ErrOverload when action reaches a limit (ie too many requests occured in a given time).
 type ErrOverload struct {
 	*errCore
 }
