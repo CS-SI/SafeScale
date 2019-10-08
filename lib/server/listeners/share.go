@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	convert "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -48,12 +48,12 @@ var ShareHandler = handlers.NewShareHandler
 type ShareListener struct{}
 
 // Create calls share service creation
-func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd *pb.ShareDefinition, err error) {
+func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *pb.ShareDefinition, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	shareName := in.GetName()
 	hostRef := srvutils.GetReference(in.GetHost())
@@ -66,21 +66,22 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create share "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't create share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot create share: no tenant set")
+		msg := "cannot create share: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := ShareHandler(tenant.Service)
 	share, err := handler.Create(ctx, shareName, hostRef, sharePath, in.GetSecurityModes(), in.GetOptions().GetReadOnly(), in.GetOptions().GetRootSquash(), in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(), in.GetOptions().GetCrossMount(), in.GetOptions().GetSubtreeCheck())
 	if err != nil {
-		tbr := scerr.Wrap(err, fmt.Sprintf("cannot create share '%s'", shareName))
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		return nil, scerr.Wrap(err, "cannot create share").ToGRPCStatus()
 	}
 	return convert.ToPBShare(in.GetName(), share), err
 }
@@ -102,38 +103,35 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete share "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't delete share: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "cannot delete share: no tenant set")
+		msg := "cannot delete share: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := ShareHandler(tenant.Service)
 	_, _, _, err = handler.Inspect(ctx, shareName)
 	if err != nil {
-		switch err.(type) {
-		case scerr.ErrNotFound:
-			return empty, status.Errorf(codes.NotFound, err.Error())
-		default:
-			return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)).Error())
-		}
+		return empty, scerr.Wrap(err, "cannot delete share").ToGRPCStatus()
 	}
 
 	err = handler.Delete(ctx, shareName)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)).Error())
+		return empty, scerr.Wrap(err, "cannot delete share").ToGRPCStatus()
 	}
 	return empty, nil
 }
 
 // List return the list of all available shares
-func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (sl *pb.ShareList, err error) {
+func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.ShareList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -141,21 +139,22 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (sl
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List shares "); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't list share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list shares: no tenant set")
+		msg := "cannot list shares: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := ShareHandler(tenant.Service)
 	shares, err := handler.List(ctx)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot list Shares")
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		return nil, scerr.Wrap(err, "cannot list Shares").ToGRPCStatus()
 	}
 
 	var pbshares []*pb.ShareDefinition
@@ -171,10 +170,10 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (sl
 // Mount mounts share on a local directory of the given host
 func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) (smd *pb.ShareMountDefinition, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
@@ -187,21 +186,22 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Mount share "+in.GetShare().GetName()+" on host "+in.GetHost().GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't mount share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot mount share: no tenant set")
+		msg := "cannot mount share: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := ShareHandler(tenant.Service)
 	mount, err := handler.Mount(ctx, shareRef, hostRef, hostPath, in.GetWithCache())
 	if err != nil {
-		tbr := scerr.Wrap(err, fmt.Sprintf("cannot mount share '%s'", shareRef))
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		return nil, scerr.Wrap(err, "cannot mount share").ToGRPCStatus()
 	}
 	return convert.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
 }
@@ -233,14 +233,15 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't mount share: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "cannot unmount share: no tenant set")
+		msg := "cannot unmount share: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := ShareHandler(tenant.Service)
 	err = handler.Unmount(ctx, shareRef, hostRef)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot unmount share '%s'", shareRef)).Error())
+		return empty, scerr.Wrap(err, "cannot unmount share").ToGRPCStatus()
 	}
 	return empty, nil
 }
@@ -248,10 +249,10 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 // Inspect shows the detail of a share and all connected clients
 func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.ShareMountList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	shareRef := srvutils.GetReference(in)
 	// FIXME: validate parameters
@@ -268,18 +269,19 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't inspect share: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect share: no tenant set")
+		msg := "cannot inspect share: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := ShareHandler(tenant.Service)
 	host, share, mounts, err := handler.Inspect(ctx, shareRef)
 	if err != nil {
-		err := scerr.Wrap(err, fmt.Sprintf("cannot inspect share '%s'", shareRef))
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, scerr.Wrap(err, "cannot inspect share").ToGRPCStatus()
 	}
+	// FIXME: this _must not_ happen if err == nil
 	if host == nil {
-		return nil, resources.ResourceNotFoundError("share", shareRef)
+		return nil, scerr.Wrap(resources.ResourceNotFoundError("share", shareRef), "cannot inspect share").ToGRPCStatus()
 	}
 
 	return convert.ToPBShareMountList(host.Name, share, mounts), nil

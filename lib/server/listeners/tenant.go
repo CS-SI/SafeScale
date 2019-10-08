@@ -21,13 +21,14 @@ import (
 	"fmt"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -53,7 +54,7 @@ func getCurrentTenant() *Tenant {
 			return nil
 		}
 		// Set unique tenant as selected
-		log.Println("Unique tenant set")
+		logrus.Println("Unique tenant set")
 		for name := range tenants {
 			service, err := iaas.UseService(name)
 			if err != nil {
@@ -69,9 +70,9 @@ func getCurrentTenant() *Tenant {
 type TenantListener struct{}
 
 // List registered tenants
-func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (list *pb.TenantList, err error) {
+func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -86,25 +87,24 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (l
 
 	tenants, err := iaas.GetTenantNames()
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(err, "cannot list tenants").ToGRPCStatus()
 	}
 
-	var tl []*pb.Tenant
+	var list []*pb.Tenant
 	for tenantName, providerName := range tenants {
-		tl = append(tl, &pb.Tenant{
+		list = append(list, &pb.Tenant{
 			Name:     tenantName,
 			Provider: providerName,
 		})
 	}
 
-	return &pb.TenantList{Tenants: tl}, nil
+	return &pb.TenantList{Tenants: list}, nil
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (tn *pb.TenantName, err error) {
+func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantName, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -119,8 +119,9 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (tn
 
 	getCurrentTenant()
 	if currentTenant == nil {
-		log.Info("Can't get tenant: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot get tenant: no tenant set")
+		msg := "cannot get tenant: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 	return &pb.TenantName{Name: currentTenant.name}, nil
 }
@@ -153,10 +154,9 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 
 	service, err := iaas.UseService(in.GetName())
 	if err != nil {
-		return empty, fmt.Errorf("unable to set tenant '%s': %s", name, err.Error())
+		return empty, scerr.Wrap(err, "cannot set tenant").ToGRPCStatus()
 	}
 	currentTenant = &Tenant{name: in.GetName(), Service: service}
-	log.Infof("Current tenant is now '%s'", name)
 	return empty, nil
 }
 
@@ -182,7 +182,7 @@ func getCurrentStorageTenants() *StorageTenants {
 			return nil
 		}
 		// Set unique tenant as selected
-		log.Println("Unique tenant set")
+		logrus.Println("Unique tenant set")
 		for name := range tenants {
 			nameSlice := []string{name}
 			storageService, err := iaas.UseStorages(nameSlice)
@@ -196,7 +196,7 @@ func getCurrentStorageTenants() *StorageTenants {
 }
 
 // StorageList lists registered storage tenants
-func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (tl *pb.TenantList, err error) {
+func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantList, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
@@ -213,7 +213,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 
 	tenants, err := iaas.GetTenants()
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(err, "cannot list storage tenants").ToGRPCStatus()
 	}
 
 	var tenantList []*pb.Tenant
@@ -233,7 +233,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 }
 
 // StorageGet returns the name of the current storage tenants used for data related commands
-func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (tnl *pb.TenantNameList, err error) {
+func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantNameList, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
@@ -250,8 +250,9 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 
 	getCurrentStorageTenants()
 	if currentStorageTenants == nil {
-		log.Info("Can't get storage tenants: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot get storage tenants: no tenant set")
+		msg := "cannot get storage tenants: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	return &pb.TenantNameList{Names: currentStorageTenants.names}, nil
@@ -261,10 +262,10 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -279,10 +280,10 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 
 	storageServices, err := iaas.UseStorages(in.GetNames())
 	if err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("unable to set tenants '%v': %s", in.GetNames(), err.Error()).Error())
+		return empty, scerr.Wrap(err, "cannot set storage tenants").ToGRPCStatus()
 	}
 
 	currentStorageTenants = &StorageTenants{names: in.GetNames(), StorageServices: storageServices}
-	log.Infof("Current storage tenants are now '%v'", in.GetNames())
+	tracer.Trace("Current storage tenants are now '%v'", in.GetNames())
 	return empty, nil
 }

@@ -162,8 +162,8 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 		func() error {
 			innerErr := m.Read(task, m.name)
 			if innerErr != nil {
-				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("not found", innerErr)
+				if _, ok := innerErr.(*scerr.ErrNotFound); ok {
+					return retry.AbortedError("not found", innerErr)
 				}
 				return innerErr
 			}
@@ -173,7 +173,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
+		if _, ok := retryErr.(*scerr.ErrTimeout); !ok {
 			return scerr.Cause(retryErr)
 		}
 		return retryErr

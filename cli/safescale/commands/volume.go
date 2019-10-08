@@ -28,6 +28,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -60,6 +61,7 @@ var volumeList = cli.Command{
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", volumeCmdName, c.Command.Name, c.Args())
 		volumes, err := client.New().Volume.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of volumes", false).Error())))
 		}
 		return clitools.SuccessResponse(volumes.Volumes)
@@ -80,6 +82,7 @@ var volumeInspect = cli.Command{
 
 		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of volume", false).Error())))
 		}
 		return clitools.SuccessResponse(toDisplaybleVolumeInfo(volumeInfo))
@@ -104,6 +107,7 @@ var volumeDelete = cli.Command{
 
 		err := client.New().Volume.Delete(volumeList, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of volume", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -151,6 +155,7 @@ var volumeCreate = cli.Command{
 
 		volume, err := client.New().Volume.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(toDisplaybleVolume(volume))
@@ -192,6 +197,7 @@ var volumeAttach = cli.Command{
 		}
 		err := client.New().Volume.Attach(def, temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "attach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -211,6 +217,7 @@ var volumeDetach = cli.Command{
 
 		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
+			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unattach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)

@@ -118,7 +118,7 @@ func (mv *Volume) Reload() error {
 	}
 	err := mv.ReadByID(*mv.id)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return scerr.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
 		}
 		return err
@@ -325,8 +325,8 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 		func() error {
 			innerErr := mv.ReadByReference(ref)
 			if innerErr != nil {
-				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("no metadata found", innerErr)
+				if _, ok := innerErr.(*scerr.ErrNotFound); ok {
+					return retry.AbortedError("no metadata found", innerErr)
 				}
 				return innerErr
 			}
@@ -337,7 +337,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	)
 	if retryErr != nil {
 		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
+		if _, ok := retryErr.(*scerr.ErrTimeout); !ok {
 			return nil, scerr.Cause(retryErr)
 		}
 		return nil, retryErr

@@ -1082,7 +1082,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	// Finally delete host
 	err = client.New().Host.Delete([]string{node.ID}, temporal.GetLongOperationTimeout())
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
 			return nil
 		}

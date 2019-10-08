@@ -310,7 +310,7 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 	url += fmt.Sprintf("%s/plugins", resourceID)
 	result, _, err := k.get(ruleName, url)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			return err
 		}
 	}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
@@ -78,8 +79,8 @@ func (w ErrorTraceProvider) GetTenantParameters() map[string]interface{} {
 // Stack specific functions
 
 // NewErrorTraceProvider ...
-func NewErrorTraceProvider(innerProvider Provider, name string) *ErrorTraceProvider {
-	return &ErrorTraceProvider{InnerProvider: innerProvider, Name: name}
+func NewErrorTraceProvider(innerProvider Provider, name string) ErrorTraceProvider {
+	return ErrorTraceProvider{InnerProvider: innerProvider, Name: name}
 }
 
 // ListAvailabilityZones ...

@@ -19,7 +19,6 @@ package listeners
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -40,9 +40,12 @@ var ImageHandler = handlers.NewImageHandler
 type ImageListener struct{}
 
 // List available images
-func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *pb.ImageList, err error) {
+func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *pb.ImageList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -50,20 +53,22 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Images"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		logrus.Info("Can't list images: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list images: no tenant set")
+		msg := "cannot list images: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := ImageHandler(currentTenant.Service)
 	images, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, scerr.Wrap(err, "cannot list image").ToGRPCStatus()
 	}
 
 	// Map resources.Image to pb.Image

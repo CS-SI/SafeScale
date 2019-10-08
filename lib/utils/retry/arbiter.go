@@ -77,7 +77,7 @@ func PrevailDone(arbiters ...Arbiter) Arbiter {
 func Unsuccessful() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 
@@ -92,7 +92,7 @@ func Unsuccessful() Arbiter {
 func UnsuccessfulWhereRetcode255() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 
@@ -109,7 +109,7 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err == nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 
@@ -123,7 +123,7 @@ func Successful() Arbiter {
 func Timeout(limit time.Duration) Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 
@@ -140,7 +140,7 @@ func Timeout(limit time.Duration) Arbiter {
 func Max(limit uint) Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 

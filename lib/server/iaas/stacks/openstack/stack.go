@@ -37,6 +37,10 @@ import (
 // ProviderErrorToString creates an error string from openstack api error
 func ProviderErrorToString(err error) string {
 	switch e := err.(type) {
+	case gophercloud.ErrDefault400:
+		return fmt.Sprintf("code: 400, reason: %s", string(e.Body[:]))
+	case *gophercloud.ErrDefault400:
+		return fmt.Sprintf("code: 400, reason: %s", string(e.Body[:]))
 	case gophercloud.ErrDefault401:
 		return fmt.Sprintf("code: 401, reason: %s", string(e.Body[:]))
 	case *gophercloud.ErrDefault401:
@@ -63,10 +67,14 @@ func ProviderErrorToString(err error) string {
 // TranslateError translates gophercloud or openstack error to SafeScale error
 func TranslateError(err error) error {
 	switch e := err.(type) {
+	case gophercloud.ErrDefault400:
+		return scerr.InvalidRequestError(string(e.Body[:]))
+	case *gophercloud.ErrDefault400:
+		return scerr.InvalidRequestError(string(e.Body[:]))
 	case gophercloud.ErrDefault401:
-		return scerr.UnauthorizedError(string(e.Body[:]))
+		return scerr.NotAuthenticatedError(string(e.Body[:]))
 	case *gophercloud.ErrDefault401:
-		return scerr.UnauthorizedError(string(e.Body[:]))
+		return scerr.NotAuthenticatedError(string(e.Body[:]))
 	case gophercloud.ErrDefault403:
 		return scerr.ForbiddenError(string(e.Body[:]))
 	case *gophercloud.ErrDefault403:
@@ -84,9 +92,9 @@ func TranslateError(err error) error {
 	case *gophercloud.ErrDefault500:
 		return scerr.InvalidRequestError(string(e.Body[:]))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body[:]))
+		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body[:])), nil, nil)
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body[:]))
+		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body[:])), nil, nil)
 	}
 
 	logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())

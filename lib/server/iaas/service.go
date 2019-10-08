@@ -19,13 +19,14 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"math"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
@@ -410,7 +411,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	}
 
 	for _, t := range allTpls {
-		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
+		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
 			log.Debugf(msg, "not enough cores")

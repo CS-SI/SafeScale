@@ -21,13 +21,13 @@ import (
 	"fmt"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -42,31 +42,33 @@ type JobManagerListener struct{}
 func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	uuid := in.Uuid
 	if in.Uuid == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, "Can't stop job: job id not set")
+		return empty, scerr.InvalidRequestError("cannot stop job: job id not set")
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", uuid), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	log.Infof("Received stop order for job '%s'...", uuid)
+	tracer.Trace("Receiving stop order for job '%s'...", uuid)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
+	// FIXME: handle error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop job "+uuid); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't stop process: no tenant set")
-		return empty, status.Errorf(codes.FailedPrecondition, "Can't stop process: no tenant set")
+		msg := "cannot stop process: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := JobManagerHandler(tenant.Service)
@@ -78,7 +80,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 // List running process
 func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *pb.JobList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -86,26 +88,27 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
+	// FIXME: handler error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Processes"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't list process : no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "Can't list process: no tenant set")
+		msg := "cannot list process: no tenant set"
+		tracer.Trace(utils.Capitalize(msg))
+		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
 	handler := JobManagerHandler(tenant.Service)
 	processMap, err := handler.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list Process %s", err.Error())
+		return nil, scerr.Wrap(err, "cannot list jobs").ToGRPCStatus()
 	}
+
 	var pbProcessList []*pb.JobDefinition
 	for uuid, info := range processMap {
 		pbProcessList = append(pbProcessList, &pb.JobDefinition{Uuid: uuid, Info: info})
 	}
-
 	return &pb.JobList{List: pbProcessList}, nil
 }

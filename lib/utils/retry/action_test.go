@@ -18,11 +18,12 @@ package retry
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 func quick_sleepy() error {
@@ -69,7 +70,7 @@ func CreateErrorWithNConsequences(n uint) (err error) {
 func CreateSkippableError() (err error) {
 	err = WhileSuccessfulDelay1Second(func() error {
 		fmt.Println("Around the world...")
-		return StopRetryError("no more", scerr.NotFoundError("wrong place"))
+		return AbortedError("no more", scerr.NotFoundError("wrong place"))
 	}, time.Minute)
 	return err
 }
@@ -144,7 +145,7 @@ func TestDeferredWrappedConsequence(t *testing.T) {
 func TestVerifyErrorType(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(scerr.ErrTimeout); !ok {
+		if _, ok := recovered.(*scerr.ErrTimeout); !ok {
 			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
 		}
 
@@ -155,12 +156,12 @@ func TestVerifyErrorType(t *testing.T) {
 
 	recovered = CreateComplexErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(scerr.ErrTimeout); !ok {
+		if _, ok := recovered.(*scerr.ErrTimeout); !ok {
 			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
-			if _, ok := cause.(scerr.ErrNotFound); !ok {
+			if _, ok := cause.(*scerr.ErrNotFound); !ok {
 				t.Errorf("It should be a ErrNotFound, but it's [%s]", reflect.TypeOf(recovered).String())
 			}
 		}
@@ -170,12 +171,12 @@ func TestVerifyErrorType(t *testing.T) {
 func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
 	if recovered != nil {
-		if _, ok := recovered.(scerr.ErrTimeout); ok {
+		if _, ok := recovered.(*scerr.ErrTimeout); ok {
 			t.Errorf("It should NOT be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
-			if _, ok := cause.(scerr.ErrNotFound); ok {
+			if _, ok := cause.(*scerr.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
 				t.Errorf("This should be a NotFound error...")
@@ -374,7 +375,7 @@ func genErr() error {
 func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
 
-	if _, ok := nerr.(scerr.ErrNotFound); !ok {
+	if _, ok := nerr.(*scerr.ErrNotFound); !ok {
 		t.Errorf("Is not a resourceNotFound")
 	}
 }

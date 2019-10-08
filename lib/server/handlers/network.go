@@ -99,8 +99,8 @@ func (handler *NetworkHandler) Create(
 	_, err = handler.service.GetNetworkByName(name)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
-		case scerr.ErrInvalidRequest, scerr.ErrTimeout:
+		case *scerr.ErrNotFound:
+		case *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -127,7 +127,7 @@ func (handler *NetworkHandler) Create(
 	})
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrInvalidRequest, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -142,9 +142,9 @@ func (handler *NetworkHandler) Create(
 				derr := handler.service.DeleteNetwork(newNetwork.ID)
 				if derr != nil {
 					switch derr.(type) {
-					case scerr.ErrNotFound:
+					case *scerr.ErrNotFound:
 						logrus.Errorf("failed to delete network, resource not found: %+v", derr)
-					case scerr.ErrTimeout:
+					case *scerr.ErrTimeout:
 						logrus.Errorf("failed to delete network, timeout: %+v", derr)
 					default:
 						logrus.Errorf("failed to delete network, other reason: %+v", derr)
@@ -168,7 +168,7 @@ func (handler *NetworkHandler) Create(
 		network.VIP, err = handler.service.CreateVIP(network.ID, fmt.Sprintf("for gateways of network %s", network.Name))
 		if err != nil {
 			switch err.(type) {
-			case scerr.ErrNotFound, scerr.ErrTimeout:
+			case *scerr.ErrNotFound, *scerr.ErrTimeout:
 				return nil, err
 			default:
 				return nil, err
@@ -212,7 +212,7 @@ func (handler *NetworkHandler) Create(
 	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -239,7 +239,7 @@ func (handler *NetworkHandler) Create(
 	img, err := handler.service.SearchImage(theos)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -323,7 +323,7 @@ func (handler *NetworkHandler) Create(
 				derr := handler.deleteGateway(primaryGateway)
 				if derr != nil {
 					switch derr.(type) {
-					case scerr.ErrTimeout:
+					case *scerr.ErrTimeout:
 						logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 					default:
 					}
@@ -332,7 +332,7 @@ func (handler *NetworkHandler) Create(
 				dmerr := handler.deleteGatewayMetadata(primaryMetadata)
 				if dmerr != nil {
 					switch dmerr.(type) {
-					case scerr.ErrTimeout:
+					case *scerr.ErrTimeout:
 						logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 					default:
 					}
@@ -358,7 +358,7 @@ func (handler *NetworkHandler) Create(
 					derr := handler.deleteGateway(secondaryGateway)
 					if derr != nil {
 						switch derr.(type) {
-						case scerr.ErrTimeout:
+						case *scerr.ErrTimeout:
 							logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 						default:
 						}
@@ -367,7 +367,7 @@ func (handler *NetworkHandler) Create(
 					dmerr := handler.deleteGatewayMetadata(secondaryMetadata)
 					if dmerr != nil {
 						switch dmerr.(type) {
-						case scerr.ErrTimeout:
+						case *scerr.ErrTimeout:
 							logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 						default:
 						}
@@ -508,7 +508,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	gw, userData, err := handler.service.CreateGateway(request)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -523,9 +523,9 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					logrus.Errorf(msgRoot+", resource not found: %v", request.Name, derr)
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					logrus.Errorf(msgRoot+", timeout: %v", request.Name, derr)
 				default:
 					logrus.Errorf(msgRoot+": %v", request.Name, derr)
@@ -542,7 +542,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	gw, err = handler.service.InspectHost(gw)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -710,9 +710,9 @@ func (handler *NetworkHandler) deleteGateway(gw *resources.Host) (err error) {
 	err = handler.service.DeleteHost(gw.ID)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case *scerr.ErrNotFound:
 			logrus.Errorf("Cleaning up on failure, failed to delete gateway '%s', resource not found: %v", gw.Name, err)
-		case scerr.ErrTimeout:
+		case *scerr.ErrTimeout:
 			logrus.Errorf("Cleaning up on failure, failed to delete gateway '%s', timeout: %v", gw.Name, err)
 		default:
 			logrus.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", gw.Name, err)
@@ -740,7 +740,7 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 	err = handler.service.UnbindHostFromVIP(vip, host)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
+		case *scerr.ErrNotFound, *scerr.ErrTimeout:
 			logrus.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", err)
 		default:
 			logrus.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", err)
@@ -799,11 +799,11 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			cleanErr := handler.service.DeleteNetwork(ref)
 			if cleanErr != nil {
 				switch cleanErr.(type) {
-				case scerr.ErrNotFound, scerr.ErrTimeout:
+				case *scerr.ErrNotFound, *scerr.ErrTimeout:
 					logrus.Warnf("error deleting network on cleanup after failure to load metadata '%s': %v", ref, cleanErr)
 				default:
 					logrus.Warnf("error deleting network on cleanup after failure to load metadata '%s': %v", ref, cleanErr)
@@ -846,7 +846,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 		return nil
 	})
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotAvailable); ok {
+		if _, ok := err.(*scerr.ErrNotAvailable); ok {
 			return fmt.Errorf(errorMsg)
 		}
 		return err
@@ -872,9 +872,9 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			err = handler.service.DeleteGateway(network.GatewayID) // allow no gateway, but log it
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					logrus.Errorf("failed to delete primary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					logrus.Errorf("failed to delete primary gateway, timeout: %s", openstack.ProviderErrorToString(err))
 				default:
 					logrus.Errorf("failed to delete primary gateway: %s", openstack.ProviderErrorToString(err))
@@ -907,9 +907,9 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			err = handler.service.DeleteGateway(network.SecondaryGatewayID) // allow no gateway, but log it
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrNotFound:
+				case *scerr.ErrNotFound:
 					logrus.Errorf("failed to delete secondary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
-				case scerr.ErrTimeout:
+				case *scerr.ErrTimeout:
 					logrus.Errorf("failed to delete secondary gateway, timeout: %s", openstack.ProviderErrorToString(err))
 				default:
 					logrus.Errorf("failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
@@ -954,11 +954,11 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	err = handler.service.DeleteNetwork(network.ID)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case *scerr.ErrNotFound:
 			// If network doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
 			logrus.Warnf("network not found on provider side, cleaning up metadata.")
 			return err
-		case scerr.ErrTimeout:
+		case *scerr.ErrTimeout:
 			logrus.Error("cannot delete network due to a timeout")
 			waitMore = true
 		default:
@@ -971,7 +971,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			if recNet != nil {
 				return fmt.Errorf("still there")
 			}
-			if _, ok := recErr.(scerr.ErrNotFound); ok {
+			if _, ok := recErr.(*scerr.ErrNotFound); ok {
 				return nil
 			}
 			return fmt.Errorf("another kind of error")

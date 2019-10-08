@@ -88,7 +88,7 @@ func (handler *ShareHandler) Create(
 	// Check if a share already exists with the same name
 	server, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -758,7 +758,7 @@ func (handler *ShareHandler) Inspect(
 
 	hostName, err := metadata.LoadShare(handler.service, shareName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, nil, nil, resources.ResourceNotFoundError("share", shareName)
 		}
 		return nil, nil, nil, err
