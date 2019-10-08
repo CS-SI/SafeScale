@@ -62,6 +62,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", err
 	}
 	data["reserved_BashLibrary"] = bashLibrary
+	data["Revision"] = system.REV
 
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
