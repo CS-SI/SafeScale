@@ -117,12 +117,23 @@ func moreLazyErrors() error {
 	return NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
 }
 
+func getNotFoundErrorWithFields() error {
+	return NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
+}
+
+func getNotFoundErrorWithFieldsAndConsequences() error {
+	nfe := NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
+	return AddConsequence(nfe, fmt.Errorf("someting else..."))
+}
+
 func TestEnrichedError(t *testing.T) {
 	x := moreLazyErrors()
 	x = WithField(x, "region", "europe1")
 	x = AddConsequence(x, fmt.Errorf("connection lost"))
+	assert.NotNil(t, x)
 
 	errct := x.Error()
+	assert.NotNil(t, errct)
 	if !strings.Contains(errct, "europe1") {
 		t.Errorf("Information loss : %s", errct)
 	}
@@ -173,5 +184,26 @@ func TestIsError(t *testing.T) {
 	iserr := IsError(x)
 	if !iserr {
 		t.Errorf("This should be an error! : %s", x)
+	}
+}
+
+func getNotFoundError() error {
+	return NotFoundError("not there !!!")
+}
+
+func TestKeepErrorType(t *testing.T) {
+	mzb := getNotFoundError()
+	if cae, ok := mzb.(*ErrNotFound); !ok {
+		t.Errorf("Error type was lost in translation !!: %T", cae)
+	}
+
+	mzb = getNotFoundErrorWithFields()
+	if cae, ok := mzb.(*ErrNotFound); !ok {
+		t.Errorf("Error type get lost in translation !!: %T", cae)
+	}
+
+	mzb = getNotFoundErrorWithFieldsAndConsequences()
+	if cae, ok := mzb.(*ErrNotFound); !ok {
+		t.Errorf("Error type get lost in translation !!: %T", cae)
 	}
 }

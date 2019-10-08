@@ -372,10 +372,39 @@ func genErr() error {
 	return resources.ResourceNotFoundError("host", "whatever")
 }
 
+func genTimeout() error {
+	return TimeoutError(time.Second, fmt.Errorf("too late..."))
+}
+
+func genLimit() error {
+	return LimitError(7, fmt.Errorf("7 times is one too many"))
+}
+
+func genAbort() error {
+	return AbortedError("bizarre provider error", fmt.Errorf("4hJx7NGwyH7dPGQNY3WG happened !!"))
+}
+
 func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
 
 	if _, ok := nerr.(*scerr.ErrNotFound); !ok {
 		t.Errorf("Is not a resourceNotFound")
+	}
+}
+
+func TestKeepType(t *testing.T) {
+	toe := genTimeout()
+	if _, ok := toe.(*scerr.ErrTimeout); !ok {
+		t.Errorf("Is not a timeout")
+	}
+
+	leo := genLimit()
+	if _, ok := leo.(*scerr.ErrLimit); !ok {
+		t.Errorf("Is not a limit error")
+	}
+
+	abo := genAbort()
+	if _, ok := abo.(*scerr.ErrAborted); !ok {
+		t.Errorf("Is not a aborted")
 	}
 }
