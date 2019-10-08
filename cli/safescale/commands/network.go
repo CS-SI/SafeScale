@@ -125,7 +125,7 @@ var networkInspect = cli.Command{
 			if network.GetSecondaryGatewayId() != "" {
 				what = "primary"
 			}
-			casted := scerr.Wrap(err, fmt.Sprintf("failed to inspect %s gateway", what))
+			casted := scerr.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %s gateway", what))
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(casted.Error())))
 		}
 		mapped["gateway_name"] = pgw.Name
