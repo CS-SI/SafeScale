@@ -189,7 +189,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			log.Errorf("Timeout running remote script '%s'", name)
 			return 255, stdout, stderr, retryErr
 		default:
