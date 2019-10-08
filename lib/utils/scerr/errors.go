@@ -671,21 +671,31 @@ func (e *ErrLimit) WithField(key string, value interface{}) Error {
 // ErrOverflow is used when a limit is reached
 type ErrOverflow struct {
 	*errCore
+	limit uint
 }
 
 // OverflowError creates a ErrOverflow error
-func OverflowError(msg string) *ErrOverflow {
+func OverflowError(msg string, limit uint, err error) *ErrOverflow {
+	if limit > 0 {
+		limitMsg := fmt.Sprintf("(limit reached: %d)", limit)
+		if msg != "" {
+			msg += " "
+		}
+		msg += limitMsg
+	}
 	return &ErrOverflow{
 		errCore: &errCore{
-			message:      msg,
-			causer:       nil,
+			Message:      msg,
+			Causer:       err,
 			consequences: []error{},
-			fields:       make(fields),
+			Fields:       make(fields),
 			grpcCode:     codes.OutOfRange,
 		},
+		limit: limit,
 	}
 }
 
+// ErrOverload when action reaches a limit (ie too many requests occured in a given time).
 func (e *ErrOverflow) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {

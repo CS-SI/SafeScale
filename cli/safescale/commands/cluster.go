@@ -99,7 +99,7 @@ func extractClusterArgument(c *cli.Context) error {
 			err = scerr.FromGRPCStatus(err)
 			if _, ok := err.(*scerr.ErrNotFound); ok {
 				if !c.Command.HasName("create") {
-					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
+					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.", clusterName))
 				}
 			} else {
 				msg := fmt.Sprintf("failed to query for cluster '%s': %s\n", clusterName, err.Error())
@@ -107,7 +107,7 @@ func extractClusterArgument(c *cli.Context) error {
 			}
 		} else {
 			if c.Command.HasName("create") {
-				return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
+				return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.", clusterName))
 			}
 		}
 	}
@@ -165,12 +165,7 @@ var clusterInspectCommand = cli.Command{
 	Aliases:   []string{"show", "get"},
 	Usage:     "inspect CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> inspect`,
-	// 		Description: `
-	// Displays information about the cluster 'clustername'.`,
-	// 	},
+
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -315,7 +310,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		}
 		result["remote_desktop"] = remoteDesktops
 	} else {
-		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale deploy platform add-feature %s remotedesktop'.", clusterName)
+		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.", clusterName)
 	}
 
 	return result, nil
@@ -545,17 +540,6 @@ var clusterDeleteCommand = cli.Command{
 	Usage:     "delete CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> delete|destroy|remove|rm [-y]`,
-	// 		Options: []string{`
-	// options:
-	//   -y,--assume-yes  Don't ask for confirmation`,
-	// 		},
-	// 		Description: `
-	// Delete a cluster.`,
-	// 	},
-
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name: "assume-yes, yes, y",
@@ -597,13 +581,6 @@ var clusterStopCommand = cli.Command{
 	Usage:     "stop CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> stop|freeze`,
-	// 		Description: `
-	// Stop the cluster (make it unavailable for duty).`,
-	// 	},
-
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -624,16 +601,7 @@ var clusterStartCommand = cli.Command{
 	Aliases:   []string{"unfreeze"},
 	Usage:     "start CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> start|unfreeze`,
-	// 		Options: []string{`
-	// options:
-	//   --force, -f Force Don't ask for confirmation`,
-	// 		},
-	// 		Description: `
-	// Start the cluster (make it available for duty).`,
-	// 	},
+
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -655,12 +623,6 @@ var clusterStateCommand = cli.Command{
 	Usage:     "state CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> state`,
-	// 		Description: `
-	// Get the cluster state.`,
-	// 	},
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -686,25 +648,6 @@ var clusterExpandCommand = cli.Command{
 	Name:      "expand",
 	Usage:     "expand CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> expand [{command options}] [{host options}]`,
-	// 		Options: []string{
-	// 			`
-	// command options:
-	//   --count,-n <number of nodes> Instructs to expand cluster with <number> of new nodes
-	//   --public,-p                  Allocates public IP address(es) to node(s)`,
-	// 			`
-	// host options:
-	//   --os <operating system> (default: Ubuntu 18.04)
-	//   --cpu <number of cpus> (default: 4)
-	//   --ram <ram size) (default: 15 GB)
-	//   --disk <disk size> (default: 100 GB)`,
-	// 		},
-	// 		Description: `
-	// Expand the cluster by adding nodes.`,
-	// 	},
 
 	Flags: []cli.Flag{
 		cli.UintFlag{
@@ -801,18 +744,6 @@ var clusterShrinkCommand = cli.Command{
 	Usage:     "shrink CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> shrink [{command options}]`,
-	// 		Options: []string{
-	// 			`
-	// command options:
-	//   -n,--count <number of nodes>  Number of nodes to delete from the cluster`,
-	// 		},
-	// 		Description: `
-	// Shrink cluster by removing last added node(s).`,
-	// 	},
-
 	Flags: []cli.Flag{
 		cli.UintFlag{
 			Name:  "count, n",
@@ -883,14 +814,6 @@ var clusterDcosCommand = cli.Command{
 	Usage:     "dcos CLUSTERNAME [COMMAND ...]",
 	ArgsUsage: "CLUSTERNAME",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> dcos [<arg>...]`,
-	// 		Description: `
-	// Executes DCOS cli on an available DCOS master.
-	// Is meaningful only for a cluster using DCOS flavor.`,
-	// 	},
-
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -920,14 +843,6 @@ var clusterKubectlCommand = cli.Command{
 	Usage:     "kubectl CLUSTERNAME [COMMAND ...]",
 	ArgsUsage: "CLUSTERNAME",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> kubectl [-- <arg>...]`,
-	// 		Description: `
-	// Executes kubectl cli on the cluster.
-	// Is meaningful only for a cluster where Kubernetes service is installed and running.`,
-	// 	},
-
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -950,12 +865,6 @@ var clusterRunCommand = cli.Command{
 	Aliases:   []string{"execute", "exec"},
 	Usage:     "run CLUSTERNAME COMMAND",
 	ArgsUsage: "CLUSTERNAME",
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster list,ls
-	//        {{.ProgName}} [options] cluster <clustername> run args[,args...]`,
-	// 	},
 
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
@@ -1245,22 +1154,6 @@ var clusterNodeCommand = cli.Command{
 		clusterNodeStopCommand,
 		clusterNodeStateCommand,
 	},
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> node <nodename> COMMAND
-	//        {{.ProgName}} [options] cluster <clustername> node list|ls`,
-	// 		Commands: `
-	//   list|ls         Lists nodes in cluster
-	//   inspect         Displays information about the node
-	//   stop|freeze     Stops the node
-	//   start|unfreeze  Delete a Cluster
-	//   state           Returns current state of the node`,
-	// 		Description: `
-	// Deploy a new cluster <clustername> or something on the cluster <clustername>.`,
-	// 		Footer: `
-	// Run 'deploy cluster COMMAND --help' for more information on a command.`,
-	// 	},
 }
 
 // clusterNodeListCommand handles 'deploy cluster node list CLUSTERNAME'
@@ -1269,13 +1162,6 @@ var clusterNodeListCommand = cli.Command{
 	Aliases:   []string{"ls"},
 	Usage:     "list CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> node list|ls`,
-	// 		Description: `
-	// List nodes in the clusters.`,
-	// 	},
 
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
@@ -1316,13 +1202,6 @@ var clusterNodeInspectCommand = cli.Command{
 	Usage:     "node inspect CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME is the name of the cluster\nHOSTNAME is the hostname of the host resource inside the cluster (ie. for a cluster called 'demo', hostname is 'node-1' and host resourcename is 'demo-node-1')",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> node <hostname> inspect`,
-	// 		Description: `
-	// Displays information about the node <hostname> of cluster <clustername>.`,
-	// 	},
-
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -1347,17 +1226,6 @@ var clusterNodeInspectCommand = cli.Command{
 var clusterNodeDeleteCommand = &cli.Command{
 	Name:    "delete",
 	Aliases: []string{"destroy", "remove", "rm"},
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> node <nodename> delete|destroy|remove|rm [-y]`,
-	// 		Options: []string{`
-	// options:
-	//   -y,--assume-yes  Don't ask for confirmation`,
-	// 		},
-	// 		Description: `
-	// Delete the node <nodename> from the cluster <clustername>.`,
-	// 	},
 
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -1406,13 +1274,6 @@ var clusterNodeStopCommand = cli.Command{
 	Aliases: []string{"freeze"},
 	Usage:   "node stop CLUSTERNAME HOSTNAME",
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> stop|freeze`,
-	// 		Description: `
-	// Stop the cluster (make it unavailable for duty).`,
-	// 	},
-
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -1433,17 +1294,6 @@ var clusterNodeStartCommand = cli.Command{
 	Aliases: []string{"unfreeze"},
 	Usage:   "node start CLUSTERNAME HOSTNAME",
 
-	//Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> node <nodename> start|unfreeze`,
-	// 		Options: []string{`
-	// options:
-	//   --force, -f Force Don't ask for confirmation`,
-	// 		},
-	// 		Description: `
-	// Start the node <nodename> of the cluster <clustername>.`,
-	// 	},
-
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -1462,13 +1312,6 @@ var clusterNodeStartCommand = cli.Command{
 var clusterNodeStateCommand = cli.Command{
 	Name:  "state",
 	Usage: "node state CLUSTERNAME HOSTNAME",
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> node <nodename> state`,
-	// 		Description: `
-	// Get the state of the node <nodename> of the cluster <clustername>.`,
-	// 	},
 
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
@@ -1501,13 +1344,6 @@ var clusterMasterListCommand = cli.Command{
 	Aliases:   []string{"ls"},
 	Usage:     "list CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: {{.ProgName}} [options] cluster <clustername> node list|ls`,
-	// 		Description: `
-	// List nodes in the clusters.`,
-	// 	},
 
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
