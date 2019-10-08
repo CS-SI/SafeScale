@@ -280,7 +280,7 @@ feature:
 
                     start:
                         targets:
-                            gateways: any
+                            gateways: all
                             hosts: yes
                             masters: no
                             nodes: no
