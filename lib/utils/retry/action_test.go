@@ -399,12 +399,25 @@ func TestKeepType(t *testing.T) {
 	}
 
 	leo := genLimit()
-	if _, ok := leo.(*scerr.ErrLimit); !ok {
+	if _, ok := leo.(*scerr.ErrOverflow); !ok {
 		t.Errorf("Is not a limit error")
 	}
 
 	abo := genAbort()
 	if _, ok := abo.(*scerr.ErrAborted); !ok {
 		t.Errorf("Is not a aborted")
+	}
+}
+
+func TestRefactorSwitch(t *testing.T) {
+	toe := genTimeout()
+
+	switch toe.(type) {
+	case ErrTimeout:
+		t.Error("No longer a timeout")
+	case *ErrTimeout:
+		fmt.Println("This requires looking for all the (type) out there...")
+	default:
+		t.Error("Unexpected problem")
 	}
 }

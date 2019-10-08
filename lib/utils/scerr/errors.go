@@ -629,45 +629,6 @@ func (e *ErrAborted) WithField(key string, value interface{}) Error {
 	return e
 }
 
-// ErrLimit ...
-type ErrLimit struct {
-	*errCore
-	limit uint
-}
-
-// AbortedError creates a ErrAborted error
-func LimitError(limit uint, err error) *ErrLimit {
-	return &ErrLimit{
-		errCore: &errCore{
-			message:      fmt.Sprintf("retry limit exceeded after %d tries", limit),
-			causer:       err,
-			consequences: []error{},
-			fields:       make(fields),
-			grpcCode:     codes.OutOfRange,
-		},
-		limit: limit,
-	}
-}
-
-func (e *ErrLimit) AddConsequence(err error) Error {
-	if err != nil {
-		if e.consequences == nil {
-			e.consequences = []error{}
-		}
-		e.consequences = append(e.consequences, err)
-	}
-	return e
-}
-
-// WithField ...
-func (e *ErrLimit) WithField(key string, value interface{}) Error {
-	if e.fields != nil {
-		e.fields[key] = value
-	}
-
-	return e
-}
-
 // ErrOverflow is used when a limit is reached
 type ErrOverflow struct {
 	*errCore
@@ -685,10 +646,10 @@ func OverflowError(msg string, limit uint, err error) *ErrOverflow {
 	}
 	return &ErrOverflow{
 		errCore: &errCore{
-			Message:      msg,
-			Causer:       err,
+			message:      msg,
+			causer:       err,
 			consequences: []error{},
-			Fields:       make(fields),
+			fields:       make(fields),
 			grpcCode:     codes.OutOfRange,
 		},
 		limit: limit,
