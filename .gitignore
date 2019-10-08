@@ -95,3 +95,7 @@ cli/scanner/Test*
 Test Results - client_test_go\.html
 
 
+
+lib/system/version.go
+
+cli/safescaled/__debug_bin

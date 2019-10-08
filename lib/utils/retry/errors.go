@@ -8,7 +8,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// ErrTimeout is an alias for utils.ErrTimeout
+// ErrTimeout is used when a timeout occurs.
 type ErrTimeout = scerr.ErrTimeout
 
 // TimeoutError ...
@@ -17,12 +17,12 @@ func TimeoutError(limit time.Duration, err error) *scerr.ErrTimeout {
 	return scerr.TimeoutError(msg, limit, err)
 }
 
-// ErrLimit is returned when the maximum attempts has been reached.
-type ErrLimit = scerr.ErrLimit
+// ErrLimit is used when a limit is reached.
+type ErrLimit = scerr.ErrOverflow
 
 // LimitError ...
-func LimitError(limit uint, err error) *scerr.ErrLimit {
-	return scerr.LimitError(limit, err)
+func LimitError(limit uint, err error) *ErrLimit {
+	return scerr.OverflowError("retry limit exceeded", limit, err)
 }
 
 // ErrAborted is returned when the context needs to stop the retries

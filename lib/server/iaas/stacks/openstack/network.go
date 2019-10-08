@@ -270,7 +270,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
-		err = TranslateError(err)
+		err = TranslateProviderError(err)
 		switch err.(type) {
 		case *scerr.ErrNotFound:
 		default:
@@ -543,11 +543,11 @@ func calcDhcpAllocationPool(cidr string) (string, string, error) {
 	}
 	start += 11
 	if start >= end {
-		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr), 0, nil)
 	}
 	end -= 3
 	if end <= start {
-		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr), 0, nil)
 	}
 	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
 }

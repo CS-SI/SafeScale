@@ -64,8 +64,8 @@ func ProviderErrorToString(err error) string {
 	}
 }
 
-// TranslateError translates gophercloud or openstack error to SafeScale error
-func TranslateError(err error) error {
+// TranslateProviderError translates gophercloud or openstack error to SafeScale error
+func TranslateProviderError(err error) error {
 	switch e := err.(type) {
 	case gophercloud.ErrDefault400:
 		return scerr.InvalidRequestError(string(e.Body[:]))
