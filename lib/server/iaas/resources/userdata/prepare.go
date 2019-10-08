@@ -43,6 +43,8 @@ type Content struct {
 	BashLibrary string
 	// Header is the bash header for scripts
 	Header string
+	// Revision is the git revision used to build SafeScale
+	Revision string
 	// User is the name of the default user (api.DefaultUser)
 	User string
 	// ExitOnError helper to quit script on error
@@ -158,6 +160,7 @@ func (ud *Content) Prepare(
 
 	ud.BashLibrary = bashLibrary
 	ud.Header = scriptHeader
+	ud.Revision = system.REV
 	ud.User = operatorUsername
 	ud.ExitOnError = exitOnErrorHeader
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
