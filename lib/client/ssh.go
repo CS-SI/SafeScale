@@ -241,7 +241,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return -1, "", "", fmt.Errorf("failed to copy after %v: %s", connectionTimeout, err.Error())
 		}
 	}

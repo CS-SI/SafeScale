@@ -210,7 +210,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	}
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return fmt.Errorf("timeout trying to copy temporary file to '%s': %s", to, retryErr.Error())
 		}
 		return retryErr
@@ -250,7 +250,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return fmt.Errorf("timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error())
 		default:
 			return fmt.Errorf("failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error())
