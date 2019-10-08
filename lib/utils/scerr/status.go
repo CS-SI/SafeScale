@@ -7,6 +7,7 @@ type ErrorLike interface {
 	IsError() bool
 }
 
+// IsError ...
 func IsError(err error) bool {
 	if err == nil {
 		return false

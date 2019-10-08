@@ -66,20 +66,6 @@ func AddConsequence(err error, cons error) error {
 	return err
 }
 
-func WithField(err error, key string, content interface{}) error {
-	if err != nil {
-		enrich, ok := err.(errorWithField)
-		if ok {
-			if key != "" {
-				nerr := enrich.WithField(key, content)
-				return nerr
-			}
-			return enrich
-		}
-	}
-	return err
-}
-
 // Consequences returns the list of consequences
 func Consequences(err error) []error {
 	if err != nil {
@@ -90,6 +76,21 @@ func Consequences(err error) []error {
 	}
 
 	return []error{}
+}
+
+// WithField ...
+func WithField(err error, key string, content interface{}) error {
+	if err != nil {
+		enrich, ok := err.(Error)
+		if ok {
+			if key != "" {
+				nerr := enrich.WithField(key, content)
+				return nerr
+			}
+			return enrich
+		}
+	}
+	return err
 }
 
 // DecorateError changes the error to something more comprehensible when
@@ -123,7 +124,8 @@ func IsGRPCTimeout(err error) bool {
 
 // IsGRPCError tells if the err is of GRPC kind
 func IsGRPCError(err error) bool {
-	return grpcstatus.Code(err) != codes.Unknown
+	_, ok := grpcstatus.FromError(err)
+	return ok
 }
 
 // FromGRPCStatus translates GRPC status to error
@@ -209,7 +211,7 @@ func (e *errCore) CauseFormatter() string {
 
 	lenConseq := len(e.Consequences())
 	if lenConseq > 0 {
-		msgFinal += " [with consequences {"
+		msgFinal += "[with consequences {"
 		for ind, con := range e.Consequences() {
 			msgFinal += con.Error()
 			if ind+1 < lenConseq {
@@ -228,7 +230,7 @@ func (e *errCore) Reset(err error) Error {
 		if cerr, ok := err.(*errCore); ok {
 			e.Message = cerr.Message
 			e.consequences = cerr.consequences
-			e.causer = cerr.causer
+			e.Causer = cerr.Causer
 		}
 	}
 	return e
@@ -274,7 +276,7 @@ func NewError(message string, cause error, consequences []error) Error {
 		Message:      message,
 		Causer:       cause,
 		consequences: consequences,
-		fields:       make(fields),
+		Fields:       make(fields),
 	}
 }
 
@@ -304,7 +306,7 @@ func (e *errCore) Error() string {
 
 	msgFinal += e.CauseFormatter()
 
-	if len(e.fields) > 0 {
+	if len(e.Fields) > 0 {
 		msgFinal += "\nWith fields: "
 		msgFinal += e.FieldsFormatter()
 	}
@@ -336,12 +338,6 @@ type ErrTimeout struct {
 	dur time.Duration
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrTimeout) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
 // TimeoutError returns an ErrTimeout instance
 func TimeoutError(msg string, timeout time.Duration, cause error) *ErrTimeout {
 	return &ErrTimeout{
@@ -359,17 +355,6 @@ func TimeoutError(msg string, timeout time.Duration, cause error) *ErrTimeout {
 // ErrNotFound resource not found error
 type ErrNotFound struct {
 	*errCore
-}
-
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrNotFound) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrNotFound) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
 }
 
 // NotFoundError creates a ErrNotFound error
@@ -390,17 +375,6 @@ type ErrNotAvailable struct {
 	*errCore
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrNotAvailable) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrNotAvailable) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
 // NotAvailableError creates a NotAvailable error
 func NotAvailableError(msg string) *ErrNotAvailable {
 	return &ErrNotAvailable{
@@ -417,17 +391,6 @@ func NotAvailableError(msg string) *ErrNotAvailable {
 // ErrDuplicate already exists error
 type ErrDuplicate struct {
 	*errCore
-}
-
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrDuplicate) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrDuplicate) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
 }
 
 // DuplicateError creates a ErrDuplicate error
@@ -448,17 +411,6 @@ type ErrInvalidRequest struct {
 	*errCore
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrInvalidRequest) AddConsequence(err error) error {
-// 	e.errCore = e.Error.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrInvalidRequest) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
 // InvalidRequestError creates a ErrInvalidRequest error
 func InvalidRequestError(msg string) *ErrInvalidRequest {
 	return &ErrInvalidRequest{
@@ -476,12 +428,6 @@ func InvalidRequestError(msg string) *ErrInvalidRequest {
 type ErrNotAuthenticated struct {
 	*errCore
 }
-
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrNotAuthenticated) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
 
 // NotAuthenticatedError creates a ErrNotAuthenticated error
 func NotAuthenticatedError(msg string) *ErrNotAuthenticated {
@@ -501,17 +447,6 @@ type ErrForbidden struct {
 	*errCore
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrForbidden) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrForbidden) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
 // ForbiddenError creates a ErrForbidden error
 func ForbiddenError(msg string) *ErrForbidden {
 	return &ErrForbidden{
@@ -528,17 +463,6 @@ func ForbiddenError(msg string) *ErrForbidden {
 // ErrAborted ...
 type ErrAborted struct {
 	*errCore
-}
-
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrAborted) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrAborted) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
 }
 
 // AbortedError creates a ErrAborted error
@@ -562,17 +486,6 @@ type ErrOverflow struct {
 	*errCore
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrOverflow) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrOverflow) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
 // OverflowError creates a ErrOverflow error
 func OverflowError(msg string) *ErrOverflow {
 	return &ErrOverflow{
@@ -591,17 +504,6 @@ type ErrOverload struct {
 	*errCore
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrOverload) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrOverload) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
 // OverloadError creates a ErrOverload error
 func OverloadError(msg string) *ErrOverload {
 	return &ErrOverload{
@@ -618,17 +520,6 @@ func OverloadError(msg string) *ErrOverload {
 // ErrNotImplemented ...
 type ErrNotImplemented struct {
 	*errCore
-}
-
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrNotImplemented) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrNotImplemented) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
 }
 
 // NotImplementedError creates a ErrNotImplemented error
@@ -651,7 +542,7 @@ func NotImplementedErrorWithReason(what string, why string) *ErrNotImplemented {
 			Message:      decorateWithCallTrace("not implemented yet:", what, why),
 			Causer:       nil,
 			consequences: []error{},
-			fields:       make(fields),
+			Fields:       make(fields),
 		},
 	}
 }
@@ -678,17 +569,6 @@ func (e *ErrList) Error() string {
 	return spew.Sdump(e.errors)
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e ErrList) AddConsequence(err error) error {
-// 	e.Error = e.Error.Reset(e.Error.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrList) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
 // ErrRuntimePanic ...
 type ErrRuntimePanic struct {
 	*errCore
@@ -712,17 +592,6 @@ type ErrInvalidInstance struct {
 	*errCore
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrInvalidInstance) AddConsequence(err error) error {
-// 	e.Error = e.Error.Reset(e.Error.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrInvalidInstance) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
 // InvalidInstanceError creates a ErrInvalidInstance error
 func InvalidInstanceError() *ErrInvalidInstance {
 	return &ErrInvalidInstance{
@@ -739,17 +608,6 @@ func InvalidInstanceError() *ErrInvalidInstance {
 // ErrInvalidParameter ...
 type ErrInvalidParameter struct {
 	*errCore
-}
-
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e* ErrInvalidParameter) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrInvalidParameter) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
 }
 
 // InvalidParameterError creates a ErrInvalidParameter error
@@ -805,18 +663,7 @@ type ErrInvalidInstanceContent struct {
 	*errCore
 }
 
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrInvalidInstanceContent) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrInvalidInstanceContent) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
-}
-
-// InvalidInstanceContentError ...
+// InvalidInstanceContentError returns an instance of ErrInvalidInstanceContent.
 func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
 	return &ErrInvalidInstanceContent{
 		errCore: &errCore{
@@ -832,17 +679,6 @@ func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
 // ErrInconsistent is used when data used is inconsistent
 type ErrInconsistent struct {
 	*errCore
-}
-
-// // AddConsequence adds an error 'err' to the list of consequences
-// func (e *ErrInconsistent) AddConsequence(err error) error {
-// 	e.errCore = e.errCore.Reset(e.errCore.AddConsequence(err))
-// 	return e
-// }
-
-func (e ErrInconsistent) WithField(key string, content interface{}) errorWithField {
-	e.ErrCore = e.ErrCore.Reset(e.ErrCore.WithField(key, content))
-	return e
 }
 
 // InconsistentError creates a ErrInconsistent error
