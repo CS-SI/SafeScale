@@ -24,13 +24,13 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// bucket is the part of the safescale client handling buckets
+// data is the part of the safescale client handling erasure-coded data
 type data struct {
 	// session is not used currently.
 	session *Session
 }
 
-// Push ...
+// Push uploads a file to storage tenants.
 func (c *data) Push(localFilePath string, fileName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
@@ -44,8 +44,8 @@ func (c *data) Push(localFilePath string, fileName string, timeout time.Duration
 	return err
 }
 
-// Get ...
-func (c *data) Get(localFilePath string, fileName string, timeout time.Duration) error {
+// Pull downloads a file from storage tenants.
+func (c *data) Pull(localFilePath string, fileName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewDataServiceClient(c.session.connection)
@@ -54,11 +54,11 @@ func (c *data) Get(localFilePath string, fileName string, timeout time.Duration)
 		return err
 	}
 
-	_, err = service.Get(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
+	_, err = service.Pull(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
 	return err
 }
 
-// List ...
+// List returns a list of files in storage tenants.
 func (c *data) List(timeout time.Duration) (*pb.FileList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
@@ -72,7 +72,7 @@ func (c *data) List(timeout time.Duration) (*pb.FileList, error) {
 
 }
 
-// Delete ...
+// Delete deletes a file from storage tenants.
 func (c *data) Delete(fileName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
