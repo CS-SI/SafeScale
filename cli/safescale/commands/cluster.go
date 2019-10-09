@@ -102,7 +102,7 @@ func extractClusterArgument(c *cli.Context) error {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.", clusterName))
 				}
 			} else {
-				msg := fmt.Sprintf("failed to query for cluster '%s': %", clusterName, err.Error())
+				msg := fmt.Sprintf("failed to query for cluster '%s': %s", clusterName, err.Error())
 				return clitools.ExitOnRPC(msg)
 			}
 		} else {
