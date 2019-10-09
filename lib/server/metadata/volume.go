@@ -131,18 +131,46 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	if mv == nil {
 		return scerr.InvalidInstanceError()
 	}
-	errID := mv.ReadByID(ref)
-	if errID != nil {
-		errName := mv.ReadByName(ref)
-		if errName != nil {
-			return errName
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+
+	volume := resources.NewVolume()
+
+	failed := false
+
+	err = mv.item.ReadFrom(ByIDFolderName, ref, func(buf []byte) (serialize.Serializable, error) {
+		err := volume.Deserialize(buf)
+		if err != nil {
+			return nil, err
+		}
+		return volume, nil
+	})
+	failed = err != nil
+
+	if failed {
+		err = mv.item.ReadFrom(ByNameFolderName, ref, func(buf []byte) (serialize.Serializable, error) {
+			err := volume.Deserialize(buf)
+			if err != nil {
+				return nil, err
+			}
+			return volume, nil
+		})
+		if err != nil {
+			return err
 		}
 	}
+
+	_, err = mv.Carry(volume)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
-func (mv *Volume) ReadByID(id string) error {
+func (mv *Volume) ReadByID(id string) (err error) {
 	if mv == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -151,11 +179,12 @@ func (mv *Volume) ReadByID(id string) error {
 	}
 
 	volume := resources.NewVolume()
-	err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err = mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
+
 		return volume, nil
 	})
 	if err != nil {
@@ -171,7 +200,7 @@ func (mv *Volume) ReadByID(id string) error {
 }
 
 // ReadByName reads the metadata of a volume identified by name
-func (mv *Volume) ReadByName(name string) error {
+func (mv *Volume) ReadByName(name string) (err error) {
 	if mv == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -180,7 +209,7 @@ func (mv *Volume) ReadByName(name string) error {
 	}
 
 	volume := resources.NewVolume()
-	err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err = mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
 		if err != nil {
 			return nil, err

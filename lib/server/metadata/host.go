@@ -101,14 +101,50 @@ func (mh *Host) Write() (err error) {
 }
 
 // ReadByReference ...
-func (mh *Host) ReadByReference(id string) (err error) {
-	errID := mh.ReadByID(id)
-	if errID != nil {
-		errName := mh.ReadByName(id)
-		if errName != nil {
-			return errName
-		}
+func (mh *Host) ReadByReference(ref string) (err error) {
+	if mh.item == nil {
+		return scerr.InvalidInstanceError()
 	}
+	if ref == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+
+	host := resources.NewHost()
+
+	failed := false
+
+	err = mh.item.ReadFrom(ByIDFolderName, ref, func(buf []byte) (serialize.Serializable, error) {
+		err := host.Deserialize(buf)
+		if err != nil {
+			return nil, err
+		}
+		return host, nil
+	})
+
+	failed = err != nil
+
+	if failed {
+		err = mh.item.ReadFrom(ByNameFolderName, ref, func(buf []byte) (serialize.Serializable, error) {
+			err := host.Deserialize(buf)
+			if err != nil {
+				return nil, err
+			}
+			return host, nil
+		})
+		if err != nil {
+			return err
+		}
+		mh.name = &(host.Name)
+		mh.id = &(host.ID)
+	} else {
+		mh.id = &(host.ID)
+		mh.name = &(host.Name)
+	}
+
 	return nil
 }
 

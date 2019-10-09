@@ -154,13 +154,50 @@ func (m *Network) Reload() (err error) {
 
 // ReadByReference tries to read first using 'ref' as an ID then as a name
 func (m *Network) ReadByReference(ref string) (err error) {
-	errID := m.ReadByID(ref)
-	if errID != nil {
-		errName := m.ReadByName(ref)
-		if errName != nil {
-			return errName
-		}
+	if m == nil {
+		return scerr.InvalidInstanceError()
 	}
+	if m.item == nil {
+		return scerr.InvalidParameterError("m.item", "cannot be nil")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	network := resources.NewNetwork()
+
+	failed := false
+
+	err = m.item.ReadFrom(ByIDFolderName, ref, func(buf []byte) (serialize.Serializable, error) {
+		err := network.Deserialize(buf)
+		if err != nil {
+			return nil, err
+		}
+		return network, nil
+	})
+	failed = err != nil
+
+	if failed {
+		err = m.item.ReadFrom(ByNameFolderName, ref, func(buf []byte) (serialize.Serializable, error) {
+			err := network.Deserialize(buf)
+			if err != nil {
+				return nil, err
+			}
+			return network, nil
+		})
+		failed = err != nil
+		if failed {
+			return err
+		}
+
+		m.name = &(network.Name)
+		m.id = &(network.ID)
+	} else {
+		m.id = &(network.ID)
+		m.name = &(network.Name)
+	}
+
 	return nil
 }
 
