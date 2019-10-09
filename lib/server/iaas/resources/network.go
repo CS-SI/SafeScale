@@ -18,6 +18,7 @@ package resources
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sirupsen/logrus"
 )
@@ -49,7 +50,7 @@ type NetworkRequest struct {
 	HA bool
 }
 
-// Network representes a virtual network
+// Network represents a virtual network
 type Network struct {
 	ID                 string                    `json:"id,omitempty"`                   // ID for the network (from provider)
 	Name               string                    `json:"name,omitempty"`                 // Name of the network
@@ -59,12 +60,14 @@ type Network struct {
 	VIP                *VIP                      `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
 	IPVersion          IPVersion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
 	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
+	NetworkState       NetworkState.Enum         `json:"status,omitempty"`
 }
 
 // NewNetwork ...
 func NewNetwork() *Network {
 	return &Network{
-		Properties: serialize.NewJSONProperties("resources.network"),
+		Properties:   serialize.NewJSONProperties("resources.network"),
+		NetworkState: NetworkState.UNKNOWNSTATE,
 	}
 }
 

@@ -28,4 +28,7 @@ const (
 	Disabled
 	//Stopped the node is stopped
 	Stopped
+
+	//Unknown
+	Unknown
 )

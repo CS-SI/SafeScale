@@ -199,11 +199,11 @@ func TestKeepErrorType(t *testing.T) {
 
 	mzb = getNotFoundErrorWithFields()
 	if cae, ok := mzb.(*ErrNotFound); !ok {
-		t.Errorf("Error type get lost in translation !!: %T", cae)
+		t.Errorf("Error type was lost in translation !!: %T", cae)
 	}
 
 	mzb = getNotFoundErrorWithFieldsAndConsequences()
 	if cae, ok := mzb.(*ErrNotFound); !ok {
-		t.Errorf("Error type get lost in translation !!: %T", cae)
+		t.Errorf("Error type was lost in translation !!: %T", cae)
 	}
 }

@@ -144,6 +144,7 @@ type Host struct {
 func NewHost() *Host {
 	return &Host{
 		Properties: serialize.NewJSONProperties("resources.host"),
+		LastState:  HostState.UNKNOWN,
 	}
 }
 
