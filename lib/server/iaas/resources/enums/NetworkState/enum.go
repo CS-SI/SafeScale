@@ -14,25 +14,26 @@
  * limitations under the License.
  */
 
-package HostState
+package NetworkState
 
 //go:generate stringer -type=Enum
 
-//Enum represents the state of an host
+//Enum represents the state of a network
 type Enum int
 
 const (
-	// STOPPED when host is stopped
-	STOPPED Enum = iota
-	// STARTING when host is starting
-	STARTING
-	// STARTED when host is started
-	STARTED
-	// STOPPING when host is stopping
-	STOPPING
-	// ERROR when host is in error state*/
-	ERROR
-
 	// Unknown
-	UNKNOWN
+	UNKNOWNSTATE Enum = iota
+
+	// PHASE1
+	PHASE1
+
+	// PHASE 2
+	PHASE2
+
+	// READY when ready
+	READY
+
+	// ERROR when error
+	NETWORKERROR
 )

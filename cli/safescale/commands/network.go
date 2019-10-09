@@ -118,6 +118,11 @@ var networkInspect = cli.Command{
 		var pgw, sgw *pb.Host
 		pgwID := network.GetGatewayId()
 		sgwID := network.GetSecondaryGatewayId()
+
+		// Added operation status
+		opState := network.GetState()
+		mapped["state"] = opState.String()
+
 		pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)

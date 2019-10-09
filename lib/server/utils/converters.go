@@ -281,6 +281,7 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 		SecondaryGatewayId: in.SecondaryGatewayID,
 		VirtualIp:          &pbVIP,
 		Failover:           in.SecondaryGatewayID != "",
+		State:              pb.NetworkState(in.NetworkState),
 	}
 }
 

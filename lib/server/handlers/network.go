@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -400,6 +401,14 @@ func (handler *NetworkHandler) Create(
 	if err != nil {
 		return nil, err
 	}
+
+	network.NetworkState = NetworkState.PHASE1
+	logrus.Debugf("Updating network metadata '%s' ...", network.Name)
+	mn, err = metadata.SaveNetwork(handler.service, network)
+	if err != nil {
+		return nil, err
+	}
+
 	primaryTask, err = primaryTask.Start(handler.waitForInstallPhase1OnGateway, primaryGateway)
 	if err != nil {
 		return nil, err
@@ -451,7 +460,17 @@ func (handler *NetworkHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	primaryTask, err = primaryTask.Start(handler.installPhase2OnGateway, data.Map{
+
+	// FIXME Modify network state here
+	network.NetworkState = NetworkState.PHASE2
+	logrus.Debugf("Updating network metadata '%s' ...", network.Name)
+	mn, err = metadata.SaveNetwork(handler.service, network)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if hosts are still attached to network according to metadata
+	primaryTask, err = primaryTask.Start(handler.installPhase2OnGateway, data.Map{ // FIXME Send network ref too
 		"host":     primaryGateway,
 		"userdata": primaryUserdata,
 	})
@@ -463,7 +482,7 @@ func (handler *NetworkHandler) Create(
 		if err != nil {
 			return nil, err
 		}
-		secondaryTask, err = secondaryTask.Start(handler.installPhase2OnGateway, data.Map{
+		secondaryTask, err = secondaryTask.Start(handler.installPhase2OnGateway, data.Map{ // FIXME Send network ref too
 			"host":     secondaryGateway,
 			"userdata": secondaryUserdata,
 		})
@@ -487,6 +506,14 @@ func (handler *NetworkHandler) Create(
 		logrus.Warnf("Network creation cancelled by user")
 		return nil, fmt.Errorf("network creation cancelled by user")
 	default:
+	}
+
+	// FIXME Modify network state here
+	network.NetworkState = NetworkState.READY
+	logrus.Debugf("Updating network metadata '%s' ...", network.Name)
+	mn, err = metadata.SaveNetwork(handler.service, network)
+	if err != nil {
+		return nil, err
 	}
 
 	return network, nil

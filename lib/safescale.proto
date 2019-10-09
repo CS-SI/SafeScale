@@ -114,6 +114,7 @@ message Network{
     string secondary_gateway_id = 5;
     VirtualIp virtual_ip = 6;
     bool failover = 7;
+    NetworkState state = 8;
 }
 
 message NetworkList{
@@ -160,6 +161,14 @@ message HostDefinition{
     HostSizing sizing = 14;
 }
 
+enum NetworkState {
+    UNKNOWNSTATE = 0;
+    PHASE1 = 1;
+    PHASE2 = 2;
+    READY = 3;
+    NETWORKERROR = 4;
+}
+
 enum HostState {
     /*STOPPED host is stopped*/
 	STOPPED = 0;
@@ -171,7 +180,9 @@ enum HostState {
 	STOPPING = 3;
 	/*ERROR host is in error state*/
 	ERROR = 4;
-  }
+    /*UNKNOWN is unknown*/
+    UNKNOWN = 5;
+}
 
 message Host{
     string id = 1;
