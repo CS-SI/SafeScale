@@ -306,7 +306,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 		return nil, fmt.Errorf("failed to find a way to check '%s'", f.DisplayName())
 	}
 
-	log.Debugf("Checking if feature '%s' is installed on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
+	log.Debugf("Checking if feature '%s' is installed on %s '%s'...", f.DisplayName(), t.Type(), t.Name())
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -479,7 +479,7 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 			if clusterInstance != nil {
 				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetIdentity(f.task).Name)
 			}
-			log.Debugf("%s %s...\n", msgHead, msgTail)
+			log.Debugf("%s %s...", msgHead, msgTail)
 		}
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
 			needed, err := NewFeature(f.task, requirement)

@@ -559,7 +559,7 @@ var hostCheckFeatureCommand = cli.Command{
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
+			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
@@ -633,7 +633,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
+			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {

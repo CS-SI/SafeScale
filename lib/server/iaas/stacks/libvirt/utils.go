@@ -121,7 +121,7 @@ func infoHandler() {
 			channel, found := vmInfoWaiter.chansByName[hostName]
 			vmInfoWaiter.mutex.Unlock()
 			if !found {
-				panic(fmt.Sprintf("Info handler, Received info from an unregistered host: \n%s", message))
+				panic(fmt.Sprintf("Info handler, Received info from an unregistered host: %s", message))
 			}
 			channel <- info
 			err = vmInfoWaiter.deregister(hostName)

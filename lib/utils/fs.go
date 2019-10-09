@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
 	"reflect"
+
+	"github.com/sirupsen/logrus"
 )
 
 // LazyRemove is identical to os.Remove, but doesn't raise an error, and
@@ -16,7 +17,7 @@ func LazyRemove(path string) error {
 		case *os.PathError:
 			// File not found, that's ok because we wanted to remove it...
 		default:
-			logrus.Errorf("LazyRemove(): err is type '%s'\n", reflect.TypeOf(err).String())
+			logrus.Errorf("LazyRemove(): err is type '%s'", reflect.TypeOf(err).String())
 			return fmt.Errorf("error removing file '%s': %v", path, err)
 		}
 	}

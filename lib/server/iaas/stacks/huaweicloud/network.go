@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -408,6 +409,8 @@ func cidrIntersects(n1, n2 *net.IPNet) bool {
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
+	const CANNOT = "cannot create subnet"
+
 	network, networkDesc, _ := net.ParseCIDR(cidr)
 
 	// Validates CIDR regarding the existing subnets
@@ -418,7 +421,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	for _, s := range *subnetworks {
 		_, sDesc, _ := net.ParseCIDR(s.CIDR)
 		if cidrIntersects(networkDesc, sDesc) {
-			return nil, scerr.Wrap(fmt.Errorf("would intersect with '%s (%s)'", s.Name, s.CIDR), "cannot create subnet")
+			return nil, scerr.Wrap(fmt.Errorf("would intersect with '%s (%s)'", s.Name, s.CIDR), CANNOT)
 		}
 	}
 
@@ -468,16 +471,30 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		err = openstack.TranslateProviderError(err)
-		switch err.(type) {
+		tErr := openstack.TranslateProviderError(err)
+		switch tErr.(type) {
 		case *scerr.ErrInvalidRequest:
-			return nil, scerr.Wrap(err, "cannot create subnet")
+			body := map[string]interface{}{}
+			err = json.Unmarshal([]byte(tErr.Error()), &body)
+			if err != nil {
+				err = scerr.InconsistentError("response is not json")
+			} else {
+				code := body["code"].(string)
+				switch code {
+				case "VPC.0003":
+					err = scerr.NotFoundError("VPC has vanished")
+				default:
+					err = scerr.Wrap(tErr, fmt.Sprintf("response code '%s' is not handled", code))
+				}
+			}
+			return nil, scerr.Wrap(err, CANNOT)
 		}
-		return nil, fmt.Errorf("error requesting subnet %s creation: %s", req.Name, err.Error())
+		return nil, scerr.Wrap(tErr, CANNOT)
 	}
+
 	subnet, err := respCreate.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("error creating Subnet %s: %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, scerr.Wrap(err, CANNOT)
 	}
 
 	// Subnet creation started, need to wait the subnet to reach the status ACTIVE

@@ -58,7 +58,7 @@ func ProviderErrorToString(err error) string {
 	case *gophercloud.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	default:
-		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)\n", reflect.TypeOf(err).String(), err)
+		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)", reflect.TypeOf(err).String(), err)
 
 		return e.Error()
 	}

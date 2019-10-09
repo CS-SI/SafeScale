@@ -185,12 +185,12 @@ var sshTunnel = cli.Command{
 
 		localPort := c.Int("local")
 		if 0 > localPort || localPort > 65535 {
-			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port\n", localPort)))
+			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port", localPort)))
 		}
 
 		remotePort := c.Int("remote")
 		if 0 > localPort || localPort > 65535 {
-			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port\n", remotePort)))
+			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port", remotePort)))
 		}
 
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
@@ -237,14 +237,14 @@ var sshClose = cli.Command{
 		if c.IsSet("local") {
 			localPort, err := strconv.Atoi(strLocalPort)
 			if err != nil || 0 > localPort || localPort > 65535 {
-				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port\n", localPort)))
+				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port", localPort)))
 			}
 		}
 		strRemotePort := c.String("remote")
 		if c.IsSet("remote") {
 			remotePort, err := strconv.Atoi(strRemotePort)
 			if err != nil || 0 > remotePort || remotePort > 65535 {
-				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port\n", remotePort)))
+				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port", remotePort)))
 			}
 		}
 

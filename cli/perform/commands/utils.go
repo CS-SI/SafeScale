@@ -107,11 +107,11 @@ func extractClusterArgument(c *cli.Context) error {
 		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
 			if _, ok := err.(*scerr.ErrNotFound); ok {
-				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
+				msg := fmt.Sprintf("Cluster '%s' not found", clusterName)
 				return cli.NewExitError(msg, int(ExitCode.NotFound))
 			}
 
-			msg := fmt.Sprintf("failed to get cluster '%s' information: %s\n", clusterName, err.Error())
+			msg := fmt.Sprintf("failed to get cluster '%s' information: %s", clusterName, err.Error())
 			return cli.NewExitError(msg, int(ExitCode.RPC))
 		}
 		if c.Command.HasName("create") {
