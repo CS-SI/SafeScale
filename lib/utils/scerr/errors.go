@@ -205,10 +205,8 @@ func (e *errCore) CauseFormatter() string {
 	msgFinal := ""
 
 	if e.Cause() != nil {
-		msgFinal += " ["
-		msgFinal += "caused by {"
+		msgFinal += ": "
 		msgFinal += e.Cause().Error()
-		msgFinal += "}]"
 	}
 
 	lenConseq := len(e.Consequences())
