@@ -476,7 +476,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		case gophercloud.ErrDefault400:
 			neutronError := ParseNeutronError(r.Err.Error())
 			if neutronError != nil {
-				msg := fmt.Sprintf("error creating subnet: bad request: %s\n", neutronError["message"])
+				msg := fmt.Sprintf("error creating subnet: bad request: %s", neutronError["message"])
 				return nil, fmt.Errorf(msg)
 			}
 		}

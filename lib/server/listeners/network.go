@@ -58,6 +58,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	if networkName == "" {
 		return nil, scerr.InvalidRequestError("cannot create network: name can't be empty string")
 	}
+
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -110,8 +111,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		in.FailOver,
 	)
 	if err != nil {
-
-		return nil, scerr.Wrap(err, "cannot create network").ToGRPCStatus()
+		// returned error is not wrap with "cannot create network" because already tells why the
+		return nil, scerr.ToGRPCStatus(err)
 	}
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)

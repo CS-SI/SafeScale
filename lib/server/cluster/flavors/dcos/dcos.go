@@ -190,7 +190,7 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
 	if err != nil {
-		logrus.Debugf("[%s] failed to remotely run configuration script: %s\n", hostLabel, err.Error())
+		logrus.Debugf("[%s] failed to remotely run configuration script: %s", hostLabel, err.Error())
 		return err
 	}
 	if retcode != 0 {

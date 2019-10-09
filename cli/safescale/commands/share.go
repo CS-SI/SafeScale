@@ -153,7 +153,7 @@ var shareDelete = cli.Command{
 			err := client.New().Share.Delete(aname, temporal.GetExecutionTimeout())
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
-				errMessage += fmt.Sprintf("error while deleting share %s : %s \n", aname, utils.Capitalize(err.Error()))
+				errMessage += fmt.Sprintf("error while deleting share %s: %s", aname, utils.Capitalize(err.Error()))
 				errs++
 			}
 		}

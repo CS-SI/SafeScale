@@ -1443,7 +1443,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 		return nil, nil
 	}
 
-	logrus.Debugf("[cluster %s] creating %d master%s...\n", clusterName, count, utils.Plural(count))
+	logrus.Debugf("[cluster %s] creating %d master%s...", clusterName, count, utils.Plural(count))
 
 	var subtasks []concurrency.Task
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
@@ -1646,7 +1646,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	started := time.Now()
 
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, pbHost.Name)
-	logrus.Debugf("[%s] starting configuration...\n", hostLabel)
+	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
 	// install docker and docker-compose feature
 	err = b.installDocker(t, pbHost, hostLabel)

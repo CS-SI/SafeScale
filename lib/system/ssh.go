@@ -164,7 +164,7 @@ func (tunnel *SSHTunnel) Close() error {
 	// Kills the process of the tunnel
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
-		log.Errorf("tunnel.cmd.Process.Kill() failed: %s\n", reflect.TypeOf(err).String())
+		log.Errorf("tunnel.cmd.Process.Kill() failed: %s", reflect.TypeOf(err).String())
 		return fmt.Errorf("unable to close tunnel :%s", err.Error())
 	}
 	// Kills remaining processes if there are some
@@ -175,7 +175,7 @@ func (tunnel *SSHTunnel) Close() error {
 		if err == nil {
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
-				log.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
+				log.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
 				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 		}
@@ -317,7 +317,7 @@ func (sc *SSHCommand) closeTunneling() error {
 
 	// Tunnels are imbricated only last error is significant
 	if err != nil {
-		log.Errorf("closeTunneling: %s\n", reflect.TypeOf(err).String())
+		log.Errorf("closeTunneling: %s", reflect.TypeOf(err).String())
 	}
 	return err
 }
@@ -544,7 +544,7 @@ func (sc *SSHCommand) cleanup() error {
 	err1 := sc.closeTunneling()
 	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
-		log.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
+		log.Errorf("closeTunneling() failed: %s", reflect.TypeOf(err1).String())
 		return fmt.Errorf("unable to close SSH tunnels: %s", err1.Error())
 	}
 	if err2 != nil {

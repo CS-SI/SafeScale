@@ -102,7 +102,7 @@ func extractClusterArgument(c *cli.Context) error {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.", clusterName))
 				}
 			} else {
-				msg := fmt.Sprintf("failed to query for cluster '%s': %s\n", clusterName, err.Error())
+				msg := fmt.Sprintf("failed to query for cluster '%s': %", clusterName, err.Error())
 				return clitools.ExitOnRPC(msg)
 			}
 		} else {
@@ -411,14 +411,14 @@ var clusterCreateCommand = cli.Command{
 		complexityStr := c.String("complexity")
 		complexity, err := Complexity.Parse(complexityStr)
 		if err != nil {
-			msg := fmt.Sprintf("Invalid option --complexity|-C: %s\n", err.Error())
+			msg := fmt.Sprintf("Invalid option --complexity|-C: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
 
 		flavorStr := c.String("flavor")
 		flavor, err := Flavor.Parse(flavorStr)
 		if err != nil {
-			msg := fmt.Sprintf("Invalid option --flavor|-F: %s\n", err.Error())
+			msg := fmt.Sprintf("Invalid option --flavor|-F: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
 
@@ -512,7 +512,7 @@ var clusterCreateCommand = cli.Command{
 					log.Warnf("Error deleting cluster instance: %s", cluDel)
 				}
 			}
-			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
+			msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 		}
 		if clusterInstance == nil {
@@ -787,7 +787,7 @@ var clusterShrinkCommand = cli.Command{
 			}
 		}
 
-		// fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...\n", count, countS, clusterName)
+		// fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...", count, countS, clusterName)
 		var msgs []string
 		availableMaster, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 		if err != nil {
@@ -823,7 +823,7 @@ var clusterDcosCommand = cli.Command{
 
 		identity := clusterInstance.GetIdentity(concurrency.RootTask())
 		if identity.Flavor != Flavor.DCOS {
-			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", identity.Flavor.String())
+			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s)", identity.Flavor.String())
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotApplicable, msg))
 		}
 
@@ -969,7 +969,7 @@ var clusterAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'.\n", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
@@ -993,7 +993,7 @@ var clusterAddFeatureCommand = cli.Command{
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error installing feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
@@ -1036,7 +1036,7 @@ var clusterCheckFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'.\n", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
@@ -1058,7 +1058,7 @@ var clusterCheckFeatureCommand = cli.Command{
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s", featureName, clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -1102,7 +1102,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'.\n", featureName)
+			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 

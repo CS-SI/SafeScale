@@ -65,7 +65,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 		return clitools.ExitOnRPC(err.Error())
 	}
 	if hostInstance == nil {
-		return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Host '%s' not found.\n", hostName))
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
 	}
 
 	return nil

@@ -1498,7 +1498,7 @@ func (c *Controller) asyncStartHost(task concurrency.Task, params concurrency.Ta
 // 			PrivateLastIndex: len(privateNodeIPs),
 // 			PublicLastIndex:  len(publicNodeIPs),
 // 		}
-// 		log.Debugf("updating metadata...\n")
+// 		log.Debugf("updating metadata...")
 // 		err = instance.updateMetadata(func() error {
 // 			instance.manager = newManager
 // 			return nil

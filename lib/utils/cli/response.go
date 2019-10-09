@@ -62,14 +62,6 @@ func (r *response) GetError() error {
 	return r.Error
 }
 
-// // GetErrorWithoutMessage ...
-// func (r *response) GetErrorWithoutMessage() error {
-// 	if r.Error != nil {
-// 		return urfcli.NewExitError("", r.Error.ExitCode())
-// 	}
-// 	return nil
-// }
-
 // Success ...
 func (r *response) Success(result interface{}) error {
 	r.Status = CmdStatus.SUCCESS
