@@ -145,7 +145,7 @@ func (ms *Share) ReadByReference(id string) (err error) {
 }
 
 // ReadByID reads the metadata of an export identified by ID from Object Storage
-func (ms *Share) ReadByID(id string) error {
+func (ms *Share) ReadByID(id string) (err error) {
 	if ms == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -153,7 +153,7 @@ func (ms *Share) ReadByID(id string) error {
 		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
 	var si shareItem
-	err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err = ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -170,7 +170,7 @@ func (ms *Share) ReadByID(id string) error {
 }
 
 // ReadByName reads the metadata of a nas identified by name
-func (ms *Share) ReadByName(name string) error {
+func (ms *Share) ReadByName(name string) (err error) {
 	if ms == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -178,7 +178,7 @@ func (ms *Share) ReadByName(name string) error {
 		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
 	var si shareItem
-	err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err = ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err
