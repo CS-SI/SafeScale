@@ -156,7 +156,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 			rint := tools.RandomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
 			if rint > 100 {
-				return "", fmt.Errorf("Suck it")
+				return "", fmt.Errorf("suck it")
 			}
 
 			return "waiting game", nil
@@ -243,9 +243,19 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 		}
 	}
 
+	begin := time.Now()
 	waited, _, err := overlord.WaitFor(time.Duration(10) * time.Second)
+	end := time.Since(begin)
+
+	if end >= (time.Second * 11) {
+		t.Errorf("It should have finished in 10s but it didn't !!")
+	}
 
 	if waited {
 		t.Errorf("It shouldn't happen")
 	}
+}
+
+func TestChildrenWaitingGameWithContexts(t *testing.T) {
+	t.Errorf("Why so serious ?")
 }
