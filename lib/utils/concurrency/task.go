@@ -63,10 +63,10 @@ type Task interface {
 	GetSignature() string
 	GetStatus() TaskStatus
 	GetContext() context.Context
-	Lock(TaskedLock)
-	RLock(TaskedLock)
-	Unlock(TaskedLock)
-	RUnlock(TaskedLock)
+	Lock(TaskedLock) error
+	RLock(TaskedLock) error
+	Unlock(TaskedLock) error
+	RUnlock(TaskedLock) error
 	New() (Task, error)
 	Reset() (Task, error)
 	Run(TaskAction, TaskParameters) (TaskResult, error)
@@ -469,25 +469,37 @@ func (t *task) New() (Task, error) {
 }
 
 // Lock locks the TaskedLock
-func (t *task) Lock(lock TaskedLock) {
-	// FIXME Call null receiver
+func (t *task) Lock(lock TaskedLock) error {
+	if t == nil {
+		return scerr.InvalidInstanceError()
+	}
 	lock.Lock(t)
+	return nil
 }
 
 // RLock locks for read the TaskedLock
-func (t *task) RLock(lock TaskedLock) {
-	// FIXME Call null receiver
+func (t *task) RLock(lock TaskedLock) error {
+	if t == nil {
+		return scerr.InvalidInstanceError()
+	}
 	lock.RLock(t)
+	return nil
 }
 
 // Unlock unlocks the TaskedLock
-func (t *task) Unlock(lock TaskedLock) {
-	// FIXME Call null receiver
+func (t *task) Unlock(lock TaskedLock) error {
+	if t == nil {
+		return scerr.InvalidInstanceError()
+	}
 	lock.Unlock(t)
+	return nil
 }
 
 // RUnlock unlocks a read lock put on the TaskedLock
-func (t *task) RUnlock(lock TaskedLock) {
-	// FIXME Call null receiver
+func (t *task) RUnlock(lock TaskedLock) error {
+	if t == nil {
+		return scerr.InvalidInstanceError()
+	}
 	lock.RUnlock(t)
+	return nil
 }
