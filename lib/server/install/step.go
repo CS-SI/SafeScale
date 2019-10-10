@@ -293,7 +293,10 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			}
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
 			results[h.Name] = result.(stepResult)
-			_, _ = subtask.Reset() // FIXME Later
+			_, err = subtask.Reset()
+			if err != nil {
+				return nil, err
+			}
 
 			if !results[h.Name].Successful() {
 				if is.Worker.action == Action.Check { // Checks can fail and it's ok
