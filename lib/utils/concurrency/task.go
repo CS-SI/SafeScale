@@ -57,16 +57,11 @@ type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 // Task ...
 type Task interface {
 	Abort() error
-	Aborted() (bool, error)
 	ForceID(string) (Task, error)
 	GetID() (string, error)
 	GetSignature() (string, error)
 	GetStatus() (TaskStatus, error)
 	GetContext() (context.Context, error)
-	Lock(TaskedLock) error
-	RLock(TaskedLock) error
-	Unlock(TaskedLock) error
-	RUnlock(TaskedLock) error
 	New() (Task, error)
 	Reset() (Task, error)
 	Run(TaskAction, TaskParameters) (TaskResult, error)
@@ -476,15 +471,6 @@ func (t *task) Abort() error {
 	return nil
 }
 
-// Aborted tells if task has been aborted
-func (t *task) Aborted() (bool, error) {
-	if t == nil {
-		return false, scerr.InvalidInstanceError()
-	}
-
-	return t.status == ABORTED, nil
-}
-
 // New creates a subtask from current task
 func (t *task) New() (Task, error) {
 	if t == nil {
@@ -495,7 +481,7 @@ func (t *task) New() (Task, error) {
 }
 
 // Lock locks the TaskedLock
-func (t *task) Lock(lock TaskedLock) error {
+func (t *task) taskLock(lock TaskedLock) error {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -504,7 +490,7 @@ func (t *task) Lock(lock TaskedLock) error {
 }
 
 // RLock locks for read the TaskedLock
-func (t *task) RLock(lock TaskedLock) error {
+func (t *task) taskRLock(lock TaskedLock) error {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -513,7 +499,7 @@ func (t *task) RLock(lock TaskedLock) error {
 }
 
 // Unlock unlocks the TaskedLock
-func (t *task) Unlock(lock TaskedLock) error {
+func (t *task) taskUnlock(lock TaskedLock) error {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -522,7 +508,7 @@ func (t *task) Unlock(lock TaskedLock) error {
 }
 
 // RUnlock unlocks a read lock put on the TaskedLock
-func (t *task) RUnlock(lock TaskedLock) error {
+func (t *task) taskRUnlock(lock TaskedLock) error {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}
