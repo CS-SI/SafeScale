@@ -85,12 +85,17 @@ func (tg *taskGroup) GetID() (string, error) {
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{taskgroup <id>}".
-func (tg *taskGroup) Signature() string {
-	tid, _ := tg.GetID() // FIXME Later
-	if !Trace.Tasks {
-		return ""
+func (tg *taskGroup) GetSignature() (string, error) {
+	tid, err := tg.GetID()
+	if err != nil {
+		return "", err
 	}
-	return fmt.Sprintf("{taskgroup %s}", tid)
+
+	if !Trace.Tasks {
+		return "", nil
+	}
+
+	return fmt.Sprintf("{taskgroup %s}", tid), nil
 }
 
 // GetStatus returns the current task status
@@ -158,7 +163,10 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
-	tid, _ := tg.GetID() // FIXME Later
+	tid, err := tg.GetID()
+	if err != nil {
+		return nil, err
+	}
 
 	errs := make(map[string]string)
 	results := make(map[string]TaskResult)
@@ -210,7 +218,10 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
 
 // TryWait tries to wait on a task; if done returns the error and true, if not returns nil and false
 func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
-	tid, _ := tg.GetID() // FIXME Later
+	tid, err := tg.GetID()
+	if err != nil {
+		return false, nil, err
+	}
 
 	results := make(map[string]TaskResult)
 
@@ -236,8 +247,12 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
 // By design, duration cannot be less than 1ms.
+// BROKEN, Do not use
 func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]TaskResult, error) {
-	tid, _ := tg.GetID() // FIXME Later
+	tid, err := tg.GetID()
+	if err != nil {
+		return false, nil, err
+	}
 
 	results := make(map[string]TaskResult)
 
@@ -248,6 +263,8 @@ func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]Task
 	if duration < time.Millisecond {
 		duration = time.Millisecond
 	}
+
+	// FIXME Broken do not use
 
 	for {
 		select {
@@ -267,7 +284,10 @@ func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]Task
 
 // Reset resets the task for reuse
 func (tg *taskGroup) Reset() (Task, error) {
-	tid, _ := tg.GetID() // FIXME Later
+	tid, err := tg.GetID()
+	if err != nil {
+		return nil, err
+	}
 
 	if tg.task.status == RUNNING {
 		return nil, fmt.Errorf("can't reset task group '%s': group running", tid)

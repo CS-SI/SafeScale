@@ -221,3 +221,31 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 		fmt.Printf("Good %s", res)
 	}
 }
+
+func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
+	overlord, err := NewTaskGroup(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theId, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theId)
+
+	for ind := 0; ind < 10; ind++ {
+		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
+			rint := tools.RandomInt(3, 5)
+			time.Sleep(time.Duration(rint) * time.Minute)
+
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		}
+	}
+
+	waited, _, err := overlord.WaitFor(time.Duration(10) * time.Second)
+
+	if waited {
+		t.Errorf("It shouldn't happen")
+	}
+}
