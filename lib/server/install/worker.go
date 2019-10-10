@@ -294,7 +294,11 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 	if w.allNodes == nil {
 		hostClt := client.New().Host
 		allHosts := []*pb.Host{}
-		for _, i := range w.cluster.ListNodeIDs(w.feature.task) {
+		list, err := w.cluster.ListNodeIDs(w.feature.task)
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
@@ -682,7 +686,8 @@ func (w *worker) validateClusterSizing() error {
 		if err != nil {
 			return err
 		}
-		curNodes := len(w.cluster.ListNodeIDs(w.feature.task))
+		list, err := w.cluster.ListNodeIDs(w.feature.task)
+		curNodes := len(list)
 		if curNodes < count {
 			return fmt.Errorf("cluster doesn't meet the minimum number of nodes (%d < %d)", curNodes, count)
 		}
