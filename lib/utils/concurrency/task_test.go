@@ -198,7 +198,9 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	select {
 	case <-time.After(time.Duration(8) * time.Second):
-		t.Errorf("Ouch!: We have dead goroutines")
+		stats := overlord.Stats()
+		t.Errorf("Ouch!: We have %d dead goroutines", len(stats[RUNNING]))
+
 	case <-c:
 		fmt.Printf("Good %s", res)
 	}

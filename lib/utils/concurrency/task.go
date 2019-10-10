@@ -56,8 +56,8 @@ type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
 // Task ...
 type Task interface {
-	Abort()
-	Aborted() bool
+	Abort() error
+	Aborted() (bool, error)
 	ForceID(string) (Task, error)
 	GetID() (string, error)
 	GetSignature() string
@@ -69,10 +69,8 @@ type Task interface {
 	RUnlock(TaskedLock)
 	New() (Task, error)
 	Reset() (Task, error)
-	// GetResult() TaskResult
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
-	// StoreResult(TaskParameters)
 	TryWait() (bool, TaskResult, error)
 	Wait() (TaskResult, error)
 }
@@ -429,23 +427,11 @@ func (t *task) Reset() (Task, error) {
 	return t, nil
 }
 
-// // GetResult returns the result of the task action
-// func (t *task) GetResult() TaskResult {
-// 	status := t.GetStatus()
-// 	if status == READY {
-// 		panic("Can't get result of task '%s': task not started!")
-// 	}
-// 	if status != DONE {
-// 		panic("Can't get result of task '%s': task not done!")
-// 	}
-// 	t.lock.Lock()
-// 	defer t.lock.Unlock()
-// 	return t.result
-// }
-
 // Abort aborts the task execution
-func (t *task) Abort() {
-	// FIXME Call null receiver
+func (t *task) Abort() error {
+	if t == nil {
+		return scerr.InvalidInstanceError()
+	}
 
 	status := t.GetStatus()
 	if status == RUNNING {
@@ -460,20 +446,17 @@ func (t *task) Abort() {
 
 		t.status = ABORTED
 	}
+
+	return nil
 }
 
 // Aborted tells if task has been aborted
-func (t *task) Aborted() bool {
-	// FIXME Call null receiver
-	return t.status == ABORTED
-}
+func (t *task) Aborted() (bool, error) {
+	if t == nil {
+		return false, scerr.InvalidInstanceError()
+	}
 
-// StoreResult stores the result of the run
-func (t *task) StoreResult(result TaskResult) {
-	// FIXME Call null receiver
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.result = result
+	return t.status == ABORTED, nil
 }
 
 // New creates a subtask from current task
