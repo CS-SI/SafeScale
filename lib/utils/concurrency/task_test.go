@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 	"time"
 )
@@ -128,9 +129,17 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	}
 
 	res, err := overlord.Wait()
-
-	require.Nil(t, err)
+	require.NotNil(t, err)
 	require.NotEmpty(t, res)
+
+	ct := err.Error()
+	if !strings.Contains(ct, "Panic protection") {
+		t.Errorf("Expected to catch a Panic here...")
+	}
+
+	if !strings.Contains(ct, "panic happened") {
+		t.Errorf("Expected to catch a Panic here...")
+	}
 }
 
 func TestChildrenWaitingGameWithRandomError(t *testing.T) {
@@ -201,7 +210,12 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	select {
 	case <-time.After(time.Duration(8) * time.Second):
 		stats := overlord.Stats()
-		t.Errorf("Ouch!: We have %d dead goroutines", len(stats[RUNNING]))
+
+		if len(stats[RUNNING]) == 0 {
+			t.Errorf("We should have dangling goroutines here...")
+		} else {
+			fmt.Printf("Ouch!: We have %d dead goroutines", len(stats[RUNNING]))
+		}
 
 	case <-c:
 		fmt.Printf("Good %s", res)
