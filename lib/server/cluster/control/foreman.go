@@ -521,18 +521,18 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			list, merr := b.cluster.ListMasterIDs(task)
-            if merr != nil {
-                err = scerr.AddConsequence(err, merr)
-            } else {
-			    values := make([]string, 0, len(list))
-			    for _, v := range list {
-				    values = append(values, v)
-			    }
-			    derr := client.New().Host.Delete(values, temporal.GetExecutionTimeout())
-			    if derr != nil {
-				    err = scerr.AddConsequence(err, derr)
-			    }
-            }
+			if merr != nil {
+				err = scerr.AddConsequence(err, merr)
+			} else {
+				values := make([]string, 0, len(list))
+				for _, v := range list {
+					values = append(values, v)
+				}
+				derr := client.New().Host.Delete(values, temporal.GetExecutionTimeout())
+				if derr != nil {
+					err = scerr.AddConsequence(err, derr)
+				}
+			}
 		}
 	}()
 	_, mastersStatus = mastersTask.Wait()
@@ -594,14 +594,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			clientHost := clientInstance.Host
-			list := b.cluster.ListNodeIDs(task)
-			values := make([]string, 0, len(list))
-			for _, v := range list {
-				values = append(values, v)
-			}
-			derr := clientHost.Delete(values, temporal.GetExecutionTimeout())
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+			list, lerr := b.cluster.ListNodeIDs(task)
+			if lerr != nil {
+				err = scerr.AddConsequence(err, lerr)
+			} else {
+				derr := clientHost.Delete(list.Values(), temporal.GetExecutionTimeout())
+				if derr != nil {
+					err = scerr.AddConsequence(err, derr)
+				}
 			}
 		}
 	}()
@@ -877,7 +877,11 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Join private node in Docker Swarm as workers
-	for _, hostID := range cluster.ListNodeIDs(task) {
+	list, err := cluster.ListNodeIDs(task)
+	if err != nil {
+		return err
+	}
+	for _, hostID := range list {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
@@ -1346,7 +1350,11 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	identity := b.cluster.GetIdentity(task)
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"] = b.cluster.ListMasterIPs(task)
+	list, err := b.cluster.ListMasterIPs(task)
+	if err != nil {
+		return err
+	}
+	params["MasterIPs"] = list.Values()
 	params["CladmPassword"] = identity.AdminPassword
 	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["EndpointIP"] = netCfg.EndpointIP
@@ -1989,7 +1997,10 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	list := b.cluster.ListNodeIDs(t)
+	list, err := b.cluster.ListNodeIDs(t)
+	if err != nil {
+		return nil, err
+	}
 	if len(list) == 0 {
 		logrus.Debugf("[cluster %s] no nodes to configure.", clusterName)
 		return nil, nil
@@ -2006,7 +2017,8 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 
 	var subtasks []concurrency.Task
 	clientHost := client.New().Host
-	for i, hostID = range list {
+	for _, hostID = range list {
+		i++
 		pbHost, err = clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
 		if err != nil {
 			break
@@ -2016,7 +2028,7 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 			return nil, err
 		}
 		subtask, err = subtask.Start(b.taskConfigureNode, data.Map{
-			"index": i + 1,
+			"index": i,
 			"host":  pbHost,
 		})
 		if err != nil {

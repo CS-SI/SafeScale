@@ -28,6 +28,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
+	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
@@ -251,7 +252,7 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
 }
 
 // ListMasters lists the names of the master nodes in the Cluster
-func (c *Controller) ListMasters(task concurrency.Task) []*clusterpropsv2.Node {
+func (c *Controller) ListMasters(task concurrency.Task) ([]*clusterpropsv2.Node, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -266,18 +267,18 @@ func (c *Controller) ListMasters(task concurrency.Task) []*clusterpropsv2.Node {
 	if err != nil {
 		log.Errorf("failed to get list of master names: %v", err)
 	}
-	return list
+	return list, nil
 }
 
 // ListMasterNames lists the names of the master nodes in the Cluster
-func (c *Controller) ListMasterNames(task concurrency.Task) map[uint]string {
+func (c *Controller) ListMasterNames(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	list := map[uint]string{}
+	list := clusterapi.NodeList{}
 	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes).Masters
 		for _, v := range nodesV2 {
@@ -286,20 +287,21 @@ func (c *Controller) ListMasterNames(task concurrency.Task) map[uint]string {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of master names: %v", err)
+		// log.Errorf("failed to get list of master names: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // ListMasterIDs lists the IDs of the master nodes in the Cluster
-func (c *Controller) ListMasterIDs(task concurrency.Task) map[uint]string {
+func (c *Controller) ListMasterIDs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	list := map[uint]string{}
+	list := clusterapi.NodeList{}
 	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes).Masters
 		for _, v := range nodesV2 {
@@ -315,14 +317,14 @@ func (c *Controller) ListMasterIDs(task concurrency.Task) map[uint]string {
 }
 
 // ListMasterIPs lists the IP addresses of the master nodes in the Cluster
-func (c *Controller) ListMasterIPs(task concurrency.Task) map[uint]string {
+func (c *Controller) ListMasterIPs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	list := map[uint]string{}
+	list := clusterapi.NodeList{}
 	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes).Masters
 		for _, v := range nodesV2 {
@@ -332,12 +334,13 @@ func (c *Controller) ListMasterIPs(task concurrency.Task) map[uint]string {
 	})
 	if err != nil {
 		log.Errorf("failed to get list of master IPs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // ListNodes lists the nodes in the Cluster
-func (c *Controller) ListNodes(task concurrency.Task) []*clusterpropsv2.Node {
+func (c *Controller) ListNodes(task concurrency.Task) ([]*clusterpropsv2.Node, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -350,20 +353,21 @@ func (c *Controller) ListNodes(task concurrency.Task) []*clusterpropsv2.Node {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IDs: %v", err)
+		// log.Errorf("failed to get list of node IDs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // ListNodeNames lists the names of the nodes in the Cluster
-func (c *Controller) ListNodeNames(task concurrency.Task) map[uint]string {
+func (c *Controller) ListNodeNames(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	list := map[uint]string{}
+	list := clusterapi.NodeList{}
 	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes).PrivateNodes
 		for _, v := range nodesV2 {
@@ -372,20 +376,21 @@ func (c *Controller) ListNodeNames(task concurrency.Task) map[uint]string {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IDs: %v", err)
+		// log.Errorf("failed to get list of node IDs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, err
 }
 
 // ListNodeIDs lists the IDs of the nodes in the Cluster
-func (c *Controller) ListNodeIDs(task concurrency.Task) map[uint]string {
+func (c *Controller) ListNodeIDs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	list := map[uint]string{}
+	list := clusterapi.NodeList{}
 	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes).PrivateNodes
 		for _, v := range nodesV2 {
@@ -394,20 +399,21 @@ func (c *Controller) ListNodeIDs(task concurrency.Task) map[uint]string {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IDs: %v", err)
+		// log.Errorf("failed to get list of node IDs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, err
 }
 
 // ListNodeIPs lists the IP addresses of the nodes in the Cluster
-func (c *Controller) ListNodeIPs(task concurrency.Task) map[uint]string {
+func (c *Controller) ListNodeIPs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list map[uint]string
+	var list clusterapi.NodeList
 	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes).PrivateNodes
 		for _, v := range nodesV2 {
@@ -416,9 +422,10 @@ func (c *Controller) ListNodeIPs(task concurrency.Task) map[uint]string {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IP addresses: %v", err)
+		// log.Errorf("failed to get list of node IP addresses: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // GetNode returns a node based on its ID
@@ -488,7 +495,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (_ *clusterprops
 	clientHost := client.New().Host
 	masters, err := c.ListMasters(task)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var (
@@ -531,7 +538,10 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2
 
 	found := false
 	clientHost := client.New().Host
-	list := c.ListNodes(task)
+	list, err := c.ListNodes(task)
+	if err != nil {
+		return nil, err
+	}
 	var node *clusterpropsv2.Node
 	for _, node = range list {
 		sshCfg, err := clientHost.SSHConfig(node.ID)
@@ -1136,7 +1146,10 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	var cleaningErrors []error
 
 	// Deletes the nodes
-	list := c.ListNodeIDs(task)
+	list, err := c.ListNodeIDs(task)
+	if err != nil {
+		return err
+	}
 	if len(list) > 0 {
 		var subtasks []concurrency.Task
 		for _, v := range list {

@@ -28,6 +28,53 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_cluster.go -package=mocks github.com/CS-SI/SafeScale/lib/server/cluster/api Cluster
 
+// NodeList contains a list of string indexed by node Numerical ID.
+type NodeList map[uint]string
+
+// KeysAndValues returns a slice with keys and a slice with values from map[uint]string
+func (nl NodeList) KeysAndValues() ([]uint, []string) {
+	length := len(nl)
+	if length <= 0 {
+		return []uint{}, []string{}
+	}
+
+	keys := make([]uint, 0, length)
+	values := make([]string, 0, length)
+	for k, v := range nl {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	return keys, values
+}
+
+// Keys returns a slice with keys from map[uint]string
+func (nl NodeList) Keys() []uint {
+	length := len(nl)
+	if length <= 0 {
+		return []uint{}
+	}
+
+	keys := make([]uint, 0, length)
+	for k := range nl {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Values returns a slice with values from map[uint]string
+func (nl NodeList) Values() []string {
+	length := len(nl)
+	if length <= 0 {
+		return []string{}
+	}
+
+	values := make([]string, 0, length)
+	for _, v := range nl {
+		values = append(values, v)
+	}
+	return values
+}
+
 // Cluster is an interface of methods associated to Cluster-like structs
 type Cluster interface {
 	// GetService ...
@@ -54,23 +101,23 @@ type Cluster interface {
 	// DeleteSpecificNode deletes a node identified by its ID
 	DeleteSpecificNode(concurrency.Task, string, string) error
 	// ListMasters lists the masters (if there is such masters in the flavor...)
-	ListMasters(concurrency.Task) []*propsv2.Node
+	ListMasters(concurrency.Task) ([]*propsv2.Node, error)
 	// ListMasterNames lists the names of masters (if there is such masters in the flavor...) (map key is the NumericalID of the host)
-	ListMasterNames(concurrency.Task) map[uint]string
+	ListMasterNames(concurrency.Task) (NodeList, error)
 	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...) (map key is the NumericalID of the host)
-	ListMasterIDs(concurrency.Task) map[uint]string
+	ListMasterIDs(concurrency.Task) (NodeList, error)
 	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...) (map key is the NumericalID of the host)
-	ListMasterIPs(concurrency.Task) map[uint]string
+	ListMasterIPs(concurrency.Task) (NodeList, error)
 	// FindAvailableMaster returns a propsv2.Node corresponding to first master available to execute order (map key is the NumericalID of the host)
 	FindAvailableMaster(concurrency.Task) (*propsv2.Node, error)
 	// ListNodes lists Nodes in the cluster
-	ListNodes(concurrency.Task) []*propsv2.Node
+	ListNodes(concurrency.Task) ([]*propsv2.Node, error)
 	// ListNodeNames lists IDs of the nodes in the cluster (map key is the NumericalID of the host)
-	ListNodeNames(concurrency.Task) map[uint]string
+	ListNodeNames(concurrency.Task) (NodeList, error)
 	// ListNodeIDs lists IDs of the nodes in the cluster (map key is the NumericalID of the host)
-	ListNodeIDs(concurrency.Task) map[uint]string
+	ListNodeIDs(concurrency.Task) (NodeList, error)
 	// ListNodeIPs lists the IPs of the nodes in the cluster (map key is the NumericalID of the host)
-	ListNodeIPs(concurrency.Task) map[uint]string
+	ListNodeIPs(concurrency.Task) (NodeList, error)
 	// FindAvailableNode returns a propsv2.Node corresponding to first node available to execute order
 	FindAvailableNode(concurrency.Task) (*propsv2.Node, error)
 	// SearchNode tells if the ID of the host passed as parameter is a node
