@@ -146,11 +146,11 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		hostID, err := w.cluster.FindAvailableMaster(w.feature.task)
+		node, err := w.cluster.FindAvailableMaster(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
-		w.availableMaster, err = client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
+		w.availableMaster, err = client.New().Host.Inspect(node.ID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -164,11 +164,11 @@ func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		hostID, err := w.cluster.FindAvailableNode(w.feature.task)
+		node, err := w.cluster.FindAvailableNode(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
-		host, err := client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
+		host, err := client.New().Host.Inspect(node.ID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -599,16 +599,16 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 			return results, nil, false, false
 		}()
 
+		if stepErr != nil {
+			return results, stepErr
+		}
+
 		if breaking {
 			break
 		}
 
 		if continuation {
 			continue
-		}
-
-		if stepErr != nil {
-			return results, stepErr
 		}
 	}
 	return results, err
