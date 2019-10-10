@@ -763,7 +763,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	}()
 
 	if len(errors) > 0 {
-		err = fmt.Errorf("errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)), strings.Join(errors, "\n"))
+		err = fmt.Errorf("errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(uint(len(errors))), strings.Join(errors, "\n"))
 		return nil, err
 	}
 

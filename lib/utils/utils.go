@@ -104,7 +104,7 @@ func ExtractRetCode(err error) (string, int, error) {
 }
 
 // Plural returns 's' if value > 1, "" otherwise
-func Plural(value int) string {
+func Plural(value uint) string {
 	if value > 1 {
 		return "s"
 	}
