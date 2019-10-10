@@ -135,13 +135,17 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	if err != nil {
 		return err
 	}
-	list := cluster.ListMasterIPs(task)
+	list, err := cluster.ListMasterIPs(task)
+	if err != nil {
+		return err
+	}
+	listValues := list.Values()
 	values := install.Variables{
-		"PrimaryMasterIP":   list[0],
+		"PrimaryMasterIP":   listValues[0],
 		"SecondaryMasterIP": "",
 	}
 	if len(list) > 1 {
-		values["SecondaryMasterIP"] = list[1]
+		values["SecondaryMasterIP"] = listValues[1]
 	}
 	results, err := feature.Add(target, values, install.Settings{})
 	if err != nil {
