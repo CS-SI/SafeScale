@@ -18,7 +18,6 @@ package api
 
 import (
 	pb "github.com/CS-SI/SafeScale/lib"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	propsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
@@ -55,25 +54,25 @@ type Cluster interface {
 	// DeleteSpecificNode deletes a node identified by its ID
 	DeleteSpecificNode(concurrency.Task, string, string) error
 	// ListMasters lists the masters (if there is such masters in the flavor...)
-	ListMasters(concurrency.Task) []*propsv1.Node
-	// ListMasterNames lists the names of masters (if there is such masters in the flavor...)
-	ListMasterNames(concurrency.Task) []string
-	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
-	ListMasterIDs(concurrency.Task) ([]string, error)
-	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-	ListMasterIPs(concurrency.Task) []string
-	// FindAvailableMaster returns ID of the first master available to execute order
-	FindAvailableMaster(concurrency.Task) (string, error)
+	ListMasters(concurrency.Task) []*propsv2.Node
+	// ListMasterNames lists the names of masters (if there is such masters in the flavor...) (map key is the NumericalID of the host)
+	ListMasterNames(concurrency.Task) map[uint]string
+	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...) (map key is the NumericalID of the host)
+	ListMasterIDs(concurrency.Task) map[uint]string
+	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...) (map key is the NumericalID of the host)
+	ListMasterIPs(concurrency.Task) map[uint]string
+	// FindAvailableMaster returns a propsv2.Node corresponding to first master available to execute order (map key is the NumericalID of the host)
+	FindAvailableMaster(concurrency.Task) (*propsv2.Node, error)
 	// ListNodes lists Nodes in the cluster
-	ListNodes(concurrency.Task) []*propsv1.Node
-	// ListNodeNames lists IDs of the nodes in the cluster
-	ListNodeNames(concurrency.Task) []string
-	// ListNodeIDs lists IDs of the nodes in the cluster
-	ListNodeIDs(concurrency.Task) []string
-	// ListNodeIPs lists the IPs of the nodes in the cluster
-	ListNodeIPs(concurrency.Task) []string
-	// FindAvailableNode returns ID of the first node available to execute order
-	FindAvailableNode(concurrency.Task) (string, error)
+	ListNodes(concurrency.Task) []*propsv2.Node
+	// ListNodeNames lists IDs of the nodes in the cluster (map key is the NumericalID of the host)
+	ListNodeNames(concurrency.Task) map[uint]string
+	// ListNodeIDs lists IDs of the nodes in the cluster (map key is the NumericalID of the host)
+	ListNodeIDs(concurrency.Task) map[uint]string
+	// ListNodeIPs lists the IPs of the nodes in the cluster (map key is the NumericalID of the host)
+	ListNodeIPs(concurrency.Task) map[uint]string
+	// FindAvailableNode returns a propsv2.Node corresponding to first node available to execute order
+	FindAvailableNode(concurrency.Task) (*propsv2.Node, error)
 	// SearchNode tells if the ID of the host passed as parameter is a node
 	SearchNode(concurrency.Task, string) bool
 	// GetNode returns a node based on its ID
