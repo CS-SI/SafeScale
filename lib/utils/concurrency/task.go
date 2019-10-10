@@ -208,7 +208,7 @@ func (t *task) GetContext() context.Context {
 }
 
 // ForceID allows to specify task ID. The unicity of the ID through all the tasks
-// becomes the responsability of the developer...
+// becomes the responsibility of the developer...
 func (t *task) ForceID(id string) (Task, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -469,7 +469,7 @@ func (t *task) Aborted() bool {
 }
 
 // StoreResult stores the result of the run
-func (t *task) StoreResult(result TaskParameters) {
+func (t *task) StoreResult(result TaskResult) {
 	// FIXME Call null receiver
 	t.lock.Lock()
 	defer t.lock.Unlock()
