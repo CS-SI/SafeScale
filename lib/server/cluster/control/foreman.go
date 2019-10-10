@@ -520,9 +520,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := client.New().Host.Delete(b.cluster.ListMasterIDs(task), temporal.GetExecutionTimeout())
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+			masters, merr := b.cluster.ListMasterIDs(task)
+			if merr != nil {
+				err = scerr.AddConsequence(err, merr)
+			} else {
+				derr := client.New().Host.Delete(masters, temporal.GetExecutionTimeout())
+				if derr != nil {
+					err = scerr.AddConsequence(err, derr)
+				}
 			}
 		}
 	}()
@@ -807,7 +812,11 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 
 	// Join masters in Docker Swarm as managers
 	joinCmd := ""
-	for _, hostID := range cluster.ListMasterIDs(task) {
+	masters, err := cluster.ListMasterIDs(task)
+	if err != nil {
+		return err
+	}
+	for _, hostID := range masters {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
@@ -1585,7 +1594,10 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	list := b.cluster.ListMasterIDs(t)
+	list, err := b.cluster.ListMasterIDs(t)
+	if err != nil {
+		return nil, err
+	}
 	if len(list) == 0 {
 		return nil, nil
 	}
@@ -1595,7 +1607,11 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 
 	clientHost := client.New().Host
 	var subtasks []concurrency.Task
-	for i, hostID := range b.cluster.ListMasterIDs(t) {
+	masters, err := b.cluster.ListMasterIDs(t)
+	if err != nil {
+		return nil, err
+	}
+	for i, hostID := range masters {
 		host, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
 		if err != nil {
 			logrus.Warnf("failed to get metadata of host: %s", err.Error())

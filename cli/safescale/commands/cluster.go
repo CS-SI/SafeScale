@@ -294,7 +294,11 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
 		remoteDesktops := map[string][]string{}
 		clientHost := client.New().Host
-		for _, id := range c.ListMasterIDs(concurrency.RootTask()) {
+		masters, err := c.ListMasterIDs(concurrency.RootTask())
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range masters {
 			host, err := clientHost.Inspect(id, temporal.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
@@ -878,7 +882,10 @@ var clusterRunCommand = cli.Command{
 }
 
 func executeCommand(command string) error {
-	masters := clusterInstance.ListMasterIDs(concurrency.RootTask())
+	masters, err := clusterInstance.ListMasterIDs(concurrency.RootTask())
+	if err != nil {
+		return err
+	}
 	if len(masters) == 0 {
 		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity(concurrency.RootTask()).Name)
 		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
@@ -1355,7 +1362,10 @@ var clusterMasterListCommand = cli.Command{
 		hostClt := client.New().Host
 		formatted := []map[string]interface{}{}
 
-		list := clusterInstance.ListMasterIDs(concurrency.RootTask())
+		list, err := clusterInstance.ListMasterIDs(concurrency.RootTask())
+		if err != nil {
+			return err
+		}
 		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {

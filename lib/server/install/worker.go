@@ -248,7 +248,11 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []*pb.Host{}
 		safescale := client.New().Host
-		for _, i := range w.cluster.ListMasterIDs(w.feature.task) {
+		masters, err := w.cluster.ListMasterIDs(w.feature.task)
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range masters {
 			host, err := safescale.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
@@ -663,7 +667,11 @@ func (w *worker) validateClusterSizing() error {
 		if err != nil {
 			return err
 		}
-		curMasters := len(w.cluster.ListMasterIDs(w.feature.task))
+		masters, err := w.cluster.ListMasterIDs(w.feature.task)
+		if err != nil {
+			return err
+		}
+		curMasters := len(masters)
 		if curMasters < count {
 			return fmt.Errorf("cluster doesn't meet the minimum number of masters (%d < %d)", curMasters, count)
 		}
