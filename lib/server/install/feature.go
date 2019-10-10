@@ -534,7 +534,10 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		}
 		v["Masters"] = cluster.ListMasters(f.task)
 		v["MasterNames"] = cluster.ListMasterNames(f.task)
-		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
+		v["MasterIDs"], err = cluster.ListMasterIDs(f.task)
+		if err != nil {
+			return err
+		}
 		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "cladm"

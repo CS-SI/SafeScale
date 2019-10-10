@@ -59,7 +59,7 @@ type Cluster interface {
 	// ListMasterNames lists the names of masters (if there is such masters in the flavor...)
 	ListMasterNames(concurrency.Task) []string
 	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
-	ListMasterIDs(concurrency.Task) []string
+	ListMasterIDs(concurrency.Task) ([]string, error)
 	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
 	ListMasterIPs(concurrency.Task) []string
 	// FindAvailableMaster returns ID of the first master available to execute order

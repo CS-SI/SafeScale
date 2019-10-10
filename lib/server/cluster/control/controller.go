@@ -292,7 +292,7 @@ func (c *Controller) ListMasterNames(task concurrency.Task) []string {
 }
 
 // ListMasterIDs lists the IDs of the master nodes in the Cluster
-func (c *Controller) ListMasterIDs(task concurrency.Task) []string {
+func (c *Controller) ListMasterIDs(task concurrency.Task) ([]string, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -308,9 +308,10 @@ func (c *Controller) ListMasterIDs(task concurrency.Task) []string {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of master IDs: %v", err) // FIXME Don't hide errors
+		return nil, fmt.Errorf("failed to get list of master IDs: %v", err)
 	}
-	return list
+
+	return list, nil
 }
 
 // ListMasterIPs lists the IP addresses of the master nodes in the Cluster
@@ -486,7 +487,10 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 	masterID := ""
 	found := false
 	clientHost := client.New().Host
-	masterIDs := c.ListMasterIDs(task)
+	masterIDs, err := c.ListMasterIDs(task)
+	if err != nil {
+		return "", err
+	}
 
 	var lastError error
 
@@ -1152,7 +1156,11 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	}
 
 	// Delete the Masters
-	list = c.ListMasterIDs(task)
+	list, err = c.ListMasterIDs(task)
+	if err != nil {
+		return err
+	}
+
 	length = len(list)
 	if len(list) > 0 {
 		var subtasks []concurrency.Task

@@ -461,7 +461,6 @@ func (handler *NetworkHandler) Create(
 		return nil, err
 	}
 
-	// FIXME Modify network state here
 	network.NetworkState = NetworkState.PHASE2
 	logrus.Debugf("Updating network metadata '%s' ...", network.Name)
 	mn, err = metadata.SaveNetwork(handler.service, network)
@@ -470,7 +469,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// Check if hosts are still attached to network according to metadata
-	primaryTask, err = primaryTask.Start(handler.installPhase2OnGateway, data.Map{ // FIXME Send network ref too
+	primaryTask, err = primaryTask.Start(handler.installPhase2OnGateway, data.Map{
 		"host":     primaryGateway,
 		"userdata": primaryUserdata,
 	})
@@ -482,7 +481,7 @@ func (handler *NetworkHandler) Create(
 		if err != nil {
 			return nil, err
 		}
-		secondaryTask, err = secondaryTask.Start(handler.installPhase2OnGateway, data.Map{ // FIXME Send network ref too
+		secondaryTask, err = secondaryTask.Start(handler.installPhase2OnGateway, data.Map{
 			"host":     secondaryGateway,
 			"userdata": secondaryUserdata,
 		})
@@ -508,7 +507,6 @@ func (handler *NetworkHandler) Create(
 	default:
 	}
 
-	// FIXME Modify network state here
 	network.NetworkState = NetworkState.READY
 	logrus.Debugf("Updating network metadata '%s' ...", network.Name)
 	mn, err = metadata.SaveNetwork(handler.service, network)
