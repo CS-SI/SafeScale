@@ -247,7 +247,6 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
 // By design, duration cannot be less than 1ms.
-// BROKEN, Do not use
 func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]TaskResult, error) {
 	tid, err := tg.GetID()
 	if err != nil {
@@ -264,21 +263,17 @@ func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]Task
 		duration = time.Millisecond
 	}
 
-	// FIXME Broken do not use
+	c := make(chan struct{})
+	go func() {
+		results, err = tg.WaitGroup()
+		c <- struct{}{} // done
+	}()
 
-	for {
-		select {
-		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil)
-		default:
-			ok, result, err := tg.TryWait()
-			if ok {
-				results[tid] = result
-				return ok, results, err
-			}
-			// Waits 1 ms between checks...
-			time.Sleep(time.Millisecond)
-		}
+	select {
+	case <-time.After(duration):
+		return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil)
+	case <-c:
+		return true, results, err
 	}
 }
 
