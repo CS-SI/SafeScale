@@ -705,8 +705,6 @@ func (handler *HostHandler) Create(
 		}
 
 		if client.IsProvisioningError(err) {
-			log.Errorf("%+v", err)
-			// FIXME Check error type
 			return nil, fmt.Errorf("error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
@@ -1006,7 +1004,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	// Conditions are met, delete host
 	var deleteMetadataOnly bool
 	var moreTimeNeeded bool
-	err = handler.service.DeleteHost(host.ID) // FIXME DeleteHost, check retry.ErrTimeout
+	err = handler.service.DeleteHost(host.ID)
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrNotFound:
@@ -1018,9 +1016,8 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		}
 	}
 
-	// FIXME Add GetHostState verification
 	if moreTimeNeeded {
-		if state, ok := handler.service.GetHostState(host.ID); ok == nil { // FIXME Unhandled timeout
+		if state, ko := handler.service.GetHostState(host.ID); ko == nil { // FIXME Unhandled timeout, GetHostState uses retry too, a HostState.ERROR can be a Timeout and not a HostState.ERROR
 			log.Warnf("While deleting the status was [%s]", state)
 			if state != HostState.ERROR {
 				deleteMetadataOnly = true
