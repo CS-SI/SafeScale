@@ -24,7 +24,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
+	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
@@ -65,6 +68,13 @@ func Load(task concurrency.Task, name string) (api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// From here, we can deal with legacy
+	err = upgradePropertyNodesIfNeeded(task, controller)
+	if err != nil {
+		return nil, err
+	}
+
 	return controller, nil
 }
 
@@ -210,3 +220,50 @@ func List() (clusterList []api.Cluster, err error) {
 // return fmt.Errorf("Sanitization of cluster Flavor '%s' not available", clusterCore.Flavor.String())
 // }
 // }
+
+// upgradePropertyNodesIfNeeded upgrade current Nodes to last Nodes (currently NodesV2)
+func upgradePropertyNodesIfNeeded(t concurrency.Task, c *control.Controller) error {
+	properties := c.GetProperties(t)
+	if !properties.Lookup(Property.NodesV2) {
+		// Replace NodesV1 by NodesV2 properties
+		return c.UpdateMetadata(t, func() error {
+			return properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+				nodesV2 := v.(*clusterpropsv2.Nodes)
+
+				return properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+					nodesV1 := v.(*clusterpropsv1.Nodes)
+
+					for _, v := range nodesV1.Masters {
+						nodesV2.GlobalLastIndex++
+
+						node := &clusterpropsv2.Node{
+							ID:          v.ID,
+							NumericalID: nodesV2.GlobalLastIndex,
+							Name:        v.Name,
+							PrivateIP:   v.PrivateIP,
+							PublicIP:    v.PublicIP,
+						}
+						nodesV2.Masters = append(nodesV2.Masters, node)
+					}
+					for _, v := range nodesV1.PrivateNodes {
+						nodesV2.GlobalLastIndex++
+
+						node := &clusterpropsv2.Node{
+							ID:          v.ID,
+							NumericalID: nodesV2.GlobalLastIndex,
+							Name:        v.Name,
+							PrivateIP:   v.PrivateIP,
+							PublicIP:    v.PublicIP,
+						}
+						nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, node)
+					}
+					nodesV2.MasterLastIndex = nodesV1.MasterLastIndex
+					nodesV2.PrivateLastIndex = nodesV1.PrivateLastIndex
+					nodesV1 = &clusterpropsv1.Nodes{}
+					return nil
+				})
+			})
+		})
+	}
+	return nil
+}

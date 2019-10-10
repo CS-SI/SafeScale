@@ -153,6 +153,8 @@ feature:
                             export DB_USER=keycloak4platform
                             export KEYCLOAK_USER=admin
                             export KEYCLOAK_PASSWORD="$(cat /run/secrets/safescale.keycloak.admin_password)"
+                            export CACHE_OWNERS_COUNT={{ len .MasterIPs }}
+                            export CACHE_OWNERS_AUTH_SESSIONS_COUNT={{ len .MasterIPs }}
 
                             cat >/root/.pgpass <<-EOF2
                             *:5432:*:postgres:$ADMIN_PG_PASSWORD

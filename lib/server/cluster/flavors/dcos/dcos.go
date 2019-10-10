@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/ErrorCode"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -140,7 +141,7 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return centos
 }
 
-func configureMaster(task concurrency.Task, foreman control.Foreman, index int, host *pb.Host) error {
+func configureMaster(task concurrency.Task, foreman control.Foreman, index uint, host *pb.Host) error {
 	box, err := getTemplateBox()
 	if err != nil {
 		return err
@@ -173,8 +174,7 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index int, 
 	return nil
 }
 
-func configureNode(task concurrency.Task, foreman control.Foreman, index int, host *pb.Host) error {
-
+func configureNode(task concurrency.Task, foreman control.Foreman, index uint, host *pb.Host) error {
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, host.Name)
 
 	box, err := getTemplateBox()
@@ -242,14 +242,18 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 	}
 
 	identity := cluster.GetIdentity(task)
-	// VPL: FIXME: use Property.NetworkV2 with VIP awareness...
-	data := map[string]interface{}{
+
+	list, err := cluster.ListMasterIPs(task)
+	if err != nil {
+		return err
+	}
+	data := data.Map{
 		"reserved_CommonRequirements": globalSystemRequirements,
 		// "BootstrapIP":                 netCfg.PrimaryGatewayPrivateIP,
 		"BootstrapIP":   netCfg.GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 		"ClusterName":   identity.Name,
-		"MasterIPs":     cluster.ListMasterIPs(task),
+		"MasterIPs":     list.Values(),
 		"DNSServerIPs":  dnsServers,
 		// "DefaultRouteIP": netCfg.VIP.PrivateIP,
 		"DefaultRouteIP": netCfg.GatewayIP,
@@ -348,13 +352,13 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag"
 	safescaleClt := client.New()
 	safescaleCltHost := safescaleClt.Host
-	masterID, err := foreman.Cluster().FindAvailableMaster(task)
+	master, err := foreman.Cluster().FindAvailableMaster(task)
 	if err != nil {
 		return ClusterState.Unknown, err
 	}
-	sshCfg, err := safescaleCltHost.SSHConfig(masterID)
+	sshCfg, err := safescaleCltHost.SSHConfig(master.ID)
 	if err != nil {
-		logrus.Errorf("failed to get ssh config to connect to master '%s': %s", masterID, err.Error())
+		logrus.Errorf("failed to get ssh config to connect to master '%s': %s", master.ID, err.Error())
 		return ClusterState.Error, err
 
 	}
@@ -362,7 +366,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	if err != nil {
 		return ClusterState.Error, err
 	}
-	retcode, _, stderr, err = safescaleClt.SSH.Run(masterID, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, stderr, err = safescaleClt.SSH.Run(master.ID, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		logrus.Errorf("failed to run remote command to get cluster state: %v\n%s", err, stderr)
 		return ClusterState.Error, err

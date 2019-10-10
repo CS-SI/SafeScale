@@ -38,4 +38,6 @@ const (
 	DefaultsV2 = "9"
 	// NetworkV2 contains optional additional info about network of the cluster (vip)
 	NetworkV2 = "10"
+	// NodesV2 contains optional additional info describing Nodes inside the cluster
+	NodesV2 = "11"
 )

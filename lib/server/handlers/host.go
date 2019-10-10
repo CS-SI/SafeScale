@@ -393,13 +393,13 @@ func (handler *HostHandler) Create(
 		}
 		if len(templates) > 0 {
 			template = templates[0]
-			msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
+			msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(uint(template.Cores)))
 			if template.CPUFreq > 0 {
 				msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 			}
 			msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
 			if template.GPUNumber > 0 {
-				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
+				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(uint(template.GPUNumber)))
 				if template.GPUType != "" {
 					msg += fmt.Sprintf(" %s", template.GPUType)
 				}
@@ -896,9 +896,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	err = host.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
 		shares = v.(*propsv1.HostShares).ByID
 		for _, share := range shares {
-			count := len(share.ClientsByID)
+			count := uint(len(share.ClientsByID))
 			if count > 0 {
-				count = len(shares)
+				count = uint(len(shares))
 				return fmt.Errorf("cannot delete host, exports %d share%s where at least one is used", count, utils.Plural(count))
 			}
 		}
@@ -910,7 +910,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 	// Don't remove a host with volumes attached
 	err = host.Properties.LockForRead(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
-		nAttached := len(v.(*propsv1.HostVolumes).VolumesByID)
+		nAttached := uint(len(v.(*propsv1.HostVolumes).VolumesByID))
 		if nAttached > 0 {
 			return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
 		}

@@ -63,3 +63,21 @@ func (m Map) Contains(key string) bool {
 	_, ok := m[key]
 	return ok
 }
+
+// Keys returns a slice with all keys of the map
+func (m Map) Keys() []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Values returns a slice with all values of the map
+func (m Map) Values() []interface{} {
+	values := make([]interface{}, 0, len(m))
+	for _, v := range m {
+		values = append(values, v)
+	}
+	return values
+}
