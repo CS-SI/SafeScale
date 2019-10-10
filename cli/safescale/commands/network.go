@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -42,6 +43,7 @@ var NetworkCmd = cli.Command{
 		networkDelete,
 		networkInspect,
 		networkList,
+		networkVIPCommand,
 	},
 }
 
@@ -240,5 +242,133 @@ var networkCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 		}
 		return clitools.SuccessResponse(network)
+	},
+}
+
+// networkVIPCommand handles 'network vip' commands
+var networkVIPCommand = cli.Command{
+	Name:      "vip",
+	Aliases:   []string{"virtualip"},
+	Usage:     "manage network virtual IP",
+	ArgsUsage: "COMMAND",
+
+	Subcommands: []cli.Command{
+		networkVIPCreateCommand,
+		networkVIPInspectCommand,
+		networkVIPDeleteCommand,
+		networkVIPBindCommand,
+		networkVIPUnbindCommand,
+	},
+}
+
+var networkVIPCreateCommand = cli.Command{
+	Name:      "create",
+	Aliases:   []string{"new"},
+	Usage:     "create NETWORK VIPNAME",
+	ArgsUsage: "<network_name> <vip_name>",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 2 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
+		}
+
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// if err != nil {
+		// 	err = scerr.FromGRPCStatus(err)
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network VIP", false).Error())))
+		// }
+
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "creation of network VIP not yet implemented"))
+
+	},
+}
+
+var networkVIPInspectCommand = cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "inspect NETWORK VIPNAME",
+	ArgsUsage: "<network_name> <vip_name>",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 2 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
+		}
+
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// if err != nil {
+		// 	err = scerr.FromGRPCStatus(err)
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network VIP", false).Error())))
+		// }
+
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "inspection of network VIP not yet implemented"))
+
+	},
+}
+
+var networkVIPDeleteCommand = cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm", "destroy"},
+	Usage:     "delete NETWORK VIPNAME",
+	ArgsUsage: "<network_name> <vip_name>",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
+		}
+
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// if err != nil {
+		// 	err = scerr.FromGRPCStatus(err)
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network VIP", false).Error())))
+		// }
+
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "deletion of network VIP not yet implemented"))
+	},
+}
+
+var networkVIPBindCommand = cli.Command{
+	Name:      "bind",
+	Aliases:   []string{"attach"},
+	Usage:     "create NETWORK VIPNAME HOST",
+	ArgsUsage: "<network_name> <vip_name> <host_name>",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 3 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
+		}
+
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// if err != nil {
+		// 	err = scerr.FromGRPCStatus(err)
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network VIP", false).Error())))
+		// }
+
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "bind host to network VIP not yet implemented"))
+	},
+}
+
+var networkVIPUnbindCommand = cli.Command{
+	Name:      "unbind",
+	Aliases:   []string{"detach"},
+	Usage:     "unbind NETWORK VIPNAME HOST",
+	ArgsUsage: "<network_name> <vip_name> <host_name>",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 3 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
+		}
+
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// if err != nil {
+		// 	err = scerr.FromGRPCStatus(err)
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unbind host from network VIP", false).Error())))
+		// }
+
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "unbind host from network VIP not yet implemented"))
 	},
 }
