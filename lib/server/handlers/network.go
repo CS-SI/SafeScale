@@ -629,7 +629,8 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	// claiming host is created
 	logrus.Infof("Waiting until gateway '%s' is available by SSH ...", gw.Name)
 	sshHandler := NewSSHHandler(handler.service)
-	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
+	ct, _ := task.GetContext()
+	ssh, err := sshHandler.GetConfig(ct, gw.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -683,17 +684,19 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
 	sshHandler := NewSSHHandler(handler.service)
 
+	ct, _ := task.GetContext()
+
 	// logrus.Debugf("Configuring gateway '%s', phase 2", gw.Name)
-	returnCode, _, _, err := sshHandler.Run(task.GetContext(), gw.Name, command)
+	returnCode, _, _, err := sshHandler.Run(ct, gw.Name, command)
 	if err != nil {
-		retrieveForensicsData(task.GetContext(), sshHandler, gw)
+		retrieveForensicsData(ct, sshHandler, gw)
 
 		return nil, err
 	}
 	if returnCode != 0 {
-		retrieveForensicsData(task.GetContext(), sshHandler, gw)
+		retrieveForensicsData(ct, sshHandler, gw)
 
-		warnings, errs := getPhaseWarningsAndErrors(task.GetContext(), sshHandler, gw)
+		warnings, errs := getPhaseWarningsAndErrors(ct, sshHandler, gw)
 
 		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gw.Name, returnCode, warnings, errs)
 	}
@@ -702,7 +705,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	// Reboot gateway
 	logrus.Debugf("Rebooting gateway '%s'", gw.Name)
 	command = "sudo systemctl reboot"
-	returnCode, _, _, err = sshHandler.Run(task.GetContext(), gw.Name, command)
+	returnCode, _, _, err = sshHandler.Run(ct, gw.Name, command)
 	if err != nil {
 		return nil, err
 	}
@@ -710,7 +713,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 		logrus.Warnf("Unexpected problem rebooting...")
 	}
 
-	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
+	ssh, err := sshHandler.GetConfig(ct, gw.ID)
 	if err != nil {
 		return nil, err
 	}

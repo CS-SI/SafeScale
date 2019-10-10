@@ -60,9 +60,9 @@ type Task interface {
 	Aborted() (bool, error)
 	ForceID(string) (Task, error)
 	GetID() (string, error)
-	GetSignature() string
-	GetStatus() TaskStatus
-	GetContext() context.Context
+	GetSignature() (string, error)
+	GetStatus() (TaskStatus, error)
+	GetContext() (context.Context, error)
 	Lock(TaskedLock) error
 	RLock(TaskedLock) error
 	Unlock(TaskedLock) error
@@ -160,7 +160,11 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 	close(t.doneCh)
 	close(t.finishCh)
 
-	tid, _ := t.GetID() // FIXME Later
+	tid, err := t.GetID()
+	if err != nil {
+		return nil, err
+	}
+
 	t.sig = fmt.Sprintf("{task %s}", tid)
 
 	return &t, nil
@@ -186,23 +190,31 @@ func (t *task) GetID() (string, error) {
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
-func (t *task) GetSignature() string {
-	// FIXME Call null receiver
-	return t.sig
+func (t *task) GetSignature() (string, error) {
+	if t == nil {
+		return "", scerr.InvalidInstanceError()
+	}
+
+	return t.sig, nil
 }
 
 // Status returns the current task status
-func (t *task) GetStatus() TaskStatus {
-	// FIXME Call null receiver
+func (t *task) GetStatus() (TaskStatus, error) {
+	if t == nil {
+		return 0, scerr.InvalidInstanceError()
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	return t.status
+	return t.status, nil
 }
 
 // GetContext returns the context associated to the task
-func (t *task) GetContext() context.Context {
-	// FIXME Call null receiver
-	return t.ctx
+func (t *task) GetContext() (context.Context, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	return t.ctx, nil
 }
 
 // ForceID allows to specify task ID. The unicity of the ID through all the tasks
@@ -230,7 +242,10 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid, _ := t.GetID() // FIXME Later
+	tid, err := t.GetID()
+	if err != nil {
+		return nil, err
+	}
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -286,7 +301,6 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 
 // run executes the function 'action'
 func (t *task) run(action TaskAction, params TaskParameters) {
-	// FIXME Call null receiver
 	result, err := action(t, params)
 
 	t.lock.Lock()
@@ -317,9 +331,12 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid, _ := t.GetID() // FIXME Later
+	tid, err := t.GetID()
+	if err != nil {
+		return nil, err
+	}
 
-	status := t.GetStatus()
+	status, _ := t.GetStatus()
 	if status == DONE {
 		return t.result, t.err
 	}
@@ -349,9 +366,12 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, _ := t.GetID() // FIXME Later
+	tid, err := t.GetID()
+	if err != nil {
+		return false, nil, err
+	}
 
-	status := t.GetStatus()
+	status, _ := t.GetStatus()
 	if status == DONE {
 		return true, t.result, t.err
 	}
@@ -377,9 +397,12 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, _ := t.GetID() // FIXME Later
+	tid, err := t.GetID()
+	if err != nil {
+		return false, nil, err
+	}
 
-	status := t.GetStatus()
+	status, _ := t.GetStatus()
 	if status == DONE {
 		return true, t.result, t.err
 	}
@@ -411,9 +434,12 @@ func (t *task) Reset() (Task, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid, _ := t.GetID() // FIXME Later
+	tid, err := t.GetID()
+	if err != nil {
+		return nil, err
+	}
 
-	status := t.GetStatus()
+	status, _ := t.GetStatus()
 	if status == RUNNING {
 		return nil, fmt.Errorf("can't reset task '%s': task running", tid)
 	}
@@ -433,7 +459,7 @@ func (t *task) Abort() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	status := t.GetStatus()
+	status, _ := t.GetStatus()
 	if status == RUNNING {
 		t.lock.Lock()
 		defer t.lock.Unlock()
