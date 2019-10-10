@@ -502,16 +502,16 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Step 2: awaits gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		mastersTask.Abort()
-		privateNodesTask.Abort()
+		_ = mastersTask.Abort()
+		_ = privateNodesTask.Abort()
 		return primaryGatewayStatus
 	}
 	if !gwFailoverDisabled {
 		if secondaryGatewayTask != nil {
 			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
 			if secondaryGatewayStatus != nil {
-				mastersTask.Abort()
-				privateNodesTask.Abort()
+				_ = mastersTask.Abort()
+				_ = privateNodesTask.Abort()
 				return secondaryGatewayStatus
 			}
 		}
@@ -533,7 +533,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}()
 	_, mastersStatus = mastersTask.Wait()
 	if mastersStatus != nil {
-		privateNodesTask.Abort()
+		_ = privateNodesTask.Abort()
 		return mastersStatus
 	}
 
@@ -561,7 +561,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	if primaryGatewayStatus != nil {
 		if !gwFailoverDisabled {
 			if secondaryGatewayTask != nil {
-				secondaryGatewayTask.Abort()
+				_ = secondaryGatewayTask.Abort()
 			}
 		}
 		return primaryGatewayStatus

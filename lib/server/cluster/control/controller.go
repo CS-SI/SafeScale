@@ -1304,16 +1304,28 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	// FIXME Log errors and introduce status
 
 	for _, n := range nodes {
-		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, err = taskGroup.Start(c.asyncStopHost, n.ID)
+		if err != nil {
+			return err
+		}
 	}
 	// Stop masters
 	for _, n := range masters {
-		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, err = taskGroup.Start(c.asyncStopHost, n.ID)
+		if err != nil {
+			return err
+		}
 	}
 	// Stop gateway(s)
-	_, _ = taskGroup.Start(c.asyncStopHost, gatewayID)
+	_, err = taskGroup.Start(c.asyncStopHost, gatewayID)
+	if err != nil {
+		return err
+	}
 	if secondaryGatewayID != "" {
-		_, _ = taskGroup.Start(c.asyncStopHost, secondaryGatewayID)
+		_, err = taskGroup.Start(c.asyncStopHost, secondaryGatewayID)
+		if err != nil {
+			return err
+		}
 	}
 
 	_, err = taskGroup.Wait()
@@ -1403,22 +1415,36 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 		return err
 	}
 
+	// FIXME Log errors and introduce status
+
 	// Start gateway(s)
 	taskGroup, err := concurrency.NewTaskGroup(task)
 	if err != nil {
 		return err
 	}
-	_, _ = taskGroup.Start(c.asyncStartHost, gatewayID)
+	_, err = taskGroup.Start(c.asyncStartHost, gatewayID)
+	if err != nil {
+		return err
+	}
 	if secondaryGatewayID != "" {
-		_, _ = taskGroup.Start(c.asyncStartHost, secondaryGatewayID)
+		_, err = taskGroup.Start(c.asyncStartHost, secondaryGatewayID)
+		if err != nil {
+			return err
+		}
 	}
 	// Start masters
 	for _, n := range masters {
-		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, err = taskGroup.Start(c.asyncStopHost, n.ID)
+		if err != nil {
+			return err
+		}
 	}
 	// Start nodes
 	for _, n := range nodes {
-		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
+		_, err = taskGroup.Start(c.asyncStopHost, n.ID)
+		if err != nil {
+			return err
+		}
 	}
 	_, err = taskGroup.Wait()
 	if err != nil {

@@ -94,16 +94,17 @@ func (tg *taskGroup) Signature() string {
 }
 
 // GetStatus returns the current task status
-func (tg *taskGroup) GetStatus() TaskStatus {
+func (tg *taskGroup) GetStatus() (TaskStatus, error) {
 	tg.task.lock.Lock()
 	defer tg.task.lock.Unlock()
-	return tg.task.status
+	return tg.task.status, nil
 }
 
 // GetContext returns the current task status
-func (tg *taskGroup) GetContext() context.Context {
+func (tg *taskGroup) GetContext() (context.Context, error) {
 	tg.task.lock.Lock()
 	defer tg.task.lock.Unlock()
+
 	return tg.task.GetContext()
 }
 
@@ -119,9 +120,12 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 	tg.lock.Lock()
 	defer tg.lock.Unlock()
 
-	tid, _ := tg.GetID() // FIXME Later
+	tid, err := tg.GetID()
+	if err != nil {
+		return nil, err
+	}
 
-	status := tg.task.GetStatus()
+	status, _ := tg.task.GetStatus()
 	if status != READY && status != RUNNING {
 		panic(fmt.Sprintf("Can't start new task in group '%s': neither ready nor running!", tid))
 	}
@@ -305,7 +309,7 @@ func (tg *taskGroup) Stats() map[TaskStatus][]string {
 	status := make(map[TaskStatus][]string)
 	for _, sub := range tg.subtasks {
 		if tid, err := sub.GetID(); err == nil {
-			st := sub.GetStatus()
+			st, _ := sub.GetStatus()
 			if len(status[st]) == 0 {
 				status[st] = []string{}
 			}

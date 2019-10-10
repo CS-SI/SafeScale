@@ -22,8 +22,10 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, theTask)
 
 	if theTask != nil {
-		if theTask.GetStatus() != DONE {
-			t.Errorf("Task should be DONE")
+		if stat, ok := theTask.GetStatus(); ok == nil {
+			if stat != DONE {
+				t.Errorf("Task should be DONE")
+			}
 		}
 	}
 

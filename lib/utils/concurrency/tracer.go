@@ -44,7 +44,7 @@ type Tracer struct {
 func NewTracer(t Task, message string, enabled bool) *Tracer {
 	tracer := Tracer{}
 	if t != nil {
-		tracer.taskSig = t.GetSignature()
+		tracer.taskSig, _ = t.GetSignature()
 		tracer.generation = t.(*task).generation + 1
 	}
 	tracer.enabled = enabled
