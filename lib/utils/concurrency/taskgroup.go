@@ -47,12 +47,12 @@ type taskGroup struct {
 }
 
 // NewTaskGroup ...
-func NewTaskGroup(parentTask Task) (Task, error) {
+func NewTaskGroup(parentTask Task) (*taskGroup, error) {
 	return newTaskGroup(context.TODO(), parentTask)
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context) (Task, error) {
+func NewTaskGroupWithContext(ctx context.Context) (*taskGroup, error) {
 	return newTaskGroup(ctx, nil)
 }
 
@@ -292,11 +292,25 @@ func (tg *taskGroup) Reset() (Task, error) {
 // }
 
 // Abort aborts the task execution
-func (tg *taskGroup) Abort() {
-	tg.task.Abort()
+func (tg *taskGroup) Abort() error {
+	return tg.task.Abort()
 }
 
 // New creates a subtask from current task
 func (tg *taskGroup) New() (Task, error) {
 	return newTask(context.TODO(), tg.task)
+}
+
+func (tg *taskGroup) Stats() map[TaskStatus][]string {
+	status := make(map[TaskStatus][]string)
+	for _, sub := range tg.subtasks {
+		if tid, err := sub.GetID(); err == nil {
+			st := sub.GetStatus()
+			if len(status[st]) == 0 {
+				status[st] = []string{}
+			}
+			status[st] = append(status[st], tid)
+		}
+	}
+	return status
 }
