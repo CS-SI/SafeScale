@@ -170,6 +170,10 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 
 // GetID returns an unique id for the task
 func (t *task) GetID() (string, error) {
+	if t == nil {
+		return "", scerr.InvalidInstanceError()
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.id == "" {
@@ -185,11 +189,13 @@ func (t *task) GetID() (string, error) {
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
 func (t *task) GetSignature() string {
+	// FIXME Call null receiver
 	return t.sig
 }
 
 // Status returns the current task status
 func (t *task) GetStatus() TaskStatus {
+	// FIXME Call null receiver
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	return t.status
@@ -197,12 +203,16 @@ func (t *task) GetStatus() TaskStatus {
 
 // GetContext returns the context associated to the task
 func (t *task) GetContext() context.Context {
+	// FIXME Call null receiver
 	return t.ctx
 }
 
 // ForceID allows to specify task ID. The unicity of the ID through all the tasks
 // becomes the responsability of the developer...
 func (t *task) ForceID(id string) (Task, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if id == "" {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty!")
 	}
@@ -218,6 +228,10 @@ func (t *task) ForceID(id string) (Task, error) {
 
 // Start runs in goroutine the function with parameters
 func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	tid, _ := t.GetID() // FIXME Later
 
 	t.lock.Lock()
@@ -238,7 +252,7 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 	return t, nil
 }
 
-// controller controls the start, termination and possibly aboprtion of the action
+// controller controls the start, termination and possibly abortion of the action
 func (t *task) controller(action TaskAction, params TaskParameters) {
 	go t.run(action, params)
 
@@ -274,6 +288,7 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 
 // run executes the function 'action'
 func (t *task) run(action TaskAction, params TaskParameters) {
+	// FIXME Call null receiver
 	result, err := action(t, params)
 
 	t.lock.Lock()
@@ -286,6 +301,10 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 
 // Run starts task, waits its completion then return the error code
 func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	stask, err := t.Start(action, params)
 	if err != nil {
 		return nil, err
@@ -296,6 +315,10 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error)
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (t *task) Wait() (TaskResult, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	tid, _ := t.GetID() // FIXME Later
 
 	status := t.GetStatus()
@@ -324,6 +347,10 @@ func (t *task) Wait() (TaskResult, error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If task still running, returns (false, nil)
 func (t *task) TryWait() (bool, TaskResult, error) {
+	if t == nil {
+		return false, nil, scerr.InvalidInstanceError()
+	}
+
 	tid, _ := t.GetID() // FIXME Later
 
 	status := t.GetStatus()
@@ -348,6 +375,10 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If duration elapsed (meaning the task is still running after duration), returns (false, utils.ErrTimeout)
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
+	if t == nil {
+		return false, nil, scerr.InvalidInstanceError()
+	}
+
 	tid, _ := t.GetID() // FIXME Later
 
 	status := t.GetStatus()
@@ -378,6 +409,10 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 
 // Reset resets the task for reuse
 func (t *task) Reset() (Task, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	tid, _ := t.GetID() // FIXME Later
 
 	status := t.GetStatus()
@@ -410,6 +445,8 @@ func (t *task) Reset() (Task, error) {
 
 // Abort aborts the task execution
 func (t *task) Abort() {
+	// FIXME Call null receiver
+
 	status := t.GetStatus()
 	if status == RUNNING {
 		t.lock.Lock()
@@ -427,11 +464,13 @@ func (t *task) Abort() {
 
 // Aborted tells if task has been aborted
 func (t *task) Aborted() bool {
+	// FIXME Call null receiver
 	return t.status == ABORTED
 }
 
 // StoreResult stores the result of the run
 func (t *task) StoreResult(result TaskParameters) {
+	// FIXME Call null receiver
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.result = result
@@ -439,25 +478,33 @@ func (t *task) StoreResult(result TaskParameters) {
 
 // New creates a subtask from current task
 func (t *task) New() (Task, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	return newTask(context.TODO(), t)
 }
 
 // Lock locks the TaskedLock
 func (t *task) Lock(lock TaskedLock) {
+	// FIXME Call null receiver
 	lock.Lock(t)
 }
 
 // RLock locks for read the TaskedLock
 func (t *task) RLock(lock TaskedLock) {
+	// FIXME Call null receiver
 	lock.RLock(t)
 }
 
 // Unlock unlocks the TaskedLock
 func (t *task) Unlock(lock TaskedLock) {
+	// FIXME Call null receiver
 	lock.Unlock(t)
 }
 
 // RUnlock unlocks a read lock put on the TaskedLock
 func (t *task) RUnlock(lock TaskedLock) {
+	// FIXME Call null receiver
 	lock.RUnlock(t)
 }
