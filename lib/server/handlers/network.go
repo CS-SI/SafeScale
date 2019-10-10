@@ -221,13 +221,13 @@ func (handler *NetworkHandler) Create(
 	}
 	if len(tpls) > 0 {
 		template = tpls[0]
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
+		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(uint(template.Cores)))
 		if template.CPUFreq > 0 {
 			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 		}
 		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
 		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
+			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(uint(template.GPUNumber)))
 			if template.GPUType != "" {
 				msg += fmt.Sprintf(" %s", template.GPUType)
 			}
@@ -850,7 +850,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	var errorMsg string
 	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
-		hostsLen := len(networkHostsV1.ByName)
+		hostsLen := uint(len(networkHostsV1.ByName))
 		if hostsLen > 0 {
 			list := make([]string, 0, hostsLen)
 			for k := range networkHostsV1.ByName {

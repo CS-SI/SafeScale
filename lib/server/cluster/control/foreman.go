@@ -84,11 +84,11 @@ type Makers struct {
 	GetGlobalSystemRequirements func(task concurrency.Task, b Foreman) (string, error)
 	GetTemplateBox              func() (*rice.Box, error)
 	ConfigureGateway            func(task concurrency.Task, b Foreman) error
-	CreateMaster                func(task concurrency.Task, b Foreman, index int) error
-	ConfigureMaster             func(task concurrency.Task, b Foreman, index int, pbHost *pb.Host) error
+	CreateMaster                func(task concurrency.Task, b Foreman, index uint) error
+	ConfigureMaster             func(task concurrency.Task, b Foreman, index uint, pbHost *pb.Host) error
 	UnconfigureMaster           func(task concurrency.Task, b Foreman, pbHost *pb.Host) error
-	CreateNode                  func(task concurrency.Task, b Foreman, index int, pbHost *pb.Host) error
-	ConfigureNode               func(task concurrency.Task, b Foreman, index int, pbHost *pb.Host) error
+	CreateNode                  func(task concurrency.Task, b Foreman, index uint, pbHost *pb.Host) error
+	ConfigureNode               func(task concurrency.Task, b Foreman, index uint, pbHost *pb.Host) error
 	UnconfigureNode             func(task concurrency.Task, b Foreman, pbHost *pb.Host, selectedMasterID string) error
 	ConfigureCluster            func(task concurrency.Task, b Foreman) error
 	UnconfigureCluster          func(task concurrency.Task, b Foreman) error
@@ -520,11 +520,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			masters, merr := b.cluster.ListMasterIDs(task)
+			list, merr := b.cluster.ListMasterIDs(task)
 			if merr != nil {
 				err = scerr.AddConsequence(err, merr)
 			} else {
-				derr := client.New().Host.Delete(masters, temporal.GetExecutionTimeout())
+				values := make([]string, 0, len(list))
+				for _, v := range list {
+					values = append(values, v)
+				}
+				derr := client.New().Host.Delete(values, temporal.GetExecutionTimeout())
 				if derr != nil {
 					err = scerr.AddConsequence(err, derr)
 				}
@@ -590,9 +594,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			clientHost := clientInstance.Host
-			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), temporal.GetExecutionTimeout())
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+			list, lerr := b.cluster.ListNodeIDs(task)
+			if lerr != nil {
+				err = scerr.AddConsequence(err, lerr)
+			} else {
+				derr := clientHost.Delete(list.Values(), temporal.GetExecutionTimeout())
+				if derr != nil {
+					err = scerr.AddConsequence(err, derr)
+				}
 			}
 		}
 	}()
@@ -690,7 +699,17 @@ func (b *foreman) getState(task concurrency.Task) (ClusterState.Enum, error) {
 }
 
 // configureNode ...
-func (b *foreman) configureNode(task concurrency.Task, index int, pbHost *pb.Host) error {
+func (b *foreman) configureNode(task concurrency.Task, index uint, pbHost *pb.Host) error {
+	if b == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if index < 1 {
+		return scerr.InvalidParameterError("index", "cannot be an interger less than 1")
+	}
+	if pbHost == nil {
+		return scerr.InvalidParameterError("phHost", "cannot be nil")
+	}
+
 	if b.makers.ConfigureNode != nil {
 		return b.makers.ConfigureNode(task, b, index, pbHost)
 	}
@@ -712,7 +731,7 @@ func (b *foreman) unconfigureNode(task concurrency.Task, hostID string, selected
 }
 
 // configureMaster ...
-func (b *foreman) configureMaster(task concurrency.Task, index int, pbHost *pb.Host) error {
+func (b *foreman) configureMaster(task concurrency.Task, index uint, pbHost *pb.Host) error {
 	if b.makers.ConfigureNode != nil {
 		return b.makers.ConfigureMaster(task, b, index, pbHost)
 	}
@@ -842,11 +861,11 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		}
 	}
 
-	selectedMasterID, err := b.Cluster().FindAvailableMaster(task)
+	master, err := b.Cluster().FindAvailableMaster(task)
 	if err != nil {
 		return fmt.Errorf("failed to find an available docker manager: %v", err)
 	}
-	selectedMaster, err := clientHost.Inspect(selectedMasterID, client.DefaultExecutionTimeout)
+	selectedMaster, err := clientHost.Inspect(master.ID, client.DefaultExecutionTimeout)
 	if err != nil {
 		return fmt.Errorf("failed to get metadata of docker manager: %s", err.Error())
 	}
@@ -858,7 +877,11 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Join private node in Docker Swarm as workers
-	for _, hostID := range cluster.ListNodeIDs(task) {
+	list, err := cluster.ListNodeIDs(task)
+	if err != nil {
+		return err
+	}
+	for _, hostID := range list {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
@@ -980,7 +1003,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 			break
 		}
 		subtask, err = subtask.Start(b.taskConfigureNode, data.Map{
-			"index": i + 1,
+			"index": uint(i + 1),
 			"host":  host,
 		})
 		if err != nil {
@@ -1020,11 +1043,11 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 	clientHost := clientInstance.Host
 	clientSSH := clientInstance.SSH
 
-	selectedMasterID, err := b.Cluster().FindAvailableMaster(task)
+	master, err := b.Cluster().FindAvailableMaster(task)
 	if err != nil {
 		return fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
 	}
-	selectedMaster, err := clientHost.Inspect(selectedMasterID, client.DefaultExecutionTimeout)
+	selectedMaster, err := clientHost.Inspect(master.ID, client.DefaultExecutionTimeout)
 	if err != nil {
 		return fmt.Errorf("failed to get metadata of host: %s", err.Error())
 	}
@@ -1091,9 +1114,12 @@ func (b *foreman) leaveMastersFromList(task concurrency.Task, public bool, hosts
 func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, selectedMasterID string) error {
 	logrus.Debugf("Instructing nodes to leave cluster...")
 
-	selectedMaster, err := b.Cluster().FindAvailableMaster(task)
-	if err != nil {
-		return err
+	if selectedMasterID == "" {
+		master, err := b.Cluster().FindAvailableMaster(task)
+		if err != nil {
+			return err
+		}
+		selectedMasterID = master.ID
 	}
 
 	clientHost := client.New().Host
@@ -1117,7 +1143,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 			}
 		}
 
-		err = b.leaveNodeFromSwarm(task, pbHost, selectedMaster)
+		err = b.leaveNodeFromSwarm(task, pbHost, selectedMasterID)
 		if err != nil {
 			return err
 		}
@@ -1126,20 +1152,21 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 	return nil
 }
 
-func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, selectedMaster string) error {
-	if selectedMaster == "" {
+func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, selectedMasterID string) error {
+	if selectedMasterID == "" {
 		var err error
-		selectedMaster, err = b.Cluster().FindAvailableMaster(task)
+		master, err := b.Cluster().FindAvailableMaster(task)
 		if err != nil {
 			return err
 		}
+		selectedMasterID = master.ID
 	}
 
 	clientSSH := client.New().SSH
 
 	// Check worker is member of the Swarm
 	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
-	retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err := clientSSH.Run(selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -1161,7 +1188,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			retcode, _, _, err := clientSSH.Run(selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -1183,12 +1210,12 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 
 	// 3rd, ask master to remove node from Swarm
 	cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
-	retcode, _, stderr, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, stderr, err = clientSSH.Run(selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr)
+		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMasterID, stderr)
 	}
 	return nil
 }
@@ -1323,7 +1350,11 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	identity := b.cluster.GetIdentity(task)
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"] = b.cluster.ListMasterIPs(task)
+	list, err := b.cluster.ListMasterIPs(task)
+	if err != nil {
+		return err
+	}
+	params["MasterIPs"] = list.Values()
 	params["CladmPassword"] = identity.AdminPassword
 	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["EndpointIP"] = netCfg.EndpointIP
@@ -1406,6 +1437,13 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
 	// Convert parameters
 	gw, ok := params.(*pb.Host)
 	if !ok {
@@ -1435,11 +1473,41 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert parameters
-	p := params.(data.Map)
-	count := p["count"].(int)
-	def := p["masterDef"].(*pb.HostDefinition)
-	nokeep := p["nokeep"].(bool)
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
+	// Convert and validate parameters
+	p, ok := params.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "is not a data.Map")
+	}
+	var (
+		count  uint
+		def    *pb.HostDefinition
+		nokeep bool
+	)
+	if count, ok = p["count"].(uint); !ok {
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
+	}
+	if count < 1 {
+		return nil, scerr.InvalidParameterError("params[count]", "cannot be an integer less than 1")
+	}
+	if _, ok = p["masterDef"]; !ok {
+		return nil, scerr.InvalidParameterError("params[masterDef]", "is missing")
+	}
+	if def, ok = p["masterDef"].(*pb.HostDefinition); !ok {
+		return nil, scerr.InvalidParameterError("params[masterDef]", "is not a *pb.HostDefinition")
+	}
+	if def == nil {
+		return nil, scerr.InvalidParameterError("params[masterDef]", "cannot be nil")
+	}
+	if nokeep, ok = p["nokeep"].(bool); !ok {
+		nokeep = true
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1456,7 +1524,8 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 
 	var subtasks []concurrency.Task
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
-	for i := 0; i < count; i++ {
+	var i uint
+	for ; i < count; i++ {
 		subtask, err := t.New()
 		if err != nil {
 			return nil, err
@@ -1491,12 +1560,47 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert parameters
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
+	// Convert and validate parameters
 	p := params.(data.Map)
-	index := p["index"].(int)
-	def := p["masterDef"].(*pb.HostDefinition)
-	timeout := p["timeout"].(time.Duration)
-	nokeep := p["nokeep"].(bool)
+	var (
+		index   uint
+		def     *pb.HostDefinition
+		timeout time.Duration
+		nokeep  bool
+		ok      bool
+	)
+	if index, ok = p["index"].(uint); !ok {
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
+	}
+	if index < 1 {
+		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
+	}
+	if _, ok = p["masterDef"]; !ok {
+		return nil, scerr.InvalidParameterError("params[masterDef]", "is missing")
+	}
+	if def, ok = p["masterDef"].(*pb.HostDefinition); !ok {
+		return nil, scerr.InvalidParameterError("params[masterDef]", "is not a *pb.HostDefinition")
+	}
+	if def == nil {
+		return nil, scerr.InvalidParameterError("params[masterDef]", "cannot be nil")
+	}
+	if _, ok := p["timeout"]; !ok {
+		timeout = 0
+	} else {
+		if timeout = p["timeout"].(time.Duration); !ok {
+			return nil, scerr.InvalidParameterError("params[timeout]", "is not a time.Duration")
+		}
+	}
+	if nokeep, ok = p["nokeep"].(bool); !ok {
+		nokeep = true
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true).GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1523,17 +1627,21 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	if pbHost != nil {
 		// Updates cluster metadata to keep track of created host, before testing if an error occurred during the creation
 		mErr := b.cluster.UpdateMetadata(t, func() error {
-			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-				nodesV1 := v.(*clusterpropsv1.Nodes)
-				// Update swarmCluster definition in Object Storage
-				node := &clusterpropsv1.Node{
-					ID:        pbHost.Id,
-					Name:      pbHost.Name,
-					PrivateIP: pbHost.PrivateIp,
-					PublicIP:  pbHost.PublicIp,
+			properties := b.cluster.GetProperties(t)
+
+			// References new node in cluster
+			return properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+				nodesV2 := v.(*clusterpropsv2.Nodes)
+
+				nodesV2.GlobalLastIndex++
+				node := &clusterpropsv2.Node{
+					ID:          pbHost.Id,
+					NumericalID: nodesV2.GlobalLastIndex,
+					Name:        pbHost.Name,
+					PrivateIP:   pbHost.PrivateIp,
+					PublicIP:    pbHost.PublicIp,
 				}
-				nodesV1.Masters = append(nodesV1.Masters, node)
+				nodesV2.Masters = append(nodesV2.Masters, node)
 				return nil
 			})
 		})
@@ -1550,27 +1658,6 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
 	logrus.Debugf("[%s] host resource creation successful", hostLabel)
-
-	// err = b.cluster.UpdateMetadata(tr.Task(), func() error {
-	// 	// Locks for write the NodesV1 extension...
-	// 	return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-	// 		nodesV1 := v.(*clusterpropsv1.Nodes)
-	// 		// Update swarmCluster definition in Object Storage
-	// 		node := &clusterpropsv1.Node{
-	// 			ID:        pbHost.Id,
-	// 			Name:      pbHost.Name,
-	// 			PrivateIP: pbHost.PrivateIp,
-	// 			PublicIP:  pbHost.PublicIp,
-	// 		}
-	// 		nodesV1.Masters = append(nodesV1.Masters, node)
-	// 		return nil
-	// 	})
-	// })
-	// if err != nil {
-	// 	logrus.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
-	// 	err = fmt.Errorf("failed to update Cluster metadata: %s", err.Error())
-	// 	return
-	// }
 
 	err = b.installProxyCacheClient(t, pbHost, hostLabel)
 	if err != nil {
@@ -1649,11 +1736,34 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert params
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	// Convert and validate params
 	p := params.(data.Map)
-	index := p["index"].(int)
-	pbHost := p["host"].(*pb.Host)
-	// FIXME: validate parameters
+	if p == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+	var (
+		index  uint
+		pbHost *pb.Host
+		ok     bool
+	)
+	if index, ok = p["index"].(uint); !ok {
+		return nil, scerr.InvalidParameterError("params[index]", "is missing")
+	}
+	if index < 1 {
+		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
+	}
+	if _, ok = p["host"]; !ok {
+		return nil, scerr.InvalidParameterError("params[host]", "is missing")
+	}
+	if pbHost, ok = p["host"].(*pb.Host); !ok {
+		return nil, scerr.InvalidParameterError("params[host]", "is not a *pb.Host")
+	}
+	if pbHost == nil {
+		return nil, scerr.InvalidParameterError("params[host]", "cannot be nil")
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1682,12 +1792,45 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert params
-	p := params.(data.Map)
-	count := p["count"].(int)
-	public := p["public"].(bool)
-	def := p["nodeDef"].(*pb.HostDefinition)
-	nokeep := p["nokeep"].(bool)
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
+	// Convert then validate params
+	p, ok := params.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "is not a data.Map")
+	}
+	var (
+		count  uint
+		public bool
+		def    *pb.HostDefinition
+		nokeep bool
+	)
+	if count, ok = p["count"].(uint); !ok {
+		count = 1
+	}
+	if count < 1 {
+		return nil, scerr.InvalidParameterError("params[count]", "cannot be an integer less than 1")
+	}
+	if public, ok = p["public"].(bool); !ok {
+		public = false
+	}
+	if _, ok = p["nodeDef"]; !ok {
+		return nil, scerr.InvalidParameterError("param[nodeDef]", "is missing")
+	}
+	if def, ok = p["nodeDef"].(*pb.HostDefinition); !ok {
+		return nil, scerr.InvalidParameterError("param[nodeDef]", "is not a *pb.HostDefinition")
+	}
+	if def == nil {
+		return nil, scerr.InvalidParameterError("param[nodeDef]", "cannot be nil")
+	}
+	if nokeep, ok = p["nokeep"].(bool); !ok {
+		nokeep = true
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1699,17 +1842,17 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 		logrus.Debugf("[cluster %s] no nodes to create.", clusterName)
 		return nil, nil
 	}
-	logrus.Debugf("[cluster %s] creating %d node%s...", clusterName, count, utils.Plural(count))
+	logrus.Debugf("[cluster %s] creating %d node%s...", clusterName, count, utils.Plural(uint(count)))
 
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	var subtasks []concurrency.Task
-	for i := 1; i <= count; i++ {
+	for i := uint(1); i <= count; i++ {
 		subtask, err := t.New()
 		if err != nil {
 			return nil, err
 		}
 		subtask, err = subtask.Start(b.taskCreateNode, data.Map{
-			"index":   i,
+			"index":   uint(i),
 			"type":    NodeType.Node,
 			"nodeDef": def,
 			"timeout": timeout,
@@ -1732,14 +1875,18 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 		return nil, fmt.Errorf(strings.Join(errs, "\n"))
 	}
 
-	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, utils.Plural(count))
+	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, utils.Plural(uint(count)))
 	return nil, nil
 }
 
 // taskCreateNode creates a Node in the Cluster
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert parameters
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
+	// Convert then validate parameters
 	p, ok := params.(data.Map)
 	if !ok {
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
@@ -1747,11 +1894,27 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	if p == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
-	// FIME: validate parameters
-	index := p["index"].(int)
-	def := p["nodeDef"].(*pb.HostDefinition)
-	timeout := p["timeout"].(time.Duration)
-	nokeep := p["nokeep"].(bool)
+	var (
+		index   int
+		def     *pb.HostDefinition
+		timeout time.Duration
+		nokeep  bool
+	)
+	if index, ok = p["index"].(int); !ok {
+		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
+	}
+	if def, ok = p["nodeDef"].(*pb.HostDefinition); !ok {
+		return nil, scerr.InvalidParameterError("params[def]", "is missing or is not a *pb.HostDefinition")
+	}
+	if def == nil {
+		return nil, scerr.InvalidParameterError("params[def]", "cannot be nil")
+	}
+	if timeout, ok = p["timeout"].(time.Duration); !ok {
+		return nil, scerr.InvalidParameterError("params[tiemeout]", "is missing ir is not a time.Duration")
+	}
+	if nokeep, ok = p["nokeep"].(bool); !ok {
+		nokeep = true
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1777,21 +1940,23 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	}
 
 	clientHost := client.New().Host
-	var node *clusterpropsv1.Node
+	var node *clusterpropsv2.Node
 	pbHost, err := clientHost.Create(hostDef, timeout)
 	if pbHost != nil {
 		mErr := b.cluster.UpdateMetadata(t, func() error {
-			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-				nodesV1 := v.(*clusterpropsv1.Nodes)
+			// Locks for write the NodesV2 extension...
+			return b.cluster.GetProperties(t).LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+				nodesV2 := v.(*clusterpropsv2.Nodes)
 				// Registers the new Agent in the swarmCluster struct
-				node = &clusterpropsv1.Node{
-					ID:        pbHost.Id,
-					Name:      pbHost.Name,
-					PrivateIP: pbHost.PrivateIp,
-					PublicIP:  pbHost.PublicIp,
+				nodesV2.GlobalLastIndex++
+				node = &clusterpropsv2.Node{
+					ID:          pbHost.Id,
+					NumericalID: nodesV2.GlobalLastIndex,
+					Name:        pbHost.Name,
+					PrivateIP:   pbHost.PrivateIp,
+					PublicIP:    pbHost.PublicIp,
 				}
-				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+				nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, node)
 				return nil
 			})
 		})
@@ -1808,31 +1973,6 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	}
 	hostLabel = fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
-
-	// err = b.cluster.UpdateMetadata(tr.Task(), func() error {
-	// 	// Locks for write the NodesV1 extension...
-	// 	return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-	// 		nodesV1 := v.(*clusterpropsv1.Nodes)
-	// 		// Registers the new Agent in the swarmCluster struct
-	// 		node = &clusterpropsv1.Node{
-	// 			ID:        pbHost.Id,
-	// 			Name:      pbHost.Name,
-	// 			PrivateIP: pbHost.PrivateIp,
-	// 			PublicIP:  pbHost.PublicIp,
-	// 		}
-	// 		nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-	// 		return nil
-	// 	})
-	// })
-	// if err != nil {
-	// 	derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
-	// 	if derr != nil {
-	// 		logrus.Errorf("failed to delete node after failure")
-	// 	}
-	// 	logrus.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
-	// 	err = fmt.Errorf("failed to create node: %s", err.Error())
-	// 	return
-	// }
 
 	err = b.installProxyCacheClient(t, pbHost, hostLabel)
 	if err != nil {
@@ -1857,7 +1997,10 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	list := b.cluster.ListNodeIDs(t)
+	list, err := b.cluster.ListNodeIDs(t)
+	if err != nil {
+		return nil, err
+	}
 	if len(list) == 0 {
 		logrus.Debugf("[cluster %s] no nodes to configure.", clusterName)
 		return nil, nil
@@ -1867,14 +2010,15 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 
 	var (
 		pbHost *pb.Host
-		i      int
+		i      uint
 		hostID string
 		errs   []string
 	)
 
 	var subtasks []concurrency.Task
 	clientHost := client.New().Host
-	for i, hostID = range list {
+	for _, hostID = range list {
+		i++
 		pbHost, err = clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
 		if err != nil {
 			break
@@ -1884,7 +2028,7 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 			return nil, err
 		}
 		subtask, err = subtask.Start(b.taskConfigureNode, data.Map{
-			"index": i + 1,
+			"index": i,
 			"host":  pbHost,
 		})
 		if err != nil {
@@ -1914,10 +2058,32 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert parameters
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
+	// Convert and validate parameters
 	p := params.(data.Map)
-	index := p["index"].(int)
-	pbHost := p["host"].(*pb.Host)
+	var (
+		index  uint
+		pbHost *pb.Host
+		ok     bool
+	)
+	if index, ok = p["index"].(uint); !ok {
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an integer")
+	}
+	if index < 1 {
+		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
+	}
+	if pbHost, ok = p["host"].(*pb.Host); !ok {
+		return nil, scerr.InvalidParameterError("params[host]", "is missing or is not a *pb.Host")
+	}
+	if pbHost == nil {
+		return nil, scerr.InvalidParameterError("params[host]", "cannot be nil")
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %s)", index, pbHost.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1944,6 +2110,10 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 
 // Installs reverseproxy
 func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
+	if b == nil {
+		return scerr.InvalidInstanceError()
+	}
+
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
 
@@ -1987,6 +2157,10 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
 func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
+	if b == nil {
+		return scerr.InvalidInstanceError()
+	}
+
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
 
@@ -2037,6 +2211,16 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 
 // install proxycache-client feature if not disabled
 func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
+	if b == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if pbHost == nil {
+		return scerr.InvalidParameterError("pbHost", "cannot be nil")
+	}
+	if hostLabel == "" {
+		return scerr.InvalidParameterError("hostLabel", "cannot be empty string")
+	}
+
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -2074,6 +2258,16 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 
 // install proxycache-server feature if not disabled
 func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
+	if b == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if pbHost == nil {
+		return scerr.InvalidParameterError("pbHost", "cannot be nil")
+	}
+	if hostLabel == "" {
+		return scerr.InvalidParameterError("hostLabel", "cannot be empty string")
+	}
+
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -2111,6 +2305,16 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 // intallDocker installs docker and docker-compose
 func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
+	if b == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if pbHost == nil {
+		return scerr.InvalidParameterError("pbHost", "cannot be nil")
+	}
+	if hostLabel == "" {
+		return scerr.InvalidParameterError("hostLabel", "cannot be empty string")
+	}
+
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -2138,21 +2342,19 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 
 // BuildHostname builds a unique hostname in the Cluster
 func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType NodeType.Enum) (string, error) {
-	var (
-		index int
-	)
+	var index int
 
 	// Locks for write the manager extension...
 	b.cluster.Lock(task)
-	outerErr := b.cluster.GetProperties(task).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
+	outerErr := b.cluster.GetProperties(task).LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes)
 		switch nodeType {
 		case NodeType.Node:
-			nodesV1.PrivateLastIndex++
-			index = nodesV1.PrivateLastIndex
+			nodesV2.PrivateLastIndex++
+			index = nodesV2.PrivateLastIndex
 		case NodeType.Master:
-			nodesV1.MasterLastIndex++
-			index = nodesV1.MasterLastIndex
+			nodesV2.MasterLastIndex++
+			index = nodesV2.MasterLastIndex
 		}
 		return nil
 	})

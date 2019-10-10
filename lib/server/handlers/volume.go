@@ -123,7 +123,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 
 	err = volume.Properties.LockForRead(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
 		volumeAttachmentsV1 := v.(*propsv1.VolumeAttachments)
-		nbAttach := len(volumeAttachmentsV1.Hosts)
+		nbAttach := uint(len(volumeAttachmentsV1.Hosts))
 		if nbAttach > 0 {
 			var list []string
 			for _, v := range volumeAttachmentsV1.Hosts {

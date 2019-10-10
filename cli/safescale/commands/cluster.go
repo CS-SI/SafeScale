@@ -152,7 +152,9 @@ func formatClusterConfig(value interface{}, detailed bool) map[string]interface{
 		delete(core, "admin_password")
 		delete(core, "defaults")
 		delete(core, "features")
-		delete(core, "gateway_ip")
+		delete(core, "default_route_ip")
+		delete(core, "primary_gateway_ip")
+		delete(core, "secondary_gateway_ip")
 		delete(core, "network_id")
 		delete(core, "nodes")
 	}
@@ -259,11 +261,11 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	err = properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
+	err = properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes)
 		result["nodes"] = map[string]interface{}{
-			"masters": nodesV1.Masters,
-			"nodes":   nodesV1.PrivateNodes,
+			"masters": nodesV2.Masters,
+			"nodes":   nodesV2.PrivateNodes,
 		}
 		return nil
 	})
@@ -799,7 +801,7 @@ var clusterShrinkCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 		for i := uint(0); i < count; i++ {
-			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster)
+			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster.ID)
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
 				msgs = append(msgs, fmt.Sprintf("failed to delete node #%d: %s", i+1, err.Error()))
@@ -886,16 +888,19 @@ func executeCommand(command string) error {
 	if err != nil {
 		return err
 	}
-	if len(masters) == 0 {
+	cMasters := len(masters)
+	if cMasters == 0 {
 		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity(concurrency.RootTask()).Name)
 		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}
 	safescalessh := client.New().SSH
-	for i, m := range masters {
+	i := 0
+	for _, m := range masters {
+		i++
 		retcode, stdout, stderr, err := safescalessh.Run(m, command, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "failed to execute command on master #%d: %s", i+1, err.Error())
-			if i+1 < len(masters) {
+			_, _ = fmt.Fprintf(os.Stderr, "failed to execute command on master #%d: %s", i, err.Error())
+			if i < cMasters {
 				_, _ = fmt.Fprintln(os.Stderr, "Trying another master...")
 				continue
 			}
@@ -1179,7 +1184,10 @@ var clusterNodeListCommand = cli.Command{
 		hostClt := client.New().Host
 		formatted := []map[string]interface{}{}
 
-		list := clusterInstance.ListNodeIDs(concurrency.RootTask())
+		list, err := clusterInstance.ListNodeIDs(concurrency.RootTask())
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
 		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {

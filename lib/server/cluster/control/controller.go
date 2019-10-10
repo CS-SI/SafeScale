@@ -28,6 +28,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
+	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
@@ -239,8 +240,8 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
 	var count uint
 
 	c.RLock(task)
-	err = c.GetProperties(task).LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		count = uint(len(v.(*clusterpropsv1.Nodes).PrivateNodes))
+	err = c.GetProperties(task).LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		count = uint(len(v.(*clusterpropsv2.Nodes).PrivateNodes))
 		return nil
 	})
 	c.RUnlock(task)
@@ -251,59 +252,60 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
 }
 
 // ListMasters lists the names of the master nodes in the Cluster
-func (c *Controller) ListMasters(task concurrency.Task) []*clusterpropsv1.Node {
+func (c *Controller) ListMasters(task concurrency.Task) ([]*clusterpropsv2.Node, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []*clusterpropsv1.Node
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		list = v.(*clusterpropsv1.Nodes).Masters
+	var list []*clusterpropsv2.Node
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		list = v.(*clusterpropsv2.Nodes).Masters
 		return nil
 	})
 	if err != nil {
 		log.Errorf("failed to get list of master names: %v", err)
 	}
-	return list
+	return list, nil
 }
 
 // ListMasterNames lists the names of the master nodes in the Cluster
-func (c *Controller) ListMasterNames(task concurrency.Task) []string {
+func (c *Controller) ListMasterNames(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []string
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes).Masters
-		for _, v := range nodesV1 {
-			list = append(list, v.Name)
+	list := clusterapi.NodeList{}
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes).Masters
+		for _, v := range nodesV2 {
+			list[v.NumericalID] = v.Name
 		}
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of master names: %v", err)
+		// log.Errorf("failed to get list of master names: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // ListMasterIDs lists the IDs of the master nodes in the Cluster
-func (c *Controller) ListMasterIDs(task concurrency.Task) ([]string, error) {
+func (c *Controller) ListMasterIDs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []string
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes).Masters
-		for _, v := range nodesV1 {
-			list = append(list, v.ID)
+	list := clusterapi.NodeList{}
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes).Masters
+		for _, v := range nodesV2 {
+			list[v.NumericalID] = v.ID
 		}
 		return nil
 	})
@@ -315,110 +317,115 @@ func (c *Controller) ListMasterIDs(task concurrency.Task) ([]string, error) {
 }
 
 // ListMasterIPs lists the IP addresses of the master nodes in the Cluster
-func (c *Controller) ListMasterIPs(task concurrency.Task) []string {
+func (c *Controller) ListMasterIPs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []string
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes).Masters
-		for _, v := range nodesV1 {
-			list = append(list, v.PrivateIP)
+	list := clusterapi.NodeList{}
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes).Masters
+		for _, v := range nodesV2 {
+			list[v.NumericalID] = v.PrivateIP
 		}
 		return nil
 	})
 	if err != nil {
 		log.Errorf("failed to get list of master IPs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // ListNodes lists the nodes in the Cluster
-func (c *Controller) ListNodes(task concurrency.Task) []*clusterpropsv1.Node {
+func (c *Controller) ListNodes(task concurrency.Task) ([]*clusterpropsv2.Node, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []*clusterpropsv1.Node
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		list = v.(*clusterpropsv1.Nodes).PrivateNodes
+	var list []*clusterpropsv2.Node
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		list = v.(*clusterpropsv2.Nodes).PrivateNodes
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IDs: %v", err)
+		// log.Errorf("failed to get list of node IDs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // ListNodeNames lists the names of the nodes in the Cluster
-func (c *Controller) ListNodeNames(task concurrency.Task) []string {
+func (c *Controller) ListNodeNames(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []string
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes).PrivateNodes
-		for _, v := range nodesV1 {
-			list = append(list, v.Name)
+	list := clusterapi.NodeList{}
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes).PrivateNodes
+		for _, v := range nodesV2 {
+			list[v.NumericalID] = v.Name
 		}
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IDs: %v", err)
+		// log.Errorf("failed to get list of node IDs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, err
 }
 
 // ListNodeIDs lists the IDs of the nodes in the Cluster
-func (c *Controller) ListNodeIDs(task concurrency.Task) []string {
+func (c *Controller) ListNodeIDs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []string
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes).PrivateNodes
-		for _, v := range nodesV1 {
-			list = append(list, v.ID)
+	list := clusterapi.NodeList{}
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes).PrivateNodes
+		for _, v := range nodesV2 {
+			list[v.NumericalID] = v.ID
 		}
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IDs: %v", err)
+		// log.Errorf("failed to get list of node IDs: %v", err)
+		return nil, err
 	}
-	return list
+	return list, err
 }
 
 // ListNodeIPs lists the IP addresses of the nodes in the Cluster
-func (c *Controller) ListNodeIPs(task concurrency.Task) []string {
+func (c *Controller) ListNodeIPs(task concurrency.Task) (clusterapi.NodeList, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
 
-	var list []string
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes).PrivateNodes
-		for _, v := range nodesV1 {
-			list = append(list, v.PrivateIP)
+	var list clusterapi.NodeList
+	err := c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes).PrivateNodes
+		for _, v := range nodesV2 {
+			list[v.NumericalID] = v.PrivateIP
 		}
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to get list of node IP addresses: %v", err)
+		// log.Errorf("failed to get list of node IP addresses: %v", err)
+		return nil, err
 	}
-	return list
+	return list, nil
 }
 
 // GetNode returns a node based on its ID
@@ -441,12 +448,9 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 	defer c.RUnlock(task)
 
 	found := false
-	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		// found, _ := contains(nodesV1.PublicNodes, hostID)
-		// if !found {
-		found, _ = contains(nodesV1.PrivateNodes, hostID)
-		// }
+	err = c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes)
+		found, _ = contains(nodesV2.PrivateNodes, hostID)
 		return nil
 	})
 	if err != nil {
@@ -467,15 +471,18 @@ func (c *Controller) SearchNode(task concurrency.Task, hostID string) bool {
 	defer c.RUnlock(task)
 
 	found := false
-	_ = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		found, _ = contains(v.(*clusterpropsv1.Nodes).PrivateNodes, hostID)
+	_ = c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		found, _ = contains(v.(*clusterpropsv2.Nodes).PrivateNodes, hostID)
 		return nil
 	})
 	return found
 }
 
-// FindAvailableMaster returns the ID of the first master available for execution
-func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, err error) {
+// FindAvailableMaster returns the *propsv2.Node corresponding to the first available master for execution
+func (c *Controller) FindAvailableMaster(task concurrency.Task) (_ *clusterpropsv2.Node, err error) {
+	if c == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -484,21 +491,22 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	masterID := ""
 	found := false
 	clientHost := client.New().Host
-	masterIDs, err := c.ListMasterIDs(task)
+	masters, err := c.ListMasters(task)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var lastError error
-
-	for _, masterID = range masterIDs {
-		sshCfg, err := clientHost.SSHConfig(masterID)
+	var (
+		lastError error
+		master    *clusterpropsv2.Node
+	)
+	for _, master = range masters {
+		sshCfg, err := clientHost.SSHConfig(master.ID)
 		if err != nil {
 			lastError = err
-			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
+			log.Errorf("failed to get ssh config for master '%s': %s", master.ID, err.Error())
 			continue
 		}
 		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
@@ -507,19 +515,19 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 				lastError = err
 				continue
 			}
-			return "", err
+			return nil, err
 		}
 		found = true
 		break
 	}
 	if !found {
-		return "", fmt.Errorf("failed to find available master: %v", lastError)
+		return nil, fmt.Errorf("failed to find available master: %v", lastError)
 	}
-	return masterID, nil
+	return master, nil
 }
 
-// FindAvailableNode returns the ID of a node available
-func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err error) {
+// FindAvailableNode returns the propsv2.Node corresponding to first available node
+func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2.Node, err error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -528,14 +536,17 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	hostID := ""
 	found := false
 	clientHost := client.New().Host
-	list := c.ListNodeIDs(task)
-	for _, hostID = range list {
-		sshCfg, err := clientHost.SSHConfig(hostID)
+	list, err := c.ListNodes(task)
+	if err != nil {
+		return nil, err
+	}
+	var node *clusterpropsv2.Node
+	for _, node = range list {
+		sshCfg, err := clientHost.SSHConfig(node.ID)
 		if err != nil {
-			log.Errorf("failed to get ssh config of node '%s': %s", hostID, err.Error())
+			log.Errorf("failed to get ssh config of node '%s': %s", node.ID, err.Error())
 			continue
 		}
 		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
@@ -543,15 +554,15 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
-			return "", err
+			return nil, err
 		}
 		found = true
 		break
 	}
 	if !found {
-		return "", fmt.Errorf("failed to find available node")
+		return nil, fmt.Errorf("failed to find available node")
 	}
-	return hostID, nil
+	return node, nil
 }
 
 // UpdateMetadata writes Cluster config in Object Storage
@@ -618,7 +629,7 @@ func (c *Controller) DeleteMetadata(task concurrency.Task) (err error) {
 	return c.metadata.Delete()
 }
 
-func contains(list []*clusterpropsv1.Node, hostID string) (bool, int) {
+func contains(list []*clusterpropsv2.Node, hostID string) (bool, int) {
 	var idx int
 	found := false
 	for i, v := range list {
@@ -762,7 +773,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	}()
 
 	if len(errors) > 0 {
-		err = fmt.Errorf("errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)), strings.Join(errors, "\n"))
+		err = fmt.Errorf("errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(uint(len(errors))), strings.Join(errors, "\n"))
 		return nil, err
 	}
 
@@ -882,19 +893,19 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 	}
 
 	// Removes master from cluster metadata
-	var master *clusterpropsv1.Node
+	var master *clusterpropsv2.Node
 	err = c.UpdateMetadata(task, func() error {
-		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-			nodesV1 := v.(*clusterpropsv1.Nodes)
-			found, idx := contains(nodesV1.Masters, hostID)
+		return c.Properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+			nodesV2 := v.(*clusterpropsv2.Nodes)
+			found, idx := contains(nodesV2.Masters, hostID)
 			if !found {
 				return resources.ResourceNotFoundError("host", hostID)
 			}
-			master = nodesV1.Masters[idx]
-			if idx < len(nodesV1.Masters)-1 {
-				nodesV1.Masters = append(nodesV1.Masters[:idx], nodesV1.Masters[idx+1:]...)
+			master = nodesV2.Masters[idx]
+			if idx < len(nodesV2.Masters)-1 {
+				nodesV2.Masters = append(nodesV2.Masters[:idx], nodesV2.Masters[idx+1:]...)
 			} else {
-				nodesV1.Masters = nodesV1.Masters[:idx]
+				nodesV2.Masters = nodesV2.Masters[:idx]
 			}
 			return nil
 		})
@@ -907,9 +918,9 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 	defer func() {
 		if err != nil {
 			derr := c.UpdateMetadata(task, func() error {
-				return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-					nodesV1 := v.(*clusterpropsv1.Nodes)
-					nodesV1.Masters = append(nodesV1.Masters, master)
+				return c.Properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+					nodesV2 := v.(*clusterpropsv2.Nodes)
+					nodesV2.Masters = append(nodesV2.Masters, master)
 					return nil
 				})
 			})
@@ -930,7 +941,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 }
 
 // DeleteLastNode deletes the last Agent node added
-func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string) (err error) {
+func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMasterID string) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -938,17 +949,18 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 		task = concurrency.RootTask()
 	}
 
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", selectedMaster), true).GoingIn()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", selectedMasterID), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	var node *clusterpropsv1.Node
+	var node *clusterpropsv2.Node
 
 	// Removed reference of the node from cluster metadata
 	c.RLock(task)
-	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
+
+	err = c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes)
+		node = nodesV2.PrivateNodes[len(nodesV2.PrivateNodes)-1]
 		return nil
 	})
 	c.RUnlock(task)
@@ -956,20 +968,21 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 		return err
 	}
 
-	if selectedMaster == "" {
-		selectedMaster, err = c.FindAvailableMaster(task)
+	if selectedMasterID == "" {
+		master, err := c.FindAvailableMaster(task)
 		if err != nil {
 			errDelNode := c.deleteNode(task, node, "")
 			err = scerr.AddConsequence(err, errDelNode)
 			return err
 		}
+		selectedMasterID = master.ID
 	}
 
-	return c.deleteNode(task, node, selectedMaster)
+	return c.deleteNode(task, node, selectedMasterID)
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
-func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, selectedMaster string) (err error) {
+func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, selectedMasterID string) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -985,20 +998,20 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
-		node *clusterpropsv1.Node
+		node *clusterpropsv2.Node
 	)
 
 	c.RLock(task)
-	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
+	err = c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes)
 		var (
 			idx   int
 			found bool
 		)
-		if found, idx = contains(nodesV1.PrivateNodes, hostID); !found {
+		if found, idx = contains(nodesV2.PrivateNodes, hostID); !found {
 			return scerr.NotFoundError(fmt.Sprintf("failed to find node '%s'", hostID))
 		}
-		node = nodesV1.PrivateNodes[idx]
+		node = nodesV2.PrivateNodes[idx]
 		return nil
 	})
 	c.RUnlock(task)
@@ -1006,20 +1019,21 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 		return err
 	}
 
-	if selectedMaster == "" {
-		selectedMaster, err = c.FindAvailableMaster(task)
+	if selectedMasterID == "" {
+		master, err := c.FindAvailableMaster(task)
 		if err != nil {
 			errDelNode := c.deleteNode(task, node, "")
 			err = scerr.AddConsequence(err, errDelNode)
 			return err
 		}
+		selectedMasterID = master.ID
 	}
 
-	return c.deleteNode(task, node, selectedMaster)
+	return c.deleteNode(task, node, selectedMasterID)
 }
 
 // deleteNode deletes the node specified by its ID
-func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) (err error) {
+func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv2.Node, selectedMaster string) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -1036,14 +1050,14 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 
 	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
 	err = c.UpdateMetadata(task, func() error {
-		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-			nodesV1 := v.(*clusterpropsv1.Nodes)
-			length := len(nodesV1.PrivateNodes)
-			_, idx := contains(nodesV1.PrivateNodes, node.ID)
+		return c.Properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+			nodesV2 := v.(*clusterpropsv2.Nodes)
+			length := len(nodesV2.PrivateNodes)
+			_, idx := contains(nodesV2.PrivateNodes, node.ID)
 			if idx < length-1 {
-				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
+				nodesV2.PrivateNodes = append(nodesV2.PrivateNodes[:idx], nodesV2.PrivateNodes[idx+1:]...)
 			} else {
-				nodesV1.PrivateNodes = nodesV1.PrivateNodes[:idx]
+				nodesV2.PrivateNodes = nodesV2.PrivateNodes[:idx]
 			}
 			return nil
 		})
@@ -1056,9 +1070,9 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	defer func() {
 		if err != nil {
 			derr := c.UpdateMetadata(task, func() error {
-				return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-					nodesV1 := v.(*clusterpropsv1.Nodes)
-					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+				return c.Properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+					nodesV2 := v.(*clusterpropsv2.Nodes)
+					nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, node)
 					return nil
 				})
 			})
@@ -1132,16 +1146,18 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	var cleaningErrors []error
 
 	// Deletes the nodes
-	list := c.ListNodeIDs(task)
-	length := len(list)
-	if length > 0 {
+	list, err := c.ListNodeIDs(task)
+	if err != nil {
+		return err
+	}
+	if len(list) > 0 {
 		var subtasks []concurrency.Task
-		for i := 0; i < length; i++ {
+		for _, v := range list {
 			subtask, err := task.New()
 			if err != nil {
 				return err
 			}
-			subtask, err = subtask.Start(deleteNodeFunc, list[i])
+			subtask, err = subtask.Start(deleteNodeFunc, v)
 			if err != nil {
 				return err
 			}
@@ -1160,17 +1176,15 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if err != nil {
 		return err
 	}
-
-	length = len(list)
 	if len(list) > 0 {
 		var subtasks []concurrency.Task
-		for i := 0; i < length; i++ {
+		for _, v := range list {
 			subtask, err := task.New()
 			if err != nil {
 				return err
 			}
 
-			subtask, err = subtask.Start(deleteMasterFunc, list[i])
+			subtask, err = subtask.Start(deleteMasterFunc, v)
 			if err != nil {
 				return err
 			}
@@ -1265,14 +1279,14 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 
 	c.RLock(task)
 	var (
-		nodes                         []*clusterpropsv1.Node
-		masters                       []*clusterpropsv1.Node
+		nodes                         []*clusterpropsv2.Node
+		masters                       []*clusterpropsv2.Node
 		gatewayID, secondaryGatewayID string
 	)
-	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		masters = nodesV1.Masters
-		nodes = nodesV1.PrivateNodes
+	err = c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes)
+		masters = nodesV2.Masters
+		nodes = nodesV2.PrivateNodes
 		return nil
 	})
 	if err != nil {
@@ -1385,14 +1399,14 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	// Starts the resources of the cluster
 	c.RLock(task)
 	var (
-		nodes                         []*clusterpropsv1.Node
-		masters                       []*clusterpropsv1.Node
+		nodes                         []*clusterpropsv2.Node
+		masters                       []*clusterpropsv2.Node
 		gatewayID, secondaryGatewayID string
 	)
-	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		masters = nodesV1.Masters
-		nodes = nodesV1.PrivateNodes
+	err = c.Properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
+		nodesV2 := v.(*clusterpropsv2.Nodes)
+		masters = nodesV2.Masters
+		nodes = nodesV2.PrivateNodes
 		return nil
 	})
 	if err != nil {
