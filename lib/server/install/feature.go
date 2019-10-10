@@ -532,13 +532,31 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 				v["CIDR"] = networkCfg.CIDR
 			}
 		}
-		v["Masters"] = cluster.ListMasters(f.task)
-		v["MasterNames"] = cluster.ListMasterNames(f.task)
-		v["MasterIDs"], err = cluster.ListMasterIDs(f.task)
+		list, err := cluster.ListMasters(f.task)
+		v["Masters"] = list
+
+		listMap, err := cluster.ListMasterIDs(f.task)
 		if err != nil {
 			return err
 		}
-		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
+		keys, values := extractKeysAndValuesFromMap(listMap)
+		v["MasterNumericalIDs"] = keys
+		v["MasterIDs"] = values
+
+		listMap, err = cluster.ListMasterIDs(f.task)
+		if err != nil {
+			return err
+		}
+		_, values = extractKeysAndValuesFromMap(listMap)
+		v["MasterNames"] = values
+
+		listMap, err = cluster.ListMasterIPs(f.task)
+		if err != nil {
+			return err
+		}
+		_, values = extractKeysAndValuesFromMap(listMap)
+		v["MasterIPs"] = values
+
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "cladm"
 			v["Password"] = identity.AdminPassword
@@ -570,4 +588,20 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 	}
 
 	return nil
+}
+
+// extractKeysAndValuesFromMap returns a slice with keys and a slice with values from map[uint]string
+func extractKeysAndValuesFromMap(m map[uint]string) ([]uint, []string) {
+	length := len(m)
+	if length <= 0 {
+		return []uint{}, []string{}
+	}
+
+	keys := make([]uint, 0, length)
+	values := make([]string, 0, length)
+	for k, v := range m {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	return keys, values
 }
