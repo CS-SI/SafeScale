@@ -296,11 +296,24 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 
 // run executes the function 'action'
 func (t *task) run(action TaskAction, params TaskParameters) {
+	var err error = nil
+	defer func() {
+		if err := recover(); err != nil {
+			t.lock.Lock()
+			defer t.lock.Unlock()
+
+			t.err = fmt.Errorf("panic happened: %v", err)
+			t.result = nil
+			t.doneCh <- true
+		}
+	}()
+
 	result, err := action(t, params)
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	err = nil
 	t.err = err
 	t.result = result
 	t.doneCh <- true
