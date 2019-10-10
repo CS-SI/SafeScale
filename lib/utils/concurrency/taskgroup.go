@@ -33,9 +33,9 @@ type TaskGroupResult map[string]TaskResult
 
 // TaskGroup is the task group interface
 type TaskGroup interface {
-	TryWait() (bool, map[string]TaskResult, error)
-	Wait() (map[string]TaskResult, error)
-	WaitFor(time.Duration) (bool, map[string]TaskResult, error)
+	TryWaitGroup() (bool, map[string]TaskResult, error)
+	WaitGroup() (map[string]TaskResult, error)
+	WaitForGroup(time.Duration) (bool, map[string]TaskResult, error)
 }
 
 // task is a structure allowing to identify (indirectly) goroutines
@@ -107,8 +107,8 @@ func (tg *taskGroup) GetContext() context.Context {
 	return tg.task.GetContext()
 }
 
-// ForceID allows to specify task ID. The unicity of the ID through all the tasks
-// becomes the responsability of the developer...
+// ForceID allows to specify task ID. The uniqueness of the ID through all the tasks
+// becomes the responsibility of the developer...
 func (tg *taskGroup) ForceID(id string) (Task, error) {
 	return tg.task.ForceID(id)
 }
@@ -148,21 +148,26 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 	return tg, nil
 }
 
-// Wait waits for the task to end, and returns the error (or nil) of the execution
 func (tg *taskGroup) Wait() (TaskResult, error) {
+	return tg.WaitGroup()
+}
+
+// Wait waits for the task to end, and returns the error (or nil) of the execution
+func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 	tid, _ := tg.GetID() // FIXME Later
+
+	errs := make(map[string]string)
+	results := make(map[string]TaskResult)
 
 	if tg.task.status == DONE {
 		tg.task.lock.Lock()
 		defer tg.task.lock.Unlock()
-		return tg.result, tg.task.err
+		results[tid] = tg.result
+		return results, tg.task.err
 	}
 	if tg.task.status != RUNNING {
 		return nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
 	}
-
-	errs := make(map[string]string)
-	results := make(map[string]TaskResult)
 
 	tg.lock.Lock()
 	defer tg.lock.Unlock()
@@ -195,9 +200,15 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 	return results, tg.task.err
 }
 
-// TryWait tries to wait on a task; if done returns the error and true, if not returns nil and false
 func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
+	return tg.TryWaitGroup()
+}
+
+// TryWait tries to wait on a task; if done returns the error and true, if not returns nil and false
+func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
 	tid, _ := tg.GetID() // FIXME Later
+
+	results := make(map[string]TaskResult)
 
 	if tg.task.status != RUNNING {
 		return false, nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
@@ -208,15 +219,23 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
 			return false, nil, nil
 		}
 	}
+
 	result, err := tg.Wait()
-	return true, result, err
+	results[tid] = result
+	return true, results, err
+}
+
+func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
+	return tg.WaitForGroup(duration)
 }
 
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
 // By design, duration cannot be less than 1ms.
-func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
+func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]TaskResult, error) {
 	tid, _ := tg.GetID() // FIXME Later
+
+	results := make(map[string]TaskResult)
 
 	if tg.task.status != RUNNING {
 		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
@@ -233,7 +252,8 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		default:
 			ok, result, err := tg.TryWait()
 			if ok {
-				return ok, result, err
+				results[tid] = result
+				return ok, results, err
 			}
 			// Waits 1 ms between checks...
 			time.Sleep(time.Millisecond)
