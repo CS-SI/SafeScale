@@ -1184,7 +1184,10 @@ var clusterNodeListCommand = cli.Command{
 		hostClt := client.New().Host
 		formatted := []map[string]interface{}{}
 
-		list := clusterInstance.ListNodeIDs(concurrency.RootTask())
+		list, err := clusterInstance.ListNodeIDs(concurrency.RootTask())
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
 		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
