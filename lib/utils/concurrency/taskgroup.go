@@ -177,6 +177,7 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 		if err != nil {
 			errs[sid] = err.Error()
 		}
+
 		results[sid] = result
 	}
 	errors := []string{}
@@ -184,7 +185,11 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 		errors = append(errors, fmt.Sprintf("%s: %s", i, e))
 	}
 	tg.task.result = results
-	tg.task.err = fmt.Errorf(strings.Join(errors, "\n"))
+	if len(errors) > 0 {
+		tg.task.err = fmt.Errorf(strings.Join(errors, "\n"))
+	} else {
+		tg.task.err = nil
+	}
 	tg.task.status = DONE
 	tg.result = results
 	return results, tg.task.err
