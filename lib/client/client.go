@@ -135,13 +135,6 @@ func DecorateError(err error, action string, maySucceed bool) error {
 
 // IsTimeoutError tells if the err is a timeout kind
 func IsTimeoutError(err error) bool {
-	// FIXME Look at that
-	/*
-		if _, ok := err.(common.ErrTimeout); ok {
-			return true
-		}
-	*/
-
 	return status.Code(err) == codes.DeadlineExceeded
 }
 
