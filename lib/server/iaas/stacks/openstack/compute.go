@@ -1050,12 +1050,12 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	}
 
 	var host *resources.Host
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
 		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
+		host = hostParam
 	}
 	if host == nil {
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")

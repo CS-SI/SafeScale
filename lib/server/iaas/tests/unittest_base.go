@@ -492,6 +492,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 func (tester *ServiceTester) Volume(t *testing.T) {
 	// Get initial number of volumes
 	lst, err := tester.Service.ListVolumes()
+	require.NotNil(t, err)
 	nbVolumes := len(lst)
 
 	v1, err := tester.Service.CreateVolume(resources.VolumeRequest{
@@ -647,6 +648,7 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 	assert.Nil(t, err)
 
 	cl, err := tester.Service.ListBuckets("")
+	require.NotNil(t, err)
 	assert.Contains(t, cl, "testC", "testC2")
 	err = tester.Service.DeleteBucket("testC")
 	assert.Nil(t, err)
