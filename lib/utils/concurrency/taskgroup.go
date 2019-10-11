@@ -136,7 +136,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 	}
 
 	tg.last++
-	subtask, err := tg.task.New()
+	subtask, err := tg.task.NewSubTask()
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +246,6 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
-// By design, duration cannot be less than 1ms.
 func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]TaskResult, error) {
 	tid, err := tg.GetID()
 	if err != nil {
@@ -257,10 +256,6 @@ func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]Task
 
 	if tg.task.status != RUNNING {
 		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
-	}
-
-	if duration < time.Millisecond {
-		duration = time.Millisecond
 	}
 
 	c := make(chan struct{})
@@ -297,18 +292,6 @@ func (tg *taskGroup) Reset() (Task, error) {
 	tg.subtasks = []Task{}
 	return tg, nil
 }
-
-// // Result returns the result of the task action
-// func (tg *taskGroup) Result() TaskResult {
-// 	status := tg.GetStatus()
-// 	if status == READY {
-// 		panic("Can't get result of task group '%s': no task started!")
-// 	}
-// 	if status != DONE {
-// 		panic("Can't get result of task group '%s': group not done!")
-// 	}
-// 	return tg.task.Result()
-// }
 
 // Abort aborts the task execution
 func (tg *taskGroup) Abort() error {
