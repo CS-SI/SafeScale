@@ -441,11 +441,13 @@ func ReadyToSsh(t *testing.T, provider Providers.Enum) {
 	defer names.TearDown()
 
 	out, err := GetOutput("safescale network list")
+	require.NotNil(t, out)
 	require.Nil(t, err)
 
 	fmt.Println("Creating network " + names.Networks[0] + " --cidr 192.168.41.0/24")
 
 	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.41.0/24")
+	require.NotNil(t, out)
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])

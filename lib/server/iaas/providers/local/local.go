@@ -65,7 +65,7 @@ type CfgOptions struct {
 	TemplatesJSONPath string
 	// Local Path of the libvirt pool where all disks created by libvirt come from and are stored
 	LibvirtStorage string
-	// Connection identifier to the virtualisation device
+	// Connection identifier to the visualisation device
 	URI string
 }
 
@@ -76,7 +76,7 @@ type CfgOptions struct {
 // }
 
 // Build Create and initialize a ClientAPI
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+func (prov *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	authOptions := stacks.AuthenticationOptions{}
 	localConfig := stacks.LocalConfiguration{}
 	config := stacks.ConfigurationOptions{}
@@ -107,7 +107,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	uri, found := compute["uri"].(string)
 	if !found {
-		return nil, fmt.Errorf("Uri is not set")
+		return nil, fmt.Errorf("URI is not set")
 	}
 	imagesJSONPath, found := compute["imagesJSONPath"].(string)
 	if !found {
@@ -140,51 +140,51 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	return localProvider, nil
 }
 
-// GetAuthOpts returns authentification options as a Config
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+// GetAuthOpts returns authentication options as a Config
+func (prov *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := resources.ConfigMap{}
 	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (prov *provider) GetConfigurationOptions() (providers.Config, error) {
 	config := resources.ConfigMap{}
 
-	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
-	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
-	config.Set("MetadataBucketName", p.Config.MetadataBucket)
-	config.Set("ProviderNetwork", p.Config.ProviderNetwork)
-	config.Set("OperatorUsername", p.Config.OperatorUsername)
+	config.Set("AutoHostNetworkInterfaces", prov.Config.AutoHostNetworkInterfaces)
+	config.Set("UseLayer3Networking", prov.Config.UseLayer3Networking)
+	config.Set("MetadataBucketName", prov.Config.MetadataBucket)
+	config.Set("ProviderNetwork", prov.Config.ProviderNetwork)
+	config.Set("OperatorUsername", prov.Config.OperatorUsername)
 
 	return config, nil
 }
 
-func (provider *provider) GetName() string {
+func (prov *provider) GetName() string {
 	return "local"
 }
 
 // ListImages ...
-func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
-	return provider.Stack.ListImages()
+func (prov *provider) ListImages(all bool) ([]resources.Image, error) {
+	return prov.Stack.ListImages()
 }
 
 // ListTemplates ...
-func (provider *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	return provider.Stack.ListTemplates()
+func (prov *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+	return prov.Stack.ListTemplates()
 }
 
-func (provider *provider) ListAvailabilityZones() (map[string]bool, error) {
-	return provider.Stack.ListAvailabilityZones()
+func (prov *provider) ListAvailabilityZones() (map[string]bool, error) {
+	return prov.Stack.ListAvailabilityZones()
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-func (p *provider) GetTenantParameters() map[string]interface{} {
-	return p.tenantParameters
+func (prov *provider) GetTenantParameters() map[string]interface{} {
+	return prov.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() providers.Capabilities {
+func (prov *provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{}
 }
 

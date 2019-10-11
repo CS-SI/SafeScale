@@ -432,6 +432,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	network, err = tester.Service.GetNetwork(network.ID)
 	assert.NoError(t, err)
 	hosts, err = tester.Service.ListHosts()
+	require.Nil(t, err)
 	assert.Equal(t, nbHosts+3, len(hosts))
 	found := 0
 	for _, v := range hosts {
