@@ -452,29 +452,17 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	)
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
-	primaryGatewayTask, err := task.New()
-	if err != nil {
-		return err
-	}
-	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskInstallGateway, srvutils.ToPBHost(primaryGateway))
+	primaryGatewayTask, err := task.StartInSubTask(b.taskInstallGateway, srvutils.ToPBHost(primaryGateway))
 	if err != nil {
 		return err
 	}
 	if !gwFailoverDisabled {
-		secondaryGatewayTask, err = task.New()
-		if err != nil {
-			return err
-		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskInstallGateway, srvutils.ToPBHost(secondaryGateway))
+		secondaryGatewayTask, err = task.StartInSubTask(b.taskInstallGateway, srvutils.ToPBHost(secondaryGateway))
 		if err != nil {
 			return err
 		}
 	}
-	mastersTask, err := task.New()
-	if err != nil {
-		return err
-	}
-	mastersTask, err = mastersTask.Start(b.taskCreateMasters, data.Map{
+	mastersTask, err := task.StartInSubTask(b.taskCreateMasters, data.Map{
 		"count":     masterCount,
 		"masterDef": mastersDef,
 		"nokeep":    !req.KeepOnFailure,
@@ -483,11 +471,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return err
 	}
 
-	privateNodesTask, err := task.New()
-	if err != nil {
-		return err
-	}
-	privateNodesTask, err = privateNodesTask.Start(b.taskCreateNodes, data.Map{
+	privateNodesTask, err := task.StartInSubTask(b.taskCreateNodes, data.Map{
 		"count":   privateNodeCount,
 		"public":  false,
 		"nodeDef": nodesDef,
@@ -543,20 +527,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
 	// Configure Gateway(s) and waits for the result
-	primaryGatewayTask, err = task.New()
-	if err != nil {
-		return err
-	}
-	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskConfigureGateway, srvutils.ToPBHost(primaryGateway))
+	primaryGatewayTask, err = task.StartInSubTask(b.taskConfigureGateway, srvutils.ToPBHost(primaryGateway))
 	if err != nil {
 		return err
 	}
 	if !gwFailoverDisabled {
-		secondaryGatewayTask, err = task.New()
-		if err != nil {
-			return err
-		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskConfigureGateway, srvutils.ToPBHost(secondaryGateway))
+		secondaryGatewayTask, err = task.StartInSubTask(b.taskConfigureGateway, srvutils.ToPBHost(secondaryGateway))
 		if err != nil {
 			return err
 		}
@@ -581,11 +557,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 
 	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
-	mt, err := task.New()
-	if err != nil {
-		return err
-	}
-	_, mastersStatus = mt.Run(b.taskConfigureMasters, nil)
+	_, mastersStatus = task.RunInSubTask(b.taskConfigureMasters, nil)
 	if mastersStatus != nil {
 		return mastersStatus
 	}
@@ -614,11 +586,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Step 6: Starts nodes configuration, if all masters and nodes
 	// have been created and gateway has been configured with success
-	pnt, privateNodesStatus := task.New()
-	if privateNodesStatus != nil {
-		return privateNodesStatus
-	}
-	_, privateNodesStatus = pnt.Run(b.taskConfigureNodes, nil)
+	_, privateNodesStatus = task.RunInSubTask(b.taskConfigureNodes, nil)
 	if privateNodesStatus != nil {
 		return privateNodesStatus
 	}
@@ -998,11 +966,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 		if err != nil {
 			break
 		}
-		subtask, err := task.New()
-		if err != nil {
-			break
-		}
-		subtask, err = subtask.Start(b.taskConfigureNode, data.Map{
+		subtask, err := task.StartInSubTask(b.taskConfigureNode, data.Map{
 			"index": uint(i + 1),
 			"host":  host,
 		})
@@ -1515,7 +1479,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	if count <= 0 {
+	if count == 0 {
 		logrus.Debugf("[cluster %s] no masters to create.", clusterName)
 		return nil, nil
 	}
@@ -1526,11 +1490,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	var i uint
 	for ; i < count; i++ {
-		subtask, err := t.New()
-		if err != nil {
-			return nil, err
-		}
-		subtask, err = subtask.Start(b.taskCreateMaster, data.Map{
+		subtask, err := t.StartInSubTask(b.taskCreateMaster, data.Map{
 			"index":     i + 1,
 			"masterDef": def,
 			"timeout":   timeout,
@@ -1704,11 +1664,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 			logrus.Warnf("failed to get metadata of host: %s", err.Error())
 			continue
 		}
-		subtask, err := t.New()
-		if err != nil {
-			return nil, err
-		}
-		subtask, err = subtask.Start(b.taskConfigureMaster, data.Map{
+		subtask, err := t.StartInSubTask(b.taskConfigureMaster, data.Map{
 			"index": i + 1,
 			"host":  host,
 		})
@@ -1838,7 +1794,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
-	if count <= 0 {
+	if count == 0 {
 		logrus.Debugf("[cluster %s] no nodes to create.", clusterName)
 		return nil, nil
 	}
@@ -1847,11 +1803,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	var subtasks []concurrency.Task
 	for i := uint(1); i <= count; i++ {
-		subtask, err := t.New()
-		if err != nil {
-			return nil, err
-		}
-		subtask, err = subtask.Start(b.taskCreateNode, data.Map{
+		subtask, err := t.StartInSubTask(b.taskCreateNode, data.Map{
 			"index":   uint(i),
 			"type":    NodeType.Node,
 			"nodeDef": def,
@@ -2023,11 +1975,7 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 		if err != nil {
 			break
 		}
-		subtask, err := t.New()
-		if err != nil {
-			return nil, err
-		}
-		subtask, err = subtask.Start(b.taskConfigureNode, data.Map{
+		subtask, err := t.StartInSubTask(b.taskConfigureNode, data.Map{
 			"index": i,
 			"host":  pbHost,
 		})

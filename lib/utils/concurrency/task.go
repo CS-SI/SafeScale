@@ -62,10 +62,12 @@ type Task interface {
 	GetSignature() (string, error)
 	GetStatus() (TaskStatus, error)
 	GetContext() (context.Context, error)
-	New() (Task, error)
+	NewSubTask() (Task, error)
 	Reset() (Task, error)
 	Run(TaskAction, TaskParameters) (TaskResult, error)
+	RunInSubTask(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
+	StartInSubTask(TaskAction, TaskParameters) (Task, error)
 	TryWait() (bool, TaskResult, error)
 	Wait() (TaskResult, error)
 }
@@ -260,6 +262,20 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 	return t, nil
 }
 
+// Start runs in goroutine the function with parameters
+func (t *task) StartInSubTask(action TaskAction, params TaskParameters) (Task, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
+	st, err := t.NewSubTask()
+	if err != nil {
+		return nil, err
+	}
+
+	return st.Start(action, params)
+}
+
 // controller controls the start, termination and possibly abortion of the action
 func (t *task) controller(action TaskAction, params TaskParameters) {
 	go t.run(action, params)
@@ -296,7 +312,7 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 
 // run executes the function 'action'
 func (t *task) run(action TaskAction, params TaskParameters) {
-	var err error = nil
+	var err error
 	defer func() {
 		if err := recover(); err != nil {
 			t.lock.Lock()
@@ -331,6 +347,20 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error)
 	}
 
 	return stask.Wait()
+}
+
+// Run starts task, waits its completion then return the error code
+func (t *task) RunInSubTask(action TaskAction, params TaskParameters) (TaskResult, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
+	st, err := t.NewSubTask()
+	if err != nil {
+		return nil, err
+	}
+
+	return st.Run(action, params)
 }
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
@@ -421,18 +451,19 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
 	}
 
-	for {
-		select {
-		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
-		default:
-			ok, result, err := t.TryWait()
-			if ok {
-				return ok, result, err
-			}
-			// Waits 1 ms between checks...
-			time.Sleep(time.Millisecond)
-		}
+	var result TaskResult
+
+	c := make(chan struct{})
+	go func() {
+		result, err = t.Wait()
+		c <- struct{}{} // done
+	}()
+
+	select {
+	case <-time.After(duration):
+		return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
+	case <-c:
+		return true, result, err
 	}
 }
 
@@ -485,7 +516,7 @@ func (t *task) Abort() error {
 }
 
 // New creates a subtask from current task
-func (t *task) New() (Task, error) {
+func (t *task) NewSubTask() (Task, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
 	}

@@ -730,11 +730,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
-		subtask, err := task.New()
-		if err != nil {
-			return nil, err
-		}
-		subtask, err = subtask.Start(c.foreman.taskCreateNode, data.Map{
+		subtask, err := task.StartInSubTask(c.foreman.taskCreateNode, data.Map{
 			"index":   i + 1,
 			"type":    nodeType,
 			"nodeDef": nodeDef,
@@ -1153,11 +1149,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if len(list) > 0 {
 		var subtasks []concurrency.Task
 		for _, v := range list {
-			subtask, err := task.New()
-			if err != nil {
-				return err
-			}
-			subtask, err = subtask.Start(deleteNodeFunc, v)
+			subtask, err := task.StartInSubTask(deleteNodeFunc, v)
 			if err != nil {
 				return err
 			}
@@ -1179,12 +1171,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if len(list) > 0 {
 		var subtasks []concurrency.Task
 		for _, v := range list {
-			subtask, err := task.New()
-			if err != nil {
-				return err
-			}
-
-			subtask, err = subtask.Start(deleteMasterFunc, v)
+			subtask, err := task.StartInSubTask(deleteMasterFunc, v)
 			if err != nil {
 				return err
 			}

@@ -99,7 +99,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 		files, err := ioutil.ReadDir(path)
 		if err == nil {
 			for _, f := range files {
-				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
+				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile {
 					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if err != nil {
 						log.Error(err) // FIXME Don't hide errors
@@ -419,7 +419,6 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	results := Results{}
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -457,7 +456,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 		return nil, err
 	}
 
-	results, err = installer.Remove(f, t, myV, s)
+	results, err := installer.Remove(f, t, myV, s)
 	// checkCache.Reset(f.DisplayName() + "@" + t.Name())
 	return results, err
 }
@@ -533,6 +532,10 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 			}
 		}
 		list, err := cluster.ListMasters(f.task)
+		if err != nil {
+			return err
+		}
+
 		v["Masters"] = list
 
 		listMap, err := cluster.ListMasterIDs(f.task)

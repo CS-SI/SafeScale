@@ -687,6 +687,9 @@ func (w *worker) validateClusterSizing() error {
 			return err
 		}
 		list, err := w.cluster.ListNodeIDs(w.feature.task)
+		if err != nil {
+			return err
+		}
 		curNodes := len(list)
 		if curNodes < count {
 			return fmt.Errorf("cluster doesn't meet the minimum number of nodes (%d < %d)", curNodes, count)
@@ -779,10 +782,9 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 
 		for _, h := range hosts {
-			tP, _ := w.feature.task.New()
 			primaryGatewayVariables["HostIP"] = h.PrivateIp
 			primaryGatewayVariables["Hostname"] = h.Name
-			_, err = tP.Start(asyncApplyProxyRule, data.Map{
+			tP, err := w.feature.task.StartInSubTask(asyncApplyProxyRule, data.Map{
 				"ctrl": primaryKongController,
 				"rule": rule,
 				"vars": &primaryGatewayVariables,
@@ -795,17 +797,17 @@ func (w *worker) setReverseProxy() (err error) {
 
 			var errS error
 			if secondaryKongController != nil {
-				tS, _ := w.feature.task.New()
 				secondaryGatewayVariables["HostIP"] = h.PrivateIp
 				secondaryGatewayVariables["Hostname"] = h.Name
-				_, errS = tS.Start(asyncApplyProxyRule, data.Map{
+				tS, errOp := w.feature.task.StartInSubTask(asyncApplyProxyRule, data.Map{
 					"ctrl": secondaryKongController,
 					"rule": rule,
 					"vars": &secondaryGatewayVariables,
 				})
-				if errS == nil {
-					_, errS = tS.Wait()
+				if errOp == nil {
+					_, errOp = tS.Wait()
 				}
+				errS = errOp
 			}
 
 			_, errP := tP.Wait()
@@ -820,7 +822,7 @@ func (w *worker) setReverseProxy() (err error) {
 	return nil
 }
 
-func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, err error) {
 	ctrl := params.(data.Map)["ctrl"].(*KongController)
 	rule := params.(data.Map)["rule"].(map[interface{}]interface{})
 	vars := params.(data.Map)["vars"].(*Variables)
@@ -828,7 +830,6 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 	hostName := (*vars)["Hostname"].(string)
 	ruleName, err := ctrl.Apply(rule, vars)
 
-	// FIXME Check this later
 	if err != nil {
 		msg := "failed to apply proxy rule"
 		if ruleName != "" {
