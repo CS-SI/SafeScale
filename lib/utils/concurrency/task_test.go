@@ -1,6 +1,7 @@
 package concurrency
 
 import (
+	"context"
 	"fmt"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
@@ -8,6 +9,8 @@ import (
 	"testing"
 	"time"
 )
+
+// FIXME The whole file task_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
 
 func TestNewTask(t *testing.T) {
 	got, err := NewTask(nil)
@@ -440,6 +443,43 @@ func TestSingleTaskWait(t *testing.T) {
 	}
 }
 
-func TestChildrenWaitingGameWithContexts(t *testing.T) {
+// FIXME This shows the problem with Tasks and contexts, run it a few times and it blocks
+func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
+	ctx, cafu := context.WithTimeout(context.TODO(), 3*time.Second)
+	single, err := NewTaskWithContext(ctx)
+	require.NotNil(t, single)
+	require.Nil(t, err)
+
+	begin := time.Now()
+
+	single, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
+		time.Sleep(time.Duration(5) * time.Second)
+		return "Ahhhh", nil
+	}, nil)
+	require.Nil(t, err)
+
+	go func() {
+		time.Sleep(time.Second)
+		cafu()
+	}()
+
+	_, err = single.Wait()
+	end := time.Since(begin)
+	if err != nil {
+		if !strings.Contains(err.Error(), "aborted") {
+			t.Errorf("Why so serious ? it's just a failure cancelling a goroutine: %s", err.Error())
+		}
+	}
+
+	if end > time.Second*5 {
+		t.Errorf("We waited too much !")
+	}
+}
+
+func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
+	t.Errorf("Why so serious ?")
+}
+
+func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	t.Errorf("Why so serious ?")
 }
