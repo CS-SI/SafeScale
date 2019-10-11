@@ -75,11 +75,11 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)   // returns masterCount, pruvateNodeCount, publicNodeCount
-	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) pb.HostDefinition // sizing of Gateway(s)
-	DefaultMasterSizing         func(task concurrency.Task, b Foreman) pb.HostDefinition // default sizing of master(s)
-	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition // default sizing of node(s)
-	DefaultImage                func(task concurrency.Task, b Foreman) string            // default image of server(s)
+	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (uint, uint, uint) // returns masterCount, pruvateNodeCount, publicNodeCount
+	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) pb.HostDefinition  // sizing of Gateway(s)
+	DefaultMasterSizing         func(task concurrency.Task, b Foreman) pb.HostDefinition  // default sizing of master(s)
+	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition  // default sizing of node(s)
+	DefaultImage                func(task concurrency.Task, b Foreman) string             // default image of server(s)
 	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType NodeType.Enum) (string, map[string]interface{})
 	GetGlobalSystemRequirements func(task concurrency.Task, b Foreman) (string, error)
 	GetTemplateBox              func() (*rice.Box, error)
@@ -758,7 +758,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	return nil
 }
 
-func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) {
+func (b *foreman) determineRequiredNodes(task concurrency.Task) (uint, uint, uint) {
 	if b.makers.MinimumRequiredServers != nil {
 		return b.makers.MinimumRequiredServers(task, b)
 	}
@@ -767,10 +767,6 @@ func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) 
 
 // configureCluster configures cluster
 func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (err error) {
-	if params == nil {
-		return scerr.InvalidParameterError("params", "cannot be nil")
-	}
-
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -780,6 +776,11 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		ok                               bool
 		primaryGateway, secondaryGateway *resources.Host
 	)
+
+	if params == nil {
+		return scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
 	if p, ok = params.(data.Map); !ok {
 		return scerr.InvalidParameterError("params", "must be a data.Map")
 	}
@@ -1166,9 +1167,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, temporal.GetHostTimeout())
+			return fmt.Errorf("SWARM worker '%s' didn't reach 'Down' state after %v", pbHost.Name, temporal.GetHostTimeout())
 		default:
-			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
+			return fmt.Errorf("SWARM worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
 		}
 	}
 
@@ -1186,13 +1187,13 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 
 // installNodeRequirements ...
 func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeType.Enum, pbHost *pb.Host, hostLabel string) (err error) {
-	if b.makers.GetTemplateBox == nil {
-		return scerr.InvalidParameterError("b.makers.GetTemplateBox", "cannot be nil")
-	}
-
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	if b.makers.GetTemplateBox == nil {
+		return scerr.InvalidParameterError("b.makers.GetTemplateBox", "cannot be nil")
+	}
 
 	netCfg, err := b.cluster.GetNetworkConfig(task)
 	if err != nil {
@@ -1346,6 +1347,10 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
 func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	if t == nil {
 		t, err = concurrency.VoidTask()
 		if err != nil {
@@ -1359,10 +1364,6 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	if pbGateway == nil {
 		return result, scerr.InvalidParameterError("params", "cannot be nil")
 	}
-
-	tracer := concurrency.NewTracer(t, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := pbGateway.Name
 	logrus.Debugf("[%s] starting installation...", hostLabel)
@@ -1401,6 +1402,10 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), false).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	if b == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -1416,10 +1421,6 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	if gw == nil {
 		return result, scerr.InvalidParameterError("params", "cannot be nil")
 	}
-
-	tracer := concurrency.NewTracer(t, "("+gw.Name+")", false).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	logrus.Debugf("[%s] starting configuration...", gw.Name)
 
@@ -1437,9 +1438,14 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	if b == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+
 	if params == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
@@ -1455,7 +1461,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 		nokeep bool
 	)
 	if count, ok = p["count"].(uint); !ok {
-		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
+		return nil, scerr.InvalidParameterError("params[count]", "is missing or is not an unsigned integer")
 	}
 	if count < 1 {
 		return nil, scerr.InvalidParameterError("params[count]", "cannot be an integer less than 1")
@@ -1472,10 +1478,6 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	if nokeep, ok = p["nokeep"].(bool); !ok {
 		nokeep = true
 	}
-
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	clusterName := b.cluster.GetIdentity(t).Name
 
@@ -1520,6 +1522,10 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	if b == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -1561,10 +1567,6 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	if nokeep, ok = p["nokeep"].(bool); !ok {
 		nokeep = true
 	}
-
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true).GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1692,6 +1694,10 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	if b == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -1720,10 +1726,6 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	if pbHost == nil {
 		return nil, scerr.InvalidParameterError("params[host]", "cannot be nil")
 	}
-
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	started := time.Now()
 
@@ -1804,7 +1806,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	var subtasks []concurrency.Task
 	for i := uint(1); i <= count; i++ {
 		subtask, err := t.StartInSubTask(b.taskCreateNode, data.Map{
-			"index":   uint(i),
+			"index":   i,
 			"type":    NodeType.Node,
 			"nodeDef": def,
 			"timeout": timeout,
@@ -1847,12 +1849,12 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
 	var (
-		index   int
+		index   uint
 		def     *pb.HostDefinition
 		timeout time.Duration
 		nokeep  bool
 	)
-	if index, ok = p["index"].(int); !ok {
+	if index, ok = p["index"].(uint); !ok {
 		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
 	}
 	if def, ok = p["nodeDef"].(*pb.HostDefinition); !ok {
