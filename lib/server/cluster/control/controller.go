@@ -669,7 +669,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count uint, req *pb.HostDef
 		return nil, scerr.InvalidInstanceError()
 	}
 	if count == 0 {
-		return nil, scerr.InvalidParameterError("count", "must be an int > 0")
+		return nil, scerr.InvalidParameterError("count", "must be greater than zero")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
