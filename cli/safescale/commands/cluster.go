@@ -700,7 +700,7 @@ var clusterExpandCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		count := int(c.Uint("count"))
+		count := c.Uint("count")
 		if count == 0 {
 			count = 1
 		}

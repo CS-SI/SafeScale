@@ -123,7 +123,18 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if ctx == nil {
+		return scerr.InvalidParameterError("ctx", "cannot be nil!")
+	}
+
+	if fileLocalPath == "" {
+		return scerr.InvalidParameterError("fileLocalPath", "cannot be empty!")
+	}
+
+	if fileName == "" {
+		return scerr.InvalidParameterError("fileName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", fileLocalPath), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -291,7 +302,18 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if ctx == nil {
+		return scerr.InvalidParameterError("ctx", "cannot be nil!")
+	}
+
+	if fileLocalPath == "" {
+		return scerr.InvalidParameterError("fileLocalPath", "cannot be empty!")
+	}
+
+	if fileName == "" {
+		return scerr.InvalidParameterError("fileName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", fileLocalPath, fileName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -458,7 +480,14 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err er
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if ctx == nil {
+		return scerr.InvalidParameterError("ctx", "cannot be nil!")
+	}
+
+	if fileName == "" {
+		return scerr.InvalidParameterError("fileName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", fileName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -520,7 +549,10 @@ func (handler *DataHandler) List(
 	if handler == nil {
 		return nil, nil, nil, nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if ctx == nil {
+		return nil, nil, nil, nil, scerr.InvalidParameterError("ctx", "cannot be nil!")
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
