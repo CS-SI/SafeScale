@@ -95,7 +95,7 @@ type Cluster interface {
 	// AddNode adds a node
 	AddNode(concurrency.Task, *pb.HostDefinition) (string, error)
 	// AddNodes adds several nodes
-	AddNodes(concurrency.Task, int, *pb.HostDefinition) ([]string, error)
+	AddNodes(concurrency.Task, uint, *pb.HostDefinition) ([]string, error)
 	// DeleteLastNode deletes a node
 	DeleteLastNode(concurrency.Task, string) error
 	// DeleteSpecificNode deletes a node identified by its ID

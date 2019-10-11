@@ -664,7 +664,7 @@ func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (str
 }
 
 // AddNodes adds <count> nodes
-func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) (hosts []string, err error) {
+func (c *Controller) AddNodes(task concurrency.Task, count uint, req *pb.HostDefinition) (hosts []string, err error) {
 	if c == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -729,7 +729,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
 	var subtasks []concurrency.Task
-	for i := 0; i < count; i++ {
+	for i := uint(0); i < count; i++ {
 		subtask, err := task.StartInSubTask(c.foreman.taskCreateNode, data.Map{
 			"index":   i + 1,
 			"type":    nodeType,

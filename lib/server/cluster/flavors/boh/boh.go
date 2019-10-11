@@ -72,10 +72,10 @@ var (
 	}
 )
 
-func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
+func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (uint, uint, uint) {
 	var (
-		privateNodeCount int
-		masterNodeCount  int
+		privateNodeCount uint
+		masterNodeCount  uint
 	)
 	switch foreman.Cluster().GetIdentity(task).Complexity {
 	case Complexity.Small:
