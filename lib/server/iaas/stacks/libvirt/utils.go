@@ -34,12 +34,12 @@ type VMInfo struct {
 type VMInfoWaiterStruct struct {
 	listner     *net.Listener
 	port        int
-	chansByName map[string](chan VMInfo)
+	chansByName map[string]chan VMInfo
 	mutex       sync.Mutex
 }
 
 var vmInfoWaiter = VMInfoWaiterStruct{
-	chansByName: map[string](chan VMInfo){},
+	chansByName: map[string]chan VMInfo{},
 }
 
 // Register will register a vmCreator who wants to be notified if the listener receives information of the vm he created

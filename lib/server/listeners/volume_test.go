@@ -16,6 +16,7 @@
 package listeners_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -85,7 +86,7 @@ func TestCreate(t *testing.T) {
 	t.Skip()
 
 	// ACT
-	_, err := underTest.Create(nil, &pb.VolumeDefinition{
+	_, err := underTest.Create(context.TODO(), &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_SSD,
 	})
 	if err != nil {
@@ -94,7 +95,7 @@ func TestCreate(t *testing.T) {
 	// ASSERT
 	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, VolumeSpeed.SSD)
 
-	_, err = underTest.Create(nil, &pb.VolumeDefinition{
+	_, err = underTest.Create(context.TODO(), &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_HDD,
 	})
 	if err != nil {
@@ -102,7 +103,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, VolumeSpeed.HDD)
-	_, err = underTest.Create(nil, &pb.VolumeDefinition{
+	_, err = underTest.Create(context.TODO(), &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_COLD,
 	})
 	if err != nil {
@@ -138,7 +139,7 @@ func TestCreate_Err(t *testing.T) {
 	t.Skip()
 
 	// ACT
-	_, err := underTest.Create(nil, &pb.VolumeDefinition{
+	_, err := underTest.Create(context.TODO(), &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_SSD,
 	})
 	// ASSERT
@@ -161,7 +162,7 @@ func TestCreate_Err_NoTenantSet(t *testing.T) {
 	t.Skip()
 
 	// ACT
-	_, err := underTest.Create(nil, &pb.VolumeDefinition{
+	_, err := underTest.Create(context.TODO(), &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_SSD,
 	})
 	// ASSERT

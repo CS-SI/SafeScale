@@ -207,7 +207,7 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index uint, h
 }
 
 func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
-	data := map[string]interface{}{}
+	nodeData := map[string]interface{}{}
 
 	var script string
 	switch hostType {
@@ -216,7 +216,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, h
 	case NodeType.Node:
 		script = "dcos_install_node.sh"
 	}
-	return script, data
+	return script, nodeData
 }
 
 func configureGateway(task concurrency.Task, foreman control.Foreman) error {
@@ -247,7 +247,7 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 	if err != nil {
 		return err
 	}
-	data := data.Map{
+	gwData := data.Map{
 		"reserved_CommonRequirements": globalSystemRequirements,
 		// "BootstrapIP":                 netCfg.PrimaryGatewayPrivateIP,
 		"BootstrapIP":   netCfg.GatewayIP,
@@ -260,7 +260,7 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 		"SSHPrivateKey":  identity.Keypair.PrivateKey,
 		"SSHPublicKey":   identity.Keypair.PublicKey,
 	}
-	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", data, netCfg.GatewayID)
+	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", gwData, netCfg.GatewayID)
 	if err != nil {
 		logrus.Errorf("[gateway] configuration failed: %s", err.Error())
 		return err
