@@ -692,7 +692,7 @@ func (handler *HostHandler) Create(
 
 	// Reboot host
 	command = "sudo systemctl reboot"
-	retcode, _, stderr, err = sshHandler.Run(ctx, host.Name, command)
+	_, _, stderr, err = sshHandler.Run(ctx, host.Name, command)
 	if err != nil {
 		return nil, err
 	}
