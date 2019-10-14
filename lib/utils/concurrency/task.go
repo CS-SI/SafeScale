@@ -117,8 +117,8 @@ func NewTask(parentTask Task) (Task, error) {
 }
 
 // NewTaskWithContext ...
-func NewTaskWithContext(ctx context.Context) (Task, error) {
-	return newTask(ctx, nil)
+func NewTaskWithContext(ctx context.Context, parentTask Task) (Task, error) {
+	return newTask(ctx, parentTask)
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
@@ -153,9 +153,6 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 		doneCh:     make(chan bool, 1),
 		finishCh:   make(chan struct{}, 1),
 	}
-	close(t.abortCh)
-	close(t.doneCh)
-	close(t.finishCh)
 
 	tid, err := t.GetID()
 	if err != nil {
@@ -195,7 +192,7 @@ func (t *task) GetSignature() (string, error) {
 	return t.sig, nil
 }
 
-// Status returns the current task status
+// GetStatus returns the current task status
 func (t *task) GetStatus() (TaskStatus, error) {
 	if t == nil {
 		return 0, scerr.InvalidInstanceError()
@@ -262,7 +259,7 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 	return t, nil
 }
 
-// Start runs in goroutine the function with parameters
+// StartInSubTask runs in a subtask goroutine the function with parameters
 func (t *task) StartInSubTask(action TaskAction, params TaskParameters) (Task, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -287,7 +284,11 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 		case <-t.ctx.Done():
 			// Context cancel signal received, propagating using abort signal
 			// tracer.Trace("receiving signal from context, aborting task...")
-			t.abortCh <- true
+			t.lock.Lock()
+			t.status = ABORTED
+			t.err = scerr.AbortedError("cancel signal received", nil)
+			t.lock.Unlock()
+			finish = true
 		case <-t.doneCh:
 			// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 			// tracer.Trace("receiving done signal from go routine")
@@ -308,6 +309,7 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 	}
 
 	t.finishCh <- struct{}{}
+	close(t.finishCh)
 }
 
 // run executes the function 'action'
@@ -320,7 +322,8 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 
 			t.err = fmt.Errorf("panic happened: %v", err)
 			t.result = nil
-			t.doneCh <- true
+			t.doneCh <- false
+			close(t.doneCh)
 		}
 	}()
 
@@ -333,6 +336,7 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	t.err = err
 	t.result = result
 	t.doneCh <- true
+	close(t.doneCh)
 }
 
 // Run starts task, waits its completion then return the error code
@@ -349,7 +353,7 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error)
 	return stask.Wait()
 }
 
-// Run starts task, waits its completion then return the error code
+// RunInSubTask starts a subtask, waits its completion then return the error code
 func (t *task) RunInSubTask(action TaskAction, params TaskParameters) (TaskResult, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -384,14 +388,12 @@ func (t *task) Wait() (TaskResult, error) {
 	if status != RUNNING {
 		return nil, fmt.Errorf("cannot wait task '%s': not running (%d)", tid, status)
 	}
+
 	<-t.finishCh
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	close(t.finishCh)
-	close(t.abortCh)
-	close(t.doneCh)
 	return t.result, t.err
 }
 
@@ -457,6 +459,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	go func() {
 		result, err = t.Wait()
 		c <- struct{}{} // done
+		close(c)
 	}()
 
 	select {
@@ -505,6 +508,7 @@ func (t *task) Abort() error {
 
 		// Tell controller to stop go routine
 		t.abortCh <- true
+		close(t.abortCh)
 
 		// Tell context to cancel
 		t.cancel()
@@ -515,47 +519,11 @@ func (t *task) Abort() error {
 	return nil
 }
 
-// New creates a subtask from current task
+// NewSubTask creates a subtask from current task
 func (t *task) NewSubTask() (Task, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
 	return newTask(context.TODO(), t)
-}
-
-// Lock locks the TaskedLock
-func (t *task) taskLock(lock TaskedLock) error {
-	if t == nil {
-		return scerr.InvalidInstanceError()
-	}
-	lock.Lock(t)
-	return nil
-}
-
-// RLock locks for read the TaskedLock
-func (t *task) taskRLock(lock TaskedLock) error {
-	if t == nil {
-		return scerr.InvalidInstanceError()
-	}
-	lock.RLock(t)
-	return nil
-}
-
-// Unlock unlocks the TaskedLock
-func (t *task) taskUnlock(lock TaskedLock) error {
-	if t == nil {
-		return scerr.InvalidInstanceError()
-	}
-	lock.Unlock(t)
-	return nil
-}
-
-// RUnlock unlocks a read lock put on the TaskedLock
-func (t *task) taskRUnlock(lock TaskedLock) error {
-	if t == nil {
-		return scerr.InvalidInstanceError()
-	}
-	lock.RUnlock(t)
-	return nil
 }

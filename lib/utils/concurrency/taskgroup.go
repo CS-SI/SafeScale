@@ -52,8 +52,8 @@ func NewTaskGroup(parentTask Task) (*taskGroup, error) {
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context) (*taskGroup, error) {
-	return newTaskGroup(ctx, nil)
+func NewTaskGroupWithContext(ctx context.Context, parentTask Task) (*taskGroup, error) {
+	return newTaskGroup(ctx, parentTask)
 }
 
 func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err error) {
@@ -61,9 +61,9 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err erro
 
 	if parentTask == nil {
 		if ctx == nil {
-			t, err = NewTask(nil)
+			t, err = NewTask(parentTask)
 		} else {
-			t, err = NewTaskWithContext(ctx)
+			t, err = NewTaskWithContext(ctx, parentTask)
 		}
 	} else {
 		switch parentTask := parentTask.(type) {
