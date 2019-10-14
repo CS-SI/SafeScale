@@ -28,36 +28,36 @@ import (
 
 func quick_sleepy() error {
 	fmt.Println("Quick OK")
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * 10 * time.Millisecond)
 	return nil
 }
 
 func sleepy() error {
 	fmt.Println("Slow OK")
-	time.Sleep(1 * time.Minute)
+	time.Sleep(1 * 60 * 10 * time.Millisecond)
 	return nil
 }
 
 func sleepy_failure() error {
 	fmt.Println("Slow fail")
-	time.Sleep(1 * time.Minute)
+	time.Sleep(1 * 60 * 10 * time.Millisecond)
 	return fmt.Errorf("always fails")
 }
 
 func quick_sleepy_failure() error {
 	fmt.Println("Quick fail")
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * 10 * time.Millisecond)
 	return fmt.Errorf("always fails")
 }
 
 func complex_sleepy_failure() error {
 	fmt.Println("Quick fail")
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * 10 * time.Millisecond)
 	return scerr.NotFoundError("Not here")
 }
 
 func CreateErrorWithNConsequences(n uint) (err error) {
-	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*10*time.Millisecond)
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -71,12 +71,12 @@ func CreateSkippableError() (err error) {
 	err = WhileSuccessfulDelay1Second(func() error {
 		fmt.Println("Around the world...")
 		return AbortedError("no more", scerr.NotFoundError("wrong place"))
-	}, time.Minute)
+	}, 60*time.Millisecond)
 	return err
 }
 
 func CreateComplexErrorWithNConsequences(n uint) (err error) {
-	err = WhileUnsuccessfulDelay1Second(complex_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(complex_sleepy_failure, time.Duration(5)*10*time.Millisecond)
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -110,7 +110,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (err error) {
 		}
 	}()
 
-	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*10*time.Millisecond)
 	return err
 }
 
@@ -124,7 +124,7 @@ func CreateWrappedDeferredErrorWithNConsequences(n uint) (err error) {
 		}
 	}()
 
-	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*10*time.Millisecond)
 	return err
 }
 
@@ -278,15 +278,15 @@ func TestWhileUnsuccessfulDelay5Seconds(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false},
-		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true},
-		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false},
-		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true},
+		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * 10 * time.Millisecond}, false},
+		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * 10 * time.Millisecond}, true},
+		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * 10 * time.Millisecond}, false},
+		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * 10 * time.Millisecond}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := WhileUnsuccessfulDelay5Seconds(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
-				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v, wantErr %v", err, tt.wantErr)
+			if err := WhileUnsuccessfulDelay50ms(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+				t.Errorf("WhileUnsuccessfulDelay50ms() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -303,31 +303,39 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		wantErr   bool
 		wantTOErr bool
 	}{
-		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false, true},
-		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true, true},
-		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false, false},
-		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true, true},
+		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * 10 * time.Millisecond}, false, true},
+		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * 10 * time.Millisecond}, true, true},
+		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * 10 * time.Millisecond}, false, false},
+		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * 10 * time.Millisecond}, true, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testStart := time.Now()
 			var err error
-			if err = WhileUnsuccessfulDelay5Seconds(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
-				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v, wantErr %v", err, tt.wantErr)
+			if err = WhileUnsuccessfulDelay50ms(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+				t.Errorf("WhileUnsuccessfulDelay50ms() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(ErrTimeout); !ok {
+					if _, ok := err.(*ErrTimeout); !ok {
 						t.Errorf("Timeout error not received...")
 					}
 				}
 			}
 			delta := time.Since(testStart)
 			if delta.Seconds() >= tt.args.timeout.Seconds()+2 && !tt.wantTOErr {
-				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
+				t.Errorf("WhileUnsuccessfulDelay50ms() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
 			}
 		})
 	}
+}
+
+func WhileUnsuccessfulDelay50msSecondsTimeout(run func() error, timeout time.Duration) error {
+	return WhileUnsuccessfulTimeout(run, 50*time.Millisecond, timeout)
+}
+
+func WhileUnsuccessfulDelay50ms(run func() error, timeout time.Duration) error {
+	return WhileUnsuccessful(run, 50*time.Millisecond, timeout)
 }
 
 func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
@@ -341,28 +349,28 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 		wantErr   bool
 		wantTOErr bool
 	}{
-		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, true, false},
-		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true, false},
-		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false, false},
-		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true, false},
+		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * 10 * time.Millisecond}, true, false},
+		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * 10 * time.Millisecond}, true, false},
+		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * 10 * time.Millisecond}, false, false},
+		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * 10 * time.Millisecond}, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testStart := time.Now()
 			var err error
-			if err = WhileUnsuccessfulDelay5SecondsTimeout(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
-				t.Errorf("WhileUnsuccessfulDelay5SecondsTimeout() error = %v, wantErr %v", err, tt.wantErr)
+			if err = WhileUnsuccessfulDelay50msSecondsTimeout(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+				t.Errorf("WhileUnsuccessfulDelay50msSecondsTimeout() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(ErrTimeout); !ok {
+					if _, ok := err.(*ErrTimeout); !ok {
 						t.Errorf("Timeout error not received...")
 					}
 				}
 			}
 			delta := time.Since(testStart)
 			if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 { // 0.5 seconds tolerance
-				t.Errorf("WhileUnsuccessfulDelay5SecondsTimeout() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
+				t.Errorf("WhileUnsuccessfulDelay50msSecondsTimeout() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
 			}
 		})
 	}
@@ -373,7 +381,7 @@ func genErr() error {
 }
 
 func genTimeout() error {
-	return TimeoutError(time.Second, fmt.Errorf("too late..."))
+	return TimeoutError(10*time.Millisecond, fmt.Errorf("too late..."))
 }
 
 func genLimit() error {
