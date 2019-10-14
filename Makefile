@@ -139,7 +139,7 @@ clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd cli && $(MAKE) $(@))
 	@(cd lib && $(MAKE) $(@))
-	# @(git clean -xdf -e .idea -e vendor -e .vscode || true)
+	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
@@ -154,7 +154,7 @@ godocs:
 
 convey:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running goconvey in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd lib && goconvey -port 8082 &)
+	@(cd lib/utils && goconvey -port 8082 &)
 
 devdeps:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dev dependencies, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
