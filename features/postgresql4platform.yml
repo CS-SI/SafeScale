@@ -1,0 +1,462 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: yes
+
+    parameters:
+        - PurgeOnRemoval=no
+
+    install:
+        bash:
+            check:
+                pace: docker
+                steps:
+                    docker:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfDoesDockerRunStack postgresql4platform || exit 192
+                            exit 0
+
+            add:
+                pace: config,image,secret,stack,start
+                steps:
+                    config:
+                        timeout: 10
+                        targets:
+                            masters: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/postgresql4platform ${SF_VARDIR}/postgresql4platform
+
+                            cat >${SF_ETCDIR}/postgresql4platform/postgresql.conf <<-EOF
+                            listen_addresses = '*'
+                            max_connections = 500
+                            data_directory = '/var/lib/postgresql/data'
+                            synchronous_commit = on
+                            shared_buffers = 128MB
+                            timezone = 'UTC'
+                            log_timezone = 'UTC'
+                            autovacuum = on
+                            track_counts = on
+                            # password_encryption = scram-sha-256
+                            password_encryption = md5
+
+                            wal_level = replica
+                            max_wal_senders = 10
+                            max_replication_slots = 9
+                            host_standy = on
+                            archive_mode = on
+                            archive_command = "/bin/true"
+
+                            # Locale
+                            lc_messages = 'en_US.UTF-8'
+                            lc_monetary = 'en_US.UTF-8'
+                            lc_numeric = 'en_US.UTF-8'
+                            lc_time = 'en_US.UTF-8'
+                            default_text_search_config = 'pg_catalog.english'
+
+                            shared_preload_libraries='repmgr'
+
+                            include_dir = '/etc/postgres/options'
+                            EOF
+
+                            GWBRIDGE_SUBNET=$(docker network inspect docker_gwbridge | jq -r .[0].IPAM.Config[0].Subnet)
+                            cat >${SF_ETCDIR}/postgresql4platform/pg_hba.conf <<-HBAEOF
+                            # TYPE  DATABASE        USER            ADDRESS             METHOD
+                            local   all             all                                 trust
+                            host    all             all             127.0.0.0/8         trust
+                            host    all             all             ${GWBRIDGE_SUBNET}  md5 # scram-sha-256
+                            host    all             all             {{.CIDR}}           md5 # scram-sha-256
+
+                            local   replication     repmgr                              trust
+                            host    replication     repmgr          127.0.0.0/8         trust
+                            host    replication     repmgr          {{.CIDR}}           md5
+
+                            local   repmgr          repmgr                              trust
+                            host    repmgr          repmgr          127.0.0.0/8         trust
+                            host    repmgr          repmgr          {{.CIDR}}           md5
+                            HBAEOF
+
+                            HOSTNAME={{.Hostname}}
+                            NODE_ID=${HOSTNAME##*-}
+                            cat >${SF_ETCDIR}/postgresql4platform/repmgr.conf <<-EOF
+                            node_id=$NODE_ID
+                            node_name=$HOSTNAME
+                            conninfo=host='{{ .HostIP }}'' port=63008 user=repmgr dbname=repmgr connect_timeout=2'
+                            data_directory=/var/lib/postgresql/data
+
+                            log_file=/var/log/repmgr.log
+                            log_level=INFO
+                            log_facility=STDERR
+                            log_status_interval=300
+
+                            pg_bindir=/usr/lib/postgresql/bin
+                            use_replication_slots=true
+                            failover=automatic
+                            reconnect_attempts=3
+                            promote_command='repmgr  -f /etc/postgres/repmgr.conf standby promote'
+                            follow_command='repmgr  -f /etc/postgres/repmgr.conf standby follow --upstream-node-id=%n'
+                            service_start_command='pg_ctl -D /var/lib/postgresql/data start'
+                            service_stop_command='pg_ctl -D /var/lib/postgresql/data stop -m fast'
+                            service_restart_command='pg_ctl -D /var/lib/postgresql/data restart -m fast'
+                            service_reload_command='pg_ctl -D /var/lib/postgresql/data reload'
+                            monitoring_history=yes
+                            repmgrd_pid_file=/var/run/repmgrd.pid
+                            EOF
+                            exit 0
+
+                    image:
+                        targets:
+                            masters: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/postgresql4platform/build
+
+                            cat >${SF_ETCDIR}/postgresql4platform/build/my-entry-point.sh <<-EOF
+                            #!/bin/bash
+
+                            PGSQL_DATA=/var/lib/postgresql/data
+
+                            update_postgresql_conf() {
+                                rm -f \${PGSQL_DATA}/postgresql.conf
+                                ln -sf /etc/postgres/postgresql.conf \${PGSQL_DATA}
+                            }
+
+                            update_pghba_conf() {
+                                rm -f \${PGSQL_DATA}/pg_hba.conf
+                                ln -sf /etc/postgres/pg_hba.conf \${PGSQL_DATA}
+                            }
+
+                            wait_for_postgres() {
+                                local timeout=\$1
+                                [ ! -n \$timeout ] && timeout=60
+                                timeout \$timeout bash -c "while ! psql -c 'select 1' >/dev/null; do sleep 5; done"
+                            }
+
+                            wait_for_dbmaster() {
+                                local timeout=\$1
+                                [ ! -n \$timeout ] && timeout=60
+                                timeout \$timeout bash -c "while ! psql -h \$REPMGR_PRIMARY_HOST -c 'select 1' >/dev/null; do sleep 5; done"
+                            }
+
+                            if [ ! -f \${PGSQL_DATA}/PG_VERSION ]; then
+                                mkdir -p \${PGSQL_DATA}
+                                rm -rf \${PGSQL_DATA}/*
+                                initdb -D \${PGSQL_DATA} --nodename {{.Hostname}} --auth=md5 --username=postgres --pwfile=/run/secrets/safescale.postgresql.passwords.postgres
+                            fi
+
+                            POSTGRES_PASSWORD=\$(cat /run/secrets/safescale.postgresql.passwords.postgres)
+                            REPMGR_PASSWORD=\$(cat /run/secrets/safescale.postgresql.passwords.repmgr)
+                            # set postgres password
+                            cat >\$HOME/.pgpass <<-EOF2
+                            *:5432:*:postgres:\$POSTGRES_PASSWORD
+                            *:5432:*:repmgr:\$REPMGR_PASSWORD
+                            EOF2
+                            chmod 0600 \$HOME/.pgpass
+                            chown postgres:postgres \$HOME/.pgpass
+
+                            # initialize cluster topology
+                            update_postgresql_conf
+                            update_pghba_conf
+                            pg_ctl -h localhost -D \${PGSQL_DATA} start &>/dev/stdout &
+                            # pid=\$!
+                            # if [ -n \$pid ]; then
+                                wait_for_postgres 60
+
+                                # Define cluster topology
+                                cat <<-SQLEOF | psql
+                            CREATE ROLE repmgr WITH PASSWORD '\$REPMGR_PASSWORD';
+                            ALTER ROLE repmgr LOGIN;
+                            ALTER ROLE repmgr REPLICATION;
+                            ALTER ROLE repmgr SUPERUSER;
+
+                            CREATE DATABASE repmgr OWNER repmgr;
+                            SQLEOF
+
+                                # Configure repmgr
+                                nodeid=\$(grep node_id /etc/postgresql/repmgr.conf | cut -d= -f2)
+                                if [ "\$nodeid" = "1" ]; then
+                                    configured=\$(psql -qAt -U repmgr repmgr -c "SELECT 1 FROM pg_tables WHERE tablename='nodes'")
+                                    if [ "\$configured" != "1" ]; then
+                                        repmgr -f /etc/postgresql/repmgr.conf primary register
+                                    fi
+                                else
+                                    wait_for_dbmaster 60
+
+                                    registered=\$(psql -qAt -h "\$REPMGR_PRIMARY_HOST" -U repmgr repmgr -c "SELECT 1 FROM repmgr.nodes WHERE node_id=\${nodeid}")
+                                    if [ "\$registered" != "1" && \$nodeid -ne 1 ]; then
+                                        pg_ctl -D "\$PGSQL_DATA" stop -m fast
+                                        rm -Rf "\$PGSQL_DATA/*"
+                                        repmgr -f /etc/postgresql/repmgr.conf -h "\$REPMGR_PRIMARY_HOST" -U repmgr -d repmgr standby clone --fast-checkpoint
+                                        update_postgresql_conf
+                                        update_pghba_conf
+                                        pg_ctl -D "\$PGSQL_DATA" start &
+                                        wait_for_postgres
+                                        repmgr -f /etc/postgresql/repmgr.conf -h "\$REPMGR_PRIMARY_HOST" -U repmgr -d repmgr standby register
+                                fi
+
+                                pg_ctl -D \${PGSQL_DATA stop -m fast
+                                rm -f \${PGSQL_DATA}/postmaster.pid /tmp/.s.PGSQL.5432
+                                # sleep 10
+                            # fi
+
+                            if [ "\$1" = "postgres" ]; then
+                                /docker-entry-point.sh "\$@" &>/dev/stdout &
+                                sleep 2
+                                exec repmgrd --verbose
+                            else
+                                exec /docker-entry-point.sh "\$@"
+                            fi
+                            EOF
+
+                            cat >${SF_ETCDIR}/postgresql4platform/build/Dockerfile <<-EOF
+                            FROM postgresql:11-alpine
+
+                            RUN apk update \
+                             && apk add --no-cache repmgr tini
+
+                            COPY ./my-entry-point.sh /
+                            ENTRYPOINT ["/sbin/tini", "--", "/my-entry-point.sh"]
+                            CMD ["postgres"]
+                            EOF
+
+                            docker build --network host -t postgresql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/Dockerfile || exit 192
+                            exit 0
+
+                    stack:
+                        targets:
+                            masters: all
+                        run: |
+                            cat >${SF_ETCDIR}/postgresql4platform/stack.yml <<-EOF
+                            version: '3.7'
+
+                            secrets:
+                                safescale.postgresql.passwords.postgres:
+                                    external: true
+                                safescale.postgresql.passwords.repmgr:
+                                    external: true
+
+                            networks:
+                                net:
+                                    driver: overlay
+                                    attachable: true
+
+                            services:
+                            EOF
+
+                            MASTERS="{{ range .MasterNames }}{{.}},{{end}}"
+                            MASTER_NAMES=${MASTERS%,}
+                            DBSLAVES=${MASTER_NAMES#*,}
+                            DBMASTER=${MASTER_NAMES%%,*}
+                            echo MASTERS=$MASTERS
+                            echo MASTER_NAMES=$MASTER_NAMES
+                            echo DBSLAVES=$DBSLAVES
+                            echo DBMASTER=$DBMASTER
+
+                            cat >>${SF_ETCDIR}/postgresql4platform/stack.yml <<-EOF
+                                master:
+                                    image: postgresql4platform:latest
+                                    environment:
+                                        # - POSTGRES_DB=postgres
+                                        # - POSTGRES_USER=postgres
+                                        - POSTGRES_PASSWORD_FILE=/run/secrets/safescale.postgresql.passwords.postgres
+                                        - REPMGR_PRIMARY_HOST=${DBMASTER}
+                                        - REPMGR_PARTNER_NODES=${MASTERS}
+                                        - REPMGR_NODE_NAME=${DBMASTER}
+                                        - REPMGR_NODE_NETWORK_NAME=postgresql4platform_master
+                                    volumes:
+                                        - ${SF_VARDIR}/postgresql4platform:/var/lib/postgresql/data
+                                    networks:
+                                        - net
+                                    healthcheck:
+                                        test: ["CMD", "pg_isready", "-U", "postgres"]
+                                        interval: 10s
+                                        timeout: 5s
+                                        retries: 5
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.labels.safescale.host.role == master
+                                                - node.hostname == ${DBMASTER}
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+                                    secrets:
+                                        - safescale.postgresql.passwords.postgres
+                                        - safescale.postgresql.passwords.repmgr
+                            EOF
+
+                            if [ ! -z "$DBSLAVES" ]; then
+                                while IFS="," read i; do
+                                    echo i=$i
+                                    INDEX=${i##*-}
+                                    echo INDEX=$INDEX
+                                    cat >>${S_ETCDIR}/postgresql4platform/stack.yml <<-EOF
+
+                                slave-${INDEX}:
+                                    image: postgresql4platform:latest
+                                    environment:
+                                        - REPMGR_PRIMARY_HOST=${DBMASTER}
+                                        - REPMGR_PARTNER_NODES=${MASTERS}
+                                        - REPMGR_NODE_NAME=${i}
+                                        - REPMGR_NODE_NETWORK_NAME=postgresql4platform_slave-${INDEX}
+                                    volumes:
+                                        - ${SF_VARDIR}/postgresql4platform:/var/lib/postgresql/data
+                                    networks:
+                                        - net
+                                    healthcheck:
+                                        test: ["CMD", "pg_isready", "-U", "postgres"]
+                                        interval: 10s
+                                        timeout: 5s
+                                        retries: 5
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.labels.safescale.host.role == master
+                                                - node.hostname != ${DBMASTER}
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+                                    secrets:
+                                        - safescale.postgresql.passwords.postgres
+                                        - safescale.postgresql.passwords.repmgr
+
+                            EOF
+                                done <<< "$DBSLAVES"
+                            fi
+
+                            # cat >>$SF_ETCDIR}/postgresql4platform/stack.yml <<-EOF
+                            #     pooler:
+                            #         image: postgresql4platform:latest
+                            #         environment:
+                            #             # - POSTGRES_DB=postgres
+                            #             # - POSTGRES_USER=postgres
+                            #             - POSTGRES_PASSWORD_FILE=/run/secrets/safescale.postgresql.passwords.postgres
+                            #         networks:
+                            #             - net
+                            #         ports:
+                            #             - published: 63008
+                            #               target: 5432
+                            #               mode: host
+                            #         healthcheck:
+                            #             test: ["CMD", "pg_isready", "-U", "postgres"]
+                            #             interval: 10s
+                            #             timeout: 5s
+                            #             retries: 5
+                            #         deploy:
+                            #             mode: global
+                            #             placement:
+                            #                 constraints:
+                            #                     - node.labels.safescale.host.role == master
+                            #             restart_policy:
+                            #                 condition: on-failure
+                            #                 delay: 5s
+                            #                 max_attempts: 3
+                            #                 window: 120s
+                            #             resources:
+                            #                 limits:
+                            #                     memory: 128M
+                            #                 reservations:
+                            #                     memory: 64M
+                            # EOF
+                            chmod go-rwx ${SF_ETCDIR}/postgresql4platform/stack.yml
+                            exit 0
+
+
+                    # network:
+                    #     targets:
+                    #         hosts: no
+                    #         gateways: any
+                    #         masters: no
+                    #         nodes: no
+                    #     run: |
+                    #         # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
+                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
+                    #         # fi
+                    #         if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
+                    #             docker network create --attachable -d bridge safescale-gw || exit 193
+                    #         fi
+                    #         exit 0
+
+                    secret:
+                        targets:
+                            masters: any
+                        run: |
+                            if docker secret inspect safescale.postgresql.passwords.postgres &>/dev/null; then
+                                docker secret rm safescale.postgresql.passwords.postgres || exit 192
+                            fi
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.passwords.postgres - || exit 193
+                            if docker secret inspect safescale.postgresql.passwords.repmgr &>/dev/null; then
+                                docker secret rm safescale.postgresql.passwords.repmgr || exit 194
+                            fi
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.passwords.repmgr - || exit 195
+                            exit 0
+
+                    start:
+                        targets:
+                            masters: any
+                        run: |
+                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || exit 196
+                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || exit 197
+                            exit 0
+
+            remove:
+                pace: stack,cleanup
+                steps:
+                    stack:
+                        targets:
+                            masters: any
+                        run: |
+                            if [ -f ${SF_ETCDIR}/postgresql4platform/stack.yml ]; then
+                                docker stack rm postgresql4platform || exit 192
+                            fi
+                            exit 0
+
+                    cleanup:
+                        targets:
+                            masters: any
+                        run: |
+                            docker image rm -f postgres:11-alpine || true
+                            docker secret rm safescale.postgresql.passwords.postgres safescale.postgresql.passwords.repmgr || true
+                            PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
+                            if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then
+                                rm -rf ${SF_ETCDIR}/postgresql4platform ${SF_VARDIR}/postgresql4platform
+                            fi
+                            exit 0
+
+...
