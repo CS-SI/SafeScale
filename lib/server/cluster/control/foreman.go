@@ -2176,12 +2176,24 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	b.cluster.RLock(task)
-	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
-		return nil
-	})
-	b.cluster.RUnlock(task)
+	err = func() error {
+		inErr := b.cluster.RLock(task)
+		if inErr != nil {
+			return inErr
+		}
+
+		inErr = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+			_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
+			return nil
+		})
+
+		inErr = b.cluster.RUnlock(task)
+		if inErr != nil {
+			return inErr
+		}
+
+		return inErr
+	}()
 	if err != nil {
 		return err
 	}
@@ -2223,12 +2235,12 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	b.cluster.RLock(task)
+	_ = b.cluster.RLock(task)
 	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
-	b.cluster.RUnlock(task)
+	_ = b.cluster.RUnlock(task)
 	if err != nil {
 		return err
 	}
@@ -2295,7 +2307,7 @@ func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType Nod
 	var index int
 
 	// Locks for write the manager extension...
-	b.cluster.Lock(task)
+	_ = b.cluster.Lock(task)
 	outerErr := b.cluster.GetProperties(task).LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes)
 		switch nodeType {
@@ -2308,7 +2320,7 @@ func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType Nod
 		}
 		return nil
 	})
-	b.cluster.Unlock(task)
+	_ = b.cluster.Unlock(task)
 	if outerErr != nil {
 		return "", outerErr
 	}
