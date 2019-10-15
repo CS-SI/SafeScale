@@ -423,7 +423,7 @@ feature:
                             [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master-
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" = "true" ]; then
-                                sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || exit 222
+                                sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/aio/deploy/recommended/kubernetes-dashboard.yaml || exit 222
                             fi
 
                             # cat <<EOF | kubectl apply -f -
