@@ -229,7 +229,7 @@ feature:
                             EOF
 
                             cat >${SF_ETCDIR}/postgresql4platform/build/Dockerfile <<-EOF
-                            FROM postgresql:11-alpine
+                            FROM postgres:11-alpine
 
                             RUN apk update \
                              && apk add --no-cache repmgr tini
@@ -239,7 +239,7 @@ feature:
                             CMD ["postgres"]
                             EOF
 
-                            docker build --network host -t postgresql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/Dockerfile || exit 192
+                            docker build --network host -t postgresql4platform:latest ${SF_ETCDIR}/postgresql4platform/build || exit 192
                             exit 0
 
                     stack:
@@ -418,21 +418,21 @@ feature:
                             masters: any
                         run: |
                             if docker secret inspect safescale.postgresql.passwords.postgres &>/dev/null; then
-                                docker secret rm safescale.postgresql.passwords.postgres || exit 192
+                                docker secret rm safescale.postgresql.passwords.postgres || exit 193
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.passwords.postgres - || exit 193
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.passwords.postgres - || exit 194
                             if docker secret inspect safescale.postgresql.passwords.repmgr &>/dev/null; then
-                                docker secret rm safescale.postgresql.passwords.repmgr || exit 194
+                                docker secret rm safescale.postgresql.passwords.repmgr || exit 195
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.passwords.repmgr - || exit 195
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.passwords.repmgr - || exit 196
                             exit 0
 
                     start:
                         targets:
                             masters: any
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || exit 196
-                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || exit 197
+                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || exit 197
+                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || exit 1978
                             exit 0
 
             remove:
