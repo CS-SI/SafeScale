@@ -521,15 +521,15 @@ func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) 
 
 	select {
 	case issues := <-doneCh:
+		if !issues {
+			log.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display())
+		}
 		if err != nil {
 			msgError, retCode, erro := ExtractRetCode(err)
 			if erro != nil {
 				return 0, "", "", err
 			}
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
-		}
-		if !issues {
-			log.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display())
 		}
 	case <-time.After(timeout):
 		errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())

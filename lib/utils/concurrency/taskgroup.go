@@ -262,6 +262,7 @@ func (tg *taskGroup) WaitForGroup(duration time.Duration) (bool, map[string]Task
 	go func() {
 		results, err = tg.WaitGroup()
 		c <- struct{}{} // done
+		close(c)
 	}()
 
 	select {

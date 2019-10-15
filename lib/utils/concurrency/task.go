@@ -170,8 +170,11 @@ func (t *task) GetID() (string, error) {
 		return "", scerr.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	if t.id == "" { // we need the lock only when changing data
+		t.lock.Lock()
+		defer t.lock.Unlock()
+	}
+
 	if t.id == "" {
 		u, err := uuid.NewV4()
 		if err != nil {
@@ -285,25 +288,25 @@ func (t *task) controller(action TaskAction, params TaskParameters) {
 			// Context cancel signal received, propagating using abort signal
 			// tracer.Trace("receiving signal from context, aborting task...")
 			t.lock.Lock()
+			defer t.lock.Unlock()
 			t.status = ABORTED
 			t.err = scerr.AbortedError("cancel signal received", nil)
-			t.lock.Unlock()
 			finish = true
 		case <-t.doneCh:
 			// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 			// tracer.Trace("receiving done signal from go routine")
 			t.lock.Lock()
+			defer t.lock.Unlock()
 			t.status = DONE
-			t.lock.Unlock()
 			finish = true
 			break
 		case <-t.abortCh:
 			// Abort signal received
 			// tracer.Trace("receiving abort signal")
 			t.lock.Lock()
+			defer t.lock.Unlock()
 			t.status = ABORTED
 			t.err = scerr.AbortedError("", nil)
-			t.lock.Unlock()
 			finish = true
 		}
 	}

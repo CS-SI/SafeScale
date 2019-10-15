@@ -70,8 +70,10 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 	if d.witness == nil {
 		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
 	}
-	d.lock.RLock(task)
-	defer d.lock.RUnlock(task)
+	_ = d.lock.RLock(task)
+	defer func() {
+		_ = d.lock.RUnlock(task)
+	}()
 
 	return inspector(d.witness.Clone())
 }
@@ -108,8 +110,10 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) error {
 		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
 	}
 
-	d.lock.Lock(task)
-	defer d.lock.Unlock(task)
+	_ = d.lock.Lock(task)
+	defer func() {
+		_ = d.lock.Unlock(task)
+	}()
 
 	clone := d.witness.Clone()
 	err := alterer(clone)
