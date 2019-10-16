@@ -297,12 +297,24 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 func normalizeScript(params map[string]interface{}) (string, error) {
 	var err error
 
-	if featureScriptTemplate == nil {
-		// parse then execute the template
-		tmpl := fmt.Sprintf(featureScriptTemplateContent, srvutils.LogFolder, srvutils.LogFolder)
-		featureScriptTemplate, err = template.New("normalize_script").Parse(tmpl)
-		if err != nil {
-			return "", fmt.Errorf("error parsing bash template: %s", err.Error())
+	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
+		featureScriptTemplateContentEnhanced := strings.Replace(featureScriptTemplateContent, "set -u -o pipefail", "set -Eeuxo pipefail", 1)
+		if featureScriptTemplate == nil {
+			// parse then execute the template
+			tmpl := fmt.Sprintf(featureScriptTemplateContentEnhanced, srvutils.LogFolder, srvutils.LogFolder)
+			featureScriptTemplate, err = template.New("normalize_script").Parse(tmpl)
+			if err != nil {
+				return "", fmt.Errorf("error parsing bash template: %s", err.Error())
+			}
+		}
+	} else {
+		if featureScriptTemplate == nil {
+			// parse then execute the template
+			tmpl := fmt.Sprintf(featureScriptTemplateContent, srvutils.LogFolder, srvutils.LogFolder)
+			featureScriptTemplate, err = template.New("normalize_script").Parse(tmpl)
+			if err != nil {
+				return "", fmt.Errorf("error parsing bash template: %s", err.Error())
+			}
 		}
 	}
 

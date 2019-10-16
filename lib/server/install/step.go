@@ -419,11 +419,10 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 		return stepResult{err: err}, nil
 	}
 
-	//command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s %s/options.json; fi; exit $rc", filename, filename, srvutils.TempFolder)
-	if !hidesOutput { // FIXME Recover information after hidesOutput
+	if !hidesOutput {
 		command = fmt.Sprintf("sudo bash %s;exit ${PIPESTATUS}", filename)
 	} else {
-		command = fmt.Sprintf("sudo BASH_XTRACEFD=7 bash %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", filename)
+		command = fmt.Sprintf("sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`\"", filename)
 	}
 
 	// Executes the script on the remote host
