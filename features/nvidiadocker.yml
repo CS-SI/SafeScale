@@ -36,10 +36,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep docker-nvidia2 &>/dev/null
+                                    dpkg -l | grep docker-nvidia2 &>/dev/null || exit 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep docker-nvidia2 &>/dev/null
+                                    rpm -qa | grep docker-nvidia2 &>/dev/null || exit 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
