@@ -143,13 +143,27 @@ func (b *foreman) ExecuteScript(
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
-	path, err := uploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
+	script, path, err := realizeTemplate(box, funcMap, tmplName, data, tmplName)
 	if err != nil {
 		return 0, "", "", err
 	}
 
-	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
-	cmd := fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
+	hidesOutput := strings.Contains(script, "set +x")
+	if hidesOutput {
+		if strings.Contains(script, "exec 2>&1\n") {
+			script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
+		}
+	}
+
+	err = uploadScriptToFileInHost(script, hostID, path)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	cmd := fmt.Sprintf("sudo bash %s;exit ${PIPESTATUS}", path)
+	if hidesOutput {
+		cmd = fmt.Sprintf("sudo BASH_XTRACEFD=7 bash %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", path)
+	}
 
 	return client.New().SSH.Run(hostID, cmd, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 }
@@ -911,40 +925,45 @@ func (b *foreman) getSwarmJoinCommand(task concurrency.Task, selectedMaster *pb.
 }
 
 // uploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
-func uploadTemplateToFile(
+func realizeTemplate(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
-	hostID string, fileName string,
-) (string, error) {
+	fileName string,
+) (string, string, error) {
 
 	if box == nil {
-		return "", scerr.InvalidParameterError("box", "cannot be nil!")
+		return "", "", scerr.InvalidParameterError("box", "cannot be nil!")
 	}
-	host, err := client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
-	if err != nil {
-		return "", fmt.Errorf("failed to get host information: %s", err)
-	}
-
 	tmplString, err := box.String(tmplName)
 	if err != nil {
-		return "", fmt.Errorf("failed to load template: %s", err.Error())
+		return "", "", fmt.Errorf("failed to load template: %s", err.Error())
 	}
 	tmplCmd, err := txttmpl.New(fileName).Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %s", err.Error())
+		return "", "", fmt.Errorf("failed to parse template: %s", err.Error())
 	}
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Execute(dataBuffer, data)
 	if err != nil {
-		return "", fmt.Errorf("failed to realize template: %s", err.Error())
+		return "", "", fmt.Errorf("failed to realize template: %s", err.Error())
 	}
 	cmd := dataBuffer.String()
 	remotePath := srvutils.TempFolder + "/" + fileName
 
-	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
+	return cmd, remotePath, nil
+}
+
+func uploadScriptToFileInHost(script string, hostID string, fileName string) error {
+	host, err := client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to get host information: %s", err)
 	}
-	return remotePath, nil
+
+	err = install.UploadStringToRemoteFile(script, host, fileName, "", "", "")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // configureNodesFromList configures nodes from a list
@@ -1253,8 +1272,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 			path, err = exec.LookPath("safescale")
 			if err != nil {
 				msg := "failed to find local binary 'safescale', make sure its path is in environment variable PATH"
-				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fmt.Errorf(utils.Capitalize(msg))
 			}
 		}
 		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescale", "root", "root", "0755")
@@ -1272,13 +1290,11 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 			path, err = exec.LookPath("safescaled")
 			if err != nil {
 				msg := "failed to find local binary 'safescaled', make sure its path is in environment variable PATH"
-				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fmt.Errorf(utils.Capitalize(msg))
 			}
 		}
 		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescaled", "root", "root", "0755")
 		if err != nil {
-			logrus.Errorf("failed to upload 'safescaled' binary")
 			return fmt.Errorf("failed to upload 'safescaled' binary': %s", err.Error())
 		}
 
@@ -1290,8 +1306,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 			retcode, stdout, stderr, err := client.New().SSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, 2*temporal.GetLongOperationTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error())
-				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fmt.Errorf(utils.Capitalize(msg))
 			}
 			if retcode != 0 {
 				output := stdout
@@ -1301,8 +1316,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 					output = stderr
 				}
 				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, output)
-				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fmt.Errorf(utils.Capitalize(msg))
 			}
 		}
 	}
@@ -1324,15 +1338,49 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["EndpointIP"] = netCfg.EndpointIP
 
-	retcode, _, _, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
+	retcode, stdout, stderr, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
 	if err != nil {
 		return err
 	}
+
 	if retcode != 0 {
-		return fmt.Errorf("[%s] system requirements installation failed: retcode=%d", hostLabel, retcode)
+		return handleExecuteScriptReturn(retcode, stdout, stderr, err, fmt.Sprintf("[%s] system requirements installation failed", hostLabel))
 	}
 
 	logrus.Debugf("[%s] system requirements installation successful.", hostLabel)
+	return nil
+}
+
+func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
+	if retcode == 0 {
+		return nil
+	}
+
+	collected := []string{}
+	if stdout != "" {
+		errLines := strings.Split(stdout, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred in line") {
+				collected = append(collected, errline)
+			}
+		}
+	}
+	if stderr != "" {
+		errLines := strings.Split(stderr, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred in line") {
+				collected = append(collected, errline)
+			}
+		}
+	}
+
+	if len(collected) > 0 {
+		if err != nil {
+			return scerr.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
+		}
+		return fmt.Errorf("%s: std error [%s]", msg, strings.Join(collected, ";"))
+	}
+
 	return nil
 }
 

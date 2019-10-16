@@ -100,6 +100,13 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 	content := buffer.String()
 
+	hidesOutput := strings.Contains(content, "set +x")
+	if hidesOutput {
+		if strings.Contains(content, "exec 2>&1\n") {
+			content = strings.Replace(content, "exec 2>&1\n", "exec 2>&7\n", 1)
+		}
+	}
+
 	// Copy script to remote host with retries if needed
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
@@ -156,8 +163,11 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		retcode             int
 	)
 
-	// cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; if [[ rc -eq 0 ]]; then rm -f %s; fi; exit $rc", filename, filename, filename)
-	cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; exit $rc", filename, filename)
+	if !hidesOutput {
+		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s;exit ${PIPESTATUS}", filename, filename)
+	} else {
+		cmd = fmt.Sprintf("chmod u+rwx %s; export BASH_XTRACEFD=7; bash -c %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
+	}
 
 	retryErr = retry.Action(
 		func() error {
@@ -213,11 +223,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	if err != nil {
-		log.Debugf("Standard output: [%s]", stdout)
-		log.Debugf("Standard error: [%s]", stderr)
+	// FIXME Simplification of error message
 
-		// TODO Simplification of error message
+	if err != nil {
 		collected := ""
 		errLines := strings.Split(stderr, "\n")
 		for _, errline := range errLines {

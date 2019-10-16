@@ -121,7 +121,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 		fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
 	)()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(tracer.TraceMessage("creation of infrastructure of cluster:"), &err)()
 
 	_ = c.Lock(task)
 
@@ -138,7 +138,9 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 
 	c.foreman = f.(*foreman)
 	_ = c.Unlock(task)
-	return c.foreman.construct(task, req)
+
+	err = c.foreman.construct(task, req)
+	return err
 }
 
 // GetService returns the service from the provider

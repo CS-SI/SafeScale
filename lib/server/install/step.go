@@ -42,9 +42,10 @@ const (
 )
 
 type stepResult struct {
-	completed bool  // if true, the script has been run to completion
+	completed bool // if true, the script has been run to completion
+	output    string
 	success   bool  // if true, the script has been run successfully and the result is a success
-	err       error // if an error occured, contains the err
+	err       error // if an error occurred, contains the err
 }
 
 func (sr stepResult) Successful() bool {
@@ -404,6 +405,13 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 		}
 	}
 
+	hidesOutput := strings.Contains(command, "set +x")
+	if hidesOutput {
+		if strings.Contains(command, "exec 2>&1\n") {
+			command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
+		}
+	}
+
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
@@ -412,17 +420,21 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	//command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s %s/options.json; fi; exit $rc", filename, filename, srvutils.TempFolder)
-	command = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
+	if !hidesOutput { // FIXME Recover information after hidesOutput
+		command = fmt.Sprintf("sudo bash %s;exit ${PIPESTATUS}", filename)
+	} else {
+		command = fmt.Sprintf("sudo BASH_XTRACEFD=7 bash %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", filename)
+	}
 
 	// Executes the script on the remote host
-	retcode, _, _, err := client.New().SSH.Run(host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, err := client.New().SSH.Run(host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
-		return stepResult{err: err}, nil
+		return stepResult{err: err, output: outrun}, nil
 	}
 	err = nil
 	ok = retcode == 0
 	if !ok {
 		err = fmt.Errorf("failure: retcode=%d", retcode)
 	}
-	return stepResult{success: ok, completed: true, err: err}, nil
+	return stepResult{success: ok, completed: true, err: err, output: outrun}, nil
 }

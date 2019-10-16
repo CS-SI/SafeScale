@@ -207,3 +207,31 @@ func TestKeepErrorType(t *testing.T) {
 		t.Errorf("Error type was lost in translation !!: %T", cae)
 	}
 }
+
+func getNotFoundErrorWithLog() (err error) {
+	defer OnExitLogError("", &err)()
+	return NotFoundError("not there !!!")
+}
+
+func TestShowMe(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	logrus.SetOutput(w)
+
+	err := getNotFoundErrorWithLog()
+	if err == nil {
+		t.Fail()
+	}
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	tk := string(out)
+
+	if !strings.Contains(tk, "getNotFoundErrorWithLog") {
+		t.Fail()
+	}
+}

@@ -17,8 +17,9 @@
 {{.Header}}
 
 print_error() {
-	read line file <<<$(caller)
-	echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+  ec=$?
+  read line file <<<$(caller)
+  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
 }
 trap print_error ERR
 
