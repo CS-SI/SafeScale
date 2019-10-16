@@ -19,6 +19,8 @@ package dcos
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"strings"
 	"sync/atomic"
 	txttmpl "text/template"
 
@@ -153,23 +155,15 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index uint,
 	if err != nil {
 		return err
 	}
-	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
+	retcode, stdout, stderr, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
 		"BootstrapIP":   netCfg.GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
 	if err != nil {
-		logrus.Debugf("[%s] failed to remotely run configuration script: %s", hostLabel, err.Error())
-		return err
+		return fmt.Errorf("[%s] failed to remotely run configuration script: %s", hostLabel, err.Error())
 	}
 	if retcode != 0 {
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
-			logrus.Debugf("[%s] configuration failed:\nretcode:%d (%s)", hostLabel, errcode, errcode.String())
-			return fmt.Errorf("scripted Master configuration failed with error code %d (%s)", errcode, errcode.String())
-		}
-
-		logrus.Debugf("[%s] configuration failed:\nretcode=%d", hostLabel, retcode)
-		return fmt.Errorf("scripted Master configuration failed with error code %d", retcode)
+		return handleExecuteScriptReturn(retcode, stdout, stderr, err, fmt.Sprintf("[%s] scripted Master configuration", hostLabel))
 	}
 	return nil
 }
@@ -185,25 +179,60 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index uint, h
 	if err != nil {
 		return err
 	}
-	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
+	retcode, stdout, stderr, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
 		"BootstrapIP":   netCfg.GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
 	if err != nil {
-		logrus.Debugf("[%s] failed to remotely run configuration script: %s", hostLabel, err.Error())
-		return err
+		return fmt.Errorf("[%s] failed to remotely run configuration script: %s", hostLabel, err.Error())
 	}
 	if retcode != 0 {
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
-			logrus.Debugf("[%s] configuration failed: retcode: %d (%s)", hostLabel, errcode, errcode.String())
-			return fmt.Errorf("scripted Agent configuration failed with error code %d (%s)", errcode, errcode.String())
-		}
-		logrus.Debugf("[%s] configuration failed: retcode=%d", hostLabel, retcode)
-		return fmt.Errorf("scripted Agent configuration failed with error code '%d'", retcode)
+		return handleExecuteScriptReturn(retcode, stdout, stderr, err, fmt.Sprintf("[%s] scripted Agent configuration", hostLabel))
 	}
 
 	return nil
+}
+
+func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
+	if retcode == 0 {
+		return nil
+	}
+
+	richErrc := fmt.Sprintf("%d", retcode)
+	if retcode < int(ErrorCode.NextErrorCode) {
+		errCode := ErrorCode.Enum(retcode)
+		richErrc = fmt.Sprintf("%d (%s)", errCode, errCode.String())
+	}
+
+	collected := []string{}
+	if stdout != "" {
+		errLines := strings.Split(stdout, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred in line") {
+				collected = append(collected, errline)
+			}
+		}
+	}
+	if stderr != "" {
+		errLines := strings.Split(stderr, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred in line") {
+				collected = append(collected, errline)
+			}
+		}
+	}
+
+	if len(collected) > 0 {
+		if err != nil {
+			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
+		}
+		return fmt.Errorf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
+	} else {
+		if err != nil {
+			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
+		}
+		return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+	}
 }
 
 func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
@@ -260,20 +289,12 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 		"SSHPrivateKey":  identity.Keypair.PrivateKey,
 		"SSHPublicKey":   identity.Keypair.PublicKey,
 	}
-	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", gwData, netCfg.GatewayID)
+	retcode, stdout, stderr, err := foreman.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", gwData, netCfg.GatewayID)
 	if err != nil {
-		logrus.Errorf("[gateway] configuration failed: %s", err.Error())
 		return err
 	}
 	if retcode != 0 {
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
-			logrus.Errorf("[gateway] configuration failed:\nretcode=%d (%s)", errcode, errcode.String())
-			return fmt.Errorf("scripted gateway configuration failed with error code %d (%s)", errcode, errcode.String())
-		}
-
-		logrus.Errorf("[gateway] configuration failed:\nretcode=%d", retcode)
-		return fmt.Errorf("scripted gateway configuration failed with error code %d", retcode)
+		return handleExecuteScriptReturn(retcode, stdout, stderr, err, fmt.Sprintf("[%s] scripted gateway configuration", "gateway"))
 	}
 
 	return nil

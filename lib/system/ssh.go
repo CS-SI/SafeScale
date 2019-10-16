@@ -373,7 +373,7 @@ func (sc *SSHCommand) Output() ([]byte, error) {
 	content, err := sc.cmd.Output()
 	nerr := sc.cleanup()
 	if err != nil {
-		return nil, err
+		return content, err
 	}
 	if nerr != nil {
 		log.Warnf("Error waiting for command cleanup: %v", nerr)
@@ -387,7 +387,7 @@ func (sc *SSHCommand) CombinedOutput() ([]byte, error) {
 	content, err := sc.cmd.CombinedOutput()
 	nerr := sc.cleanup()
 	if err != nil {
-		return nil, err
+		return content, err
 	}
 	if nerr != nil {
 		log.Warnf("Error waiting for command cleanup: %v", nerr)
@@ -464,14 +464,6 @@ func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) 
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 
-	// if strings.Contains(sc.Display(), "ENDSSH") {
-	// 	defer utils.NewStopwatch().OnExitLogWithLevel(
-	// 		fmt.Sprintf("Running command with timeout of %s:\n%s", timeout, sc.Display()),
-	// 		fmt.Sprintf("Command run: [%s]", sc.Display()),
-	// 		log.DebugLevel,
-	// 	)()
-	// }
-
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
 	if err != nil {
@@ -520,21 +512,22 @@ func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) 
 	}()
 
 	select {
-	case issues := <-doneCh:
-		if !issues {
-			log.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display())
-		}
+	case cleanlyDone := <-doneCh:
 		if err != nil {
 			msgError, retCode, erro := ExtractRetCode(err)
 			if erro != nil {
-				return 0, "", "", err
+				return 0, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), err
 			}
+			if !cleanlyDone && retCode != 0 {
+				log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
+			}
+
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 		}
 	case <-time.After(timeout):
 		errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
 		log.Warnf(errMsg)
-		return 0, "", "", fmt.Errorf(errMsg)
+		return 0, string(msgOut[:]), string(msgErr[:]), fmt.Errorf(errMsg)
 	}
 
 	return 0, string(msgOut[:]), string(msgErr[:]), nil
@@ -633,7 +626,6 @@ func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
-	// FIXME Add traces
 	return ssh.command(cmdString, true)
 }
 

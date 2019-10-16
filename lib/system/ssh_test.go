@@ -19,10 +19,12 @@ package system_test
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os/user"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -31,46 +33,58 @@ import (
 
 func Test_Command(t *testing.T) {
 	usr, err := user.Current()
+	usr.Name = "oscar"
+
 	assert.Nil(t, err)
-	content, err := ioutil.ReadFile(fmt.Sprintf("%s/.ssh/id_rsa", usr.HomeDir))
+	content, err := ioutil.ReadFile(fmt.Sprintf("%s/.ssh/test_rsa", usr.HomeDir))
 	if err != nil {
 		t.Skip()
 	}
 
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	ssh_conf := system.SSHConfig{
-		User:       usr.Name,
+		User:       "oscar",
 		Host:       "127.0.0.1",
 		Port:       22,
 		PrivateKey: string(content),
 	}
 	cmd, err := ssh_conf.Command("whoami")
-	assert.Nil(t, err)
-	out, err := cmd.Output() // FIXME Correct this test
-	if err != nil {
-		t.Skip()
-	}
-	assert.Nil(t, err)
-	assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
+	require.Nil(t, err)
+	out, err := cmd.Output()
+	require.Nil(t, err)
+	require.Equal(t, "oscar", strings.Trim(string(out), "\n"))
 	gateway := ssh_conf
 
 	if !utils.IsEmpty(gateway) {
 		ssh_conf.GatewayConfig = &gateway
 		cmd, err := ssh_conf.Command("bash -c whoami")
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		out, err := cmd.Output()
-		assert.Nil(t, err)
-		assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
+		require.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
 	}
 
+	/*
+		if !utils.IsEmpty(gateway) {
+			ssh_conf.GatewayConfig = &gateway
+			cmd, err := ssh_conf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
+			require.Nil(t, err)
+			vibra, err := cmd.Output()
+			require.NotNil(t, err)
+			fmt.Println(err)
+			fmt.Println(string(vibra))
+		}
+
+	*/
+
 	if !utils.IsEmpty(gateway) {
-		gw := gateway
-		ssh_conf.GatewayConfig.GatewayConfig = &gw
-		cmd, err := ssh_conf.Command("bash -c whoami")
-		assert.Nil(t, err)
-		out, err := cmd.Output()
-		assert.Nil(t, err)
-		assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
+		ssh_conf.GatewayConfig = &gateway
+		cmd, err := ssh_conf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
+		require.Nil(t, err)
+		errc, vibra, _, err := cmd.RunWithTimeout(nil, 2*time.Minute)
+		if errc != 0 {
+			fmt.Println(string(vibra))
+		}
+		require.True(t, errc != 0)
 	}
 }

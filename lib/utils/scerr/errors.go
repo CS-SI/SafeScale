@@ -126,6 +126,9 @@ func IsGRPCTimeout(err error) bool {
 
 // IsGRPCError tells if the err is of GRPC kind
 func IsGRPCError(err error) bool {
+	if err == nil {
+		return false
+	}
 	_, ok := grpcstatus.FromError(err)
 	return ok
 }
@@ -1040,11 +1043,6 @@ const (
 // OnExitLogErrorWithLevel returns a function that will log error with the log level wanted
 // Intended to be used with defer for example.
 func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
-	// If there is nothing to log, or if err is a grpc one, returns an empty function
-	if in == "" {
-		return func() {}
-	}
-
 	logLevelFn, ok := commonlog.LogLevelFnMap[level]
 	if !ok {
 		logLevelFn = logrus.Error
@@ -1060,7 +1058,7 @@ func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
 
 	// if 'in' is empty, recover function name from caller
 	if len(in) == 0 {
-		if pc, _, _, ok := runtime.Caller(1); ok {
+		if pc, _, _, ok := runtime.Caller(2); ok {
 			if f := runtime.FuncForPC(pc); f != nil {
 				in = filepath.Base(f.Name())
 			}

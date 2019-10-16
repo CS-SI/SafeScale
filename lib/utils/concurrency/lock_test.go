@@ -83,7 +83,7 @@ func TestNewTaskedLock(t *testing.T) {
 		}()
 	}
 
-	runOutOfTime := waitTimeout(&wg, time.Duration(18*time.Second))
+	runOutOfTime := waitTimeout(&wg, time.Duration(8*time.Second))
 	if runOutOfTime {
 		t.Errorf("Failure: timeout")
 	}
