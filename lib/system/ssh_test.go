@@ -79,7 +79,7 @@ func Test_Command(t *testing.T) {
 
 	if !utils.IsEmpty(gateway) {
 		ssh_conf.GatewayConfig = &gateway
-		cmd, err := ssh_conf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
+		cmd, err := ssh_conf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
 		require.Nil(t, err)
 		errc, vibra, _, err := cmd.RunWithTimeout(nil, 2*time.Minute)
 		if errc != 0 {

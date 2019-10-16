@@ -162,7 +162,7 @@ func (b *foreman) ExecuteScript(
 
 	cmd := fmt.Sprintf("sudo bash %s;exit ${PIPESTATUS}", path)
 	if hidesOutput {
-		cmd = fmt.Sprintf("sudo BASH_XTRACEFD=7 bash %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", path)
+		cmd = fmt.Sprintf("sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`\"", path)
 	}
 
 	return client.New().SSH.Run(hostID, cmd, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
