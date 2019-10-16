@@ -420,9 +420,9 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	if !hidesOutput {
-		command = fmt.Sprintf("sudo bash %s;exit ${PIPESTATUS}", filename)
+		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", filename, filename)
 	} else {
-		command = fmt.Sprintf("sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`\"", filename)
+		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
 	}
 
 	// Executes the script on the remote host

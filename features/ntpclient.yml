@@ -33,10 +33,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ntpdate &>/dev/null
+                                    dpkg -l | grep ntpdate &>/dev/null || exit 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ntpdate &>/dev/null
+                                    rpm -qa | grep ntpdate &>/dev/null || exit 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
