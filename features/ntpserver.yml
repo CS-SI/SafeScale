@@ -82,7 +82,7 @@ feature:
                             # then firewalld  itself
                             sfService restart firewalld
                             sfFirewallAdd --zone=public --add-port=123/udp --permanent
-                            sfFirewallReload
+                            sfFirewallReload || fail 204 "Firewall problem"
 
                     ready:
                         targets:

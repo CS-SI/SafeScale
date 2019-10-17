@@ -102,7 +102,12 @@ sfWaitLockfile() {
 
 create_user() {
 	echo "Creating user {{.User}}..."
-	useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+	if getent passwd {{.User}}; then
+	  echo "User {{.User}} already exists !"
+	  useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
+	else
+	  useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+	fi
 	echo "{{.User}}:{{.Password}}" | chpasswd
 	groupadd -r docker
 	usermod -aG docker {{.User}}

@@ -208,7 +208,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 	if stdout != "" {
 		errLines := strings.Split(stdout, "\n")
 		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred in line") {
+			if strings.Contains(errline, "An error occurred") {
 				collected = append(collected, errline)
 			}
 		}
@@ -216,7 +216,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 	if stderr != "" {
 		errLines := strings.Split(stderr, "\n")
 		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred in line") {
+			if strings.Contains(errline, "An error occurred") {
 				collected = append(collected, errline)
 			}
 		}

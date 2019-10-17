@@ -257,7 +257,7 @@ feature:
 
                             # sfFirewallAdd --zone=trusted --add-interface=${KONG_PUB_BRIDGE} && \
                             # sfFirewallAdd --zone=trusted --add-interface=${KONG_DB_BRIDGE} && \
-                            sfFirewallAdd --zone=public --add-service=https && sfFirewallReload
+                            sfFirewallAdd --zone=public --add-service=https && sfFirewallReload || fail 204 "Firewall problem"
 
                     start:
                         targets:
@@ -317,7 +317,7 @@ feature:
 
                             # sfFirewallAdd --zone=trusted --remove-interface=${KONG_PUB_BRIDGE} && \
                             # sfFirewallAdd --zone=trusted --remove-interface=${KONG_DB_BRIDGE} && \
-                            sfFirewallAdd --zone=public --remove-service=https && sfFirewallReload
+                            sfFirewallAdd --zone=public --remove-service=https && sfFirewallReload || fail 204 "Firewall problem"
 
                             # docker network rm ${KONG_PUB_BRIDGE}
                             # docker network rm ${KONG_DB_BRIDGE}

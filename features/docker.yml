@@ -148,7 +148,7 @@ feature:
                             sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
                             sfFirewallAdd --zone=trusted --add-service docker-swarm
                             sfFirewallAdd --zone=trusted --add-masquerade
-                            sfFirewallReload
+                            sfFirewallReload || fail 204 "Firewall problem"
 
                     ready:
                         targets:

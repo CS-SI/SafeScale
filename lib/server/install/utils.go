@@ -39,15 +39,26 @@ import (
 )
 
 const (
-	featureScriptTemplateContent = `#!/bin/bash -x
+	featureScriptTemplateContent = `#!/bin/bash
 
 set -u -o pipefail
 
-print_error() {
+function print_error() {
+    ec=$?
     read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file:" "{"` + "`" + `sed "${line}q;d" "$file"` + "`" + `"}" >&2
+    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"` + "`" + `sed "${line}q;d" "$file"` + "`" + `"}" >&2
 }
 trap print_error ERR
+
+function fail() {
+	if [ -z "$2" ]
+	then
+    	echo "An error occurred: $1"
+	else
+		echo "An error occurred (errorcode $1): $2"
+	fi
+    exit $1
+}
 
 set +x
 rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log

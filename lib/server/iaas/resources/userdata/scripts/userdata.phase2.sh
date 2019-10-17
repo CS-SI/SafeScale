@@ -429,7 +429,7 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-    if which wget; then
+    if command -v wget; then
       wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
     else
       ping -n -c1 -w30 -i5 www.google.com || return 1
