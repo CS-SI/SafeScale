@@ -243,8 +243,9 @@ feature:
                             sysctl --system
 
                             # Disable swap if enabled
-                            SWAPS=$(grep "swap[[:space:]]*sw[[:space:]]*" /etc/fstab | column -t | cut -d' ' -f1)
-                            if [ $? -eq 0 ]; then
+                            op=-1
+                            SWAPS=$(grep "swap[[:space:]]*sw[[:space:]]*" /etc/fstab | column -t | cut -d' ' -f1) && op=$? || true
+                            if [ $op -eq 0 ]; then
                                 cp /etc/fstab /etc/fstab.before_swap_disable
                                 for s in $SWAPS; do
                                     swapoff $s &>/dev/null
