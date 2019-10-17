@@ -100,8 +100,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 	content := buffer.String()
 
-	hidesOutput := strings.Contains(content, "set +x")
+	hidesOutput := strings.Contains(content, "set +x\n")
 	if hidesOutput {
+		content = strings.Replace(content, "set +x\n", "\n", 1)
 		if strings.Contains(content, "exec 2>&1\n") {
 			content = strings.Replace(content, "exec 2>&1\n", "exec 2>&7\n", 1)
 		}
@@ -223,13 +224,11 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	// FIXME Simplification of error message
-
 	if err != nil {
 		collected := ""
 		errLines := strings.Split(stderr, "\n")
 		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred in line") {
+			if strings.Contains(errline, "An error occurred") {
 				collected += errline + ";"
 			}
 		}

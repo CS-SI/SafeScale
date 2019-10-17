@@ -348,7 +348,7 @@ feature:
 
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload
+                                    sfFirewallReload || fail 204 "Firewall problem"
                                     ;;
                                 calico) # Untested yet...
                                     sfKubectl apply -f https://gist.githubusercontent.com/joshrosso/ed1f5ea5a2f47d86f536e9eee3f1a2c2/raw/dfd95b9230fb3f75543706f3a95989964f36b154/calico-3.5.yaml || exit 210
@@ -356,7 +356,7 @@ feature:
                                 canal) # Untested yet...
                                     sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || exit 211
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload
+                                    sfFirewallReload || fail 204 "Firewall problem"
                                     ;;
                             esac
                             exit 0
@@ -386,11 +386,11 @@ feature:
                                 flannel)
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload
+                                    sfFirewallReload || fail 204 "Firewall problem"
                                     ;;
                                 canal)
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload
+                                    sfFirewallReload || fail 204 "Firewall problem"
                                     ;;
                             esac
 
@@ -485,7 +485,7 @@ feature:
                                     yum remove -y kubectl kubeadm kubelet || exit 224
                                     ;;
                             esac
-                            sfFirewallReload
+                            sfFirewallReload || fail 204 "Firewall problem"
                             rm -f /etc/kubernetes/.joined
                             exit 0
 

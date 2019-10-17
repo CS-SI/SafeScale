@@ -405,8 +405,9 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 		}
 	}
 
-	hidesOutput := strings.Contains(command, "set +x")
+	hidesOutput := strings.Contains(command, "set +x\n")
 	if hidesOutput {
+		command = strings.Replace(command, "set +x\n", "\n", 1)
 		if strings.Contains(command, "exec 2>&1\n") {
 			command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
 		}

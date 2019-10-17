@@ -620,7 +620,7 @@ feature:
                             nodes: no
                         run: |
                             sfFirewallAdd --zone=trusted --add-interface=docker_gwbridge
-                            sfFirewallReload
+                            sfFirewallReload || fail 204 "Firewall problem"
                             exit 0
 
                     start:

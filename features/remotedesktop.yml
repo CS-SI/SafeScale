@@ -525,16 +525,16 @@ feature:
                                 <short>Drop any connection to SafeScale remote desktop</short>
                             </zone>
                             EOF
-                            sfFirewallReload
+                            sfFirewallReload || fail 204 "Firewall problem"
 
                             # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
-                            sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }}
+                            sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd || fail 204 "Firewall problem"
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }} || fail 204 "Firewall problem"
                             {{ if .SecondaryGatewayIP }}
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }}
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }}
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }} || fail 204 "Firewall problem"
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }} || fail 204 "Firewall problem"
                             {{ end }}
-                            sfFirewallReload
+                            sfFirewallReload || fail 204 "Firewall problem"
                             # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.DefaultRouteIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
                             # {{ if .SecondaryGatewayIP }}
                             # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.PrimaryGatewayIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'

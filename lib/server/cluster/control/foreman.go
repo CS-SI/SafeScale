@@ -148,8 +148,9 @@ func (b *foreman) ExecuteScript(
 		return 0, "", "", err
 	}
 
-	hidesOutput := strings.Contains(script, "set +x")
+	hidesOutput := strings.Contains(script, "set +x\n")
 	if hidesOutput {
+		script = strings.Replace(script, "set +x\n", "\n", 1)
 		if strings.Contains(script, "exec 2>&1\n") {
 			script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
 		}
@@ -1360,7 +1361,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 	if stdout != "" {
 		errLines := strings.Split(stdout, "\n")
 		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred in line") {
+			if strings.Contains(errline, "An error occurred") {
 				collected = append(collected, errline)
 			}
 		}
@@ -1368,7 +1369,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 	if stderr != "" {
 		errLines := strings.Split(stderr, "\n")
 		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred in line") {
+			if strings.Contains(errline, "An error occurred") {
 				collected = append(collected, errline)
 			}
 		}

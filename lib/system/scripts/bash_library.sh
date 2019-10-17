@@ -202,7 +202,7 @@ export -f sfRetry
 # but you may use sfFirewallAdd in this case)
 sfFirewall() {
 	[ $# -eq 0 ] && return 0
-	which firewall-cmd &>/dev/null || return 1
+	command -v firewall-cmd &>/dev/null || return 1
 	# Restart firewalld if failed
 	if [ "$(sfGetFact "use_systemd")" = "1" ]; then
 		if sudo systemctl is-failed firewalld; then
@@ -210,7 +210,7 @@ sfFirewall() {
 		fi
 	fi
 	# sudo may be superfluous if executed as root, but won't harm
-	sudo firewall-cmd "$@"
+	command -v firewall-cmd &>/dev/null && sudo firewall-cmd "$@" || true
 }
 export -f sfFirewall
 
@@ -223,7 +223,7 @@ export -f sfFirewallAdd
 
 # sfFirewallReload reloads firewall rules
 sfFirewallReload() {
-	which firewall-cmd &>/dev/null || return 1
+	command -v firewall-cmd &>/dev/null || return 1
 	# sudo may be superfluous if executed as root, but won't harm
 	sudo firewall-cmd --reload
 }
@@ -236,11 +236,11 @@ sfInstall() {
 			export DEBIAN_FRONTEND=noninteractive
 			sfRetry 5m 3 "sfApt update"
 			sfApt install $1 -y || exit 194
-			which $1 || exit 194
+			command -v $1 || exit 194
 			;;
 		centos|rhel)
 			yum install -y $1 || exit 194
-			which $1 || exit 194
+			command -v $1 || exit 194
 			;;
 		*)
 			echo "Unsupported operating system '$LINUX_KIND'"
@@ -367,7 +367,7 @@ sfMarathon() {
 export -f sfMarathon
 
 sfProbeGPU() {
-	if which lspci &>/dev/null; then
+	if command -v lspci &>/dev/null; then
 		val=$(lspci | grep nvidia 2>/dev/null) || true
 		[ ! -z "$val" ] && FACTS["nVidia GPU"]=$val || true
 	fi
@@ -560,7 +560,7 @@ sfDetectFacts() {
 		VERSION_ID=$VERSION_ID
 		[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
 	else
-		if which lsb_release &>/dev/null; then
+		if command -v lsb_release &>/dev/null; then
 			LINUX_KIND=$(lsb_release -is)
 			LINUX_KIND=${LINUX_KIND,,}
 			VERSION_ID=$(lsb_release -rs | cut -d. -f1)

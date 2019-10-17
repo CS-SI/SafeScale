@@ -49,7 +49,7 @@ sfDetectFacts() {
 		. /etc/os-release
 		LINUX_KIND=$ID
 	} || {
-		which lsb_release &>/dev/null && {
+		command -v lsb_release &>/dev/null && {
 			LINUX_KIND=$(lsb_release -is)
 			LINUX_KIND=${LINUX_KIND,,}
 			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
@@ -66,9 +66,18 @@ sfDetectFacts
 
 create_user() {
 	echo "Creating user {{.User}}..."
-	useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+	if getent passwd {{.User}}; then
+    echo "User {{.User}} already exists !"
+    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
+	else
+    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+	fi
 	echo "{{.User}}:{{.Password}}" | chpasswd
-	groupadd -r docker
+	if getent group docker; then
+	  echo "Group docker already exists !"
+	else
+	  groupadd -r docker
+	fi
 	usermod -aG docker {{.User}}
 	SUDOERS_FILE=/etc/sudoers.d/{{.User}}
 	[ ! -d "$(dirname $SUDOERS_FILE)" ] && SUDOERS_FILE=/etc/sudoers
@@ -144,11 +153,11 @@ disable_cloudinit_network_autoconf() {
 disable_services() {
 	case $LINUX_KIND in
 		debian|ubuntu)
-		  if [[ -n $(which systemctl) ]]; then
+		  if [[ -n $(command -v systemctl) ]]; then
 		    systemctl stop apt-daily.service &>/dev/null
 			  systemctl kill --kill-who=all apt-daily.service &>/dev/null
 		  fi
-		  if [[ -n $(which system) ]]; then
+		  if [[ -n $(command -v system) ]]; then
         which system && service stop apt-daily.service &>/dev/null
 		  fi
 			;;
