@@ -519,7 +519,13 @@ func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) 
 				return 0, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), err
 			}
 			if !cleanlyDone && retCode != 0 {
-				log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
+				if strings.Contains(sc.Display(), ".check_") {
+					if retCode != 1 {
+						log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
+					}
+				} else {
+					log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
+				}
 			}
 
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
