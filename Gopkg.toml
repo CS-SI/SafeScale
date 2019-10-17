@@ -17,6 +17,10 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "=2.0.0"
 
 [[constraint]]
+  name= "github.com/jwells131313/goethe"
+  version = "=v1.4.0"
+
+[[constraint]]
   name = "github.com/gobwas/glob"
   version = "=v0.2.3"
 
