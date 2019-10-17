@@ -616,6 +616,7 @@ sfDetectFacts() {
 
 sfGetFact() {
 	[ $# -eq 0 ] && return
+	# shellcheck source=.
 	source "$SERIALIZED_FACTS"
 	[ ${FACTS[$1]+isset} ] && echo -n ${FACTS[$1]}
 }
