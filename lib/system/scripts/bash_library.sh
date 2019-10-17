@@ -516,8 +516,8 @@ sfIsPodRunning() {
     local domain=${1#*@}
     [ -z ${domain+x} ] && domain=default
     set +o pipefail
-    ( sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null)
-    retcode=$?
+    retcode=-1
+    ( sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null && retcode=$? || true )
     set -o pipefail
     [ $retcode = 0 ] && return 0 || return 1
 }

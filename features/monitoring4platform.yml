@@ -260,11 +260,10 @@ feature:
                                 sleep 1
 
                                 tenant=$(cat /etc/safescale/tenants.json | jq -r .tenants[0].name)
-                                safescale tenant set $tenant
-                                retcode=$?
+                                retcode=-1
+                                safescale tenant set $tenant && retcode=$? || true
                                 if [ $retcode -eq 0 ]; then
-                                    result=$(safescale host reboot $1)
-                                    retcode=$?
+                                    result=$(safescale host reboot $1) && retcode=$? || true
                                     if [ $retcode -eq 0 ]; then
                                         status=$(echo $result | jq -r .status)
                                         if [ "$status" != "success" ]; then
@@ -289,8 +288,9 @@ feature:
                                         var="AMX_ALERT_${i}_LABEL_service"
                                         host=${!var}
                                         echo "Alert 'gateway_down' received for gateway '$host'. Restarting gateway '$host'..."
-                                        restart_host "$host"
-                                        [ $? -eq 0 ] && echo "Gateway '$host' restarted." || echo "failed to restart gateway '$host'!"
+                                        op=-1
+                                        restart_host "$host" && op=$? || true
+                                        [ $op -eq 0 ] && echo "Gateway '$host' restarted." || echo "failed to restart gateway '$host'!"
                                         ;;
                                     *)
                                         echo "Unknown alert '$alert' received."

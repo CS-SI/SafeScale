@@ -113,11 +113,11 @@ feature:
                                 }
 
                         run: |
-                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1)
-                            rc=$?
-                            [ $rc -ne 0 ] && {
+                            op=-1
+                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1) && op=$? || true
+                            [ $op -ne 0 ] && {
                                 echo $output
-                                echo $output | grep "already installed" &>/dev/null || exit $rc
+                                echo $output | grep "already installed" &>/dev/null || exit $op
                             }
                             exit 0
 
@@ -405,8 +405,9 @@ feature:
 
                             MASTERIP=
                             for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
-                                NODE_JOIN_CMD=$(sfRemoteExec $m kubeadm token create --print-join-command)
-                                [ $? -ne 0 ] && continue
+                                op=-1
+                                NODE_JOIN_CMD=$(sfRemoteExec $m kubeadm token create --print-join-command) && op=$? || true
+                                [ $op -ne 0 ] && continue
                                 NODE_JOIN_CMD=$(echo $NODE_JOIN_CMD | head -1)
                                 MASTERIP=$m
                                 break

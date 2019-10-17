@@ -110,14 +110,16 @@ feature:
                                 debian|ubuntu)
                                     sfService enable ntp || exit 195
                                     sfService restart ntp || exit 196
-                                    sfRetry 5m 5 sfService status ntp &>/dev/null
-                                    [ $? -ne 0 ] && exit 197
+                                    op=-1
+                                    sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
+                                    [ $op -ne 0 ] && exit 197
                                     ;;
                                 centos|rhel)
                                     sfService enable ntpd || exit 195
                                     sfService restart ntpd || exit 196
-                                    sfRetry 5m 5 sfService status ntpd &>/dev/null
-                                    [ $? -ne 0 ] && exit 197
+                                    op=-1
+                                    sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
+                                    [ $op -ne 0 ] && exit 197
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
