@@ -19,6 +19,7 @@ package concurrency
 import (
 	"fmt"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
+	"github.com/jwells131313/goethe"
 	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
@@ -211,4 +212,43 @@ func TestNewTaskedLockStereo(t *testing.T) {
 	if runOutOfTime {
 		t.Errorf("Failure: timeout")
 	}
+}
+
+func TestOldLockType(t *testing.T) {
+	talo := NewTaskedLock()
+
+	tawri, _ := NewTask(nil)
+
+	recall := func() {
+		talo.Lock(tawri)
+		defer talo.Unlock(tawri)
+	}
+
+	kall := func() {
+		talo.Lock(tawri)
+		defer talo.Unlock(tawri)
+
+		recall()
+	}
+
+	kall()
+}
+
+func TestNewLockType(t *testing.T) {
+	var ethe = goethe.GG()
+	var lock = ethe.NewGoetheLock()
+
+	seb := func() {
+		lock.WriteLock()
+		defer lock.WriteUnlock()
+	}
+
+	anofu := func() {
+		lock.WriteLock()
+		defer lock.WriteUnlock()
+
+		seb()
+	}
+
+	ethe.Go(anofu)
 }
