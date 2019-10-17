@@ -515,10 +515,8 @@ sfIsPodRunning() {
     local pod=${1%@*}
     local domain=${1#*@}
     [ -z ${domain+x} ] && domain=default
-    set +o pipefail
-    retcode=-1
-    ( sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null && retcode=$? || true )
-    set -o pipefail
+    local retcode=-1
+    sudo -u cladm -i kubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null && retcode=$? || true
     [ $retcode = 0 ] && return 0 || return 1
 }
 export -f sfIsPodRunning

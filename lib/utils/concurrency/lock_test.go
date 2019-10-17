@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/jwells131313/goethe"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
@@ -54,10 +54,10 @@ func TestNewTaskedLock(t *testing.T) {
 		go func() {
 			fmt.Println("Ask 4 Reading...")
 			err := talo.RLock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.RUnlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Reading...")
 			time.Sleep(time.Duration(tools.RandomInt(30, 90)) * time.Millisecond)
@@ -72,10 +72,10 @@ func TestNewTaskedLock(t *testing.T) {
 		go func() {
 			fmt.Println("Ask 4 Writing...")
 			err := talo.Lock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.Unlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Writing...")
 			time.Sleep(time.Duration(tools.RandomInt(3, 30)) * time.Millisecond)
@@ -102,10 +102,10 @@ func TestNewTaskedLockWait(t *testing.T) {
 		go func() {
 			fmt.Println("Ask 4 Reading...")
 			err := talo.RLock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.RUnlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Reading...")
 			time.Sleep(time.Duration(tools.RandomInt(30, 90)) * time.Millisecond)
@@ -122,10 +122,10 @@ func TestNewTaskedLockWait(t *testing.T) {
 		go func() {
 			fmt.Println("Ask 4 Writing...")
 			err := talo.Lock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.Unlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Writing...")
 			time.Sleep(time.Duration(tools.RandomInt(700, 1200)) * time.Millisecond)
@@ -152,17 +152,17 @@ func TestNewTaskedLockMono(t *testing.T) {
 		go func() {
 			fmt.Println("Ask 4 Reading...")
 			err := talo.RLock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.RUnlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Ask 4 Writing...")
 			err = talo.Lock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.Unlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Reading and writing...")
 			time.Sleep(time.Duration(tools.RandomInt(300, 900)) * time.Millisecond)
@@ -189,17 +189,17 @@ func TestNewTaskedLockStereo(t *testing.T) {
 		go func() {
 			fmt.Println("Ask 4 Writing...")
 			err := talo.Lock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.Unlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Ask 4 Reading...")
 			err = talo.RLock(tawri)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			defer func() {
 				err = talo.RUnlock(tawri)
-				require.Nil(t, err)
+				assert.Nil(t, err)
 			}()
 			fmt.Println("Reading and Writing...")
 			time.Sleep(time.Duration(tools.RandomInt(300, 900)) * time.Millisecond)
@@ -219,16 +219,58 @@ func TestOldLockType(t *testing.T) {
 
 	tawri, _ := NewTask(nil)
 
+	reader := func() {
+		err := talo.RLock(tawri)
+		assert.Nil(t, err)
+		defer talo.RUnlock(tawri)
+	}
+
 	recall := func() {
-		talo.Lock(tawri)
+		err := talo.Lock(tawri)
+		assert.Nil(t, err)
 		defer talo.Unlock(tawri)
+
+		reader()
 	}
 
 	kall := func() {
-		talo.Lock(tawri)
+		err := talo.Lock(tawri)
+		assert.Nil(t, err)
 		defer talo.Unlock(tawri)
 
 		recall()
+	}
+
+	kall()
+}
+
+func TestOldLockTypeBis(t *testing.T) {
+	talo := NewTaskedLock()
+
+	tawri, _ := NewTask(nil)
+
+	recall := func() string {
+		err := talo.Lock(tawri)
+		assert.Nil(t, err)
+		defer talo.Unlock(tawri)
+		return "World"
+	}
+
+	reader := func() string {
+		err := talo.RLock(tawri)
+		assert.Nil(t, err)
+		defer talo.RUnlock(tawri)
+
+		fmt.Println(recall())
+		return "Hello"
+	}
+
+	kall := func() {
+		err := talo.Lock(tawri)
+		assert.Nil(t, err)
+		defer talo.Unlock(tawri)
+
+		fmt.Println(reader())
 	}
 
 	kall()
@@ -238,17 +280,64 @@ func TestNewLockType(t *testing.T) {
 	var ethe = goethe.GG()
 	var lock = ethe.NewGoetheLock()
 
+	reader := func() {
+		err := lock.ReadLock()
+		assert.Nil(t, err)
+		defer lock.ReadUnlock()
+	}
+
 	seb := func() {
-		lock.WriteLock()
+		err := lock.WriteLock()
+		assert.Nil(t, err)
 		defer lock.WriteUnlock()
+
+		reader()
 	}
 
 	anofu := func() {
-		lock.WriteLock()
+		err := lock.WriteLock()
+		assert.Nil(t, err)
 		defer lock.WriteUnlock()
 
 		seb()
 	}
 
-	ethe.Go(anofu)
+	_, err := ethe.Go(anofu)
+	assert.Nil(t, err)
+}
+
+func TestNewTaskedLockMonoBis(t *testing.T) {
+	var ethe = goethe.GG()
+	var lock = ethe.NewGoetheLock()
+
+	num := 1
+	wg := sync.WaitGroup{}
+	wg.Add(num)
+	for j := 0; j < num; j++ {
+		ethe.Go(func() {
+			fmt.Println("Ask 4 Reading...")
+			err := lock.ReadLock()
+			assert.Nil(t, err)
+			defer func() {
+				err = lock.ReadUnlock()
+				assert.Nil(t, err)
+			}()
+			fmt.Println("Ask 4 Writing...")
+			err = lock.WriteLock()
+			assert.Nil(t, err)
+			defer func() {
+				err = lock.WriteUnlock()
+				assert.Nil(t, err)
+			}()
+			fmt.Println("Reading and writing...")
+			time.Sleep(time.Duration(tools.RandomInt(30, 90)) * time.Millisecond)
+			fmt.Println("Finished reading and writing...")
+			wg.Done()
+		})
+	}
+
+	runOutOfTime := waitTimeout(&wg, time.Duration(18*time.Second))
+	if runOutOfTime {
+		t.Errorf("Failure: timeout")
+	}
 }
