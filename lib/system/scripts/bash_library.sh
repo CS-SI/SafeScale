@@ -527,6 +527,12 @@ sfGithubLastRelease() {
 }
 export -f sfGithubLastRelease
 
+# Returns the tag name corresponding to the last non-beta release
+sfGithubLastNotBetaRelease() {
+  curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases" | jq -c '.[] | select(.tag_name | contains("beta") | not)' | head -n 1 | jq -r .tag_name
+}
+export -f sfGithubLastNotBetaRelease
+
 # echoes a random string
 # $1 is the size of the result (optional)
 # $2 is the characters to choose from (optional); use preferably [:xxx:] notation (like [:alnum:] for all letters and digits)
