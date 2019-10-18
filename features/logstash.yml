@@ -37,8 +37,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            [ -d ${SF_ETCDIR}/logstash ] || exit 192
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'logstash:7.1.1' &>/dev/null || exit 193
+                            [ -d ${SF_ETCDIR}/logstash ] || fail 192
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'logstash:7.1.1' &>/dev/null || fail 193
                             exit 0
 
             add:
@@ -172,7 +172,7 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
+                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || fail 192
 
                     remove:
                         targets:

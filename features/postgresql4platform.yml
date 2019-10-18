@@ -35,7 +35,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack postgresql4platform || exit 192
+                            sfDoesDockerRunStack postgresql4platform || fail 192
                             exit 0
 
             add:
@@ -292,7 +292,7 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         docker secret rm postgresql4platform &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgresql4platform - || exit 192
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgresql4platform - || fail 192
                     #         exit 0
 
                     # network:
@@ -303,10 +303,10 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
-                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
+                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || fail 192
                     #         # fi
                     #         if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
-                    #             docker network create --attachable -d bridge safescale-gw || exit 193
+                    #             docker network create --attachable -d bridge safescale-gw || fail 193
                     #         fi
                     #         exit 0
 
@@ -315,16 +315,16 @@ feature:
                             masters: any
                         run: |
                             if docker secret inspect safescale.postgresql.password &>/dev/null; then
-                                docker secret rm safescale.postgresql.password || exit 192
+                                docker secret rm safescale.postgresql.password || fail 192
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password - || exit 193
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password - || fail 193
 
                     start:
                         targets:
                             masters: any
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || exit 194
-                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || exit 195
+                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || fail 194
+                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || fail 195
                             exit 0
 
             remove:
@@ -335,7 +335,7 @@ feature:
                             masters: any
                         run: |
                             if [ -f ${SF_ETCDIR}/postgresql4platform/stack.yml ]; then
-                                docker stack rm postgresql4platform || exit 192
+                                docker stack rm postgresql4platform || fail 192
                             fi
                             exit 0
 

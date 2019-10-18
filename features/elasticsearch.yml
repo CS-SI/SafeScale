@@ -39,7 +39,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} || exit 192
+                            sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} || fail 192
                             exit 0
 
             add:
@@ -139,7 +139,7 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || exit 195
+                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || fail 195
                             exit 0
 
                     running:
@@ -166,7 +166,7 @@ feature:
                             {{ else }}
                             URL="http://{{.HostIP}}:9200/_cat/health"
                             {{ end }}
-                            sfRetry 5m 5 "curl -k ${URL} &>/dev/null" || exit 196
+                            sfRetry 5m 5 "curl -k ${URL} &>/dev/null" || fail 196
                             exit 0
 
             remove:
@@ -184,7 +184,7 @@ feature:
                                 {{ else }}
                                 OPTIONS=
                                 {{ end }}
-                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || exit 197
+                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || fail 197
                             fi
                             exit 0
 

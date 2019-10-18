@@ -33,10 +33,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ansible &>/dev/null || exit 1
+                                    dpkg -l | grep ansible &>/dev/null || fail 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ansible &>/dev/null || exit 1
+                                    rpm -qa | grep ansible &>/dev/null || fail 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -73,7 +73,7 @@ feature:
                                     sfRetry 5m 3 "sfApt install -y ansible"
                                     ;;
                                 centos|rhel)
-                                    yum install -y ansible || exit 192
+                                    yum install -y ansible || fail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

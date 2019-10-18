@@ -29,7 +29,7 @@ feature:
                 yum install -y http://build.openhpc.community/OpenHPC:/1.3/CentOS_7/x86_64/ohpc-release-1.3-1.el7.x86_64.rpm && \
                 yum install -y ohpc-base-compute ohpc-slurm-client lmod-ohpc ganglia-gmond-ohpc nhc-ohpc && \
                 yum install -y ohpc-autotools EasyBuild-ohpc hwloc-ohpc spack-ohpc valgrind-ohpc && \
-                yum install -y openmpi3-gnu7-ohpc mpich-gnu7-ohpc  ohpc-gnu7-perf-tools slurm-torque || exit $?
+                yum install -y openmpi3-gnu7-ohpc mpich-gnu7-ohpc  ohpc-gnu7-perf-tools slurm-torque || fail $?
                 sed -i -e 's/ControlMachine=.*$/ControlMachine={{.PrimaryMasterName}}/g' /etc/slurm/slurm.conf
                 sed -e 's/<sms>/{{.PrimaryMasterIP}}/g' /opt/ohpc/pub/examples/ganglia/gmond.conf >/etc/ganglia/gmond.conf
                 systemctl enable slurmd
