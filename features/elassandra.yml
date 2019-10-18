@@ -39,8 +39,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            [ -d ${SF_ETC_DIR}/elassandra ] || exit 192
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'strapdata/elassandra:6' &>/dev/null || exit 193
+                            [ -d ${SF_ETC_DIR}/elassandra ] || fail 192
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'strapdata/elassandra:6' &>/dev/null || fail 193
                             exit 0
 
             add:
@@ -133,7 +133,7 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
+                            docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS rm --stop -v --force || fail 192
 
                     remove:
                         targets:

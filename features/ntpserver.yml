@@ -33,10 +33,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ntp &>/dev/null || exit 1
+                                    dpkg -l | grep ntp &>/dev/null || fail 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ntp &>/dev/null || exit 1
+                                    rpm -qa | grep ntp &>/dev/null || fail 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -61,7 +61,7 @@ feature:
                                     sfRetry 5m 3 "sfApt install -y ntp"
                                     ;;
                                 centos|rhel)
-                                    yum install -y ntp || exit 192
+                                    yum install -y ntp || fail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -93,15 +93,15 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfService enable ntp || exit 195
-                                    sfService restart ntp || exit 196
+                                    sfService enable ntp || fail 195
+                                    sfService restart ntp || fail 196
                                     op=-1
                                     sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && exit 197
                                     ;;
                                 centos|rhel)
-                                    sfService enable ntpd || exit 195
-                                    sfService restart ntpd || exit 196
+                                    sfService enable ntpd || fail 195
+                                    sfService restart ntpd || fail 196
                                     op=-1
                                     sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && exit 197

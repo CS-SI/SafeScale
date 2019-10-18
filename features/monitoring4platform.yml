@@ -45,7 +45,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack monitoring4platform || exit 192
+                            sfDoesDockerRunStack monitoring4platform || fail 192
                             exit 0
 
             add:
@@ -62,16 +62,16 @@ feature:
                             VERSION={{.NodeExporterVersion}}
                             [ -z "$VERSION" -o "$VERSION" = "latest" ] && VERSION=$(sfGithubLastRelease prometheus node_exporter)
                             URL=https://github.com/prometheus/node_exporter/releases/download/${VERSION}/node_exporter-${VERSION#v}.linux-amd64.tar.gz
-                            sfDownload "$URL" node_exporter.tar.gz 3m 5 || exit 193
+                            sfDownload "$URL" node_exporter.tar.gz 3m 5 || fail 193
                             tar -zxvf node_exporter.tar.gz && mv node_exporter-*/node_exporter /usr/sbin
                             rm -f node_exporter.tar.gz
 
                             if [ "$(sfGetFact "use_systemd")" = "1" ]; then
                                 URL=https://raw.githubusercontent.com/prometheus/node_exporter/${VERSION}/examples/systemd/node_exporter.service
-                                sfDownload "$URL" /etc/systemd/system/node_exporter.service 3m 5 || exit 194
+                                sfDownload "$URL" /etc/systemd/system/node_exporter.service 3m 5 || fail 194
                             else
                                 URL=https://raw.githubusercontent.com/prometheus/node_exporter/${VERSION}/examples/init.d/node_exporter
-                                sfDownload "$URL" /etc/init.d/node_exporter 3m 5 || exit 195
+                                sfDownload "$URL" /etc/init.d/node_exporter 3m 5 || fail 195
                             fi
 
                             mkdir -p /etc/sysconfig ${SF_VARDIR}/node_exporter/textfile_collector
@@ -81,8 +81,8 @@ feature:
 
                             useradd node_exporter || true
 
-                            sfService enable node_exporter || exit 196
-                            sfService start node_exporter || exit 197
+                            sfService enable node_exporter || fail 196
+                            sfService start node_exporter || fail 197
                             exit 0
 
                     prometheus:
@@ -351,7 +351,7 @@ feature:
                             ENTRYPOINT ["/prometheus-am-executor"]
                             EOF
 
-                            docker build --network host -t am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || exit 193
+                            docker build --network host -t am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || fail 193
                             exit 0
 
                     alertmanager:
@@ -799,7 +799,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/monitoring4platform/stack.yml monitoring4platform || exit 198
+                            docker stack deploy -c ${SF_ETCDIR}/monitoring4platform/stack.yml monitoring4platform || fail 198
                             exit 0
 
                     running:
@@ -808,7 +808,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || exit 199
+                            sfRetry 5m 5 "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || fail 199
                             exit 0
 
             remove:
@@ -821,7 +821,7 @@ feature:
                             nodes: no
                         run: |
                             if [ -f ${SF_ETCDIR}/monitoring4platform/stack.yml ]; then
-                                docker stack rm monitoring4platform || exit 200
+                                docker stack rm monitoring4platform || fail 200
                             fi
                             exit 0
 

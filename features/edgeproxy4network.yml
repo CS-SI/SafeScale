@@ -35,7 +35,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null || exit 192
+                            curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null || fail 192
 
             add:
 #                pace: config,secret,networks,start
@@ -163,7 +163,7 @@ feature:
                                         - "127.0.0.1:8444:8444"
                                     restart: always
                                     healthcheck:
-                                        test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
+                                        test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || fail 1"]
                                         interval: 5s
                                         retries: 10
                             #         secrets:
@@ -230,7 +230,7 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         docker secret rm safescale.edgeproxy.db_password &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.edgeproxy.db_password - &>/dev/null || exit 192
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.edgeproxy.db_password - &>/dev/null || fail 192
                     #         exit 0
 
                     networks:
@@ -266,8 +266,8 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network up -d || exit 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || exit 194
+                            docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network up -d || fail 193
+                            sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || fail 194
                             exit 0
 
             remove:
@@ -281,19 +281,19 @@ feature:
                             nodes: no
                         run: |
                             if [ -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml ]; then
-                                docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network rm --stop --force || exit 195
+                                docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network rm --stop --force || fail 195
                                 # docker secret rm safescale.edgeproxy.db_password &>/dev/null
                                 docker image rm -f edgeproxy4network:latest
                                 rm -rf ${SF_ETCDIR}/edgeproxy4network
 
                             else
                                 if [ -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml ]; then
-                                    docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force || exit 196
+                                    docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force || fail 196
                                     docker image rm -f kong4gateway:latest
                                     rm -rf ${SF_ETCDIR}/kong4gateway
                                 fi
                                 if [ -f ${SF_ETCDIR}/kong/docker-compose.yml ]; then
-                                    docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force || exit 197
+                                    docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force || fail 197
                                     docker image rm -f kong:latest
                                     rm -rf ${SF_ETCDIR}/kong
                                 fi

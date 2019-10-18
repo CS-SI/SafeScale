@@ -205,7 +205,7 @@ feature:
                             CMD ["-b", "0.0.0.0"]
                             EOF
 
-                            docker build -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || exit 192
+                            docker build -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || fail 192
 
                     # secret:
                     #     targets:
@@ -215,8 +215,8 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         docker secret rm keycloak4gateway-db keycloak4gateway-admin &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create keycloak4gateway-db - || exit 193
-                    #         echo -n "{{ .KeycloakAdminPassword }}" | docker secret create keycloak4gateway-admin - || exit 193
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create keycloak4gateway-db - || fail 193
+                    #         echo -n "{{ .KeycloakAdminPassword }}" | docker secret create keycloak4gateway-admin - || fail 193
                     #         exit 0
 
                     compose:
@@ -285,8 +285,8 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway up -d || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer keycloak4gateway:latest keycloak4gateway_server_1" || exit 195
+                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway up -d || fail 194
+                            sfRetry 5m 5 "sfDoesDockerRunContainer keycloak4gateway:latest keycloak4gateway_server_1" || fail 195
                             exit 0
 
             remove:
@@ -299,7 +299,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway rm --stop --force || exit 196
+                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway rm --stop --force || fail 196
                             exit 0
 
                     cleanup:

@@ -46,7 +46,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} || exit 192
+                            sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} || fail 192
                             exit 0
 
             add:
@@ -152,12 +152,12 @@ feature:
                             nodes: no
                         run: |
                             mkdir -p ${SF_TMPDIR}/elastalert-kibana-plugin && cd ${SF_TMPDIR}/elastalert-kibana-plugin
-                            wget -O pkg.zip https://github.com/bitsensor/elastalert-kibana-plugin/releases/download/1.0.4/elastalert-kibana-plugin-1.0.4-7.1.1.zip || exit 193
-                            unzip pkg.zip || exit 194
+                            wget -O pkg.zip https://github.com/bitsensor/elastalert-kibana-plugin/releases/download/1.0.4/elastalert-kibana-plugin-1.0.4-7.1.1.zip || fail 193
+                            unzip pkg.zip || fail 194
                             {{- if .ClusterFlavor }}
-                            ./bin/kibana-plugin https://{{ .GatewayIP }}/monitoring/kibana/ || exit 195
+                            ./bin/kibana-plugin https://{{ .GatewayIP }}/monitoring/kibana/ || fail 195
                             {{ else }}
-                            ./bin/kibana-plugin {{ .KibanaURL }} || exit 196
+                            ./bin/kibana-plugin {{ .KibanaURL }} || fail 196
                             {{ end -}}
                             cd ${SF_TMPDIR}
                             rm -rf elastalert-kibana-plugin
@@ -174,7 +174,7 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end -}}
-                            docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d || exit 198
+                            docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d || fail 198
                             exit 0
 
                     running:
@@ -188,7 +188,7 @@ feature:
                             {{ else }}
                             PREFIX="elastalert"
                             {{ end -}}
-                            sfRetry 5m 5 "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || exit 200
+                            sfRetry 5m 5 "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || fail 200
                             exit 0
 
                     ready:
@@ -197,7 +197,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || exit 201
+                            sfRetry 5m 5 "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || fail 201
                             exit 0
 
             remove:
@@ -215,7 +215,7 @@ feature:
                                 {{ else }}
                                 OPTIONS=
                                 {{ end -}}
-                                docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force || exit 203
+                                docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force || fail 203
                             fi
                             exit 0
 
