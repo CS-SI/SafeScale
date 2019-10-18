@@ -735,10 +735,10 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 	if recoverCode == 0 && recoverErr == nil {
 		lines := strings.Split(recoverStdOut, "\n")
 		for _, line := range lines {
-			if strings.HasPrefix(line, "An error occurred") {
+			if strings.Contains(line, "An error occurred") {
 				warnings = append(warnings, line)
 			}
-			if strings.HasPrefix(line, "PROVISIONING_ERROR") {
+			if strings.Contains(line, "PROVISIONING_ERROR") {
 				errs = append(errs, line)
 			}
 		}
