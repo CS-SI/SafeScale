@@ -434,7 +434,45 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	err = nil
 	ok = retcode == 0
 	if !ok {
-		err = fmt.Errorf("failure: retcode=%d", retcode)
+		err = handleExecuteScriptReturn(retcode, outrun, "", err, "failure")
 	}
 	return stepResult{success: ok, completed: true, err: err, output: outrun}, nil
+}
+
+func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
+	if retcode == 0 {
+		return nil
+	}
+
+	richErrc := fmt.Sprintf("%d", retcode)
+
+	collected := []string{}
+	if stdout != "" {
+		errLines := strings.Split(stdout, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred") {
+				collected = append(collected, errline)
+			}
+		}
+	}
+	if stderr != "" {
+		errLines := strings.Split(stderr, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred") {
+				collected = append(collected, errline)
+			}
+		}
+	}
+
+	if len(collected) > 0 {
+		if err != nil {
+			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
+		}
+		return fmt.Errorf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
+	} else {
+		if err != nil {
+			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
+		}
+		return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+	}
 }
