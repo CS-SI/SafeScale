@@ -53,9 +53,13 @@ trap print_error ERR
 function fail() {
 	if [ -z "$2" ]
 	then
-    	echo "An error occurred: $1"
+		if [ $1 -ne 0 ]; then
+    		echo "An error occurred: $1"
+		fi
 	else
-		echo "An error occurred (errorcode $1): $2"
+		if [ $1 -ne 0 ]; then
+			echo "An error occurred (errorcode $1): $2"
+		fi
 	fi
     exit $1
 }
