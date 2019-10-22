@@ -52,8 +52,6 @@ type TaskResult interface{}
 // TaskAction ...
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
-// FIXME Unit test this class
-
 // Task ...
 type Task interface {
 	Abort() error
@@ -154,12 +152,13 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 		finishCh:   make(chan struct{}, 1),
 	}
 
-	tid, err := t.GetID()
+	u, err := uuid.NewV4()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create a new task: %v", err)
 	}
 
-	t.sig = fmt.Sprintf("{task %s}", tid)
+	t.id = u.String()
+	t.sig = fmt.Sprintf("{task %s}", t.id)
 
 	return &t, nil
 }
@@ -170,18 +169,9 @@ func (t *task) GetID() (string, error) {
 		return "", scerr.InvalidInstanceError()
 	}
 
-	if t.id == "" { // we need the lock only when changing data
-		t.lock.Lock()
-		defer t.lock.Unlock()
-	}
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-	if t.id == "" {
-		u, err := uuid.NewV4()
-		if err != nil {
-			return "", fmt.Errorf("failed to create a new task: %v", err)
-		}
-		t.id = u.String()
-	}
 	return t.id, nil
 }
 
@@ -335,7 +325,6 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	err = nil
 	t.err = err
 	t.result = result
 	t.doneCh <- true
@@ -381,7 +370,11 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, err
 	}
 
-	status, _ := t.GetStatus()
+	status, err := t.GetStatus()
+	if err != nil {
+		return nil, err
+	}
+
 	if status == DONE {
 		return t.result, t.err
 	}
@@ -414,7 +407,11 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return false, nil, err
 	}
 
-	status, _ := t.GetStatus()
+	status, err := t.GetStatus()
+	if err != nil {
+		return false, nil, err
+	}
+
 	if status == DONE {
 		return true, t.result, t.err
 	}
@@ -445,7 +442,11 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, err
 	}
 
-	status, _ := t.GetStatus()
+	status, err := t.GetStatus()
+	if err != nil {
+		return false, nil, err
+	}
+
 	if status == DONE {
 		return true, t.result, t.err
 	}
@@ -484,7 +485,11 @@ func (t *task) Reset() (Task, error) {
 		return nil, err
 	}
 
-	status, _ := t.GetStatus()
+	status, err := t.GetStatus()
+	if err != nil {
+		return nil, err
+	}
+
 	if status == RUNNING {
 		return nil, fmt.Errorf("can't reset task '%s': task running", tid)
 	}
@@ -498,13 +503,17 @@ func (t *task) Reset() (Task, error) {
 	return t, nil
 }
 
-// Abort aborts the task execution
-func (t *task) Abort() error {
+// Abort aborts the task execution if running and marks it as ABORTED unless it's already DONE
+func (t *task) Abort() (err error) {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}
 
-	status, _ := t.GetStatus()
+	status, err := t.GetStatus()
+	if err != nil {
+		return err
+	}
+
 	if status == RUNNING {
 		t.lock.Lock()
 		defer t.lock.Unlock()
@@ -517,6 +526,10 @@ func (t *task) Abort() error {
 		t.cancel()
 
 		t.status = ABORTED
+	} else {
+		if t.status != DONE {
+			t.status = ABORTED
+		}
 	}
 
 	return nil

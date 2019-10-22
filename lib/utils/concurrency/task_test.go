@@ -18,6 +18,7 @@ package concurrency
 
 import (
 	"context"
+	"fmt"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
 	"strings"
@@ -32,9 +33,9 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theId, err := got.GetID()
+	theID, err := got.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	theTask, err := got.Start(nil, nil)
 	require.Nil(t, err)
@@ -62,9 +63,9 @@ func TestWaitingGame(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theId, err := got.GetID()
+	theID, err := got.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	tarray := []Task{}
 
@@ -127,7 +128,7 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	require.Nil(t, err)
 
 	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.Nil(t, err)
@@ -140,29 +141,29 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	require.Nil(t, res)
 	require.Nil(t, err)
 
-	if end >= (time.Millisecond * 200) {
+	if end >= (time.Millisecond * 15) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
 
 	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.NotNil(t, err)
 
-	time.Sleep(time.Duration(5) * time.Second)
+	time.Sleep(time.Duration(50) * time.Millisecond)
 
 	single, err = single.Reset()
 	require.Nil(t, err)
 
 	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.Nil(t, err)
 
 	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.NotNil(t, err)
@@ -195,12 +196,12 @@ func TestSingleTaskTryWaitOK(t *testing.T) {
 	require.Nil(t, err)
 
 	single, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.Nil(t, err)
 
-	time.Sleep(time.Duration(5) * time.Second)
+	time.Sleep(time.Duration(50) * time.Millisecond)
 	// by now single should succeed
 
 	begin := time.Now()
@@ -211,7 +212,34 @@ func TestSingleTaskTryWaitOK(t *testing.T) {
 	require.NotNil(t, res)
 	require.Nil(t, err)
 
-	if end >= (time.Millisecond * 200) {
+	if end >= (time.Millisecond * 100) {
+		t.Errorf("It should have finished fast but it didn't !!")
+	}
+}
+
+func TestSingleTaskTryWaitKO(t *testing.T) {
+	single, err := NewTask(nil)
+	require.NotNil(t, single)
+	require.Nil(t, err)
+
+	single, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
+		time.Sleep(time.Duration(30) * time.Millisecond)
+		return "Ahhhh", fmt.Errorf("Chaos")
+	}, nil)
+	require.Nil(t, err)
+
+	time.Sleep(time.Duration(50) * time.Millisecond)
+	// by now single should succeed
+
+	begin := time.Now()
+	waited, res, err := single.TryWait()
+	end := time.Since(begin)
+
+	require.True(t, waited)
+	require.NotNil(t, res)
+	require.NotNil(t, err)
+
+	if end >= (time.Millisecond * 100) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
 }
@@ -222,7 +250,7 @@ func TestSingleTaskWait(t *testing.T) {
 	require.Nil(t, err)
 
 	single, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.Nil(t, err)
@@ -234,8 +262,8 @@ func TestSingleTaskWait(t *testing.T) {
 	require.NotNil(t, res)
 	require.Nil(t, err)
 
-	if end >= (time.Second*4) || end < (time.Second) {
-		t.Errorf("It should have finished near 3s but it didn't !!")
+	if end >= (time.Millisecond*40) || end < (time.Millisecond*20) {
+		t.Errorf("It should have finished near 30s but it didn't !!")
 	}
 }
 
@@ -378,9 +406,9 @@ func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theId, err := overlord.GetID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	var tasks []Task
 	for ind := 0; ind < 10; ind++ {

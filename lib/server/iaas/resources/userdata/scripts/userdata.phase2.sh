@@ -27,7 +27,16 @@ print_error() {
 trap print_error ERR
 
 fail() {
-    echo "PROVISIONING_ERROR: $1"
+    if [ -z "$2" ]
+    then
+      if [ $1 -ne 0 ]; then
+        echo "PROVISIONING_ERROR: $1"
+      fi
+    else
+      if [ $1 -ne 0 ]; then
+        echo "PROVISIONING_ERROR: $1: $2"
+      fi
+    fi
     echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
     # For compatibility with previous user_data implementation (until v19.03.x)...
     ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done

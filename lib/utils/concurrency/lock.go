@@ -30,8 +30,6 @@ type TaskedLock interface {
 	RUnlock(Task) error
 	Lock(Task) error
 	Unlock(Task) error
-	IsRLocked(Task) (bool, error)
-	IsLocked(Task) (bool, error)
 }
 
 // taskedLock ...
@@ -68,22 +66,27 @@ func (tm *taskedLock) RLock(task Task) error {
 		return err
 	}
 
+	// logrus.Warnf("Calling rlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
+	access := false
+	defer func() {
+		tm.lock.Unlock()
+		if access {
+			tm.rwmutex.RLock()
+		}
+	}()
 
 	if _, ok := tm.readLocks[tid]; ok {
 		tm.readLocks[tid]++
-		tm.lock.Unlock()
 		return nil
 	}
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
 		tracer.Trace("really RLocking...")
-		tm.lock.Unlock()
-		tm.rwmutex.RLock()
+		access = true
 		return nil
 	}
 	tracer.Trace("using running write lock...")
-	tm.lock.Unlock()
 	return nil
 }
 
@@ -102,8 +105,15 @@ func (tm *taskedLock) RUnlock(task Task) error {
 		return err
 	}
 
+	// logrus.Warnf("Calling runlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	defer tm.lock.Unlock()
+	access := false
+	defer func() {
+		tm.lock.Unlock()
+		if access {
+			tm.rwmutex.RUnlock()
+		}
+	}()
 
 	if _, ok := tm.readLocks[tid]; !ok {
 		tracer.Trace("Can't RUnlock, not RLocked")
@@ -117,7 +127,7 @@ func (tm *taskedLock) RUnlock(task Task) error {
 			tracer.Trace("in running write lock, doing nothing")
 		} else {
 			tracer.Trace("really RUnlocking...")
-			tm.rwmutex.RUnlock()
+			access = true
 		}
 	}
 
@@ -138,12 +148,19 @@ func (tm *taskedLock) Lock(task Task) error {
 		return err
 	}
 
+	// logrus.Warnf("Calling lock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
+	access := false
+	defer func() {
+		tm.lock.Unlock()
+		if access {
+			tm.rwmutex.Lock()
+		}
+	}()
 
 	// If already locked for write, increments counter for the task
 	if _, ok := tm.writeLocks[tid]; ok {
 		tm.writeLocks[tid]++
-		tm.lock.Unlock()
 		return nil
 	}
 	// If already lock for read, panic
@@ -154,8 +171,7 @@ func (tm *taskedLock) Lock(task Task) error {
 	}
 	// registers lock for read for the task and actively lock the RWMutex
 	tm.writeLocks[tid] = 1
-	tm.lock.Unlock()
-	tm.rwmutex.Lock()
+	access = true
 	return nil
 }
 
@@ -173,8 +189,15 @@ func (tm *taskedLock) Unlock(task Task) error {
 		return err
 	}
 
+	// logrus.Warnf("Calling unlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	defer tm.lock.Unlock()
+	access := false
+	defer func() {
+		tm.lock.Unlock()
+		if access {
+			tm.rwmutex.Unlock()
+		}
+	}()
 
 	// a TaskedLock can be Locked then RLocked without problem,
 	// but RUnlocks must have been done before Unlock.
@@ -189,27 +212,7 @@ func (tm *taskedLock) Unlock(task Task) error {
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {
 		delete(tm.writeLocks, tid)
-		tm.rwmutex.Unlock()
+		access = true
 	}
 	return nil
-}
-
-// IsRLocked tells if the task is owning a read lock
-func (tm *taskedLock) IsRLocked(task Task) (bool, error) {
-	taskid, err := task.GetID() // FIXME Fix locks later
-	if err != nil {
-		return false, err
-	}
-	_, ok := tm.readLocks[taskid]
-	return ok, nil
-}
-
-// IsLocked tells if the task is owning a write lock
-func (tm *taskedLock) IsLocked(task Task) (bool, error) {
-	taskid, err := task.GetID() // FIXME Fix locks later
-	if err != nil {
-		return false, err
-	}
-	_, ok := tm.writeLocks[taskid]
-	return ok, nil
 }

@@ -32,9 +32,9 @@ func TestChildrenWaitingGame(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theId, err := overlord.GetID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
@@ -57,9 +57,9 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theId, err := overlord.GetID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
@@ -95,15 +95,15 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theId, err := overlord.GetID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
 			rint := tools.RandomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
-			if rint > 100 {
+			if rint > 55 {
 				return "", fmt.Errorf("suck it")
 			}
 
@@ -115,8 +115,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 	}
 
 	res, err := overlord.Wait()
-
-	require.Nil(t, err)
+	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 }
 
@@ -125,9 +124,9 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theId, err := overlord.GetID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
@@ -162,18 +161,18 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theId, err := overlord.GetID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	var tasks []Task
 
 	for ind := 0; ind < 800; ind++ {
 		rt, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
-			rint := tools.RandomInt(50, 250)
+			rint := tools.RandomInt(5, 25)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
-			if rint > 150 {
-				time.Sleep(time.Duration(14) * time.Second)
+			if rint > 10 {
+				time.Sleep(time.Duration(800) * time.Millisecond)
 			}
 
 			return "waiting game", nil
@@ -189,12 +188,15 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	c := make(chan struct{})
 	go func() {
 		res, err = overlord.Wait()
+		if err != nil {
+			t.Errorf("It shouldn't happen")
+		}
 		c <- struct{}{} // done
 		close(c)
 	}()
 
 	select {
-	case <-time.After(time.Duration(3) * time.Second):
+	case <-time.After(time.Duration(300) * time.Millisecond):
 		stats := overlord.Stats()
 
 		if len(stats[RUNNING]) == 0 {
@@ -206,6 +208,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	case <-c:
 		fmt.Printf("Good %s", res)
+		t.Errorf("It should have failed")
 	}
 
 	require.True(t, true)
@@ -216,9 +219,9 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theId, err := overlord.GetID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
-	require.NotEmpty(t, theId)
+	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 10; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {

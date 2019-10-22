@@ -209,7 +209,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 				problems = problems || (err != nil)
 
 				if !problems {
-					provider = fmt.Sprintf("%s", suffixCandidate)
+					provider = suffixCandidate
 				}
 			}
 

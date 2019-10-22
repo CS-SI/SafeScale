@@ -121,7 +121,7 @@ type Cluster interface {
 	// FindAvailableNode returns a propsv2.Node corresponding to first node available to execute order
 	FindAvailableNode(concurrency.Task) (*propsv2.Node, error)
 	// SearchNode tells if the ID of the host passed as parameter is a node
-	SearchNode(concurrency.Task, string) bool
+	SearchNode(concurrency.Task, string) (bool, error)
 	// GetNode returns a node based on its ID
 	GetNode(concurrency.Task, string) (*pb.Host, error)
 	// CountNodes counts the nodes of the cluster
