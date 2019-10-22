@@ -131,10 +131,13 @@ func (b *foreman) ExecuteScript(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string,
 ) (errCode int, stdOut string, stdErr string, err error) {
-
 	tracer := concurrency.NewTracer(nil, "("+hostID+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	if b == nil {
+		return 0, "", "", scerr.InvalidInstanceError()
+	}
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, err := system.GetBashLibrary()
@@ -171,6 +174,8 @@ func (b *foreman) ExecuteScript(
 
 // construct ...
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
+	defer scerr.OnPanic(&err)()
+
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -496,21 +501,31 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return err
 	}
 
-	// FIXME What about cleanup ?, unit test Task class
-
 	// Step 2: awaits gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		_ = mastersTask.Abort()
-		_ = privateNodesTask.Abort()
+		abortMasterErr := mastersTask.Abort()
+		if abortMasterErr != nil {
+			primaryGatewayStatus = scerr.AddConsequence(primaryGatewayStatus, abortMasterErr)
+		}
+		abortNodesErr := privateNodesTask.Abort()
+		if abortNodesErr != nil {
+			primaryGatewayStatus = scerr.AddConsequence(primaryGatewayStatus, abortNodesErr)
+		}
 		return primaryGatewayStatus
 	}
 	if !gwFailoverDisabled {
 		if secondaryGatewayTask != nil {
 			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
 			if secondaryGatewayStatus != nil {
-				_ = mastersTask.Abort()
-				_ = privateNodesTask.Abort()
+				abortMasterErr := mastersTask.Abort()
+				if abortMasterErr != nil {
+					secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortMasterErr)
+				}
+				abortNodesErr := privateNodesTask.Abort()
+				if abortNodesErr != nil {
+					secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortNodesErr)
+				}
 				return secondaryGatewayStatus
 			}
 		}
@@ -536,7 +551,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}()
 	_, mastersStatus = mastersTask.Wait()
 	if mastersStatus != nil {
-		_ = privateNodesTask.Abort()
+		abortNodesErr := privateNodesTask.Abort()
+		if abortNodesErr != nil {
+			mastersStatus = scerr.AddConsequence(mastersStatus, abortNodesErr)
+		}
 		return mastersStatus
 	}
 
@@ -556,7 +574,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	if primaryGatewayStatus != nil {
 		if !gwFailoverDisabled {
 			if secondaryGatewayTask != nil {
-				_ = secondaryGatewayTask.Abort()
+				secondaryGatewayErr := secondaryGatewayTask.Abort()
+				if secondaryGatewayErr != nil {
+					primaryGatewayStatus = scerr.AddConsequence(primaryGatewayStatus, secondaryGatewayErr)
+				}
 			}
 		}
 		return primaryGatewayStatus
@@ -683,9 +704,6 @@ func (b *foreman) getState(task concurrency.Task) (ClusterState.Enum, error) {
 
 // configureNode ...
 func (b *foreman) configureNode(task concurrency.Task, index uint, pbHost *pb.Host) error {
-	if b == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if index < 1 {
 		return scerr.InvalidParameterError("index", "cannot be an interger less than 1")
 	}
@@ -1455,9 +1473,6 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if b == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	if params == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
@@ -1490,10 +1505,6 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	if b == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 
 	if params == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
@@ -1571,13 +1582,11 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	defer scerr.OnPanic(&err)()
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if b == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	if params == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
@@ -1747,9 +1756,6 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if b == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	// Convert and validate params
 	p := params.(data.Map)
 	if p == nil {
@@ -1799,9 +1805,6 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	if b == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	if params == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
@@ -1885,9 +1888,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 // taskCreateNode creates a Node in the Cluster
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	if b == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
+	defer scerr.OnPanic(&err)()
 
 	// Convert then validate parameters
 	p, ok := params.(data.Map)
@@ -2057,9 +2058,6 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	if b == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	if params == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
@@ -2109,9 +2107,7 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 
 // Installs reverseproxy
 func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
-	if b == nil {
-		return scerr.InvalidInstanceError()
-	}
+	defer scerr.OnPanic(&err)()
 
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
@@ -2156,9 +2152,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
 func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
-	if b == nil {
-		return scerr.InvalidInstanceError()
-	}
+	defer scerr.OnPanic(&err)()
 
 	identity := b.cluster.GetIdentity(task)
 	clusterName := identity.Name
@@ -2210,9 +2204,8 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 
 // install proxycache-client feature if not disabled
 func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	if b == nil {
-		return scerr.InvalidInstanceError()
-	}
+	defer scerr.OnPanic(&err)()
+
 	if pbHost == nil {
 		return scerr.InvalidParameterError("pbHost", "cannot be nil")
 	}
@@ -2269,9 +2262,8 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 
 // install proxycache-server feature if not disabled
 func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	if b == nil {
-		return scerr.InvalidInstanceError()
-	}
+	defer scerr.OnPanic(&err)()
+
 	if pbHost == nil {
 		return scerr.InvalidParameterError("pbHost", "cannot be nil")
 	}
@@ -2284,12 +2276,10 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	_ = b.cluster.RLock(task)
 	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
-	_ = b.cluster.RUnlock(task)
 	if err != nil {
 		return err
 	}
@@ -2316,9 +2306,6 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 // intallDocker installs docker and docker-compose
 func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-	if b == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if pbHost == nil {
 		return scerr.InvalidParameterError("pbHost", "cannot be nil")
 	}
@@ -2352,11 +2339,16 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 }
 
 // BuildHostname builds a unique hostname in the Cluster
-func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType NodeType.Enum) (string, error) {
+func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType NodeType.Enum) (cluid string, err error) {
 	var index int
 
+	defer scerr.OnPanic(&err)()
+
 	// Locks for write the manager extension...
-	_ = b.cluster.Lock(task)
+	err = b.cluster.Lock(task)
+	if err != nil {
+		return "", err
+	}
 	outerErr := b.cluster.GetProperties(task).LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes)
 		switch nodeType {
@@ -2369,7 +2361,15 @@ func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType Nod
 		}
 		return nil
 	})
-	_ = b.cluster.Unlock(task)
+	defer func() {
+		unlockErr := b.cluster.Unlock(task)
+		if unlockErr != nil {
+			logrus.Warn(unlockErr)
+		}
+		if err == nil && unlockErr != nil {
+			err = unlockErr
+		}
+	}()
 	if outerErr != nil {
 		return "", outerErr
 	}

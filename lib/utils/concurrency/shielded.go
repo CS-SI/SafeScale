@@ -19,6 +19,7 @@ package concurrency
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/sirupsen/logrus"
 )
 
 // Shielded allows to store data with controlled access to it
@@ -56,8 +57,8 @@ func (d *Shielded) Clone() *Shielded {
 // 	return &protector{shielded: d, readLock: true}, nil
 // }
 
-// Inspect is used to lock a clonable for read
-func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) error) error {
+// Inspect is used to lock a cloneable for read
+func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) error) (err error) {
 	if d == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -68,11 +69,21 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 		return scerr.InvalidParameterError("inspector", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
+		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
-	_ = d.lock.RLock(task)
+
+	err = d.lock.RLock(task)
+	if err != nil {
+		return err
+	}
 	defer func() {
-		_ = d.lock.RUnlock(task)
+		unlockErr := d.lock.RUnlock(task)
+		if unlockErr != nil {
+			logrus.Warn(unlockErr)
+		}
+		if err == nil && unlockErr != nil {
+			err = unlockErr
+		}
 	}()
 
 	return inspector(d.witness.Clone())
@@ -95,8 +106,8 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 // 	return &protector{shielded: d, readLock: false}, nil
 // }
 
-// Alter allows to update a clonable using a write lock
-func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) error {
+// Alter allows to update a cloneable using a write lock
+func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) (err error) {
 	if d == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -107,16 +118,25 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) error {
 		return scerr.InvalidParameterError("alterer", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
+		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
-	_ = d.lock.Lock(task)
+	err = d.lock.Lock(task)
+	if err != nil {
+		return err
+	}
 	defer func() {
-		_ = d.lock.Unlock(task)
+		unlockErr := d.lock.Unlock(task)
+		if unlockErr != nil {
+			logrus.Warn(unlockErr)
+		}
+		if err == nil && unlockErr != nil {
+			err = unlockErr
+		}
 	}()
 
 	clone := d.witness.Clone()
-	err := alterer(clone)
+	err = alterer(clone)
 	if err != nil {
 		return err
 	}
