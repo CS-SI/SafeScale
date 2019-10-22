@@ -43,7 +43,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 192
+                                    fail 192
                                     ;;
                             esac
 
@@ -59,7 +59,7 @@ feature:
                         run: |
                             lspci | grep -i nvidia &>/dev/null || {
                                 echo "No nVidia GPU detected. Aborting."
-                                exit 192
+                                fail 192
                             }
 
                             DOCKER_VERSION=$(sfGetFact "docker_version")
@@ -144,7 +144,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
                             exit 0
@@ -167,7 +167,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
 

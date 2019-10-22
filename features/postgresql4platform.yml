@@ -269,7 +269,7 @@ feature:
                                 update_pghba_conf
                                 op=-1
                                 pg_ctl start &>/dev/null && wait_for_local_postgres 60 && op=$?
-                                [ $op -ne 0 ] && echo "Failed." && exit 1
+                                [ $op -ne 0 ] && echo "Failed." && fail 1
                                 echo OK
 
                                 # Checking if repmgr needs to be initialized
@@ -289,7 +289,7 @@ feature:
                                     echo -n "registering host as primary postgresql instance... "
                                     op=-1
                                     repmgr --config-file=/etc/postgresql/repmgr.conf primary register && op=$?
-                                    [ $op -ne 0 ] && echo "Failed." && exit 2
+                                    [ $op -ne 0 ] && echo "Failed." && fail 2
                                     echo done
                                 fi
                                 pg_ctl stop -m fast &>/dev/null
@@ -656,7 +656,7 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
-                            [ -z "${TARGET_DIR+x}" ] && exit 197
+                            [ -z "${TARGET_DIR+x}" ] && fail 197
 
                             cat >${TARGET_DIR}/includes/postgresql4platform.conf <<-'EOF'
                             upstream postgresql4platform {

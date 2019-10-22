@@ -30,7 +30,7 @@ feature:
                         ;;
                     *)
                         echo "Unmanaged linux distribution '$LINUX_KIND', aborting."
-                        exit 1
+                        fail 1
                         ;;
                 esac
 
@@ -60,7 +60,7 @@ feature:
                         ;;
                     *)
                         echo "Unmanaged linux distribution '$LINUX_KIND', aborting."
-                        exit 1
+                        fail 1
                         ;;
                 esac
 

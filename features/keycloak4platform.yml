@@ -156,7 +156,7 @@ feature:
                             echo "Waiting for database server..."
                             op=-1
                             timeout 60 bash -c "while ! $PSQL 'select 1' >/dev/null; do sleep 5; done" && op=$? || true
-                            if [ $op -ne 0 ] && echo "Database server not ready for 60s. Aborting." && exit 1
+                            if [ $op -ne 0 ] && echo "Database server not ready for 60s. Aborting." && fail 1
                             echo "Database server ready."
 
                             # # Create database if needed

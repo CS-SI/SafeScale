@@ -40,7 +40,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
 
@@ -77,7 +77,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    fail 195
                                     ;;
                             esac
                             exit 0
@@ -103,7 +103,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
 

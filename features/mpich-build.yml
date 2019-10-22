@@ -48,7 +48,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
                             cd ${SF_TMPDIR}

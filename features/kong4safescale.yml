@@ -70,7 +70,7 @@ feature:
                             echo "Waiting for database server..."
                             op=-1
                             timeout 60 sh -c "while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done" && op=$? || true
-                            [ $op -ne 0 ] && echo "Database failed to respond in 60s, aborting." && exit 1
+                            [ $op -ne 0 ] && echo "Database failed to respond in 60s, aborting." && fail 1
                             echo "Database server ready."
 
                             case \$1 in

@@ -40,7 +40,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
 
@@ -72,7 +72,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    fail 195
                                     ;;
                             esac
                             exit 0
@@ -86,7 +86,7 @@ feature:
                         run: |
                             op=-1
                             VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
-                            [ $op -ne 0 ] && exit 192
+                            [ $op -ne 0 ] && fail 192
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
                             sfDownload "$URL" docker-compose 3m 5 || fail 193
                             chmod +x docker-compose && mv docker-compose /usr/bin
@@ -162,7 +162,7 @@ feature:
                             sfService restart docker || fail 196
                             op=-1
                             sfRetry 2m 5 "sfService status docker &>/dev/null" && op=$? || true
-                            [ $op -ne 0 ] && exit 197
+                            [ $op -ne 0 ] && fail 197
                             exit 0
 
             remove:
@@ -186,7 +186,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1 "Unsupported operating system '$LINUX_KIND'"
                                     ;;
                             esac
                             rm -f /usr/bin/docker-compose || true
