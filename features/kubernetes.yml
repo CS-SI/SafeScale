@@ -489,41 +489,4 @@ feature:
                             rm -f /etc/kubernetes/.joined
                             exit 0
 
-    # proxy:
-    #     rules:
-    #         - name: upstream
-    #           type: upstream
-    #           targets:
-    #               masters: all
-    #           content: |
-    #               {
-    #                   "name": "k8s-CPs",
-    #                   "target": "{{.HostIP}}:6443",
-    #                   "weight": 100
-    #               }
-
-    #         - name: service
-    #           type: service
-    #           targets:
-    #               masters: one
-    #           content: |
-    #               {
-    #                   "protocol": "https",
-    #                   "name": "k8s-CPs-{{.ClusterName}}",
-    #                   "host": "k8s-CPs",
-    #                   "port": 6443
-    #               }
-
-    #         - name: route
-    #           type: route
-    #           targets:
-    #               masters: one
-    #           content: |
-    #               {
-    #                   "protocols": ["https"],
-    #                   "hosts": [ "{{.DefaultRouteIP}}"],
-    #                   "paths": ["/"],
-    #                   "service": { "id": "{{.service}}" }
-    #               }
-
 ...
