@@ -394,6 +394,124 @@ sfIngressReload() {
 }
 export -f sfIngressReload
 
+# This function allows to create a database on platform PostgreSQL
+# It is intended to be used on one of the platform PostgreSQL servers in the cluster
+sfPgsqlCreateDatabase() {
+	local dbname=$1
+	if [ -z "$dbname" ]; then
+	    echo "missing dbname"
+		return 1
+	fi
+	local owner=$2
+	local cmd="CREATE DATABASE $dbname"
+	[ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
+	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
+	if [ ! -z "$id" ]; then
+		docker exec -ti $id psql -c $cmd
+		return $?
+	fi
+	return 1
+}
+
+sfPgsqlDropDatabase() {
+	local dbname=$1
+	if [ -z "$dbname" ]; then
+	    echo "missing dbname"
+		return 1
+	fi
+	local cmd="DROP DATABASE $dbname"
+	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
+	if [ ! -z "$id" ]; then
+		docker exec -ti $id psql -c $cmd
+		return $?
+	fi
+	return 1
+}
+
+# This function allows to create a database on platform PostgreSQL
+# Role name and optional options are passed as parameter, password is passed in stdin. example:
+#     echo "toto" | sfPgsqlCreateRole my_role CREATEDB LOGIN
+#     "toto" is the password, "my_role" is the role name
+# It is intended to be used on one of the platform PostgreSQL servers in the cluster
+sfPgsqlCreateRole() {
+	local rolename=$1
+	shift
+	[ -z "$rolename" ] && echo "missing role name" && return 1
+	local options="$*"
+	local password=$(</dev/stdin)}
+
+	local cmd="CREATE ROLE $rolename"
+	[ ! -z "$options" ] && cmd="$cmd WITH $options"
+	if [ ! -z "$password" ]; then
+	    [ -z "$options" ] && cmd="$cmd WITH "
+		cmd="$cmd PASSWORD '$password'"
+	fi
+	echo "sfPgsql"
+	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
+	if [ ! -z "$id" ]; then
+		docker exec -ti $id psql -c $cmd
+		return $?
+	fi
+	return 1
+}
+
+sfPgsqlDropRole() {
+	local rolename=$1
+
+	local cmd="DROP ROLE $rolename"
+	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
+	if [ ! -z "$id" ]; then
+		docker exec -ti $id psql -c $cmd
+		return $?
+	fi
+	return 1
+}
+
+# This function allows to update password of a user on platform PostgreSQL
+# Username is passed as parameter to the function, password is passed in stdin. example:
+#     echo "toto" | sfPgPoolUpdatePassword tata
+#     "toto" is the password, "tata" is the username
+# It is intended to be used on one of the platform PostgreSQL servers in the cluster
+sfPgsqlUpdatePassword() {
+	declare username=${1}
+	if [ -z "$username" ]; then
+		echo "username is missing"
+		return 1
+	fi
+	declare password=${2:=$(</dev/stdin)}
+	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
+	if [ ! -z "$id" ]; then
+		docker exec -ti $id psql -c "ALTER USER $username WITH PASSWORD '$password'"
+		return $?
+	fi
+	return 1
+}
+
+# This function allows to add/update password of a user for PgPool
+# Username is passed as parameter to the function, password is passed in stdin. example:
+#     echo "toto" | sfPgPoolUpdatePassword tata
+#     "toto" is the password, "tata" is the username
+# It's intended to be used on all members of PgPool for consistency
+sfPgPoolUpdatePassword() {
+	local username=$1
+	if [ -z "$username" ]; then
+		echo "username is missing"
+		return 1
+	fi
+	local password=${2:=$(</dev/stdin)}
+	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_pooler)
+	if [ ! -z "$id" ]; then
+		docker exec -ti $id pg_md5 --config-file=/etc/postgresql/pgpool.conf --md5auth --username=$username "$password"
+		retcode=$?
+		if [ $retcode -eq 0 ]; then
+			docker exec -ti $id pgpool --config-file=/etc/postgresql/pgpool.conf reload
+			retcode=$?
+		fi
+		return $retcode
+	fi
+	return 1
+}
+
 # sfService abstracts the command to use to manipulate services
 sfService() {
 	[ $# -ne 2 ] && return 1
