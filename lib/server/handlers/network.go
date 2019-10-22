@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
+	// "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
 
 	"github.com/sirupsen/logrus"
 

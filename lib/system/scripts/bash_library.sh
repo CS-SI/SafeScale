@@ -443,7 +443,7 @@ sfPgsqlCreateRole() {
 	local cmd="CREATE ROLE $rolename"
 	[ ! -z "$options" ] && cmd="$cmd WITH $options"
 	if [ ! -z "$password" ]; then
-	    if [ -z "$options" ] && cmd="$cmd WITH "
+	    [ -z "$options" ] && cmd="$cmd WITH "
 		cmd="$cmd PASSWORD '$password'"
 	fi
 	echo "sfPgsql"
