@@ -22,8 +22,10 @@ install_common_requirements() {
     export LANG=C
 
     # Disable SELinux
-    setenforce 0
-    sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
+    if [[ -n $(command -v setenforce) ]]; then
+	      setenforce 0 || fail 201 "Error setting selinux in disabled mode"
+        sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
+    fi
 
     # Upgrade to last CentOS revision
     rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info && \

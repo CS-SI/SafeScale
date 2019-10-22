@@ -20,8 +20,10 @@ install_common_requirements() {
     export LANG=C
 
     # Disable SELinux
-    setenforce 0 &>/dev/null
-    sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config &>/dev/null
+    if [[ -n $(command -v setenforce) ]]; then
+	      setenforce 0 || fail 201 "Error setting selinux in disabled mode"
+        sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
+    fi
 
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
