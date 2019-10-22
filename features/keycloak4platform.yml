@@ -41,15 +41,11 @@ feature:
                             curl -Ssl -I -k https://{{ .HostIP }}:8443/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null
 
             add:
-                pace: config,build,secret,stack,database,start
+                pace: image,secret,stack,pgsql,pgpool,start
                 steps:
-                    config:
-                        timeout: 10
+                    image:
                         targets:
-                            hosts: no
-                            gateways: no
                             masters: all
-                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/keycloak4platform/build
 
@@ -134,25 +130,17 @@ feature:
                             +</server>
                             EOF
 
-                    build:
-                        timeout: 10
-                        targets:
-                            hosts: no
-                            gateways: no
-                            masters: all
-                            nodes: no
-                        run: |
                             cat >${SF_ETCDIR}/keycloak4platform/build/my-docker-entrypoint.sh <<-'EOF'
                             #!/bin/bash
 
-                            export ADMIN_PG_PASSWORD="$(cat /run/secrets/safescale.postgresxl.password)"
-                            export DB_PASSWORD="$(cat /run/secrets/safescale.keycloak.db_password)"
+                            export ADMIN_PG_PASSWORD="$(cat /run/secrets/password.postgres)"
+                            export DB_PASSWORD="$(cat /run/secrets/password.dbuser)"
                             export DB_VENDOR=POSTGRES
-                            export DB_ADDR=postgresxl4safescale_coordinator
+                            export DB_ADDR={{.DefaultRouteIP}}
                             export DB_DATABASE=keycloak4platform
                             export DB_USER=keycloak4platform
                             export KEYCLOAK_USER=admin
-                            export KEYCLOAK_PASSWORD="$(cat /run/secrets/safescale.keycloak.admin_password)"
+                            export KEYCLOAK_PASSWORD="$(cat /run/secrets/password.admin)"
 
                             cat >/root/.pgpass <<-EOF2
                             *:5432:*:postgres:$ADMIN_PG_PASSWORD
@@ -160,7 +148,7 @@ feature:
                             EOF2
                             chmod 0600 /root/.pgpass
 
-                            PSQL="psql -h $DB_ADDR -U postgres -c"
+                            PSQL="psql -h {{ .DefaultRouteIP}} -p 63008 -U postgres -c"
 
                             # wait for database server
                             echo "Waiting for database server..."
@@ -226,28 +214,29 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker secret rm safescale.keycloak.db_password safescale.keycloak.admin_password &>/dev/null || true
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.db_password - || exit 193
-                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.admin_password - || exit 194
+                            docker secret rm safescale.keycloak.password.dbuser safescale.keycloak.password.admin &>/dev/null || true
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.password.dbuser - || exit 193
+                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || exit 194
                             exit 0
 
-                    database:
+                    pgsql:
                         targets:
-                            hosts: no
-                            gateways: no
                             masters: any
-                            nodes: no
                         run: |
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE DATABASE keycloak4platform;" || exit 195
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "CREATE USER keycloak4platform;" || exit 196
+                            sfPsqlCreateDatabase keycloak4platform
+                            echo -n "{{ .KeycloakdAdminPassword }}" | sfPsqlCreateRole keycloak4platform LOGIN || exit 196
+                            exit 0
+
+                    pgpool:
+                        targets:
+                            masters: all
+                        run: |
+                            echo -n "{{ .KeycloakdAdminPassword }}" | sfPgpoolUpdatePassword keycloak4platform || exit 197
                             exit 0
 
                     stack:
                         targets:
-                            hosts: no
-                            gateways: no
                             masters: all
-                            nodes: no
                         run: |
                             cat >${SF_ETCDIR}/keycloak4platform/stack.yml <<-EOF
                             version: '3.3'
@@ -258,8 +247,6 @@ feature:
                                         - PROXY_ADDRESS_FORWARDING=true
                                         # - KEYCLOAK_LOGLEVEL=DEBUG
                                         # - ROOT_LOGLEVEL=DEBUG
-                                    networks:
-                                        - postgresxl4safescale_net
                                     ports:
                                         - published: 8443
                                           target: 8443
@@ -275,32 +262,28 @@ feature:
                                             max_attempts: 3
                                             window: 120s
                                     secrets:
-                                        - safescale.postgresxl.password
-                                        - safescale.keycloak.db_password
-                                        - safescale.keycloak.admin_password
+                                        - password.postgres
+                                        - password.dbuser
+                                        - password.admin
 
                             secrets:
-                                safescale.postgresxl.password:
+                                password.postgres:
                                     external: true
-                                safescale.keycloak.db_password:
+                                    name: safescale.postgresql.password.postgres
+                                password.dbuser:
                                     external: true
-                                safescale.keycloak.admin_password:
+                                    name: safescale.keycloak.password.dbuser
+                                password.admin:
                                     external: true
-
-                            networks:
-                                postgresxl4safescale_net:
-                                    external: true
+                                    name: safescale.keycloak.password.admin
                             EOF
 
                     start:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: any
-                            nodes: no
                         run: |
                             docker stack deploy -c ${SF_ETCDIR}/keycloak4platform/stack.yml keycloak4platform || exit 197
-                            sfRetry 5m 5 "sfDoesDockerRunService keycloak4platform:latest keycloak4platform_server" || exit 198
+                            sfRetry 5m 5 sfDoesDockerRunStack keycloak4platform || exit 198
                             exit 0
 
             remove:
@@ -308,16 +291,13 @@ feature:
                 steps:
                     stack:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: any
-                            nodes: no
                         run: |
                             docker stack rm keycloak4platform || exit 199
-                            docker secret rm safescale.keycloak.db_password safescale.keycloak.admin_password &>/dev/null
+                            docker secret rm safescale.keycloak.password.dbuser safescale.keycloak.password.admin &>/dev/null
                             # VPL: add database keycloak4platform deletion
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP DATABASE keycloak4platform;"
-                            docker exec $(docker ps -q -f name=postgresxl4safescale_coordinator) psql -c "DROP USER keycloak4platform;"
+                            sfPgsqlDropDatabase keycloak4platform
+                            sfPgsqlDropRole keycloak4platform
                             exit 0
 
                     cleanup:
@@ -329,6 +309,7 @@ feature:
                         run: |
                             sfRemoveDockerImage keycloak4platform:latest
                             rm -drf ${SF_ETCDIR}/keycloak4platform ${SF_VARDIR}/keycloak4platform
+                            exit 0
 
     proxy:
         rules:
