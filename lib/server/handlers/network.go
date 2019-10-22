@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -289,6 +291,7 @@ func (handler *NetworkHandler) Create(
 	primaryTask, err = primaryTask.Start(handler.createGateway, data.Map{
 		"request": primaryRequest,
 		"sizing":  sizing,
+		"primary": true,
 	})
 	if err != nil {
 		return nil, err
@@ -305,6 +308,7 @@ func (handler *NetworkHandler) Create(
 		secondaryTask, err = secondaryTask.Start(handler.createGateway, data.Map{
 			"request": secondaryRequest,
 			"sizing":  sizing,
+			"primary": false,
 		})
 		if err != nil {
 			return nil, err
@@ -503,6 +507,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	// name := inputs["name"].(string)
 	request := inputs["request"].(resources.GatewayRequest)
 	sizing := inputs["sizing"].(resources.SizingRequirements)
+	primary := inputs["primary"].(bool)
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
 	gw, userData, err := handler.service.CreateGateway(request)
@@ -562,7 +567,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	} else {
 		userData.DefaultRouteIP = gw.GetPrivateIP()
 	}
-	userData.IsPrimaryGateway = true
+	userData.IsPrimaryGateway = primary
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
 	err = gw.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
