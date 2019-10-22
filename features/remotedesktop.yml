@@ -39,7 +39,7 @@ feature:
                             masters: all
                         run: |
                             if ! docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null; then
-                                exit 1
+                                fail 1
                             fi
                             exit 0
 
@@ -70,7 +70,7 @@ feature:
                                     ;;
                                 *)
                                     echo "unsupported OS type '$LINUX_KIND'"
-                                    exit 193
+                                    fail 193
                                     ;;
                             esac
                             exit 0
@@ -88,7 +88,7 @@ feature:
 
                             if [ ! -d ~{{.Username}} ]; then
                                 echo "Homedir of user {{.Username}} not found"
-                                exit 196
+                                fail 196
                             fi
 
                             # Configurations

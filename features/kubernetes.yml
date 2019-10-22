@@ -197,7 +197,7 @@ feature:
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
-                                   exit 193
+                                   fail 193
                             esac
                             sfService enable kubelet && sfService start kubelet
                             exit 0
@@ -224,12 +224,14 @@ feature:
                                     sysctl --system
 
                                     # Set SELinux in permissive mode (effectively disabling it)
-                                    setenforce 0
-                                    sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+                                    if [[ -n $(command -v setenforce) ]]; then
+                                        setenforce 0 || fail 201 "Error setting selinux in Permissive mode"
+                                        sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+                                    fi
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution '$LINUX_KIND'"
-                                    exit 196
+                                    fail 196
                                     ;;
                             esac
 
@@ -263,7 +265,7 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
-                            [ -z "${TARGET_DIR+x}" ] && exit 197
+                            [ -z "${TARGET_DIR+x}" ] && fail 197
 
                             cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
                             upstream kubernetes-api-cluster {
@@ -415,7 +417,7 @@ feature:
                                 MASTERIP=$m
                                 break
                             done
-                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && exit 220
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && fail 220
                             eval $NODE_JOIN_CMD || fail 221
                             touch /etc/kubernetes/.joined
                             exit 0

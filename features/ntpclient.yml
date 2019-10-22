@@ -40,7 +40,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
 
@@ -65,7 +65,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    fail 195
                                     ;;
                             esac
                             exit 0
@@ -93,7 +93,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    fail 195
                                     ;;
                             esac
                             echo "server NTP-server-host prefer iburst" >> /etc/ntp.conf
@@ -112,18 +112,18 @@ feature:
                                     sfService restart ntp || fail 196
                                     op=-1
                                     sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && exit 197
+                                    [ $op -ne 0 ] && fail 197
                                     ;;
                                 centos|rhel)
                                     sfService enable ntpd || fail 195
                                     sfService restart ntpd || fail 196
                                     op=-1
                                     sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && exit 197
+                                    [ $op -ne 0 ] && fail 197
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    fail 195
                                     ;;
                             esac
                             exit 0
@@ -149,7 +149,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    fail 1
                                     ;;
                             esac
 
