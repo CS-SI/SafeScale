@@ -145,7 +145,7 @@ feature:
                         run: |
                             mkdir -p ${SF_VARDIR}/postgresql4platform/pgpool
                             touch ${SF_VARDIR}/postgresql4platform/pgpool/pool_passwd
-                            chown postgres:safescale ${SF_VARDIR}/postgresql4platform/pgpool/pool_passwd
+                            chown 70:safescale ${SF_VARDIR}/postgresql4platform/pgpool/pool_passwd
                             chmode u+rw-x,g+r-wx,o-rwx ${SF_VARDIR}/postgresql4platform/pgpool/pool_passwd
 
                             cat >${SF_ETCDIR}/postgresql4platform/pgpool.conf.template <<-EOF
@@ -157,13 +157,9 @@ feature:
 
                             enable_pool_hba = on
                             authentication_timeout = 10
-                            pool_passwd = '/var/lib/postgresql/pool_passwd'
 
                             log_destination = 'stderr'
                             print_timestamp = on
-                            log_per_node_statement = on
-                            log_connections = on
-                            debug_level = 1
 
                             failover_on_backend_error = on
                             failover_command = '/bin/true'
@@ -612,7 +608,7 @@ feature:
                                     image: pgpool4platform:latest
                                     volumes:
                                         - ${SF_ETCDIR}/postgresql4platform/pgpool.conf.template:/etc/postgresql/pgpool.conf.template:ro
-                                        - ${SF_VARDIR}/postgresql4platform/pgpool/pool_passwd:/var/lib/postgresql/pool_passwd
+                                        - ${SF_VARDIR}/postgresql4platform/pgpool/pool_passwd:/etc/postgresql/pool_passwd
                                     networks:
                                         - net
                                     ports:
