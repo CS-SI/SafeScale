@@ -256,6 +256,7 @@ feature:
                             # set postgresql passwords
                             cat >\$HOME/.pgpass <<-EOF2
                             *:5432:*:postgres:\$POSTGRES_PASSWORD
+                            {{ .DefaultRouteIP }}:63008:*:postgres:\$POSTGRES_PASSWORD
                             *:5432:*:repmgr:\$REPMGR_PASSWORD
                             EOF2
                             chmod 0600 \$HOME/.pgpass
@@ -425,6 +426,21 @@ feature:
                         run: |
                             mkdir -p ${SF_ETCDIR}/postgresql4platform/build/pgpool
 
+                            cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/update_password.sh <<-EOF
+                            #!/bin/bash
+                            [ \$# -ne 2 ] && echo "invalid parameters" && exit 1
+
+                            USERNAME=\$1
+                            PASSWORD="\$2"
+
+                            grep -v "^\${USERNAME}:" /etc/postgresql/pool_passwd >/tmp/pool_passwd.new
+                            >/etc/postgresql/pool_passwd
+                            cat /tmp/pool_passwd.new >>/etc/postgresql/pool_passwd
+                            rm /tmp/pool_passwd.new
+                            pg_md5 --config-file=/etc/postgresql/pgpool.conf -m --username=\$USERNAME "\$PASSWORD"
+                            exit \$?
+                            EOF
+
                             cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/my-docker-entrypoint.sh <<-EOF
                             #!/bin/bash
 
@@ -458,7 +474,8 @@ feature:
                              && chown postgres /etc/postgresql /var/lib/postgresql /var/run/pgpool /var/log/pgpool
 
                             COPY ./my-docker-entrypoint.sh /
-                            RUN chmod a+rx /my-docker-entrypoint.sh
+                            COPY ./update_password.sh /usr/local/bin/
+                            RUN chmod a+rx /my-docker-entrypoint.sh /usr/local/bin/update_password.sh
 
                             USER postgres
 
@@ -494,10 +511,10 @@ feature:
                             secrets:
                                 postgres.password:
                                     external: true
-                                    name: safescale.postgresql.passwords.postgres
+                                    name: safescale.postgresql.password.postgres
                                 repmgr.password:
                                     external: true
-                                    name: safescale.postgresql.passwords.repmgr
+                                    name: safescale.postgresql.password.repmgr
 
                             networks:
                                 net:
@@ -680,10 +697,15 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            if docker secret inspect safescale.postgresql.passwords.postgres &>/dev/null; then
-                                docker secret rm safescale.postgresql.passwords.postgres || exit 193
+                            if docker secret inspect safescale.postgresql.password.password.postgres &>/dev/null; then
+                                docker secret rm safescale.postgresql.password.postgres || exit 193
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password - || exit 193
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || exit 194
+                            if docker secret inspect safescale.postgresql.password.repmgr &>/dev/null; then
+                                docker secret rm safescale.postgresql.password.repmgr || exit 195
+                            fi
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.repmgr - || exit 196
+                            exit 0
 
                     start:
                         targets:
@@ -712,7 +734,7 @@ feature:
                             sfDeleteDockerImage pgsql4platform:latest || true
                             sfDeleteDockerImage pgpool4platform:latest || true
                             docker network rm postgresql4platform_net || true
-                            docker secret rm safescale.postgresql.passwords.postgres safescale.postgresql.passwords.repmgr || true
+                            docker secret rm safescale.postgresql.password.postgres safescale.postgresql.password.repmgr || true
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then
                                 rm -rf ${SF_ETCDIR}/postgresql4platform ${SF_VARDIR}/postgresql4platform
