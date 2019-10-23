@@ -310,7 +310,7 @@ export -f sfDropzonePush
 sfDropzoneSync() {
 	local remote="$1"
 	__create_dropzone &>/dev/null
-	scp -i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error -r ~cladm/.dropzone cladm@${remote}:~/
+	scp $__cluster_admin_ssh_options__ -r ~cladm/.dropzone cladm@${remote}:~/
 }
 export -f sfDropzoneSync
 
@@ -347,7 +347,7 @@ export -f sfDropzoneClean
 sfRemoteExec() {
 	local remote=$1
 	shift
-	ssh -i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error cladm@$remote $*
+	ssh $__cluster_admin_ssh_options__ cladm@$remote $*
 }
 export -f sfRemoteExec
 
@@ -403,14 +403,15 @@ sfPgsqlCreateDatabase() {
 		return 1
 	fi
 	local owner=$2
-	local cmd="CREATE DATABASE $dbname"
-	[ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
-	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
-	if [ ! -z "$id" ]; then
-		docker exec -ti $id psql -c $cmd
-		return $?
+	id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
+	retcode=$?
+	if [ $retcode -eq 0 -a ! -z "$id" ]; then
+		local cmd="CREATE DATABASE $dbname"
+		[ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
+		docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
+		retcode=$?
 	fi
-	return 1
+	return $retcode
 }
 
 sfPgsqlDropDatabase() {
@@ -419,13 +420,18 @@ sfPgsqlDropDatabase() {
 	    echo "missing dbname"
 		return 1
 	fi
-	local cmd="DROP DATABASE $dbname"
-	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
-	if [ ! -z "$id" ]; then
-		docker exec -ti $id psql -c $cmd
-		return $?
+	id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
+	retcode=$?
+	if [ $retcode -eq 0 -a ! -z "$id" ]; then
+		local cmd="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${dbname}'"
+		docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
+		retcode=$?
+		if [ $retcode -eq 0 ]; then
+			docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "DROP DATABASE $dbname"
+			retcode=$?
+		fi
 	fi
-	return 1
+	return $retcode
 }
 
 # This function allows to create a database on platform PostgreSQL
@@ -438,34 +444,41 @@ sfPgsqlCreateRole() {
 	shift
 	[ -z "$rolename" ] && echo "missing role name" && return 1
 	local options="$*"
-	local password=$(</dev/stdin)}
 
-	local cmd="CREATE ROLE $rolename"
-	[ ! -z "$options" ] && cmd="$cmd WITH $options"
-	if [ ! -z "$password" ]; then
-	    [ -z "$options" ] && cmd="$cmd WITH "
-		cmd="$cmd PASSWORD '$password'"
+	local password=
+	read -t 1 password
+
+	id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
+	retcode=$?
+	if [ $retcode -eq 0 -a ! -z "$id" ]; then
+		local cmd="CREATE ROLE $rolename"
+		[ ! -z "$options" ] && cmd="$cmd $options"
+		docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
+		retcode=$?
 	fi
-	echo "sfPgsql"
-	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
-	if [ ! -z "$id" ]; then
-		docker exec -ti $id psql -c $cmd
-		return $?
+	if [ $retcode -eq 0 -a ! -z "$password" ]; then
+		echo -n "$password" | sfPgsqlUpdatePassword $rolename
+		retcode=$?
 	fi
-	return 1
+	return $retcode
 }
 
+# This function allows to drop a database on platform PostgreSQL
+# Role name is passed as parameter
+# It is intended to be used on one of the platform PostgreSQL servers in the cluster
 sfPgsqlDropRole() {
 	local rolename=$1
-
-	local cmd="DROP ROLE $rolename"
-	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
-	if [ ! -z "$id" ]; then
-		docker exec -ti $id psql -c $cmd
-		return $?
+	id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
+	retcode=$?
+	if [ $retcode -eq 0 -a ! -z "$id" ]; then
+		local cmd="DROP ROLE $rolename"
+		docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
+		retcode=$?
 	fi
-	return 1
+	return $retcode
 }
+
+__cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
 
 # This function allows to update password of a user on platform PostgreSQL
 # Username is passed as parameter to the function, password is passed in stdin. example:
@@ -473,43 +486,34 @@ sfPgsqlDropRole() {
 #     "toto" is the password, "tata" is the username
 # It is intended to be used on one of the platform PostgreSQL servers in the cluster
 sfPgsqlUpdatePassword() {
-	declare username=${1}
+	local username=${1}
 	if [ -z "$username" ]; then
 		echo "username is missing"
 		return 1
 	fi
-	declare password=${2:=$(</dev/stdin)}
-	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_db)
-	if [ ! -z "$id" ]; then
-		docker exec -ti $id psql -c "ALTER USER $username WITH PASSWORD '$password'"
-		return $?
-	fi
-	return 1
-}
 
-# This function allows to add/update password of a user for PgPool
-# Username is passed as parameter to the function, password is passed in stdin. example:
-#     echo "toto" | sfPgPoolUpdatePassword tata
-#     "toto" is the password, "tata" is the username
-# It's intended to be used on all members of PgPool for consistency
-sfPgPoolUpdatePassword() {
-	local username=$1
-	if [ -z "$username" ]; then
-		echo "username is missing"
-		return 1
-	fi
-	local password=${2:=$(</dev/stdin)}
-	id=$(docker ps {{ "--format '{{.Name}}:{{.ID}}'" }} | grep postgresql4platform_pooler)
-	if [ ! -z "$id" ]; then
-		docker exec -ti $id pg_md5 --config-file=/etc/postgresql/pgpool.conf --md5auth --username=$username "$password"
+	local password
+	read -t 1 password
+	[ -z "$password" ] && echo "missing password from pipe" && return 1
+
+	id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
+	retcode=$?
+	if [ $retcode -eq 0 -a ! -z "$id" ]; then
+		docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "ALTER USER $username WITH PASSWORD '$password'"
 		retcode=$?
-		if [ $retcode -eq 0 ]; then
-			docker exec -ti $id pgpool --config-file=/etc/postgresql/pgpool.conf reload
-			retcode=$?
-		fi
-		return $retcode
 	fi
-	return 1
+	if [ $retcode -eq 0 ]; then
+		for i in {{ range .MasterIPs }}{{.}} {{end}}; do
+			id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_pooler | cut -d: -f2)
+			retcode=$?
+			if [ $retcode -eq 0 -a ! -z "$id" ]; then
+				ssh $__cluster_admin_ssh_options__ cladm@$i docker exec $id /usr/local/bin/update_password.sh $username "$password"
+				retcode=$?
+			fi
+			[ $retcode -ne 0 ] && break
+		done
+	fi
+	return $retcode
 }
 
 # sfService abstracts the command to use to manipulate services
