@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	// "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -31,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
