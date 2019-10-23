@@ -332,7 +332,6 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	err = nil
 	t.err = err
 	t.result = result
 	t.doneCh <- true
