@@ -22,9 +22,15 @@ install_common_requirements() {
     export LANG=C
 
     # Disable SELinux
-    if [[ -n $(command -v setenforce) ]]; then
-	      setenforce 0 || fail 201 "Error setting selinux in disabled mode"
-        sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
+    if [[ -n $(command -v getenforce) ]]; then
+        act=0
+        getenforce | grep "Disabled" || act=1
+        if [ $act -eq 1 ]; then
+            if [[ -n $(command -v setenforce) ]]; then
+                setenforce 0 || fail 201 "Error setting selinux in Disabled mode"
+                sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
+            fi
+        fi
     fi
 
     # Upgrade to last CentOS revision
