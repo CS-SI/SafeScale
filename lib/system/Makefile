@@ -5,7 +5,7 @@ GO?=go
 VERSIONFILE := version.go
 REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 
-all: nfs gensrc
+all: nfs generate
 
 vet:
 	@$(GO) vet ./...
@@ -13,7 +13,7 @@ vet:
 nfs:
 	@(cd nfs && $(MAKE) all)
 
-generate:
+generate: gensrc
 	@(cd nfs && $(MAKE) $(@))
 	@(go generate .)
 
