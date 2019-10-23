@@ -21,7 +21,8 @@ feature:
         cluster: all
     requirements:
         features:
-            - postgres4gateway
+            - postgresql4platform
+
     parameters:
         - KeycloakAdminPassword
 
@@ -37,19 +38,15 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            curl -Ssl -I -k https://{{ .HostIP }}:8443/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null
+                            curl -Ssl -I -k https://{{ .DefaultRouteIP }}:63009/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null
 
             add:
-                # pace: config,build,secret,compose,start
-                pace: config,build,compose,start
+                pace: config,build,secrets,stack,start
                 steps:
                     config:
                         timeout: 10
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/keycloak4gateway
 
@@ -137,44 +134,40 @@ feature:
                     build:
                         timeout: 10
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
-                            cat >${SF_ETCDIR}/keycloak4gateway/my-docker-entrypoint.sh <<-'EOF'
+                            cat >${SF_ETCDIR}/keycloak4gateway/my-docker-entrypoint.sh <<-EOF
                             #!/bin/bash
 
-                            case ${DB_VENDOR,,} in
-                                postgres)
-                                          cat >/root/.pgpass <<-EOF2
-                            *:5432:*:postgres:$ADMIN_PG_PASSWORD
-                            *:5432:keycloak4gateway:keycloak4gateway:$KEYCLOAK_PG_PASSWORD
+                            export KEYCLOAK_USER=admin
+                            export KEYCLOAK_PASSWORD=\$(cat /run/secrets/password.admin)
+
+                            export DB_ADDR={{ .DefaultRouteIP }}
+                            export DB_PORT=63008
+                            export DB_VENDOR=postgres
+                            export DB_DATABASE=keycloak4gateway
+                            #FIXME: Using postgres user because for now keycloak4gateway doesn't have enough rights to do the job
+                            # export DB_USER=keycloak4gateway
+                            export DB_USER=postgres
+                            export DB_PASSWORD=\$(cat /run/secrets/password.postgres)
+
+                            export ADMIN_DB_PASSWORD=\$(cat /run/secrets/password.postgres)
+
+                            cat >/root/.pgpass <<-EOF2
+                            *:5432:*:postgres:\$ADMIN_DB_PASSWORD
+                            *:5432:keycloak4gateway:keycloak4gateway:\$DB_PASSWORD
                             EOF2
-                                          chmod 0600 /root/.pgpass
+                            chmod 0600 /root/.pgpass
 
-                                          # wait for database server
-                                          while ! psql -h $DB_ADDR -U postgres -c 'select 1' >/dev/null; do
-                                              sleep 5
-                                          done
+                            # Generates SSL certificates
+                            IP=\$(ifconfig eth0 | grep inet | tr -s ' ' '#' | cut -d\# -f3 | head -n 1)
+                                openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN=\$IP" \
+                             && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
+                             && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale \
+                             && cp ./safescale.jks /opt/jboss/keycloak/standalone/configuration/ \
+                             && chown jboss:jboss /opt/jboss/keycloak/standalone/configuration/safescale.jks
 
-                                          # Create database if needed
-                                          if ! psql -h $DB_ADDR -U postgres ${DB_DATABASE} -c '\q' &>/dev/null; then
-                                              psql -h $DB_ADDR -U postgres <<-EOSQL
-                            CREATE DATABASE ${DB_DATABASE};
-                            CREATE USER ${DB_USER};
-                            EOSQL
-                                          fi
-
-                                          # Update ownership and DB_USER password
-                                          psql -h $DB_ADDR -U postgres <<-EOSQL
-                            ALTER USER ${DB_USER} PASSWORD '${DB_PASSWORD}';
-                            ALTER DATABASE ${DB_DATABASE} OWNER TO ${DB_USER};
-                            EOSQL
-                                          ;;
-                            esac
-
-                            exec /opt/jboss/tools/docker-entrypoint.sh $*
+                            exec /opt/jboss/tools/docker-entrypoint.sh "\$@"
                             EOF
 
                             cat >${SF_ETCDIR}/keycloak4gateway/Dockerfile <<-'EOF'
@@ -184,14 +177,14 @@ feature:
                             USER root
 
                             # need psql in my-docker-entrypoint.sh and patch
-                            RUN yum install -qy postgresql patch
+                            RUN yum install -q -y postgresql patch net-tools
 
-                            # Generates SSL certificates
-                            RUN openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN={{ .HostIP }}" \
-                             && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
-                             && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale \
-                             && cp ./safescale.jks keycloak/standalone/configuration/ \
-                             && chown jboss:jboss keycloak/standalone/configuration/safescale.jks
+                            # # Generates SSL certificates
+                            # RUN openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN={{ .HostIP }}" \
+                            #  && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
+                            #  && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale \
+                            #  && cp ./safescale.jks keycloak/standalone/configuration/ \
+                            #  && chown jboss:jboss keycloak/standalone/configuration/safescale.jks
 
                             # Updates configuration
                             COPY standalone-ha.xml.patch keycloak/standalone/configuration/
@@ -205,113 +198,114 @@ feature:
                             CMD ["-b", "0.0.0.0"]
                             EOF
 
-                            docker build -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || exit 192
+                            docker build --network host -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || exit 192
 
-                    # secret:
-                    #     targets:
-                    #         hosts: no
-                    #         gateways: any
-                    #         masters: no
-                    #         nodes: no
-                    #     run: |
-                    #         docker secret rm keycloak4gateway-db keycloak4gateway-admin &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create keycloak4gateway-db - || exit 193
-                    #         echo -n "{{ .KeycloakAdminPassword }}" | docker secret create keycloak4gateway-admin - || exit 193
-                    #         exit 0
-
-                    compose:
+                    secrets:
                         targets:
-                            hosts: yes
-                            gateways: all
-                            masters: no
-                            nodes: no
+                            masters: any
                         run: |
-                            KEYCLOAK_PG_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
-                            ADMIN_PG_PASSWORD="$(cat ${SF_ETCDIR}/postgres4gateway/password)"
+                            if docker secret inspect safescale.keycloak.password.dbuser &>/dev/null; then
+                                docker secret rm safescale.keycloak.password.dbuser
+                            fi
+                            KC_PASSWORD=$(sfRandomString 16 "[:alnum:]")
+                            echo -n "$KC_PASSWORD" | docker secret create safescale.keycloak.password.dbuser - || exit 193
+                            if docker secret inspect safescale.keycloak.password.admin &>/dev/null; then
+                                docker secret rm safescale.keycloak.password.admin
+                            fi
+                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || exit 194
 
-                            cat >${SF_ETCDIR}/keycloak4gateway/docker-compose.yml <<-EOF
-                            version: '2.1'
+                            echo -n $KC_PASSWORD | sfPgsqlCreateRole keycloak4gateway LOGIN || exit 195
+                            sfPgsqlCreateDatabase keycloak4gateway keycloak4gateway || exit 196
+                            exit 0
+
+                    stack:
+                        targets:
+                            masters: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/keycloak4gateway
+
+                            cat >${SF_ETCDIR}/keycloak4gateway/stack.yml <<-EOF
+                            version: '3.7'
                             services:
                                 server:
                                     image: keycloak4gateway:latest
                                     environment:
-                                        - DB_VENDOR=POSTGRES
-                                        - DB_ADDR={{ .HostIP }}
-                                        - DB_DATABASE=keycloak4gateway
-                                        - DB_USER=keycloak4gateway
-                                        - DB_PASSWORD=${KEYCLOAK_PG_PASSWORD}
-                                        - ADMIN_PG_PASSWORD=${ADMIN_PG_PASSWORD}
-                                        - KEYCLOAK_USER=admin
-                                        - KEYCLOAK_PASSWORD={{ .KeycloakAdminPassword }}
                                         - PROXY_ADDRESS_FORWARDING=true
                                         # - KEYCLOAK_LOGLEVEL=DEBUG
                                         # - ROOT_LOGLEVEL=DEBUG
-                                    network_mode: "host"
                                     ports:
-                                        - {{ .HostIP }}:8443:8443
-                                    restart: always
-                                    # deploy:
-                                    #     mode: global
-                                    #     placement:
-                                    #         constraints:
-                                    #             - node.role == manager
-                                    #     restart_policy:
-                                    #         condition: on-failure
-                                    #         delay: 5s
-                                    #         max_attempts: 3
-                                    #         window: 120s
-                            #         secrets:
-                            #             - postgres4gateway
-                            #             - keycloak4gateway-db
-                            #             - keycloak4gateway-admin
+                                        - published: 63009
+                                          target: 8443
+                                          mode: host
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.labels.safescale.host.role == gateway
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
+                                    secrets:
+                                        - password.postgres
+                                        - password.dbuser
+                                        - password.admin
 
-                            # secrets:
-                            #     postgres4gateway:
-                            #         external: true
-                            #     keycloak4gateway-db:
-                            #         external: true
-                            #     keycloak4gateway-admin:
-                            #         external: true
-
-                            # networks:
-                            #     safescale-gw:
-                            #         external: true
+                            secrets:
+                                password.postgres:
+                                    external: true
+                                    name: safescale.postgresql.password.postgres
+                                password.dbuser:
+                                    external: true
+                                    name: safescale.keycloak.password.dbuser
+                                password.admin:
+                                    external: true
+                                    name: safescale.keycloak.password.admin
                             EOF
 
                     start:
                         targets:
-                            gateways: all
-                            hosts: yes
-                            masters: no
-                            nodes: no
+                            masters: any
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway up -d || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer keycloak4gateway:latest keycloak4gateway_server_1" || exit 195
+                            docker stack deploy -c ${SF_ETCDIR}/keycloak4gateway/stack.yml keycloak4gateway || exit 197
+                            sfRetry 5m 5 "sfDoesDockerRunStack keycloak4gateway" || exit 198
                             exit 0
 
             remove:
-                pace: compose,cleanup
+                pace: stack,db,image,cleanup
                 steps:
-                    compose:
+                    stack:
+                        targets:
+                            masters: any
+                        run: |
+                            docker stack rm keycloak4gateway || exit 199
+                            docker secret rm safescale.keycloak.password.dbuser || true
+                            docker secret rm safescale.keycloak.password.admin || true
+                            exit 0
+
+                    db:
+                        targets:
+                            masters: any
+                        run: |
+                            sfPgsqlDropDatabase keycloak4gateway || exit 200
+                            sfPgsqlDropRole keycloak4gateway || exit 201
+                            exit 0
+
+                    image:
                         targets:
                             gateways: all
-                            hosts: yes
-                            masters: no
-                            nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway rm --stop --force || exit 196
+                            docker image rm -f keycloak4gateway:latest || true
                             exit 0
 
                     cleanup:
                         targets:
-                            hosts: yes
                             gateways: all
-                            masters: no
-                            nodes: no
+                            masters: all
                         run: |
-                            docker secret rm keycloak4gateway-db keycloak4gateway-admin
-                            docker image rm -f keycloak4gateway:latest
                             rm -drf ${SF_ETCDIR}/keycloak4gateway ${SF_VARDIR}/keycloak4gateway
+                            exit 0
 
     proxy:
         rules:
@@ -321,7 +315,7 @@ feature:
                   gateways: all
               content: |
                   {
-                      "target": "{{.HostIP}}:8443",
+                      "target": "{{.HostIP}}:63009",
                       "weight": 100
                   }
 
