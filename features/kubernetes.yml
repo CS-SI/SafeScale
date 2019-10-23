@@ -224,9 +224,15 @@ feature:
                                     sysctl --system
 
                                     # Set SELinux in permissive mode (effectively disabling it)
-                                    if [[ -n $(command -v setenforce) ]]; then
-                                        setenforce 0 || fail 201 "Error setting selinux in Permissive mode"
-                                        sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+                                    if [[ -n $(command -v getenforce) ]]; then
+                                        act=0
+                                        getenforce | grep "Disabled" || act=1
+                                        if [ $act -eq 1 ]; then
+                                            if [[ -n $(command -v setenforce) ]]; then
+                                                setenforce 0 || fail 201 "Error setting selinux in Permissive mode"
+                                                sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+                                            fi
+                                        fi
                                     fi
                                     ;;
                                 *)
