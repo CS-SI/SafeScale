@@ -35,7 +35,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack postgresql4platform || fail 192
+                            sfDoesDockerRunStack postgresql4platform || exit 192
                             exit 0
 
             add:
@@ -256,6 +256,7 @@ feature:
                             # set postgresql passwords
                             cat >\$HOME/.pgpass <<-EOF2
                             *:5432:*:postgres:\$POSTGRES_PASSWORD
+                            {{ .DefaultRouteIP }}:63008:*:postgres:\$POSTGRES_PASSWORD
                             *:5432:*:repmgr:\$REPMGR_PASSWORD
                             EOF2
                             chmod 0600 \$HOME/.pgpass
@@ -267,9 +268,8 @@ feature:
                                 echo -n "Waiting postgresql master is ready... "
                                 update_postgresql_conf
                                 update_pghba_conf
-                                op=-1
-                                pg_ctl start &>/dev/null && wait_for_local_postgres 60 && op=$?
-                                [ $op -ne 0 ] && echo "Failed." && fail 1
+                                pg_ctl start &>/dev/null && wait_for_local_postgres 60
+                                [ \$? -ne 0 ] && echo "Failed." && exit 1
                                 echo OK
 
                                 # Checking if repmgr needs to be initialized
@@ -287,18 +287,16 @@ feature:
                                     echo done
 
                                     echo -n "registering host as primary postgresql instance... "
-                                    op=-1
-                                    repmgr --config-file=/etc/postgresql/repmgr.conf primary register && op=$?
-                                    [ $op -ne 0 ] && echo "Failed." && fail 2
+                                    repmgr --config-file=/etc/postgresql/repmgr.conf primary register
+                                    [ \$? -ne 0 ] && echo "Failed." && exit 2
                                     echo done
                                 fi
                                 pg_ctl stop -m fast &>/dev/null
                             else
                                 # We are on a slave
                                 echo -n "Waiting postgresql master is ready... "
-                                op=-1
-                                wait_for_dbmaster 60 && op=$?
-                                [ $op -ne 0 ] && echo Failed && exit 3
+                                wait_for_dbmaster 60
+                                [ \$? -ne 0 ] && echo Failed && exit 3
                                 echo OK
                                 registered=\$(psql -qAt -h "\$REPMGR_PRIMARY_HOST" -U repmgr repmgr -c "SELECT 1 FROM repmgr.nodes WHERE node_id=\${nodeid}")
                                 if [ "\$registered" != "1" ]; then
@@ -309,13 +307,11 @@ feature:
                                     set +x
                                     update_postgresql_conf
                                     update_pghba_conf
-                                    op=-1
-                                    pg_ctl start &>/dev/stdout && wait_for_local_postgres 60 && op=$?
-                                    [ $op -ne 0 ] && echo "Failed to start postgresql instance." && exit 4
+                                    pg_ctl start &>/dev/stdout && wait_for_local_postgres 60
+                                    [ \$? -ne 0 ] && echo "Failed to start postgresql instance." && exit 4
                                     echo -n "Registering postgresql instance as hot-standby... "
-                                    op=-1
-                                    repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register && op=$?
-                                    [ $op -ne 0 ] && echo "Failed." && exit 5
+                                    repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register
+                                    [ \$? -ne 0 ] && echo "Failed." && exit 5
                                     echo done
                                 fi
                             fi
@@ -421,7 +417,7 @@ feature:
                             CMD ["postgres"]
                             EOF
 
-                            docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || fail 192
+                            docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || exit 192
                             exit 0
 
                     pgpool-img:
@@ -429,6 +425,21 @@ feature:
                             masters: all
                         run: |
                             mkdir -p ${SF_ETCDIR}/postgresql4platform/build/pgpool
+
+                            cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/update_password.sh <<-EOF
+                            #!/bin/bash
+                            [ \$# -ne 2 ] && echo "invalid parameters" && exit 1
+
+                            USERNAME=\$1
+                            PASSWORD="\$2"
+
+                            grep -v "^\${USERNAME}:" /etc/postgresql/pool_passwd >/tmp/pool_passwd.new
+                            >/etc/postgresql/pool_passwd
+                            cat /tmp/pool_passwd.new >>/etc/postgresql/pool_passwd
+                            rm /tmp/pool_passwd.new
+                            pg_md5 --config-file=/etc/postgresql/pgpool.conf -m --username=\$USERNAME "\$PASSWORD"
+                            exit \$?
+                            EOF
 
                             cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/my-docker-entrypoint.sh <<-EOF
                             #!/bin/bash
@@ -463,14 +474,15 @@ feature:
                              && chown postgres /etc/postgresql /var/lib/postgresql /var/run/pgpool /var/log/pgpool
 
                             COPY ./my-docker-entrypoint.sh /
-                            RUN chmod a+rx /my-docker-entrypoint.sh
+                            COPY ./update_password.sh /usr/local/bin/
+                            RUN chmod a+rx /my-docker-entrypoint.sh /usr/local/bin/update_password.sh
 
                             USER postgres
 
                             ENTRYPOINT ["/sbin/tini", "--", "/my-docker-entrypoint.sh"]
                             EOF
 
-                            docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || fail 192
+                            docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || exit 192
                             exit 0
 
                     stack:
@@ -499,10 +511,10 @@ feature:
                             secrets:
                                 postgres.password:
                                     external: true
-                                    name: safescale.postgresql.passwords.postgres
+                                    name: safescale.postgresql.password.postgres
                                 repmgr.password:
                                     external: true
-                                    name: safescale.postgresql.passwords.repmgr
+                                    name: safescale.postgresql.password.repmgr
 
                             networks:
                                 net:
@@ -656,7 +668,7 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
-                            [ -z "${TARGET_DIR+x}" ] && fail 197
+                            [ -z "${TARGET_DIR+x}" ] && exit 197
 
                             cat >${TARGET_DIR}/includes/postgresql4platform.conf <<-'EOF'
                             upstream postgresql4platform {
@@ -677,7 +689,7 @@ feature:
                             masters: any
                         run: |
                             if ! docker network list --filter 'name=postgresql4platform_net' | grep postgresql4platform_net; then
-                                docker network create --attachable -d overlay --scope swarm postgresql4platform_net || fail 193
+                                docker network create --attachable -d overlay --scope swarm postgresql4platform_net || exit 193
                             fi
                             exit 0
 
@@ -685,17 +697,22 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            if docker secret inspect safescale.postgresql.passwords.postgres &>/dev/null; then
-                                docker secret rm safescale.postgresql.passwords.postgres || fail 193
+                            if docker secret inspect safescale.postgresql.password.password.postgres &>/dev/null; then
+                                docker secret rm safescale.postgresql.password.postgres || exit 193
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password - || fail 193
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || exit 194
+                            if docker secret inspect safescale.postgresql.password.repmgr &>/dev/null; then
+                                docker secret rm safescale.postgresql.password.repmgr || exit 195
+                            fi
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.repmgr - || exit 196
+                            exit 0
 
                     start:
                         targets:
                             masters: any
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || fail 194
-                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || fail 195
+                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || exit 194
+                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || exit 195
                             exit 0
 
             remove:
@@ -706,7 +723,7 @@ feature:
                             masters: any
                         run: |
                             if [ -f ${SF_ETCDIR}/postgresql4platform/stack.yml ]; then
-                                docker stack rm postgresql4platform || fail 192
+                                docker stack rm postgresql4platform || exit 192
                             fi
                             exit 0
 
@@ -717,7 +734,7 @@ feature:
                             sfDeleteDockerImage pgsql4platform:latest || true
                             sfDeleteDockerImage pgpool4platform:latest || true
                             docker network rm postgresql4platform_net || true
-                            docker secret rm safescale.postgresql.passwords.postgres safescale.postgresql.passwords.repmgr || true
+                            docker secret rm safescale.postgresql.password.postgres safescale.postgresql.password.repmgr || true
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then
                                 rm -rf ${SF_ETCDIR}/postgresql4platform ${SF_VARDIR}/postgresql4platform
