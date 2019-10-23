@@ -21,6 +21,7 @@ package userdata
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -33,7 +34,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
@@ -160,7 +160,7 @@ func (ud *Content) Prepare(
 
 	ud.BashLibrary = bashLibrary
 	ud.Header = scriptHeader
-	ud.Revision = system.REV
+	ud.Revision = REV
 	ud.User = operatorUsername
 	ud.ExitOnError = exitOnErrorHeader
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
