@@ -207,7 +207,7 @@ feature:
                             CMD ["-b", "0.0.0.0"]
                             EOF
 
-                            docker build --network host -t keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || fail 192
+                            docker build --network host -t keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || exit 192
                             exit 0
 
                     secret:
@@ -218,8 +218,8 @@ feature:
                             nodes: no
                         run: |
                             docker secret rm safescale.keycloak.password.dbuser safescale.keycloak.password.admin &>/dev/null || true
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.password.dbuser - || fail 193
-                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || fail 194
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.password.dbuser - || exit 193
+                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || exit 194
                             exit 0
 
                     pgsql:

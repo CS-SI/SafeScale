@@ -193,6 +193,7 @@ depclean: begin
 
 generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@rm -f ./generation_results.log || true
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@$(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log

@@ -23,6 +23,7 @@ vet:
 	@$(GO) vet ./...
 
 generate: sdk
+	@(cd server/iaas/resources/enums && $(MAKE) $@)
 	@(cd server && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
