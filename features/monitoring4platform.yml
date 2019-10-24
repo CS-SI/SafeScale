@@ -520,7 +520,7 @@ feature:
                                 #     deploy:
                                 #         mode: global
                                 #         restart_policy:
-                                #             condition: on-exiture
+                                #             condition: on-failure
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s
@@ -547,7 +547,7 @@ feature:
                                         mode: global
                                         endpoint_mode: dnsrr
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -588,7 +588,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -616,7 +616,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -647,7 +647,7 @@ feature:
                                             constraints:
                                                 - node.role == manager
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -683,7 +683,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -710,7 +710,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -739,7 +739,7 @@ feature:
                                 #             constraints:
                                 #                 - node.platform.os == linux
                                 #         restart_policy:
-                                #             condition: on-exiture
+                                #             condition: on-failure
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s
@@ -770,7 +770,7 @@ feature:
                                 #             constraints:
                                 #                 - node.role == manager
                                 #         restart_policy:
-                                #             condition: on-exiture
+                                #             condition: on-failure
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s

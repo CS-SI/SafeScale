@@ -50,23 +50,6 @@ function print_error() {
 }
 trap print_error ERR
 
-function sfFail() {
-	if [ -z "$2" ]; then
-		if [ $1 -ne 0 ]; then
-    		echo "An error occurred: $1"
-		fi
-	else
-		if [ $1 -ne 0 ]; then
-			echo "An error occurred (errorcode $1): $2"
-		fi
-	fi
-    exit $1
-}
-
-function sfExit() {
-    exit 0
-}
-
 set +x
 rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
@@ -81,9 +64,7 @@ set -x
 `
 )
 
-var (
-	featureScriptTemplate *template.Template
-)
+var featureScriptTemplate *template.Template
 
 // parseTargets validates targets on the cluster from the feature specification
 // Without error, returns 'master target', 'private node target' and 'public node target'
