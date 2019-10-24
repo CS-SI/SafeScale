@@ -40,7 +40,7 @@ feature:
                 run: |
                     STATUS=$(sfDcos spark plan show deploy --json | jq .status
                     echo $STATUS | grep COMPLETE || sfFail 192
-                    sfFail 0
+                    sfExit
 
             add:
                 pace: package,cli
@@ -79,7 +79,7 @@ feature:
                             VERSION=$(echo $(basename $(readlink -f /usr/local/spark)) | cut -d- -f2)
                             [ "$VERSION" = "{{.SparkVersion}}" ] || sfFail 193
                             [ -x /usr/local/spark/bin/spark ] || sfFail 194
-                            sfFail 0
+                            sfExit
 
 
             add:

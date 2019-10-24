@@ -43,6 +43,7 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
 
             add:
                 pace: ntp-server,firewall,ready
@@ -68,7 +69,7 @@ feature:
                                     sfFail 195
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
                     firewall:
                         targets:
@@ -111,7 +112,7 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: ntp-server

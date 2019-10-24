@@ -37,7 +37,7 @@ feature:
                             nodes: all
                         run: |
                             sfDoesDockerRunContainer docker.elastic.co/beats/packetbeat:{{ .Version }} packetbeat4safescale_agent_1 || sfFail 192
-                            sfFail 0
+                            sfExit
 
             add:
                 pace: config,compose,start
@@ -133,7 +133,7 @@ feature:
                         run: |
                             docker-compose -f ${SF_ETCDIR}/packetbeat4safescale/docker-compose.yml -p packetbeat4safescale up -d || sfFail 193
                             sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/packetbeat:{{ .Version }} packetbeat4safescale_agent_1" || sfFail 194
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: stop,cleanup
@@ -146,7 +146,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/packetbeat4safescale/docker-compose.yml -p packetbeat4safescale rm --stop --force || sfFail 195
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -157,6 +157,6 @@ feature:
                         run: |
                             docker image rm -f docker.elastic.co/beats/packetbeat:{{ .Version }}
                             rm -rf ${SF_ETCDIR}/packetbeat4safescale
-                            sfFail 0
+                            sfExit
 
 ...

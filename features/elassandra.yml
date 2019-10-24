@@ -41,7 +41,7 @@ feature:
                         run: |
                             [ -d ${SF_ETC_DIR}/elassandra ] || sfFail 192
                             docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'strapdata/elassandra:6' &>/dev/null || sfFail 193
-                            sfFail 0
+                            sfExit
 
             add:
                 pace: image,config,start,ready
@@ -91,7 +91,7 @@ feature:
                                     restart: always
 
                             EOF
-                            sfFail 0
+                            sfExit
 
                     start:
                         targets:
@@ -145,7 +145,7 @@ feature:
                             purge={{.KeepDataOnRemoval}}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elassandra ${SF_VARDIR}/elassandra
-                            sfFail 0
+                            sfExit
 
     proxy:
         rules:

@@ -39,7 +39,7 @@ feature:
                                     if ! file $(which docker-compose) 2>/dev/null | grep x86-64 &>/dev/null; then
                                         sfFail 1
                                     fi
-                                    sfFail 0
+                                    sfExit
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -63,7 +63,7 @@ feature:
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
                             sfDownload "$URL" docker-compose 3m 5 || sfFail 193
                             chmod +x docker-compose && mv docker-compose /usr/bin
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: docker-compose
@@ -76,5 +76,5 @@ feature:
                             nodes: all
                         run: |
                             rm /usr/bin/docker-compose || rm -f /usr/local/bin/docker-compose
-                            sfFail 0
+                            sfExit
 ...

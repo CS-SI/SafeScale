@@ -206,7 +206,7 @@ feature:
                             EOF
 
                             docker build --network host -t keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || sfFail 192
-                            sfFail 0
+                            sfExit
 
                     secret:
                         targets:
@@ -218,7 +218,7 @@ feature:
                             docker secret rm safescale.keycloak.password.dbuser safescale.keycloak.password.admin &>/dev/null || true
                             echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.password.dbuser - || sfFail 193
                             echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || sfFail 194
-                            sfFail 0
+                            sfExit
 
                     pgsql:
                         targets:
@@ -226,14 +226,14 @@ feature:
                         run: |
                             sfPsqlCreateDatabase keycloak4platform
                             echo -n "{{ .KeycloakdAdminPassword }}" | sfPsqlCreateRole keycloak4platform LOGIN || sfFail 196
-                            sfFail 0
+                            sfExit
 
                     pgpool:
                         targets:
                             masters: all
                         run: |
                             echo -n "{{ .KeycloakdAdminPassword }}" | sfPgpoolUpdatePassword keycloak4platform || sfFail 197
-                            sfFail 0
+                            sfExit
 
                     stack:
                         targets:
@@ -285,7 +285,7 @@ feature:
                         run: |
                             docker stack deploy -c ${SF_ETCDIR}/keycloak4platform/stack.yml keycloak4platform || sfFail 197
                             sfRetry 5m 5 "sfDoesDockerRunStack keycloak4platform" || sfFail 198
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: stack,cleanup
@@ -296,10 +296,9 @@ feature:
                         run: |
                             docker stack rm keycloak4platform || sfFail 199
                             docker secret rm safescale.keycloak.password.dbuser safescale.keycloak.password.admin &>/dev/null
-                            # VPL: add database keycloak4platform deletion
                             sfPgsqlDropDatabase keycloak4platform
                             sfPgsqlDropRole keycloak4platform
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -310,7 +309,7 @@ feature:
                         run: |
                             sfRemoveDockerImage keycloak4platform:latest
                             rm -drf ${SF_ETCDIR}/keycloak4platform ${SF_VARDIR}/keycloak4platform
-                            sfFail 0
+                            sfExit
 
     proxy:
         rules:

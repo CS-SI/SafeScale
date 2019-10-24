@@ -80,7 +80,7 @@ feature:
                                     sfFail 195
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: ansible

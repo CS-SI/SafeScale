@@ -41,7 +41,7 @@ feature:
                             if ! docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null; then
                                 sfFail 1
                             fi
-                            sfFail 0
+                            sfExit
 
             add:
                 #pace: desktop+deps,tigervnc+guacamole,start
@@ -73,7 +73,7 @@ feature:
                                     sfFail 193
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
                     tigervnc:
                         targets:
@@ -260,7 +260,7 @@ feature:
                             systemctl enable vncconfig\@:0.service && \
                             systemctl restart vncserver\@:0.service || sfFail 198
                             systemctl restart vncconfig\@:0.service || sfFail 199
-                            sfFail 0
+                            sfExit
 
                     deps:
                         targets:
@@ -274,7 +274,7 @@ feature:
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
                             sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || sfFail 200
                             sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || sfFail 201
-                            sfFail 0
+                            sfExit
 
                     guacamole:
                         targets:
@@ -480,7 +480,7 @@ feature:
 
                             # build image
                             docker build -t remotedesktop:latest --network=host . || sfFail 202
-                            sfFail 0
+                            sfExit
 
                     start:
                         targets:
@@ -546,7 +546,7 @@ feature:
                             # Starts remotedesktop container                          #
                             ###########################################################
                             docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d || sfFail 203
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: image

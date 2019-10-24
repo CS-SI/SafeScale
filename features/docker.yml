@@ -75,7 +75,7 @@ feature:
                                     sfFail 195
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
                     docker-compose:
                         targets:
@@ -90,7 +90,7 @@ feature:
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
                             sfDownload "$URL" docker-compose 3m 5 || sfFail 193
                             chmod +x docker-compose && mv docker-compose /usr/bin
-                            sfFail 0
+                            sfExit
 
                     config:
                         targets:
@@ -133,7 +133,7 @@ feature:
                             }
                             EOF
                             fi
-                            sfFail 0
+                            sfExit
 
                     firewall:
                         targets:
@@ -163,7 +163,7 @@ feature:
                             op=-1
                             sfRetry 2m 5 "sfService status docker &>/dev/null" && op=$? || true
                             [ $op -ne 0 ] && sfFail 197
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: cleanup
@@ -190,6 +190,6 @@ feature:
                                     ;;
                             esac
                             rm -f /usr/bin/docker-compose || true
-                            sfFail 0
+                            sfExit
 
 ...

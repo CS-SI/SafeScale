@@ -193,6 +193,7 @@ feature:
                             EOF
 
                             docker build --network host -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || sfFail 192
+                            sfExit
 
                     secrets:
                         targets:
@@ -210,7 +211,7 @@ feature:
 
                             echo -n $KC_PASSWORD | sfPgsqlCreateRole keycloak4gateway LOGIN || sfFail 195
                             sfPgsqlCreateDatabase keycloak4gateway keycloak4gateway || sfFail 196
-                            sfFail 0
+                            sfExit
 
                     stack:
                         targets:
@@ -264,7 +265,7 @@ feature:
                         run: |
                             docker stack deploy -c ${SF_ETCDIR}/keycloak4gateway/stack.yml keycloak4gateway || sfFail 197
                             sfRetry 5m 5 "sfDoesDockerRunStack keycloak4gateway" || sfFail 198
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: stack,db,image,cleanup
@@ -276,7 +277,7 @@ feature:
                             docker stack rm keycloak4gateway || sfFail 199
                             docker secret rm safescale.keycloak.password.dbuser || true
                             docker secret rm safescale.keycloak.password.admin || true
-                            sfFail 0
+                            sfExit
 
                     db:
                         targets:
@@ -284,14 +285,14 @@ feature:
                         run: |
                             sfPgsqlDropDatabase keycloak4gateway || sfFail 200
                             sfPgsqlDropRole keycloak4gateway || sfFail 201
-                            sfFail 0
+                            sfExit
 
                     image:
                         targets:
                             gateways: all
                         run: |
                             docker image rm -f keycloak4gateway:latest || true
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -299,7 +300,7 @@ feature:
                             masters: all
                         run: |
                             rm -drf ${SF_ETCDIR}/keycloak4gateway ${SF_VARDIR}/keycloak4gateway
-                            sfFail 0
+                            sfExit
 
     proxy:
         rules:

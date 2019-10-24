@@ -147,7 +147,7 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: pkg

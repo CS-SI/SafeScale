@@ -111,7 +111,6 @@ feature:
                                         }
                                     }
                                 }
-
                         run: |
                             output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1)
                             rc=$?
@@ -119,13 +118,14 @@ feature:
                                 echo $output
                                 echo $output | grep "already installed" &>/dev/null || sfFail $op
                             }
-                            sfFail 0
+                            sfExit
 
                     cli:
                         targets:
                             masters: all
                         run: |
                             sfDcos package install --yes kubernetes --cli
+                            sfExit
 
                     config:
                         targets:
@@ -134,6 +134,7 @@ feature:
                             sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || sfFail 192
                             sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                             sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
+                            sfExit
 
             remove:
                 pace: package
@@ -142,7 +143,8 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            sfDcos package remove --yes kubernetes
+                            sfDcos package remove --yes kubernetes || sfFail 192
+                            sfExit
 
         bash:
             check:
@@ -169,7 +171,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfFail 0
+                            [ -f /etc/kubernetes/.joined ] && sfExit
 
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
@@ -200,14 +202,14 @@ feature:
                                    sfFail 193
                             esac
                             sfService enable kubelet && sfService start kubelet
-                            sfFail 0
+                            sfExit
 
                     sysconf:
                         targets:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfFail 0
+                            [ -f /etc/kubernetes/.joined ] && sfExit
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -259,7 +261,7 @@ feature:
                                     grep -v "$s" /etc/fstab >>/etc/fstab.new && mv /etc/fstab.new /etc/fstab
                                 done
                             fi
-                            sfFail 0
+                            sfExit
 
                     reverseproxy:
                         targets:
@@ -284,13 +286,13 @@ feature:
                             }
                             EOF
                             sfReverseProxyReload
-                            sfFail 0
+                            sfExit
 
                     cp1-init:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfFail 0
+                            [ -f /etc/kubernetes/.joined ] && sfExit
 
                             mkdir -p /etc/kubernetes/kubeadm
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-'EOF'
@@ -311,7 +313,6 @@ feature:
                             sfRetry 5m 5 kubeadm config images pull || sfFail 198
                             kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 199
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 200
-                            #cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -1) || sfFail 201
                             cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1) || sfFail 201
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
@@ -328,8 +329,8 @@ feature:
                             # Push control-plane join command to all the other masters
                             echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
                             cat ${SF_TMPDIR}/cp_join_cmd.sh
-                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 203
-                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 204
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 203
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 204
                             for ip in {{range .MasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
                                 sfDropzoneSync $ip || sfFail 205
@@ -346,7 +347,7 @@ feature:
 
                             touch /etc/kubernetes/.joined
                             echo "init done"
-                            sfFail 0
+                            sfExit
 
                     cni:
                         targets:
@@ -369,14 +370,14 @@ feature:
                                     sfFirewallReload || sfFail 204 "Firewall problem"
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit 0
 
                     cpx-init:
                         targets:
                             masters: all
                         run: |
                             # Don't try to init a kubernetes cluster already running
-                            [ -f /etc/kubernetes/.joined ] && sfFail 0
+                            [ -f /etc/kubernetes/.joined ] && sfExit
 
                             sfDropzonePop ${SF_TMPDIR} || sfFail 212
                             sfDropzoneClean
@@ -404,14 +405,13 @@ feature:
                                     sfFirewallReload || sfFail 204 "Firewall problem"
                                     ;;
                             esac
-
-                            sfFail 0
+                            sfExit
 
                     join:
                         targets:
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfFail 0
+                            [ -f /etc/kubernetes/.joined ] && sfExit
 
                             MASTERIP=
                             for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
@@ -424,7 +424,7 @@ feature:
                             [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 220
                             eval $NODE_JOIN_CMD || sfFail 221
                             touch /etc/kubernetes/.joined
-                            sfFail 0
+                            sfExit
 
                     final:
                         targets:
@@ -463,7 +463,7 @@ feature:
                             #     name: cladm
                             #     namespace: kube-system
                             # EOF
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: node,reset,reverseproxy,clean
@@ -504,6 +504,6 @@ feature:
                             esac
                             sfFirewallReload || sfFail 204 "Firewall problem"
                             rm -f /etc/kubernetes/.joined
-                            sfFail 0
+                            sfExit
 
 ...

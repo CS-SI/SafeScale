@@ -40,7 +40,7 @@ feature:
                             nodes: no
                         run: |
                             sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} || sfFail 192
-                            sfFail 0
+                            sfExit
 
             add:
                 pace: config,start,running,ready
@@ -140,7 +140,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || sfFail 195
-                            sfFail 0
+                            sfExit
 
                     running:
                         targets:
@@ -167,7 +167,7 @@ feature:
                             URL="http://{{.HostIP}}:9200/_cat/health"
                             {{ end }}
                             sfRetry 5m 5 "curl -k ${URL} &>/dev/null" || sfFail 196
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: stop,remove
@@ -186,7 +186,7 @@ feature:
                                 {{ end }}
                                 docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 197
                             fi
-                            sfFail 0
+                            sfExit
 
                     remove:
                         targets:
@@ -198,7 +198,7 @@ feature:
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elasticsearch ${SF_VARDIR}/elasticsearch
-                            sfFail 0
+                            sfExit
 
     proxy:
         rules:
