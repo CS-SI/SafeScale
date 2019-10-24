@@ -17,6 +17,10 @@
 package temporal
 
 import (
+	"fmt"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -89,5 +93,60 @@ func TestStartStopDurationWithPause(t *testing.T) {
 	res := FormatDuration(stowa.Duration())
 	if !strings.Contains(res, "0.03") {
 		t.Errorf("This should be near 30 ms and it isn't: %s", res)
+	}
+}
+
+func TestStartStopDurationWithPauseDefaultFormatting(t *testing.T) {
+	stowa := NewStopwatch()
+
+	stowa.Start()
+	time.Sleep(10 * time.Millisecond)
+	stowa.Pause() // this time, duration changes because we used Pause
+
+	time.Sleep(time.Second)
+	stowa.Start()
+	time.Sleep(20 * time.Millisecond)
+	stowa.Stop()
+
+	text := fmt.Sprintf("This is %s", stowa)
+	if !strings.Contains(text, "0.03") {
+		t.Errorf("This should be near 30 ms and it isn't: %s", text)
+	}
+}
+
+func printSomething(sw *Stopwatch) {
+	logrus.SetOutput(os.Stdout)
+	defer (*sw).OnExitLogInfo("Foo", "Bar")
+}
+
+func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
+	stowa := NewStopwatch()
+
+	stowa.Start()
+	time.Sleep(10 * time.Millisecond)
+	stowa.Pause() // this time, duration changes because we used Pause
+
+	time.Sleep(time.Second)
+	stowa.Start()
+	time.Sleep(20 * time.Millisecond)
+	stowa.Stop()
+
+	text := fmt.Sprintf("This is %s", stowa)
+	if !strings.Contains(text, "0.03") {
+		t.Errorf("This should be near 30 ms and it isn't: %s", text)
+	}
+
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printSomething(&stowa)
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	if !strings.Contains(string(out), "Foo") {
+		t.Fail()
 	}
 }
