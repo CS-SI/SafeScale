@@ -789,11 +789,9 @@ func (w *worker) setReverseProxy() (err error) {
 				"rule": rule,
 				"vars": &primaryGatewayVariables,
 			})
-			if err != nil { // FIXME Later
-				continue
+			if err != nil {
+				return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 			}
-
-			// FIXME Correct error handling
 
 			var errS error
 			if secondaryKongController != nil {
