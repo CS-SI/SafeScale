@@ -27,14 +27,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func runOnlyInIntegrationTest(key string) {
-	if tenantOverride := os.Getenv(key); tenantOverride == "" {
-		panic("This only runs as an integration test")
+func runOnlyInIntegrationTest(t *testing.T, key string) bool {
+	if t == nil {
+		return false
 	}
+	if tenantOverride := os.Getenv(key); tenantOverride == "" {
+		t.Skipf("This only runs as an integration test")
+		return false
+	}
+	return true
 }
 
 func TestCmds(t *testing.T) {
-	runOnlyInIntegrationTest("TEST_SCANNER")
+	runOnlyInIntegrationTest(t, "TEST_SCANNER")
 
 	out, err := exec.Command("bash", "-c", "lscpu -p'CPU,CORE,SOCKET,MAXMHZ,MINMHZ' | tail -1").Output()
 	assert.NoError(t, err)
@@ -66,7 +71,7 @@ func TestCmds(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	runOnlyInIntegrationTest("TEST_SCANNER")
-
-	RunScanner("")
+	if runOnlyInIntegrationTest(nil, "TEST_SCANNER") {
+		RunScanner("")
+	}
 }
