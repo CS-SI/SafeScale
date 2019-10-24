@@ -33,14 +33,14 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ntp &>/dev/null
+                                    dpkg -l | grep ntp &>/dev/null || sfFail 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ntp &>/dev/null
+                                    rpm -qa | grep ntp &>/dev/null || sfFail 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    sfFail 1
                                     ;;
                             esac
 
@@ -61,14 +61,14 @@ feature:
                                     sfRetry 5m 3 "sfApt install -y ntp"
                                     ;;
                                 centos|rhel)
-                                    yum install -y ntp || exit 192
+                                    yum install -y ntp || sfFail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    sfFail 195
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
                     firewall:
                         targets:
@@ -82,7 +82,7 @@ feature:
                             # then firewalld  itself
                             sfService restart firewalld
                             sfFirewallAdd --zone=public --add-port=123/udp --permanent
-                            sfFirewallReload
+                            sfFirewallReload || sfFail 204 "Firewall problem"
 
                     ready:
                         targets:
@@ -93,23 +93,25 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfService enable ntp || exit 195
-                                    sfService restart ntp || exit 196
-                                    sfRetry 5m 5 sfService status ntp &>/dev/null
-                                    [ $? -ne 0 ] && exit 197
+                                    sfService enable ntp || sfFail 195
+                                    sfService restart ntp || sfFail 196
+                                    op=-1
+                                    sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
+                                    [ $op -ne 0 ] && sfFail 197
                                     ;;
                                 centos|rhel)
-                                    sfService enable ntpd || exit 195
-                                    sfService restart ntpd || exit 196
-                                    sfRetry 5m 5 sfService status ntpd &>/dev/null
-                                    [ $? -ne 0 ] && exit 197
+                                    sfService enable ntpd || sfFail 195
+                                    sfService restart ntpd || sfFail 196
+                                    op=-1
+                                    sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
+                                    [ $op -ne 0 ] && sfFail 197
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    sfFail 1
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
             remove:
                 pace: ntp-server
@@ -136,7 +138,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    sfFail 1
                                     ;;
                             esac
 

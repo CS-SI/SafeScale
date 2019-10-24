@@ -45,8 +45,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack monitoring4platform || exit 192
-                            exit 0
+                            sfDoesDockerRunStack monitoring4platform || sfFail 192
+                            sfFail 0
 
             add:
                 # pace: prometheus,am-executor,alertmanager,karma,grafana,portainer,stack,secrets,network,start,running
@@ -62,16 +62,16 @@ feature:
                             VERSION={{.NodeExporterVersion}}
                             [ -z "$VERSION" -o "$VERSION" = "latest" ] && VERSION=$(sfGithubLastRelease prometheus node_exporter)
                             URL=https://github.com/prometheus/node_exporter/releases/download/${VERSION}/node_exporter-${VERSION#v}.linux-amd64.tar.gz
-                            sfDownload "$URL" node_exporter.tar.gz 3m 5 || exit 193
+                            sfDownload "$URL" node_exporter.tar.gz 3m 5 || sfFail 193
                             tar -zxvf node_exporter.tar.gz && mv node_exporter-*/node_exporter /usr/sbin
                             rm -f node_exporter.tar.gz
 
                             if [ "$(sfGetFact "use_systemd")" = "1" ]; then
                                 URL=https://raw.githubusercontent.com/prometheus/node_exporter/${VERSION}/examples/systemd/node_exporter.service
-                                sfDownload "$URL" /etc/systemd/system/node_exporter.service 3m 5 || exit 194
+                                sfDownload "$URL" /etc/systemd/system/node_exporter.service 3m 5 || sfFail 194
                             else
                                 URL=https://raw.githubusercontent.com/prometheus/node_exporter/${VERSION}/examples/init.d/node_exporter
-                                sfDownload "$URL" /etc/init.d/node_exporter 3m 5 || exit 195
+                                sfDownload "$URL" /etc/init.d/node_exporter 3m 5 || sfFail 195
                             fi
 
                             mkdir -p /etc/sysconfig ${SF_VARDIR}/node_exporter/textfile_collector
@@ -81,9 +81,9 @@ feature:
 
                             useradd node_exporter || true
 
-                            sfService enable node_exporter || exit 196
-                            sfService start node_exporter || exit 197
-                            exit 0
+                            sfService enable node_exporter || sfFail 196
+                            sfService start node_exporter || sfFail 197
+                            sfFail 0
 
                     prometheus:
                         targets:
@@ -240,7 +240,7 @@ feature:
                             EOF
                             chown -R nobody:safescale ${SF_ETCDIR}/monitoring4platform/prometheus ${SF_VARDIR}/monitoring4platform/prometheus
                             chmod -R u+rwx,g+rx-w,o-rwx ${SF_ETCDIR}/monitoring4platform/prometheus ${SF_VARDIR}/monitoring4platform/prometheus
-                            exit 0
+                            sfFail 0
 
                     am-executor:
                         targets:
@@ -253,7 +253,7 @@ feature:
 
                             cat >${SF_ETCDIR}/monitoring4platform/am-executor/scripts/execute.sh <<-'EOF'
                             #!/usr/bin/env bash
-                            set -euo pipefail
+                            set -euo pipeexit
 
                             restart_host() {
                                 safescaled &
@@ -289,8 +289,9 @@ feature:
                                         var="AMX_ALERT_${i}_LABEL_service"
                                         host=${!var}
                                         echo "Alert 'gateway_down' received for gateway '$host'. Restarting gateway '$host'..."
-                                        restart_host "$host"
-                                        [ $? -eq 0 ] && echo "Gateway '$host' restarted." || echo "failed to restart gateway '$host'!"
+                                        op=-1
+                                        restart_host "$host" && op=$? || true
+                                        [ $op -eq 0 ] && echo "Gateway '$host' restarted." || echo "exited to restart gateway '$host'!"
                                         ;;
                                     *)
                                         echo "Unknown alert '$alert' received."
@@ -298,7 +299,7 @@ feature:
                                 esac
                             done
 
-                            exit 0
+                            sfFail 0
                             EOF
                             chown root:1000 ${SF_ETCDIR}/monitoring4platform/am-executor/scripts/execute.sh
                             chmod ug+rx,o-rwx ${SF_ETCDIR}/monitoring4platform/am-executor/scripts/execute.sh
@@ -351,8 +352,8 @@ feature:
                             ENTRYPOINT ["/prometheus-am-executor"]
                             EOF
 
-                            docker build --network host -t am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || exit 193
-                            exit 0
+                            docker build --network host -t am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || sfFail 193
+                            sfFail 0
 
                     alertmanager:
                         targets:
@@ -401,7 +402,7 @@ feature:
                             EOF
                             chown -R safescale:safescale ${SF_ETCDIR}/monitoring4platform/karma/
                             chmod -R g-w,o-rwx ${SF_ETCDIR}/monitoring4platform/karma/
-                            exit 0
+                            sfFail 0
 
                     karma:
                         targets:
@@ -418,7 +419,7 @@ feature:
                                     - name: monitoring4platform_alertmanager
                                       uri: http://monitoring4platform_alertmanager:9093/
                             EOF
-                            exit 0
+                            sfFail 0
 
                     grafana:
                         targets:
@@ -460,7 +461,7 @@ feature:
                             # id=472 is the user used to run grafana in container
                             chown -R 472:safescale ${SF_VARDIR}/monitoring4platform/grafana ${SF_LOGDIR}/monitoring4platform/grafana
                             chmod 0750 ${SF_VARDIR}/monitoring4platform/grafana ${SF_LOGDIR}/monitoring4platform/grafana
-                            exit 0
+                            sfFail 0
 
                     # portainer:
                     #     targets:
@@ -470,7 +471,7 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         mkdir -p ${SF_VARDIR}/monitoring4platform/portainer
-                    #         exit 0
+                    #         sfFail 0
 
                     stack:
                         targets:
@@ -520,7 +521,7 @@ feature:
                                 #     deploy:
                                 #         mode: global
                                 #         restart_policy:
-                                #             condition: on-failure
+                                #             condition: on-exiture
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s
@@ -547,7 +548,7 @@ feature:
                                         mode: global
                                         endpoint_mode: dnsrr
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -588,7 +589,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -616,7 +617,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -647,7 +648,7 @@ feature:
                                             constraints:
                                                 - node.role == manager
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -683,7 +684,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -710,7 +711,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -739,7 +740,7 @@ feature:
                                 #             constraints:
                                 #                 - node.platform.os == linux
                                 #         restart_policy:
-                                #             condition: on-failure
+                                #             condition: on-exiture
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s
@@ -770,7 +771,7 @@ feature:
                                 #             constraints:
                                 #                 - node.role == manager
                                 #         restart_policy:
-                                #             condition: on-failure
+                                #             condition: on-exiture
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s
@@ -791,7 +792,7 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         echo "{{.ClusterAdminPassword}}" | docker secret create safescale.portainer-ui.admin_password -
-                    #         exit 0
+                    #         sfFail 0
 
                     start:
                         targets:
@@ -799,8 +800,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/monitoring4platform/stack.yml monitoring4platform || exit 198
-                            exit 0
+                            docker stack deploy -c ${SF_ETCDIR}/monitoring4platform/stack.yml monitoring4platform || sfFail 198
+                            sfFail 0
 
                     running:
                         targets:
@@ -808,8 +809,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || exit 199
-                            exit 0
+                            sfRetry 5m 5 "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || sfFail 199
+                            sfFail 0
 
             remove:
                 pace: stop,cleanup
@@ -821,9 +822,9 @@ feature:
                             nodes: no
                         run: |
                             if [ -f ${SF_ETCDIR}/monitoring4platform/stack.yml ]; then
-                                docker stack rm monitoring4platform || exit 200
+                                docker stack rm monitoring4platform || sfFail 200
                             fi
-                            exit 0
+                            sfFail 0
 
                     cleanup:
                         targets:
@@ -843,7 +844,7 @@ feature:
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/monitoring4platform ${SF_VARDIR}/monitoring4platform
-                            exit 0
+                            sfFail 0
 
     proxy:
         rules:

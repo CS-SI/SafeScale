@@ -39,8 +39,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} || exit 192
-                            exit 0
+                            sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} || sfFail 192
+                            sfFail 0
 
             add:
                 pace: config,start,running,ready
@@ -139,8 +139,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || exit 195
-                            exit 0
+                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || sfFail 195
+                            sfFail 0
 
                     running:
                         targets:
@@ -166,8 +166,8 @@ feature:
                             {{ else }}
                             URL="http://{{.HostIP}}:9200/_cat/health"
                             {{ end }}
-                            sfRetry 5m 5 "curl -k ${URL} &>/dev/null" || exit 196
-                            exit 0
+                            sfRetry 5m 5 "curl -k ${URL} &>/dev/null" || sfFail 196
+                            sfFail 0
 
             remove:
                 pace: stop,remove
@@ -184,9 +184,9 @@ feature:
                                 {{ else }}
                                 OPTIONS=
                                 {{ end }}
-                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || exit 197
+                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 197
                             fi
-                            exit 0
+                            sfFail 0
 
                     remove:
                         targets:
@@ -198,7 +198,7 @@ feature:
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elasticsearch ${SF_VARDIR}/elasticsearch
-                            exit 0
+                            sfFail 0
 
     proxy:
         rules:
