@@ -170,7 +170,7 @@ feature:
                             memory_cache_enabled = on
                             memqcache_method = 'shmem'
 
-                            connection_cache = on
+                            connection_cache = off
 
                             replication_mode = off
 
