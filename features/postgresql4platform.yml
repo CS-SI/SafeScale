@@ -312,11 +312,11 @@ feature:
                                     update_pghba_conf
                                     op=-1
                                     pg_ctl start &>/dev/stdout && wait_for_local_postgres 60 && op=\$?
-                                    [ \$op -ne 0 ] && echo "exited to start postgresql instance." && sfFail 4
+                                    [ \$op -ne 0 ] && echo "failed to start postgresql instance." && sfFail 4
                                     echo -n "Registering postgresql instance as hot-standby... "
                                     op=-1
                                     repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register && op=\$?
-                                    [ \$op -ne 0 ] && echo "exited." && sfFail 5
+                                    [ \$op -ne 0 ] && echo "failed." && sfFail 5
                                     echo done
                                 fi
                             fi
