@@ -33,14 +33,14 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep docker-ce &>/dev/null || fail 1
+                                    dpkg -l | grep docker-ce &>/dev/null || exit 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep docker-ce &>/dev/null || fail 1
+                                    rpm -qa | grep docker-ce &>/dev/null || exit 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 1
+                                    exit 1
                                     ;;
                             esac
 
@@ -59,20 +59,20 @@ feature:
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry 5m 3 "sfApt update"
                                     sfRetry 5m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
-                                    sfRetry 5m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || fail 192
-                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || fail 193
+                                    sfRetry 5m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || exit 192
+                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 193
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
                                     sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -qqy docker-ce" || fail 194
+                                    sfRetry 5m 3 "sfApt install -qqy docker-ce" || exit 194
                                     ;;
                                 centos|rhel)
-                                    sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || fail 192
-                                    sfRetry 7m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || fail 193
-                                    sfRetry 7m 3 yum install -y docker-ce || fail 194
+                                    sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
+                                    sfRetry 7m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 193
+                                    sfRetry 7m 3 yum install -y docker-ce || exit 194
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 195
+                                    exit 195
                                     ;;
                             esac
                             exit 0
@@ -86,9 +86,9 @@ feature:
                         run: |
                             op=-1
                             VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
-                            [ $op -ne 0 ] && fail 192
+                            [ $op -ne 0 ] && exit 192
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                            sfDownload "$URL" docker-compose 3m 5 || fail 193
+                            sfDownload "$URL" docker-compose 3m 5 || exit 193
                             chmod +x docker-compose && mv docker-compose /usr/bin
                             exit 0
 
@@ -149,7 +149,7 @@ feature:
                             sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
                             sfFirewallAdd --zone=trusted --add-service docker-swarm
                             sfFirewallAdd --zone=trusted --add-masquerade
-                            sfFirewallReload || fail 204 "Firewall problem"
+                            sfFirewallReload || exit 204 "Firewall problem"
 
                     ready:
                         targets:
@@ -158,11 +158,11 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfService enable docker || fail 195
-                            sfService restart docker || fail 196
+                            sfService enable docker || exit 195
+                            sfService restart docker || exit 196
                             op=-1
                             sfRetry 2m 5 "sfService status docker &>/dev/null" && op=$? || true
-                            [ $op -ne 0 ] && fail 197
+                            [ $op -ne 0 ] && exit 197
                             exit 0
 
             remove:
@@ -186,7 +186,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 1 "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1 "Unsupported operating system '$LINUX_KIND'"
                                     ;;
                             esac
                             rm -f /usr/bin/docker-compose || true

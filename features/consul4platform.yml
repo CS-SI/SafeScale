@@ -35,7 +35,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack consul4platform || fail 192
+                            sfDoesDockerRunStack consul4platform || exit 192
                             exit 0
 
             add:
@@ -267,7 +267,7 @@ feature:
                                         # endpoint_mode: dnsrr
                                         update_config:
                                             parallelism: 1
-                                            failure_action: rollback
+                                            exiture_action: rollback
                                             delay: 30s
                                         restart_policy:
                                             condition: any
@@ -304,7 +304,7 @@ feature:
                                         # endpoint_mode: dnsrr
                                         update_config:
                                             parallelism: 1
-                                            failure_action: rollback
+                                            exiture_action: rollback
                                             delay: 30s
                                         restart_policy:
                                             condition: any
@@ -326,9 +326,9 @@ feature:
                             nodes: no
                         run: |
                             # if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul4platform_net"; then
-                            #     docker network create -d overlay consul4platform_net || fail 194
+                            #     docker network create -d overlay consul4platform_net || exit 194
                             # fi
-                            docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || fail 195
+                            docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || exit 195
                             exit 0
 
                     ready:
@@ -338,7 +338,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || fail 197
+                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || exit 197
                             exit 0
 
             remove:
@@ -351,7 +351,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm consul4platform || fail 200
+                            docker stack rm consul4platform || exit 200
                             exit 0
 
                     cleanup:
@@ -361,7 +361,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfRemoveDockerImage consul || fail 202
+                            sfRemoveDockerImage consul || exit 202
                             rm -rf ${SF_ETCDIR}/consul4platform ${SF_VARDIR}/consul4platform
                             exit 0
 

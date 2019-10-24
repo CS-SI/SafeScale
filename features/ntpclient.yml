@@ -33,14 +33,14 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ntpdate &>/dev/null || fail 1
+                                    dpkg -l | grep ntpdate &>/dev/null || exit 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ntpdate &>/dev/null || fail 1
+                                    rpm -qa | grep ntpdate &>/dev/null || exit 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 1
+                                    exit 1
                                     ;;
                             esac
 
@@ -58,14 +58,14 @@ feature:
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ntpdate" || fail 194
+                                    sfRetry 5m 3 "sfApt install -y ntpdate" || exit 194
                                     ;;
                                 centos|rhel)
-                                    yum install -y ntpdate || fail 194
+                                    yum install -y ntpdate || exit 194
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 195
+                                    exit 195
                                     ;;
                             esac
                             exit 0
@@ -78,22 +78,22 @@ feature:
                             nodes: all
                         run: |
                             echo "{{.GatewayIP}}  NTP-server-host" >> /etc/hosts
-                            ntpdate NTP-server-host || fail 201
+                            ntpdate NTP-server-host || exit 201
                             timedatectl set-ntp off
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt install -y ntp ntpstat" || fail 202
-                                    sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf  || fail 203
-                                    sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf  || fail 204
+                                    sfRetry 5m 3 "sfApt install -y ntp ntpstat" || exit 202
+                                    sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf  || exit 203
+                                    sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf  || exit 204
                                     ;;
                                 centos|rhel)
-                                    yum install -y ntp || fail 202
-                                    sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || fail 203
+                                    yum install -y ntp || exit 202
+                                    sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || exit 203
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 195
+                                    exit 195
                                     ;;
                             esac
                             echo "server NTP-server-host prefer iburst" >> /etc/ntp.conf
@@ -108,22 +108,22 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfService enable ntp || fail 195
-                                    sfService restart ntp || fail 196
+                                    sfService enable ntp || exit 195
+                                    sfService restart ntp || exit 196
                                     op=-1
                                     sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && fail 197
+                                    [ $op -ne 0 ] && exit 197
                                     ;;
                                 centos|rhel)
-                                    sfService enable ntpd || fail 195
-                                    sfService restart ntpd || fail 196
+                                    sfService enable ntpd || exit 195
+                                    sfService restart ntpd || exit 196
                                     op=-1
                                     sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && fail 197
+                                    [ $op -ne 0 ] && exit 197
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 195
+                                    exit 195
                                     ;;
                             esac
                             exit 0
@@ -149,7 +149,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    fail 1
+                                    exit 1
                                     ;;
                             esac
 

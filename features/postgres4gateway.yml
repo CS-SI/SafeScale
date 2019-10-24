@@ -38,7 +38,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || fail 192
+                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || exit 192
                             exit 0
 
             add:
@@ -102,7 +102,7 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         docker secret rm postgres4gateway &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || fail 192
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || exit 192
                     #         exit 0
 
                     # network:
@@ -113,10 +113,10 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
-                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || fail 192
+                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
                     #         # fi
                     #         if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
-                    #             docker network create --attachable -d bridge safescale-gw || fail 193
+                    #             docker network create --attachable -d bridge safescale-gw || exit 193
                     #         fi
                     #         exit 0
 
@@ -127,8 +127,8 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || fail 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || fail 195
+                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || exit 194
+                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || exit 195
                             exit 0
 
             remove:
@@ -141,7 +141,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || fail 196
+                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || exit 196
                             docker image rm -f postgres:11-alpine
                             # docker secret rm postgres4gateway &>/dev/null
                             exit 0

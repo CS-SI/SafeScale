@@ -47,7 +47,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'postgresxl:latest' || fail 192
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'postgresxl:latest' || exit 192
                             exit 0
 
             add:
@@ -375,7 +375,7 @@ feature:
                             ENTRYPOINT ["/docker-entrypoint.sh"]
                             EOF
 
-                            docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || fail 192
+                            docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || exit 192
                             yes | docker image prune || true
                             exit 0
 
@@ -412,7 +412,7 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -447,7 +447,7 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -485,7 +485,7 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -523,7 +523,7 @@ feature:
                                             reservations:
                                                 memory: 256M
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -561,7 +561,7 @@ feature:
                                             reservations:
                                                 memory: 256M
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -597,7 +597,7 @@ feature:
                             {{ else }}
                             PASSWORD="{{ .AdminPassword }}"
                             {{ end }}
-                            echo -n "$PASSWORD" | docker secret create postgresxl.password - || fail 193
+                            echo -n "$PASSWORD" | docker secret create postgresxl.password - || exit 193
                             exit 0
 
                     network:
@@ -620,7 +620,7 @@ feature:
                             nodes: no
                         run: |
                             sfFirewallAdd --zone=trusted --add-interface=docker_gwbridge
-                            sfFirewallReload || fail 204 "Firewall problem"
+                            sfFirewallReload || exit 204 "Firewall problem"
                             exit 0
 
                     start:
@@ -630,12 +630,12 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/postgresxl/stack.yml postgresxl || fail 194
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-master" || fail 195
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-slave" || fail 196
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-proxy" || fail 197
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_coordinator" || fail 198
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_data" || fail 199
+                            docker stack deploy -c ${SF_ETCDIR}/postgresxl/stack.yml postgresxl || exit 194
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-master" || exit 195
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-slave" || exit 196
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-proxy" || exit 197
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_coordinator" || exit 198
+                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_data" || exit 199
                             exit 0
 
             remove:
@@ -648,7 +648,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "docker stack rm postgresxl" || fail 200
+                            sfRetry 5m 5 "docker stack rm postgresxl" || exit 200
                             exit 0
 
                     cleanup:

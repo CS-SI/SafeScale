@@ -70,7 +70,7 @@ feature:
                             echo "Waiting for database server..."
                             op=-1
                             timeout 60 sh -c "while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done" && op=$? || true
-                            [ $op -ne 0 ] && echo "Database failed to respond in 60s, aborting." && fail 1
+                            [ $op -ne 0 ] && echo "Database exited to respond in 60s, aborting." && exit 1
                             echo "Database server ready."
 
                             case \$1 in
@@ -171,7 +171,7 @@ feature:
 
                             CMD ["kong", "docker-start"]
                             EOF
-                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || fail 192
+                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || exit 192
                             exit 0
 
                     stack:
@@ -228,12 +228,12 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
                                     # healthcheck:
-                                    #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || fail 1"]
+                                    #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
                                     #     interval: 5s
                                     #     retries: 10
                                     secrets:
@@ -276,7 +276,7 @@ feature:
                                 #             constraints:
                                 #                 - node.role == manager
                                 #         restart_policy:
-                                #             condition: on-failure
+                                #             condition: on-exiture
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s
@@ -292,7 +292,7 @@ feature:
                             nodes: no
                         run: |
                             docker secret rm safescale.kong.db_password &>/dev/null || true
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || fail 193
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || exit 193
                             exit 0
 
                     start:
@@ -302,8 +302,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || fail 194
-                            sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || fail 195
+                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || exit 194
+                            sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || exit 195
                             exit 0
 
             remove:
@@ -316,7 +316,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm kong4safescale  || fail 196
+                            docker stack rm kong4safescale  || exit 196
                             docker secret rm safescale.kong.db_password &>/dev/null
                             exit 0
 

@@ -39,7 +39,7 @@ feature:
                     masters: one
                 run: |
                     STATUS=$(sfDcos spark plan show deploy --json | jq .status
-                    echo $STATUS | grep COMPLETE || fail 192
+                    echo $STATUS | grep COMPLETE || exit 192
                     exit 0
 
             add:
@@ -75,10 +75,10 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -l /usr/local/spark ] || fail 192
+                            [ -l /usr/local/spark ] || exit 192
                             VERSION=$(echo $(basename $(readlink -f /usr/local/spark)) | cut -d- -f2)
-                            [ "$VERSION" = "{{.SparkVersion}}" ] || fail 193
-                            [ -x /usr/local/spark/bin/spark ] || fail 194
+                            [ "$VERSION" = "{{.SparkVersion}}" ] || exit 193
+                            [ -x /usr/local/spark/bin/spark ] || exit 194
                             exit 0
 
 
@@ -93,7 +93,7 @@ feature:
                         run: |
                             cd /usr/local
                             wget -q http://www-eu.apache.org/dist/spark/spark-{{.SparkVersion}}/spark-{{.SparkVersion}}-bin-hadoop2.7.tgz && \
-                            tar zxvf spark-{{.SparkVersion}-bin-hadoop2.7.tgz || fail 195
+                            tar zxvf spark-{{.SparkVersion}-bin-hadoop2.7.tgz || exit 195
                             rm -f spark-{{.SparkVersion}}-bin-hadoop2.7.tgz
                             ln -s /usr/local/spark-{{.SparkVersion}}-bin-hadoop2.7 /usr/local/spark
                             ln -s /usr/local/spark/bin/spark-submit /usr/local/bin

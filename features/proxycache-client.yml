@@ -60,7 +60,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged OS '$LINUX_KIND'. Aborting."
-                                    fail 1
+                                    exit 1
                             esac
 
                     docker:
@@ -91,7 +91,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged OS '$LINUX_KIND'. Aborting."
-                                    fail 1
+                                    exit 1
                             esac
                             grep -vi proxy /etc/environment >/etc/environment.new
                             mv /etc/environment.new /etc/environment
