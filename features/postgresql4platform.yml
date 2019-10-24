@@ -197,7 +197,7 @@ feature:
                             backend_port${i} = 5432
                             backend_weight${i} = 1
                             backend_data_directory${i} = '/var/lib/postgresql/data'
-                            backend_flag${i} = 'ALLOW_TO_exitOVER'
+                            backend_flag${i} = 'ALLOW_TO_FAILOVER'
                             EOF
                             done
                             chown 70:safescale ${SF_ETCDIR}/postgresql4platform/pgpool.conf.template
@@ -438,7 +438,7 @@ feature:
                             cat /tmp/pool_passwd.new >>/etc/postgresql/pool_passwd
                             rm /tmp/pool_passwd.new
                             pg_md5 --config-file=/etc/postgresql/pgpool.conf -m --username=\$USERNAME "\$PASSWORD"
-                            sfFail \$?
+                            exit \$?
                             EOF
 
                             cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/my-docker-entrypoint.sh <<-EOF
@@ -559,7 +559,7 @@ feature:
                                             constraints:
                                                 - node.hostname == ${HOSTNAME_RADIX}-1
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -610,7 +610,7 @@ feature:
                                             constraints:
                                                 - node.hostname == ${SLAVE_HOST}
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -643,7 +643,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s

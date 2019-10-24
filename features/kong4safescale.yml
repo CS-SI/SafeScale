@@ -228,7 +228,7 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -276,7 +276,7 @@ feature:
                                 #             constraints:
                                 #                 - node.role == manager
                                 #         restart_policy:
-                                #             condition: on-exiture
+                                #             condition: on-failure
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s

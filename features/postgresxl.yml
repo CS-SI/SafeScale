@@ -412,7 +412,7 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -447,7 +447,7 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -485,7 +485,7 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -523,7 +523,7 @@ feature:
                                             reservations:
                                                 memory: 256M
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
@@ -561,7 +561,7 @@ feature:
                                             reservations:
                                                 memory: 256M
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
