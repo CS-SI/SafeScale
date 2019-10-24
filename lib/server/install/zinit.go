@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
 	"github.com/sirupsen/logrus"
 )
@@ -30,7 +31,7 @@ func init() {
 		ntpServerFeature(),
 		ntpClientFeature(),
 		ansibleFeature(),
-		postgresxlFeature(),
+		postgresql4platformFeature(),
 		nVidiaDockerFeature(),
 		mpichOsPkgFeature(),
 		mpichBuildFeature(),

@@ -150,9 +150,9 @@ func ansibleFeature() *Feature {
 	}
 }
 
-// postgresxlFeature feature. ...
-func postgresxlFeature() *Feature {
-	name := "postgresxl"
+// postgresql4platformFeature feature. ...
+func postgresql4platformFeature() *Feature {
+	name := "postgresql4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
