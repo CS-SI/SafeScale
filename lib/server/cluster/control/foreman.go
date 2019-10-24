@@ -881,7 +881,7 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
 		}
-		labelCmd := "docker node update " + secondaryGateway.Name + " --label-add safescale.host.role=node"
+		labelCmd := "docker node update " + secondaryGateway.Name + " --label-add safescale.host.role=gateway"
 		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.Name, stderr)
