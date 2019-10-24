@@ -43,6 +43,8 @@ feature:
                         chmod a+rx helm && \
                         chown {{.Username}} helm && \
                         mv helm ~{{.Username}}/.local/bin
+                        sfExit
+
                 config:
                     targets:
                         hosts: none

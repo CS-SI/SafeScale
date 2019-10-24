@@ -41,6 +41,7 @@ feature:
                             nodes: no
                         run: |
                             sfDoesDockerRunContainer docker.elastic.co/kibana/kibana:{{ .Version }} || sfFail 192
+                            sfExit
 
             add:
                 pace: config,start
@@ -83,7 +84,7 @@ feature:
                                         - ${SF_ETCDIR}/kibana/config.yml:/usr/share/kibana/config/kibana.yml
                                     restart: always
                             EOF
-                            sfFail 0
+                            sfExit
 
                     start:
                         targets:
@@ -97,7 +98,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || sfFail 193
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: stop,remove
@@ -116,7 +117,7 @@ feature:
                             {{ end }}
                                 docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 194
                             fi
-                            sfFail 0
+                            sfExit
 
                     remove:
                         targets:
@@ -126,7 +127,7 @@ feature:
                         run: |
                             docker image rm -f docker.elastic.co/kibana/kibana:{{ .Version }}
                             rm -rf ${SF_ETCDIR}/kibana ${SF_VARDIR}/kibana
-                            sfFail 0
+                            sfExit
 
     proxy:
         rules:

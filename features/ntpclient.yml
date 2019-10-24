@@ -68,7 +68,7 @@ feature:
                                     sfFail 195
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
                     config:
                         targets:
@@ -97,7 +97,7 @@ feature:
                                     ;;
                             esac
                             echo "server NTP-server-host prefer iburst" >> /etc/ntp.conf
-                            sfFail 0
+                            sfExit
 
                     ready:
                         targets:
@@ -126,7 +126,7 @@ feature:
                                     sfFail 195
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: ntpdate

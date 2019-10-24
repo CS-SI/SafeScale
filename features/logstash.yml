@@ -39,7 +39,7 @@ feature:
                         run: |
                             [ -d ${SF_ETCDIR}/logstash ] || sfFail 192
                             docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'logstash:7.1.1' &>/dev/null || sfFail 193
-                            sfFail 0
+                            sfExit
 
             add:
                 pace: image,config,start,ready
@@ -130,7 +130,7 @@ feature:
                                         - ${SF_ETCDIR}/logstash/pipeline/:/usr/share/logstash/pipeline/:ro
                                     restart: always
                             EOF
-                            sfFail 0
+                            sfExit
 
                     start:
                         targets:
@@ -156,7 +156,8 @@ feature:
                             {{ else }}
                             PREFIX="logstash"
                             {{ end }}
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running
+                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running || sfFail 192
+                            sfExit
 
             remove:
                 pace: stop,remove
@@ -173,6 +174,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 192
+                            sfExit
 
                     remove:
                         targets:
@@ -182,6 +184,6 @@ feature:
                         run: |
                             docker image rm -f logstash:7.1.1
                             rm -rf ${SF_ETCDIR}/logstash
-                            sfFail 0
+                            sfExit
 
 ...
