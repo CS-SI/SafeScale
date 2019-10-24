@@ -70,7 +70,7 @@ func TestStartStopDurationAgain(t *testing.T) {
 
 	res := FormatDuration(stowa.Duration())
 	if !strings.Contains(res, "0.01") {
-		t.Errorf("This should be 10 ms and it isn't: %s", res)
+		t.Errorf("This should be near 10 ms and it isn't: %s", res)
 	}
 }
 
@@ -87,7 +87,7 @@ func TestStartStopDurationWithPause(t *testing.T) {
 	stowa.Stop()
 
 	res := FormatDuration(stowa.Duration())
-	if !strings.Contains(res, "0.030s") {
-		t.Errorf("This should be 30 ms and it isn't: %s", res)
+	if !strings.Contains(res, "0.03") {
+		t.Errorf("This should be near 30 ms and it isn't: %s", res)
 	}
 }
