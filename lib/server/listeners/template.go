@@ -52,7 +52,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Teplates List"); err == nil {
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Templates List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
