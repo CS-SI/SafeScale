@@ -285,7 +285,7 @@ func (handler *NetworkHandler) Create(
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
 	primaryRequest.Name = primaryGatewayName
-	primaryTask, err := concurrency.NewTaskWithContext(ctx, nil) // FIXME Parent
+	primaryTask, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (handler *NetworkHandler) Create(
 	if failover {
 		secondaryRequest := gwRequest
 		secondaryRequest.Name = secondaryGatewayName
-		secondaryTask, err = concurrency.NewTaskWithContext(ctx, nil) // FIXME Parent
+		secondaryTask, err = concurrency.NewTaskWithContext(ctx, nil)
 		if err != nil {
 			return nil, err
 		}

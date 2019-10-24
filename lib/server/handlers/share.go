@@ -79,7 +79,16 @@ func (handler *ShareHandler) Create(
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if shareName == "" {
+		return nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
+	}
+	if hostName == "" {
+		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
+	}
+	if path == "" {
+		return nil, scerr.InvalidParameterError("path", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -242,7 +251,10 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if name == "" {
+		return scerr.InvalidParameterError("name", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -324,7 +336,6 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	//FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -379,7 +390,18 @@ func (handler *ShareHandler) Mount(
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if shareName == "" {
+		return nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
+	}
+
+	if hostName == "" {
+		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
+	}
+
+	if path == "" {
+		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -607,7 +629,14 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if shareName == "" {
+		return scerr.InvalidParameterError("shareName", "cannot be empty!")
+	}
+
+	if hostName == "" {
+		return scerr.InvalidParameterError("hostName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -724,7 +753,10 @@ func (handler *ShareHandler) ForceInspect(
 	if handler == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if shareName == "" {
+		return nil, nil, nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -750,7 +782,10 @@ func (handler *ShareHandler) Inspect(
 	if handler == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if shareName == "" {
+		return nil, nil, nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()

@@ -150,7 +150,10 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if hostParam == nil {
+		return scerr.InvalidParameterError("hostParam", "cannot be nil!")
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -170,7 +173,14 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if hostName == "" {
+		return -1, "", "", scerr.InvalidParameterError("hostName", "cannot be empty!")
+	}
+
+	if cmd == "" {
+		return -1, "", "", scerr.InvalidParameterError("cmd", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -267,7 +277,14 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if from == "" {
+		return -1, "", "", scerr.InvalidParameterError("from", "cannot be empty!")
+	}
+
+	if to == "" {
+		return -1, "", "", scerr.InvalidParameterError("to", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
