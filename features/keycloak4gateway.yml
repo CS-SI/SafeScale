@@ -164,7 +164,7 @@ feature:
                              && cp ./safescale.jks /opt/jboss/keycloak/standalone/configuration/ \
                              && chown jboss:jboss /opt/jboss/keycloak/standalone/configuration/safescale.jks
 
-                            exec /opt/jboss/tools/docker-entrypoint.sh -Djboss.tx.node.id={{ .Hostname }} "\$@"
+                            exec /opt/jboss/tools/docker-entrypoint.sh -Djboss.tx.node.id={{ .Hostname }} \$@
                             EOF
 
                             cat >${SF_ETCDIR}/keycloak4gateway/Dockerfile <<-'EOF'
@@ -222,10 +222,12 @@ feature:
                                     image: keycloak4gateway:latest
                                     environment:
                                         - PROXY_ADDRESS_FORWARDING=true
-                                        - JGROUPS_DISCOVERY_PROTOCOL=JDBC_PING
-                                        - JGROUPS_DISCOVERY_PROPERTIES=datasource_jndi_name=java:jboss/datasources/KeycloakDS
+                                        # - JGROUPS_DISCOVERY_PROTOCOL=JDBC_PING
+                                        # - JGROUPS_DISCOVERY_PROPERTIES=datasource_jndi_name=java:jboss/datasources/KeycloakDS
                                         # - KEYCLOAK_LOGLEVEL=DEBUG
                                         # - ROOT_LOGLEVEL=DEBUG
+                                    networks:
+                                        - net
                                     ports:
                                         - published: 63009
                                           target: 8443
@@ -255,6 +257,10 @@ feature:
                                 password.admin:
                                     external: true
                                     name: safescale.keycloak.password.admin
+
+                            networks:
+                                net:
+                                    driver: overlay
                             EOF
 
                     start:
