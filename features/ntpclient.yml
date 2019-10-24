@@ -33,14 +33,32 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
+<<<<<<< refs/remotes/origin/develop
                                     dpkg -l | grep ntpdate &>/dev/null || exit 1
+||||||| ancestor
+                                    dpkg -l | grep ntpdate &>/dev/null || fail 1
+=======
+                                    dpkg -l | grep ntpdate &>/dev/null || sfFail 1
+>>>>>>> Changes in features
                                     ;;
                                 centos|rhel)
+<<<<<<< refs/remotes/origin/develop
                                     rpm -qa | grep ntpdate &>/dev/null || exit 1
+||||||| ancestor
+                                    rpm -qa | grep ntpdate &>/dev/null || fail 1
+=======
+                                    rpm -qa | grep ntpdate &>/dev/null || sfFail 1
+>>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 1
+||||||| ancestor
+                                    fail 1
+=======
+                                    sfFail 1
+>>>>>>> Changes in features
                                     ;;
                             esac
 
@@ -58,17 +76,35 @@ feature:
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry 5m 3 "sfApt update"
+<<<<<<< refs/remotes/origin/develop
                                     sfRetry 5m 3 "sfApt install -y ntpdate" || exit 194
+||||||| ancestor
+                                    sfRetry 5m 3 "sfApt install -y ntpdate" || fail 194
+=======
+                                    sfRetry 5m 3 "sfApt install -y ntpdate" || sfFail 194
+>>>>>>> Changes in features
                                     ;;
                                 centos|rhel)
+<<<<<<< refs/remotes/origin/develop
                                     yum install -y ntpdate || exit 194
+||||||| ancestor
+                                    yum install -y ntpdate || fail 194
+=======
+                                    yum install -y ntpdate || sfFail 194
+>>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 195
+||||||| ancestor
+                                    fail 195
+=======
+                                    sfFail 195
+>>>>>>> Changes in features
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
                     config:
                         targets:
@@ -78,26 +114,56 @@ feature:
                             nodes: all
                         run: |
                             echo "{{.GatewayIP}}  NTP-server-host" >> /etc/hosts
+<<<<<<< refs/remotes/origin/develop
                             ntpdate NTP-server-host || exit 201
+||||||| ancestor
+                            ntpdate NTP-server-host || fail 201
+=======
+                            ntpdate NTP-server-host || sfFail 201
+>>>>>>> Changes in features
                             timedatectl set-ntp off
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
+<<<<<<< refs/remotes/origin/develop
                                     sfRetry 5m 3 "sfApt install -y ntp ntpstat" || exit 202
                                     sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf  || exit 203
                                     sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf  || exit 204
+||||||| ancestor
+                                    sfRetry 5m 3 "sfApt install -y ntp ntpstat" || fail 202
+                                    sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf  || fail 203
+                                    sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf  || fail 204
+=======
+                                    sfRetry 5m 3 "sfApt install -y ntp ntpstat" || sfFail 202
+                                    sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf  || sfFail 203
+                                    sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf  || sfFail 204
+>>>>>>> Changes in features
                                     ;;
                                 centos|rhel)
+<<<<<<< refs/remotes/origin/develop
                                     yum install -y ntp || exit 202
                                     sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || exit 203
+||||||| ancestor
+                                    yum install -y ntp || fail 202
+                                    sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || fail 203
+=======
+                                    yum install -y ntp || sfFail 202
+                                    sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 203
+>>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 195
+||||||| ancestor
+                                    fail 195
+=======
+                                    sfFail 195
+>>>>>>> Changes in features
                                     ;;
                             esac
                             echo "server NTP-server-host prefer iburst" >> /etc/ntp.conf
-                            exit 0
+                            sfFail 0
 
                     ready:
                         targets:
@@ -108,25 +174,59 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
+<<<<<<< refs/remotes/origin/develop
                                     sfService enable ntp || exit 195
                                     sfService restart ntp || exit 196
+||||||| ancestor
+                                    sfService enable ntp || fail 195
+                                    sfService restart ntp || fail 196
+=======
+                                    sfService enable ntp || sfFail 195
+                                    sfService restart ntp || sfFail 196
+>>>>>>> Changes in features
                                     op=-1
                                     sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
+<<<<<<< refs/remotes/origin/develop
                                     [ $op -ne 0 ] && exit 197
+||||||| ancestor
+                                    [ $op -ne 0 ] && fail 197
+=======
+                                    [ $op -ne 0 ] && sfFail 197
+>>>>>>> Changes in features
                                     ;;
                                 centos|rhel)
+<<<<<<< refs/remotes/origin/develop
                                     sfService enable ntpd || exit 195
                                     sfService restart ntpd || exit 196
+||||||| ancestor
+                                    sfService enable ntpd || fail 195
+                                    sfService restart ntpd || fail 196
+=======
+                                    sfService enable ntpd || sfFail 195
+                                    sfService restart ntpd || sfFail 196
+>>>>>>> Changes in features
                                     op=-1
                                     sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
+<<<<<<< refs/remotes/origin/develop
                                     [ $op -ne 0 ] && exit 197
+||||||| ancestor
+                                    [ $op -ne 0 ] && fail 197
+=======
+                                    [ $op -ne 0 ] && sfFail 197
+>>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 195
+||||||| ancestor
+                                    fail 195
+=======
+                                    sfFail 195
+>>>>>>> Changes in features
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
             remove:
                 pace: ntpdate
@@ -149,7 +249,13 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 1
+||||||| ancestor
+                                    fail 1
+=======
+                                    sfFail 1
+>>>>>>> Changes in features
                                     ;;
                             esac
 

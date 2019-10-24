@@ -46,8 +46,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} || exit 192
-                            exit 0
+                            sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} || sfFail 192
+                            sfFail 0
 
             add:
                 # pace: config,kibanaplugin,start,running,ready
@@ -152,16 +152,16 @@ feature:
                             nodes: no
                         run: |
                             mkdir -p ${SF_TMPDIR}/elastalert-kibana-plugin && cd ${SF_TMPDIR}/elastalert-kibana-plugin
-                            wget -O pkg.zip https://github.com/bitsensor/elastalert-kibana-plugin/releases/download/1.0.4/elastalert-kibana-plugin-1.0.4-7.1.1.zip || exit 193
-                            unzip pkg.zip || exit 194
+                            wget -O pkg.zip https://github.com/bitsensor/elastalert-kibana-plugin/releases/download/1.0.4/elastalert-kibana-plugin-1.0.4-7.1.1.zip || sfFail 193
+                            unzip pkg.zip || sfFail 194
                             {{- if .ClusterFlavor }}
-                            ./bin/kibana-plugin https://{{ .GatewayIP }}/monitoring/kibana/ || exit 195
+                            ./bin/kibana-plugin https://{{ .GatewayIP }}/monitoring/kibana/ || sfFail 195
                             {{ else }}
-                            ./bin/kibana-plugin {{ .KibanaURL }} || exit 196
+                            ./bin/kibana-plugin {{ .KibanaURL }} || sfFail 196
                             {{ end -}}
                             cd ${SF_TMPDIR}
                             rm -rf elastalert-kibana-plugin
-                            exit 0
+                            sfFail 0
 
                     start:
                         targets:
@@ -174,8 +174,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end -}}
-                            docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d || exit 198
-                            exit 0
+                            docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d || sfFail 198
+                            sfFail 0
 
                     running:
                         targets:
@@ -188,8 +188,8 @@ feature:
                             {{ else }}
                             PREFIX="elastalert"
                             {{ end -}}
-                            sfRetry 5m 5 "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || exit 200
-                            exit 0
+                            sfRetry 5m 5 "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || sfFail 200
+                            sfFail 0
 
                     ready:
                         targets:
@@ -197,8 +197,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || exit 201
-                            exit 0
+                            sfRetry 5m 5 "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || sfFail 201
+                            sfFail 0
 
             remove:
                 pace: stop,remove
@@ -215,9 +215,9 @@ feature:
                                 {{ else }}
                                 OPTIONS=
                                 {{ end -}}
-                                docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force || exit 203
+                                docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 203
                             fi
-                            exit 0
+                            sfFail 0
 
                     remove:
                         targets:
@@ -229,6 +229,6 @@ feature:
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elastalert ${SF_VARDIR}/elastalert ${SF_LOGDIR}/elastalert
-                            exit 0
+                            sfFail 0
 
 ...

@@ -33,14 +33,14 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ansible &>/dev/null || exit 1
+                                    dpkg -l | grep ansible &>/dev/null || sfFail 1
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ansible &>/dev/null || exit 1
+                                    rpm -qa | grep ansible &>/dev/null || sfFail 1
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    sfFail 1
                                     ;;
                             esac
 
@@ -73,14 +73,14 @@ feature:
                                     sfRetry 5m 3 "sfApt install -y ansible"
                                     ;;
                                 centos|rhel)
-                                    yum install -y ansible || exit 192
+                                    yum install -y ansible || sfFail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    sfFail 195
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
             remove:
                 pace: ansible
@@ -103,7 +103,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    sfFail 1
                                     ;;
                             esac
 

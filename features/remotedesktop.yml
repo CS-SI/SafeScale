@@ -39,9 +39,15 @@ feature:
                             masters: all
                         run: |
                             if ! docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null; then
+<<<<<<< refs/remotes/origin/develop
                                 exit 1
+||||||| ancestor
+                                fail 1
+=======
+                                sfFail 1
+>>>>>>> Changes in features
                             fi
-                            exit 0
+                            sfFail 0
 
             add:
                 #pace: desktop+deps,tigervnc+guacamole,start
@@ -62,7 +68,13 @@ feature:
                                     yum makecache fast && \
                                     yum groupinstall -y -t "X Window system" && \
                                     yum groupinstall -y -t Xfce && \
+<<<<<<< refs/remotes/origin/develop
                                     yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || exit 192
+||||||| ancestor
+                                    yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || fail 192
+=======
+                                    yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
+>>>>>>> Changes in features
                                     ;;
                                 debian|ubuntu)
                                     sfApt update && apt-mark hold xscreensaver
@@ -70,10 +82,16 @@ feature:
                                     ;;
                                 *)
                                     echo "unsupported OS type '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 193
+||||||| ancestor
+                                    fail 193
+=======
+                                    sfFail 193
+>>>>>>> Changes in features
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
                     tigervnc:
                         targets:
@@ -82,13 +100,27 @@ feature:
                         timeout: 15
                         run: |
                             URL="https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz"
+<<<<<<< refs/remotes/origin/develop
                             sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || exit 194
                             tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || exit 195
+||||||| ancestor
+                            sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || fail 194
+                            tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || fail 195
+=======
+                            sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194
+                            tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195
+>>>>>>> Changes in features
                             rm -rf ${SF_TMPDIR}/tigervnc.tgz
 
                             if [ ! -d ~{{.Username}} ]; then
                                 echo "Homedir of user {{.Username}} not found"
+<<<<<<< refs/remotes/origin/develop
                                 exit 196
+||||||| ancestor
+                                fail 196
+=======
+                                sfFail 196
+>>>>>>> Changes in features
                             fi
 
                             # Configurations
@@ -253,14 +285,30 @@ feature:
                             EOF
                             cat ${SF_TMPDIR}/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
                             rm -f ${SF_TMPDIR}/xfce_conf.encoded
+<<<<<<< refs/remotes/origin/develop
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 197
+||||||| ancestor
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || fail 197
+=======
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || sfFail 197
+>>>>>>> Changes in features
 
                             systemctl daemon-reload && \
                             systemctl enable vncserver\@:0.service && \
                             systemctl enable vncconfig\@:0.service && \
+<<<<<<< refs/remotes/origin/develop
                             systemctl restart vncserver\@:0.service || exit 198
                             systemctl restart vncconfig\@:0.service || exit 199
                             exit 0
+||||||| ancestor
+                            systemctl restart vncserver\@:0.service || fail 198
+                            systemctl restart vncconfig\@:0.service || fail 199
+                            exit 0
+=======
+                            systemctl restart vncserver\@:0.service || sfFail 198
+                            systemctl restart vncconfig\@:0.service || sfFail 199
+                            sfFail 0
+>>>>>>> Changes in features
 
                     deps:
                         targets:
@@ -272,9 +320,19 @@ feature:
 
                             VERSION=1.0.0
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
+<<<<<<< refs/remotes/origin/develop
                             sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 200
                             sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 201
                             exit 0
+||||||| ancestor
+                            sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || fail 200
+                            sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || fail 201
+                            exit 0
+=======
+                            sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || sfFail 200
+                            sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || sfFail 201
+                            sfFail 0
+>>>>>>> Changes in features
 
                     guacamole:
                         targets:
@@ -479,8 +537,16 @@ feature:
                             EOF
 
                             # build image
+<<<<<<< refs/remotes/origin/develop
                             docker build -t remotedesktop:latest --network=host . || exit 202
                             exit 0
+||||||| ancestor
+                            docker build -t remotedesktop:latest --network=host . || fail 202
+                            exit 0
+=======
+                            docker build -t remotedesktop:latest --network=host . || sfFail 202
+                            sfFail 0
+>>>>>>> Changes in features
 
                     start:
                         targets:
@@ -525,16 +591,44 @@ feature:
                                 <short>Drop any connection to SafeScale remote desktop</short>
                             </zone>
                             EOF
+<<<<<<< refs/remotes/origin/develop
                             sfFirewallReload || exit 204 "Firewall problem"
+||||||| ancestor
+                            sfFirewallReload || fail 204 "Firewall problem"
+=======
+                            sfFirewallReload || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
 
                             # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
+<<<<<<< refs/remotes/origin/develop
                             sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd || exit 204 "Firewall problem"
                             sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }} || exit 204 "Firewall problem"
+||||||| ancestor
+                            sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd || fail 204 "Firewall problem"
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }} || fail 204 "Firewall problem"
+=======
+                            sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                             {{ if .SecondaryGatewayIP }}
+<<<<<<< refs/remotes/origin/develop
                             sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }} || exit 204 "Firewall problem"
                             sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }} || exit 204 "Firewall problem"
+||||||| ancestor
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }} || fail 204 "Firewall problem"
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }} || fail 204 "Firewall problem"
+=======
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                             {{ end }}
+<<<<<<< refs/remotes/origin/develop
                             sfFirewallReload || exit 204 "Firewall problem"
+||||||| ancestor
+                            sfFirewallReload || fail 204 "Firewall problem"
+=======
+                            sfFirewallReload || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                             # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.DefaultRouteIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
                             # {{ if .SecondaryGatewayIP }}
                             # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.PrimaryGatewayIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
@@ -545,8 +639,16 @@ feature:
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
+<<<<<<< refs/remotes/origin/develop
                             docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d || exit 203
                             exit 0
+||||||| ancestor
+                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d || fail 203
+                            exit 0
+=======
+                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d || sfFail 203
+                            sfFail 0
+>>>>>>> Changes in features
 
             remove:
                 pace: image
