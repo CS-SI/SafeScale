@@ -117,9 +117,15 @@ feature:
                             output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1) && op=$? || true
                             [ $op -ne 0 ] && {
                                 echo $output
+<<<<<<< refs/remotes/origin/develop
                                 echo $output | grep "already installed" &>/dev/null || exit $op
+||||||| ancestor
+                                echo $output | grep "already installed" &>/dev/null || fail $op
+=======
+                                echo $output | grep "already installed" &>/dev/null || sfFail $op
+>>>>>>> Changes in features
                             }
-                            exit 0
+                            sfFail 0
 
                     cli:
                         targets:
@@ -131,7 +137,13 @@ feature:
                         targets:
                             masters: all
                         run: |
+<<<<<<< refs/remotes/origin/develop
                             sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || exit 192
+||||||| ancestor
+                            sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || fail 192
+=======
+                            sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || sfFail 192
+>>>>>>> Changes in features
                             sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                             sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 
@@ -169,7 +181,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            [ -f /etc/kubernetes/.joined ] && sfFail 0
 
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
@@ -177,7 +189,13 @@ feature:
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
+<<<<<<< refs/remotes/origin/develop
                                     sfApt update && sfApt install -y kubelet kubeadm kubectl || exit 192
+||||||| ancestor
+                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || fail 192
+=======
+                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 192
+>>>>>>> Changes in features
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
 
@@ -193,29 +211,53 @@ feature:
                             exclude=kube*
                             EOF
 
+<<<<<<< refs/remotes/origin/develop
                                     yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes || exit 192
+||||||| ancestor
+                                    yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes || fail 192
+=======
+                                    yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 192
+>>>>>>> Changes in features
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
+<<<<<<< refs/remotes/origin/develop
                                    exit 193
+||||||| ancestor
+                                   fail 193
+=======
+                                   sfFail 193
+>>>>>>> Changes in features
                             esac
                             sfService enable kubelet && sfService start kubelet
-                            exit 0
+                            sfFail 0
 
                     sysconf:
                         targets:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            [ -f /etc/kubernetes/.joined ] && sfFail 0
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
+<<<<<<< refs/remotes/origin/develop
                                     sfRetry 5m 5 sfApt install -y ebtables socat || exit 194
+||||||| ancestor
+                                    sfRetry 5m 5 sfApt install -y ebtables socat || fail 194
+=======
+                                    sfRetry 5m 5 sfApt install -y ebtables socat || sfFail 194
+>>>>>>> Changes in features
                                     ;;
                                 redhat|centos)
+<<<<<<< refs/remotes/origin/develop
                                     sfRetry 5m 5 yum install -y ebtables socat || exit 195
+||||||| ancestor
+                                    sfRetry 5m 5 yum install -y ebtables socat || fail 195
+=======
+                                    sfRetry 5m 5 yum install -y ebtables socat || sfFail 195
+>>>>>>> Changes in features
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
                             net.bridge.bridge-nf-call-iptables = 1
@@ -229,7 +271,13 @@ feature:
                                         getenforce | grep "Disabled" || act=1
                                         if [ $act -eq 1 ]; then
                                             if [[ -n $(command -v setenforce) ]]; then
+<<<<<<< refs/remotes/origin/develop
                                                 setenforce 0 || exit 201 "Error setting selinux in Permissive mode"
+||||||| ancestor
+                                                setenforce 0 || fail 201 "Error setting selinux in Permissive mode"
+=======
+                                                setenforce 0 || sfFail 201 "Error setting selinux in Permissive mode"
+>>>>>>> Changes in features
                                                 sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
                                             fi
                                         fi
@@ -237,7 +285,13 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 196
+||||||| ancestor
+                                    fail 196
+=======
+                                    sfFail 196
+>>>>>>> Changes in features
                                     ;;
                             esac
 
@@ -260,7 +314,7 @@ feature:
                                     grep -v "$s" /etc/fstab >>/etc/fstab.new && mv /etc/fstab.new /etc/fstab
                                 done
                             fi
-                            exit 0
+                            sfFail 0
 
                     reverseproxy:
                         targets:
@@ -271,7 +325,13 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
+<<<<<<< refs/remotes/origin/develop
                             [ -z "${TARGET_DIR+x}" ] && exit 197
+||||||| ancestor
+                            [ -z "${TARGET_DIR+x}" ] && fail 197
+=======
+                            [ -z "${TARGET_DIR+x}" ] && sfFail 197
+>>>>>>> Changes in features
 
                             cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
                             upstream kubernetes-api-cluster {
@@ -285,13 +345,13 @@ feature:
                             }
                             EOF
                             sfReverseProxyReload
-                            exit 0
+                            sfFail 0
 
                     cp1-init:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            [ -f /etc/kubernetes/.joined ] && sfFail 0
 
                             mkdir -p /etc/kubernetes/kubeadm
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-'EOF'
@@ -309,11 +369,25 @@ feature:
                             # EOF
                             # fi
 
+<<<<<<< refs/remotes/origin/develop
                             sfRetry 5m 5 kubeadm config images pull || exit 198
                             kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || exit 199
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || exit 200
                             #cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -1) || exit 201
                             cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1) || exit 201
+||||||| ancestor
+                            sfRetry 5m 5 kubeadm config images pull || fail 198
+                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || fail 199
+                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || fail 200
+                            #cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -1) || fail 201
+                            cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1) || fail 201
+=======
+                            sfRetry 5m 5 kubeadm config images pull || sfFail 198
+                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 199
+                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 200
+                            #cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -1) || sfFail 201
+                            cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1) || sfFail 201
+>>>>>>> Changes in features
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
                             mkdir -p ~{{.Username}}/.kube
@@ -323,31 +397,65 @@ feature:
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
+<<<<<<< refs/remotes/origin/develop
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || exit 202
+||||||| ancestor
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 202
+=======
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 202
+>>>>>>> Changes in features
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
                             echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
                             cat ${SF_TMPDIR}/cp_join_cmd.sh
+<<<<<<< refs/remotes/origin/develop
                             sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || exit 203
                             sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || exit 204
+||||||| ancestor
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 203
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 204
+=======
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 203
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 204
+>>>>>>> Changes in features
                             for ip in {{range .MasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
+<<<<<<< refs/remotes/origin/develop
                                 sfDropzoneSync $ip || exit 205
+||||||| ancestor
+                                sfDropzoneSync $ip || fail 205
+=======
+                                sfDropzoneSync $ip || sfFail 205
+>>>>>>> Changes in features
                             done
                             rm ${SF_TMPDIR}/cp_join_cmd.sh ${SF_TMPDIR}/init_cluster_admin_kube.sh
                             sfDropzoneClean
 
                             # waits availability of key pods
+<<<<<<< refs/remotes/origin/develop
 
                             set -u -o pipeexit
                             sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || exit 206
                             sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || exit 207
                             sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || exit 208
+||||||| ancestor
+                            
+                            set -u -o pipefail
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || fail 206
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || fail 207
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || fail 208
+=======
+
+                            set -u -o pipeexit
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 206
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 207
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 208
+>>>>>>> Changes in features
 
                             touch /etc/kubernetes/.joined
                             echo "init done"
-                            exit 0
+                            sfFail 0
 
                     cni:
                         targets:
@@ -355,64 +463,136 @@ feature:
                         run: |
                             case {{.CNI}} in
                                 flannel)
+<<<<<<< refs/remotes/origin/develop
                                     sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || exit 209
+||||||| ancestor
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || fail 209
+=======
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 209
+>>>>>>> Changes in features
 
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
+<<<<<<< refs/remotes/origin/develop
                                     sfFirewallReload || exit 204 "Firewall problem"
+||||||| ancestor
+                                    sfFirewallReload || fail 204 "Firewall problem"
+=======
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                                     ;;
                                 calico) # Untested yet...
+<<<<<<< refs/remotes/origin/develop
                                     sfKubectl apply -f https://gist.githubusercontent.com/joshrosso/ed1f5ea5a2f47d86f536e9eee3f1a2c2/raw/dfd95b9230fb3f75543706f3a95989964f36b154/calico-3.5.yaml || exit 210
+||||||| ancestor
+                                    sfKubectl apply -f https://gist.githubusercontent.com/joshrosso/ed1f5ea5a2f47d86f536e9eee3f1a2c2/raw/dfd95b9230fb3f75543706f3a95989964f36b154/calico-3.5.yaml || fail 210
+=======
+                                    sfKubectl apply -f https://gist.githubusercontent.com/joshrosso/ed1f5ea5a2f47d86f536e9eee3f1a2c2/raw/dfd95b9230fb3f75543706f3a95989964f36b154/calico-3.5.yaml || sfFail 210
+>>>>>>> Changes in features
                                     ;;
                                 canal) # Untested yet...
+<<<<<<< refs/remotes/origin/develop
                                     sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || exit 211
+||||||| ancestor
+                                    sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || fail 211
+=======
+                                    sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || sfFail 211
+>>>>>>> Changes in features
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
+<<<<<<< refs/remotes/origin/develop
                                     sfFirewallReload || exit 204 "Firewall problem"
+||||||| ancestor
+                                    sfFirewallReload || fail 204 "Firewall problem"
+=======
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
                     cpx-init:
                         targets:
                             masters: all
                         run: |
                             # Don't try to init a kubernetes cluster already running
-                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            [ -f /etc/kubernetes/.joined ] && sfFail 0
 
+<<<<<<< refs/remotes/origin/develop
                             sfDropzonePop ${SF_TMPDIR} || exit 212
+||||||| ancestor
+                            sfDropzonePop ${SF_TMPDIR} || fail 212
+=======
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 212
+>>>>>>> Changes in features
                             sfDropzoneClean
 
+<<<<<<< refs/remotes/origin/develop
                             [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || exit 213
                             bash ${SF_TMPDIR}/cp_join_cmd.sh || exit 215
                             [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || exit 215
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || exit 216
+||||||| ancestor
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || fail 213
+                            bash ${SF_TMPDIR}/cp_join_cmd.sh || fail 215
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || fail 215
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 216
+=======
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 213
+                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 215
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 215
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 216
+>>>>>>> Changes in features
 
                             # waits availability of key pods
+<<<<<<< refs/remotes/origin/develop
                             set -u -o pipeexit
                             sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || exit 217
                             sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 218
                             sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || exit 219
+||||||| ancestor
+                            set -u -o pipefail
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || fail 217
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || fail 218
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || fail 219
+=======
+                            set -u -o pipeexit
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 217
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || sfFail 218
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 219
+>>>>>>> Changes in features
 
                             # Configure firewall
                             case {{.CNI}} in
                                 flannel)
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
+<<<<<<< refs/remotes/origin/develop
                                     sfFirewallReload || exit 204 "Firewall problem"
+||||||| ancestor
+                                    sfFirewallReload || fail 204 "Firewall problem"
+=======
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                                     ;;
                                 canal)
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
+<<<<<<< refs/remotes/origin/develop
                                     sfFirewallReload || exit 204 "Firewall problem"
+||||||| ancestor
+                                    sfFirewallReload || fail 204 "Firewall problem"
+=======
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                                     ;;
                             esac
 
-                            exit 0
+                            sfFail 0
 
                     join:
                         targets:
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            [ -f /etc/kubernetes/.joined ] && sfFail 0
 
                             MASTERIP=
                             for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
@@ -423,10 +603,18 @@ feature:
                                 MASTERIP=$m
                                 break
                             done
+<<<<<<< refs/remotes/origin/develop
                             [ -z "$MASTERIP" ] && echo "exited to find available master to register with. Aborted." && exit 220
                             eval $NODE_JOIN_CMD || exit 221
+||||||| ancestor
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && fail 220
+                            eval $NODE_JOIN_CMD || fail 221
+=======
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 220
+                            eval $NODE_JOIN_CMD || sfFail 221
+>>>>>>> Changes in features
                             touch /etc/kubernetes/.joined
-                            exit 0
+                            sfFail 0
 
                     final:
                         targets:
@@ -436,11 +624,27 @@ feature:
                             [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" = "true" ]; then
+<<<<<<< refs/remotes/origin/develop
                                 if curl --output /dev/null --silent --head --exit "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
                                     sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || exit 222 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+||||||| ancestor
+                                if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
+                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || fail 222 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+=======
+                                if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
+                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+>>>>>>> Changes in features
                                 else
+<<<<<<< refs/remotes/origin/develop
                                     if curl --output /dev/null --silent --head --exit "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
                                         sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || exit 222 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+||||||| ancestor
+                                    if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
+                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || fail 222 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+=======
+                                    if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
+                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+>>>>>>> Changes in features
                                     fi
                                 fi
                             fi
@@ -465,7 +669,7 @@ feature:
                             #     name: cladm
                             #     namespace: kube-system
                             # EOF
-                            exit 0
+                            sfFail 0
 
             remove:
                 pace: node,reset,reverseproxy,clean
@@ -498,14 +702,32 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
+<<<<<<< refs/remotes/origin/develop
                                     sfApt purge -y kubectl kubeadm kubelet || exit 223 "exiture purging kubernetes"
+||||||| ancestor
+                                    sfApt purge -y kubectl kubeadm kubelet || fail 223 "Failure purging kubernetes"
+=======
+                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 223 "exiture purging kubernetes"
+>>>>>>> Changes in features
                                     ;;
                                 redhat|centos)
+<<<<<<< refs/remotes/origin/develop
                                     yum remove -y kubectl kubeadm kubelet || exit 224 "exiture purging kubernetes"
+||||||| ancestor
+                                    yum remove -y kubectl kubeadm kubelet || fail 224 "Failure purging kubernetes"
+=======
+                                    yum remove -y kubectl kubeadm kubelet || sfFail 224 "exiture purging kubernetes"
+>>>>>>> Changes in features
                                     ;;
                             esac
+<<<<<<< refs/remotes/origin/develop
                             sfFirewallReload || exit 204 "Firewall problem"
+||||||| ancestor
+                            sfFirewallReload || fail 204 "Firewall problem"
+=======
+                            sfFirewallReload || sfFail 204 "Firewall problem"
+>>>>>>> Changes in features
                             rm -f /etc/kubernetes/.joined
-                            exit 0
+                            sfFail 0
 
 ...

@@ -36,8 +36,16 @@ feature:
                             masters: all
                             nodes: all
                         run: |
+<<<<<<< refs/remotes/origin/develop
                             sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1 || exit 192
                             exit 0
+||||||| ancestor
+                            sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1 || fail 192
+                            exit 0
+=======
+                            sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1 || sfFail 192
+                            sfFail 0
+>>>>>>> Changes in features
 
             add:
                 pace: config,compose,start
@@ -169,9 +177,19 @@ feature:
                             masters: all
                             nodes: all
                         run: |
+<<<<<<< refs/remotes/origin/develop
                             docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale up -d || exit 193
                             sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1" || exit 194
                             exit 0
+||||||| ancestor
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale up -d || fail 193
+                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1" || fail 194
+                            exit 0
+=======
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale up -d || sfFail 193
+                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1" || sfFail 194
+                            sfFail 0
+>>>>>>> Changes in features
 
             remove:
                 pace: stop,cleanup
@@ -183,8 +201,16 @@ feature:
                             masters: all
                             nodes: all
                         run: |
+<<<<<<< refs/remotes/origin/develop
                             docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale rm --stop --force || exit 195
                             exit 0
+||||||| ancestor
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale rm --stop --force || fail 195
+                            exit 0
+=======
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale rm --stop --force || sfFail 195
+                            sfFail 0
+>>>>>>> Changes in features
 
                     cleanup:
                         targets:
@@ -195,6 +221,6 @@ feature:
                         run: |
                             docker image rm -f docker.elastic.co/beats/metricbeat:{{ .Version }}
                             rm -rf ${SF_ETCDIR}/metricbeat4safescale
-                            exit 0
+                            sfFail 0
 
 ...

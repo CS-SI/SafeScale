@@ -36,14 +36,32 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
+<<<<<<< refs/remotes/origin/develop
                                     dpkg -l | grep docker-nvidia2 &>/dev/null || exit 1
+||||||| ancestor
+                                    dpkg -l | grep docker-nvidia2 &>/dev/null || fail 1
+=======
+                                    dpkg -l | grep docker-nvidia2 &>/dev/null || sfFail 1
+>>>>>>> Changes in features
                                     ;;
                                 centos|rhel)
+<<<<<<< refs/remotes/origin/develop
                                     rpm -qa | grep docker-nvidia2 &>/dev/null || exit 1
+||||||| ancestor
+                                    rpm -qa | grep docker-nvidia2 &>/dev/null || fail 1
+=======
+                                    rpm -qa | grep docker-nvidia2 &>/dev/null || sfFail 1
+>>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 192
+||||||| ancestor
+                                    fail 192
+=======
+                                    sfFail 192
+>>>>>>> Changes in features
                                     ;;
                             esac
 
@@ -59,7 +77,13 @@ feature:
                         run: |
                             lspci | grep -i nvidia &>/dev/null || {
                                 echo "No nVidia GPU detected. Aborting."
+<<<<<<< refs/remotes/origin/develop
                                 exit 192
+||||||| ancestor
+                                fail 192
+=======
+                                sfFail 192
+>>>>>>> Changes in features
                             }
 
                             DOCKER_VERSION=$(sfGetFact "docker_version")
@@ -76,7 +100,13 @@ feature:
                                     update-initramfs -u || true
 
                                     dpkg --compare-versions $(sfGetFact "version_id") ge 18.04 && DIST=ubuntu18.04 || DIST=ubuntu16.04
+<<<<<<< refs/remotes/origin/develop
                                     sfWaitForApt && apt install -y gcc linux-headers-$(uname -r) || exit $?
+||||||| ancestor
+                                    sfWaitForApt && apt install -y gcc linux-headers-$(uname -r) || fail $?
+=======
+                                    sfWaitForApt && apt install -y gcc linux-headers-$(uname -r) || sfFail $?
+>>>>>>> Changes in features
                                     if dpkg --compare-versions $DOCKER_VERSION ge 19.03; then
                                         # first install cuda-drivers
                                         apt-get install linux-headers-$(uname -r)
@@ -93,8 +123,16 @@ feature:
                                         sfApt install -y nvidia-container-toolkit
                                         systemctl restart docker
                                     else
+<<<<<<< refs/remotes/origin/develop
                                         wget -O cuda-repo.deb ${NVIDIA_URL}/${DIST}/x86_64/cuda-repo-${DIST}_9.2.148-1_amd64.deb || exit $?
                                         dpkg -i cuda-repo.deb || exit $?
+||||||| ancestor
+                                        wget -O cuda-repo.deb ${NVIDIA_URL}/${DIST}/x86_64/cuda-repo-${DIST}_9.2.148-1_amd64.deb || fail $?
+                                        dpkg -i cuda-repo.deb || fail $?
+=======
+                                        wget -O cuda-repo.deb ${NVIDIA_URL}/${DIST}/x86_64/cuda-repo-${DIST}_9.2.148-1_amd64.deb || sfFail $?
+                                        dpkg -i cuda-repo.deb || sfFail $?
+>>>>>>> Changes in features
                                         apt-key adv --fetch-keys ${NVIDIA_URL}/${DIST}/x86_64/7fa2af80.pub
                                         rm -f cuda-repo.deb
 
@@ -102,28 +140,66 @@ feature:
                                         curl -s -L ${NVIDIA_DOCKER_URL}/${DIST}/nvidia-docker.list | \
                                             tee /etc/apt/sources.list.d/nvidia-docker.list
                                         sfWaitForApt && apt update
+<<<<<<< refs/remotes/origin/develop
                                         sfWaitForApt && apt install -y cuda || exit $?
                                         sfWaitForApt && yes | apt install -y nvidia-docker2 || exit $?
+||||||| ancestor
+                                        sfWaitForApt && apt install -y cuda || fail $?
+                                        sfWaitForApt && yes | apt install -y nvidia-docker2 || fail $?
+=======
+                                        sfWaitForApt && apt install -y cuda || sfFail $?
+                                        sfWaitForApt && yes | apt install -y nvidia-docker2 || sfFail $?
+>>>>>>> Changes in features
                                     fi
                                     ;;
 
                                 debian)
+<<<<<<< refs/remotes/origin/develop
                                     wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || exit $?
                                     dpkg -i cuda-repo.deb || exit $?
                                     sfWaitForApt && apt install -y dirmngr gcc linux-headers-$(uname -r) || exit $?
+||||||| ancestor
+                                    wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || fail $?
+                                    dpkg -i cuda-repo.deb || fail $?
+                                    sfWaitForApt && apt install -y dirmngr gcc linux-headers-$(uname -r) || fail $?
+=======
+                                    wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || sfFail $?
+                                    dpkg -i cuda-repo.deb || sfFail $?
+                                    sfWaitForApt && apt install -y dirmngr gcc linux-headers-$(uname -r) || sfFail $?
+>>>>>>> Changes in features
                                     apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1710/x86_64/7fa2af80.pub
                                     rm -f cuda-repo.deb
                                     curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
                                     DIST=$(. /etc/os-release; echo $ID$VERSION_ID)
                                     curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
                                         tee /etc/apt/sources.list.d/nvidia-docker.list
+<<<<<<< refs/remotes/origin/develop
                                     wget -O screen-resolution-extra.deb http://security.ubuntu.com/ubuntu/pool/main/s/screen-resolution-extra/screen-resolution-extra_0.17.1.1_all.deb || exit $?
                                     wget -O python3-xkit.deb http://archive.ubuntu.com/ubuntu/pool/main/x/x-kit/python3-xkit_0.5.0ubuntu2_all.deb || exit $?
                                     apt -y install libgtk-3-0 policykit-1-gnome || exit $?
                                     dpkg -i python3-xkit.deb screen-resolution-extra.deb || exit $?
+||||||| ancestor
+                                    wget -O screen-resolution-extra.deb http://security.ubuntu.com/ubuntu/pool/main/s/screen-resolution-extra/screen-resolution-extra_0.17.1.1_all.deb || fail $?
+                                    wget -O python3-xkit.deb http://archive.ubuntu.com/ubuntu/pool/main/x/x-kit/python3-xkit_0.5.0ubuntu2_all.deb || fail $?
+                                    apt -y install libgtk-3-0 policykit-1-gnome || fail $?
+                                    dpkg -i python3-xkit.deb screen-resolution-extra.deb || fail $?
+=======
+                                    wget -O screen-resolution-extra.deb http://security.ubuntu.com/ubuntu/pool/main/s/screen-resolution-extra/screen-resolution-extra_0.17.1.1_all.deb || sfFail $?
+                                    wget -O python3-xkit.deb http://archive.ubuntu.com/ubuntu/pool/main/x/x-kit/python3-xkit_0.5.0ubuntu2_all.deb || sfFail $?
+                                    apt -y install libgtk-3-0 policykit-1-gnome || sfFail $?
+                                    dpkg -i python3-xkit.deb screen-resolution-extra.deb || sfFail $?
+>>>>>>> Changes in features
                                     sfWaitForApt && apt update
+<<<<<<< refs/remotes/origin/develop
                                     sfWaitForApt && apt install -y cuda || exit $?
                                     sfWaitForApt && yes | apt install -y nvidia-docker2 || exit $?
+||||||| ancestor
+                                    sfWaitForApt && apt install -y cuda || fail $?
+                                    sfWaitForApt && yes | apt install -y nvidia-docker2 || fail $?
+=======
+                                    sfWaitForApt && apt install -y cuda || sfFail $?
+                                    sfWaitForApt && yes | apt install -y nvidia-docker2 || sfFail $?
+>>>>>>> Changes in features
                                     ;;
 
                                 centos|rhel)
@@ -137,17 +213,35 @@ feature:
                                         sfSystem restart docker
                                     else
                                         curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | \
+<<<<<<< refs/remotes/origin/develop
                                             tee /etc/yum.repos.d/nvidia-docker.repo || exit $?
+||||||| ancestor
+                                            tee /etc/yum.repos.d/nvidia-docker.repo || fail $?
+=======
+                                            tee /etc/yum.repos.d/nvidia-docker.repo || sfFail $?
+>>>>>>> Changes in features
                                         yum clean expire-cache
+<<<<<<< refs/remotes/origin/develop
                                         yum install -y cuda nvidia-docker2 || exit $?
+||||||| ancestor
+                                        yum install -y cuda nvidia-docker2 || fail $?
+=======
+                                        yum install -y cuda nvidia-docker2 || sfFail $?
+>>>>>>> Changes in features
                                     fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 1
+||||||| ancestor
+                                    fail 1
+=======
+                                    sfFail 1
+>>>>>>> Changes in features
                                     ;;
                             esac
-                            exit 0
+                            sfFail 0
 
             remove:
                 pace: pkg
@@ -167,7 +261,13 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 1
+||||||| ancestor
+                                    fail 1
+=======
+                                    sfFail 1
+>>>>>>> Changes in features
                                     ;;
                             esac
 

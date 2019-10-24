@@ -48,18 +48,38 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
+<<<<<<< refs/remotes/origin/develop
                                     exit 1
+||||||| ancestor
+                                    fail 1
+=======
+                                    sfFail 1
+>>>>>>> Changes in features
                                     ;;
                             esac
                             cd ${SF_TMPDIR}
+<<<<<<< refs/remotes/origin/develop
                             wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || exit 2
+||||||| ancestor
+                            wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || fail 2
+=======
+                            wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || sfFail 2
+>>>>>>> Changes in features
                             tar -zxvf mpich-3.2.1.tar.gz
                             cd mpich-3.2.1
                             ./configure --disable-fortran
+<<<<<<< refs/remotes/origin/develop
                             make -j${FACTS["2 3rd of threads"]} || exit 3
                             make install || exit 4
+||||||| ancestor
+                            make -j${FACTS["2 3rd of threads"]} || fail 3
+                            make install || fail 4
+=======
+                            make -j${FACTS["2 3rd of threads"]} || sfFail 3
+                            make install || sfFail 4
+>>>>>>> Changes in features
                             rm -rf mpich-3.2.1*
-                            exit 0
+                            sfFail 0
 
             remove:
                 pace: binary

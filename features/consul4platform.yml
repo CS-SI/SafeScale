@@ -35,8 +35,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack consul4platform || exit 192
-                            exit 0
+                            sfDoesDockerRunStack consul4platform || sfFail 192
+                            sfFail 0
 
             add:
                 pace: config-masters,config-nodes,config-gws,stack,start,ready
@@ -48,7 +48,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            exit 0
+                            sfFail 0
 
                     config-masters:
                         targets:
@@ -112,7 +112,7 @@ feature:
                             }
                             EOF
                             chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
-                            exit 0
+                            sfFail 0
 
                     config-nodes:
                         targets:
@@ -167,7 +167,7 @@ feature:
                             }
                             EOF
                             chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
-                            exit 0
+                            sfFail 0
 
                     config-gws:
                         targets:
@@ -222,7 +222,7 @@ feature:
                             }
                             EOF
                             chmod 0644 ${SF_ETCDIR}/consul4platform/*.json
-                            exit 0
+                            sfFail 0
 
                     stack:
                         targets:
@@ -316,7 +316,7 @@ feature:
                             EOF
                             chown safescale:safescale ${SF_ETCDIR}/consul4platform/stack.yml
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/consul4platform/stack.yml
-                            exit 0
+                            sfFail 0
 
                     start:
                         targets:
@@ -326,10 +326,10 @@ feature:
                             nodes: no
                         run: |
                             # if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul4platform_net"; then
-                            #     docker network create -d overlay consul4platform_net || exit 194
+                            #     docker network create -d overlay consul4platform_net || sfFail 194
                             # fi
-                            docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || exit 195
-                            exit 0
+                            docker stack deploy -c ${SF_ETCDIR}/consul4platform/stack.yml consul4platform || sfFail 195
+                            sfFail 0
 
                     ready:
                         targets:
@@ -338,8 +338,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || exit 197
-                            exit 0
+                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || sfFail 197
+                            sfFail 0
 
             remove:
                 pace: stop,cleanup
@@ -351,8 +351,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm consul4platform || exit 200
-                            exit 0
+                            docker stack rm consul4platform || sfFail 200
+                            sfFail 0
 
                     cleanup:
                         targets:
@@ -361,9 +361,9 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfRemoveDockerImage consul || exit 202
+                            sfRemoveDockerImage consul || sfFail 202
                             rm -rf ${SF_ETCDIR}/consul4platform ${SF_VARDIR}/consul4platform
-                            exit 0
+                            sfFail 0
 
     proxy:
         rules:
