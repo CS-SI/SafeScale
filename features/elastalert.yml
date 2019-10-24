@@ -47,7 +47,7 @@ feature:
                             nodes: no
                         run: |
                             sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} || sfFail 192
-                            sfFail 0
+                            sfExit
 
             add:
                 # pace: config,kibanaplugin,start,running,ready
@@ -161,7 +161,7 @@ feature:
                             {{ end -}}
                             cd ${SF_TMPDIR}
                             rm -rf elastalert-kibana-plugin
-                            sfFail 0
+                            sfExit
 
                     start:
                         targets:
@@ -175,7 +175,7 @@ feature:
                             OPTIONS=
                             {{ end -}}
                             docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d || sfFail 198
-                            sfFail 0
+                            sfExit
 
                     running:
                         targets:
@@ -189,7 +189,7 @@ feature:
                             PREFIX="elastalert"
                             {{ end -}}
                             sfRetry 5m 5 "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || sfFail 200
-                            sfFail 0
+                            sfExit
 
                     ready:
                         targets:
@@ -198,7 +198,7 @@ feature:
                             nodes: no
                         run: |
                             sfRetry 5m 5 "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || sfFail 201
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: stop,remove
@@ -217,7 +217,7 @@ feature:
                                 {{ end -}}
                                 docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 203
                             fi
-                            sfFail 0
+                            sfExit
 
                     remove:
                         targets:
@@ -229,6 +229,6 @@ feature:
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elastalert ${SF_VARDIR}/elastalert ${SF_LOGDIR}/elastalert
-                            sfFail 0
+                            sfExit
 
 ...

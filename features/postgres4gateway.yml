@@ -38,16 +38,8 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || exit 192
-                            exit 0
-||||||| ancestor
-                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || fail 192
-                            exit 0
-=======
                             sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || sfFail 192
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             add:
                 # pace: config,secret,network,start
@@ -100,7 +92,7 @@ feature:
                             #         external: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/postgres4gateway/docker-compose.yml
-                            sfFail 0
+                            sfExit
 
                     # secret:
                     #     targets:
@@ -110,16 +102,8 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         docker secret rm postgres4gateway &>/dev/null || true
-<<<<<<< refs/remotes/origin/develop
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || exit 192
-                    #         exit 0
-||||||| ancestor
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || fail 192
-                    #         exit 0
-=======
                     #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || sfFail 192
-                    #         sfFail 0
->>>>>>> Changes in features
+                    #         sfExit
 
                     # network:
                     #     targets:
@@ -129,24 +113,12 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
-<<<<<<< refs/remotes/origin/develop
-                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
-||||||| ancestor
-                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || fail 192
-=======
                     #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || sfFail 192
->>>>>>> Changes in features
                     #         # fi
                     #         if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
-<<<<<<< refs/remotes/origin/develop
-                    #             docker network create --attachable -d bridge safescale-gw || exit 193
-||||||| ancestor
-                    #             docker network create --attachable -d bridge safescale-gw || fail 193
-=======
                     #             docker network create --attachable -d bridge safescale-gw || sfFail 193
->>>>>>> Changes in features
                     #         fi
-                    #         sfFail 0
+                    #         sfExit
 
                     start:
                         targets:
@@ -155,19 +127,9 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || exit 195
-                            exit 0
-||||||| ancestor
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || fail 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || fail 195
-                            exit 0
-=======
                             docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || sfFail 194
                             sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             remove:
                 pace: compose,cleanup
@@ -179,16 +141,10 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || exit 196
-||||||| ancestor
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || fail 196
-=======
                             docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || sfFail 196
->>>>>>> Changes in features
                             docker image rm -f postgres:11-alpine
                             # docker secret rm postgres4gateway &>/dev/null
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -201,6 +157,6 @@ feature:
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" ]; then
                                 rm -rf ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway
                             fi
-                            sfFail 0
+                            sfExit
 
 ...

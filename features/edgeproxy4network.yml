@@ -231,7 +231,7 @@ feature:
                     #     run: |
                     #         docker secret rm safescale.edgeproxy.db_password &>/dev/null || true
                     #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.edgeproxy.db_password - &>/dev/null || sfFail 192
-                    #         sfFail 0
+                    #         sfExit
 
                     networks:
                         targets:
@@ -268,7 +268,7 @@ feature:
                         run: |
                             docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network up -d || sfFail 193
                             sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || sfFail 194
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: compose,networks
@@ -298,7 +298,7 @@ feature:
                                     rm -rf ${SF_ETCDIR}/kong
                                 fi
                             fi
-                            sfFail 0
+                            sfExit
 
                     networks:
                         targets:
@@ -321,6 +321,6 @@ feature:
 
                             # docker network rm ${KONG_PUB_BRIDGE}
                             # docker network rm ${KONG_DB_BRIDGE}
-                            sfFail 0
+                            sfExit
 
 ...

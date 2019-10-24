@@ -37,19 +37,9 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            [ -d ${SF_ETCDIR}/logstash ] || exit 192
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'logstash:7.1.1' &>/dev/null || exit 193
-                            exit 0
-||||||| ancestor
-                            [ -d ${SF_ETCDIR}/logstash ] || fail 192
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'logstash:7.1.1' &>/dev/null || fail 193
-                            exit 0
-=======
                             [ -d ${SF_ETCDIR}/logstash ] || sfFail 192
                             docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'logstash:7.1.1' &>/dev/null || sfFail 193
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             add:
                 pace: image,config,start,ready
@@ -140,7 +130,7 @@ feature:
                                         - ${SF_ETCDIR}/logstash/pipeline/:/usr/share/logstash/pipeline/:ro
                                     restart: always
                             EOF
-                            sfFail 0
+                            sfExit
 
                     start:
                         targets:
@@ -166,7 +156,8 @@ feature:
                             {{ else }}
                             PREFIX="logstash"
                             {{ end }}
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running
+                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running || sfFail 192
+                            sfExit
 
             remove:
                 pace: stop,remove
@@ -182,13 +173,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-<<<<<<< refs/remotes/origin/develop
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
-||||||| ancestor
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || fail 192
-=======
                             docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 192
->>>>>>> Changes in features
+                            sfExit
 
                     remove:
                         targets:
@@ -198,6 +184,6 @@ feature:
                         run: |
                             docker image rm -f logstash:7.1.1
                             rm -rf ${SF_ETCDIR}/logstash
-                            sfFail 0
+                            sfExit
 
 ...

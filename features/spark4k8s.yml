@@ -39,16 +39,8 @@ feature:
                     masters: one
                 run: |
                     STATUS=$(sfDcos spark plan show deploy --json | jq .status
-<<<<<<< refs/remotes/origin/develop
-                    echo $STATUS | grep COMPLETE || exit 192
-                    exit 0
-||||||| ancestor
-                    echo $STATUS | grep COMPLETE || fail 192
-                    exit 0
-=======
                     echo $STATUS | grep COMPLETE || sfFail 192
-                    sfFail 0
->>>>>>> Changes in features
+                    sfExit
 
             add:
                 pace: package,cli
@@ -83,27 +75,11 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            [ -l /usr/local/spark ] || exit 192
-||||||| ancestor
-                            [ -l /usr/local/spark ] || fail 192
-=======
                             [ -l /usr/local/spark ] || sfFail 192
->>>>>>> Changes in features
                             VERSION=$(echo $(basename $(readlink -f /usr/local/spark)) | cut -d- -f2)
-<<<<<<< refs/remotes/origin/develop
-                            [ "$VERSION" = "{{.SparkVersion}}" ] || exit 193
-                            [ -x /usr/local/spark/bin/spark ] || exit 194
-                            exit 0
-||||||| ancestor
-                            [ "$VERSION" = "{{.SparkVersion}}" ] || fail 193
-                            [ -x /usr/local/spark/bin/spark ] || fail 194
-                            exit 0
-=======
                             [ "$VERSION" = "{{.SparkVersion}}" ] || sfFail 193
                             [ -x /usr/local/spark/bin/spark ] || sfFail 194
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
 
             add:
@@ -117,13 +93,7 @@ feature:
                         run: |
                             cd /usr/local
                             wget -q http://www-eu.apache.org/dist/spark/spark-{{.SparkVersion}}/spark-{{.SparkVersion}}-bin-hadoop2.7.tgz && \
-<<<<<<< refs/remotes/origin/develop
-                            tar zxvf spark-{{.SparkVersion}-bin-hadoop2.7.tgz || exit 195
-||||||| ancestor
-                            tar zxvf spark-{{.SparkVersion}-bin-hadoop2.7.tgz || fail 195
-=======
                             tar zxvf spark-{{.SparkVersion}-bin-hadoop2.7.tgz || sfFail 195
->>>>>>> Changes in features
                             rm -f spark-{{.SparkVersion}}-bin-hadoop2.7.tgz
                             ln -s /usr/local/spark-{{.SparkVersion}}-bin-hadoop2.7 /usr/local/spark
                             ln -s /usr/local/spark/bin/spark-submit /usr/local/bin

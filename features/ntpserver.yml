@@ -33,34 +33,17 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-<<<<<<< refs/remotes/origin/develop
-                                    dpkg -l | grep ntp &>/dev/null || exit 1
-||||||| ancestor
-                                    dpkg -l | grep ntp &>/dev/null || fail 1
-=======
                                     dpkg -l | grep ntp &>/dev/null || sfFail 1
->>>>>>> Changes in features
                                     ;;
                                 centos|rhel)
-<<<<<<< refs/remotes/origin/develop
-                                    rpm -qa | grep ntp &>/dev/null || exit 1
-||||||| ancestor
-                                    rpm -qa | grep ntp &>/dev/null || fail 1
-=======
                                     rpm -qa | grep ntp &>/dev/null || sfFail 1
->>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-<<<<<<< refs/remotes/origin/develop
-                                    exit 1
-||||||| ancestor
-                                    fail 1
-=======
                                     sfFail 1
->>>>>>> Changes in features
                                     ;;
                             esac
+                            sfExit
 
             add:
                 pace: ntp-server,firewall,ready
@@ -79,26 +62,14 @@ feature:
                                     sfRetry 5m 3 "sfApt install -y ntp"
                                     ;;
                                 centos|rhel)
-<<<<<<< refs/remotes/origin/develop
-                                    yum install -y ntp || exit 192
-||||||| ancestor
-                                    yum install -y ntp || fail 192
-=======
                                     yum install -y ntp || sfFail 192
->>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-<<<<<<< refs/remotes/origin/develop
-                                    exit 195
-||||||| ancestor
-                                    fail 195
-=======
                                     sfFail 195
->>>>>>> Changes in features
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
                     firewall:
                         targets:
@@ -112,13 +83,7 @@ feature:
                             # then firewalld  itself
                             sfService restart firewalld
                             sfFirewallAdd --zone=public --add-port=123/udp --permanent
-<<<<<<< refs/remotes/origin/develop
-                            sfFirewallReload || exit 204 "Firewall problem"
-||||||| ancestor
-                            sfFirewallReload || fail 204 "Firewall problem"
-=======
                             sfFirewallReload || sfFail 204 "Firewall problem"
->>>>>>> Changes in features
 
                     ready:
                         targets:
@@ -129,59 +94,25 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-<<<<<<< refs/remotes/origin/develop
-                                    sfService enable ntp || exit 195
-                                    sfService restart ntp || exit 196
-||||||| ancestor
-                                    sfService enable ntp || fail 195
-                                    sfService restart ntp || fail 196
-=======
                                     sfService enable ntp || sfFail 195
                                     sfService restart ntp || sfFail 196
->>>>>>> Changes in features
                                     op=-1
                                     sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
-<<<<<<< refs/remotes/origin/develop
-                                    [ $op -ne 0 ] && exit 197
-||||||| ancestor
-                                    [ $op -ne 0 ] && fail 197
-=======
                                     [ $op -ne 0 ] && sfFail 197
->>>>>>> Changes in features
                                     ;;
                                 centos|rhel)
-<<<<<<< refs/remotes/origin/develop
-                                    sfService enable ntpd || exit 195
-                                    sfService restart ntpd || exit 196
-||||||| ancestor
-                                    sfService enable ntpd || fail 195
-                                    sfService restart ntpd || fail 196
-=======
                                     sfService enable ntpd || sfFail 195
                                     sfService restart ntpd || sfFail 196
->>>>>>> Changes in features
                                     op=-1
                                     sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
-<<<<<<< refs/remotes/origin/develop
-                                    [ $op -ne 0 ] && exit 197
-||||||| ancestor
-                                    [ $op -ne 0 ] && fail 197
-=======
                                     [ $op -ne 0 ] && sfFail 197
->>>>>>> Changes in features
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-<<<<<<< refs/remotes/origin/develop
-                                    exit 1
-||||||| ancestor
-                                    fail 1
-=======
                                     sfFail 1
->>>>>>> Changes in features
                                     ;;
                             esac
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: ntp-server
@@ -208,13 +139,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-<<<<<<< refs/remotes/origin/develop
-                                    exit 1
-||||||| ancestor
-                                    fail 1
-=======
                                     sfFail 1
->>>>>>> Changes in features
                                     ;;
                             esac
 

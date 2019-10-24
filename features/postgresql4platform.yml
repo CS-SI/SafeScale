@@ -35,16 +35,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            sfDoesDockerRunStack postgresql4platform || exit 192
-                            exit 0
-||||||| ancestor
-                            sfDoesDockerRunStack postgresql4platform || fail 192
-                            exit 0
-=======
                             sfDoesDockerRunStack postgresql4platform || sfFail 192
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             add:
                 pace: network,pgsql-cfg,pgsql-img,pgpool-cfg,pgpool-img,reverseproxy,secrets,stack,start
@@ -148,7 +140,7 @@ feature:
                             service_reload_command='pg_ctl -D /var/lib/postgresql/data reload'
                             EOF
                             chown 70:safescale ${SF_ETCDIR}/postgresql4platform/repmgr.conf
-                            sfFail 0
+                            sfExit
 
                     pgpool-cfg:
                         targets:
@@ -213,7 +205,7 @@ feature:
                             done
                             chown 70:safescale ${SF_ETCDIR}/postgresql4platform/pgpool.conf.template
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/postgresql4platform/pgpool.conf.template
-                            sfFail 0
+                            sfExit
 
                     pgsql-img:
                         targets:
@@ -279,16 +271,8 @@ feature:
                                 pg_ctl start &>/dev/null && wait_for_local_postgres 60
                                 [ \$? -ne 0 ] && echo "Failed." && sfFail 1
                                 op=-1
-<<<<<<< refs/remotes/origin/develop
-                                pg_ctl start &>/dev/null && wait_for_local_postgres 60 && op=$?
-                                [ $op -ne 0 ] && echo "exited." && exit 1
-||||||| ancestor
-                                pg_ctl start &>/dev/null && wait_for_local_postgres 60 && op=$?
-                                [ $op -ne 0 ] && echo "Failed." && fail 1
-=======
                                 pg_ctl start &>/dev/null && wait_for_local_postgres 60 && op=\$?
                                 [ \$op -ne 0 ] && echo "Failed." && sfFail 1
->>>>>>> Changes in features
                                 echo OK
 
                                 # Checking if repmgr needs to be initialized
@@ -307,35 +291,15 @@ feature:
 
                                     echo -n "registering host as primary postgresql instance... "
                                     op=-1
-<<<<<<< refs/remotes/origin/develop
-                                    repmgr --config-file=/etc/postgresql/repmgr.conf primary register && op=$?
-                                    [ $op -ne 0 ] && echo "exited." && exit 2
-                                    echo done
-||||||| ancestor
-                                    repmgr --config-file=/etc/postgresql/repmgr.conf primary register && op=$?
-                                    [ $op -ne 0 ] && echo "Failed." && fail 2
-                                    echo done
-=======
                                     repmgr --config-file=/etc/postgresql/repmgr.conf primary register && op=\$?
                                     [ \$op -ne 0 ] && echo "Failed." && sfFail 2
->>>>>>> Changes in features
                                 fi
                                 pg_ctl stop -m fast &>/dev/null
                             else
                                 # We are on a slave
                                 echo -n "Waiting postgresql master is ready... "
-<<<<<<< refs/remotes/origin/develop
-                                op=-1
-                                wait_for_dbmaster 60 && op=$?
-                                [ $op -ne 0 ] && echo exited && exit 3
-||||||| ancestor
-                                op=-1
-                                wait_for_dbmaster 60 && op=$?
-                                [ $op -ne 0 ] && echo Failed && fail 3
-=======
                                 wait_for_dbmaster 60
                                 [ \$? -ne 0 ] && echo Failed && sfFail 3
->>>>>>> Changes in features
                                 echo OK
                                 registered=\$(psql -qAt -h "\$REPMGR_PRIMARY_HOST" -U repmgr repmgr -c "SELECT 1 FROM repmgr.nodes WHERE node_id=\${nodeid}")
                                 if [ "\$registered" != "1" ]; then
@@ -347,28 +311,12 @@ feature:
                                     update_postgresql_conf
                                     update_pghba_conf
                                     op=-1
-<<<<<<< refs/remotes/origin/develop
-                                    pg_ctl start &>/dev/stdout && wait_for_local_postgres 60 && op=$?
-                                    [ $op -ne 0 ] && echo "exited to start postgresql instance." && exit 4
-||||||| ancestor
-                                    pg_ctl start &>/dev/stdout && wait_for_local_postgres 60 && op=$?
-                                    [ $op -ne 0 ] && echo "Failed to start postgresql instance." && fail 4
-=======
                                     pg_ctl start &>/dev/stdout && wait_for_local_postgres 60 && op=\$?
                                     [ \$op -ne 0 ] && echo "exited to start postgresql instance." && sfFail 4
->>>>>>> Changes in features
                                     echo -n "Registering postgresql instance as hot-standby... "
                                     op=-1
-<<<<<<< refs/remotes/origin/develop
-                                    repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register && op=$?
-                                    [ $op -ne 0 ] && echo "exited." && exit 5
-||||||| ancestor
-                                    repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register && op=$?
-                                    [ $op -ne 0 ] && echo "Failed." && fail 5
-=======
                                     repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register && op=\$?
                                     [ \$op -ne 0 ] && echo "exited." && sfFail 5
->>>>>>> Changes in features
                                     echo done
                                 fi
                             fi
@@ -412,13 +360,7 @@ feature:
                             #if [ \$designated_master_count -lt 1 ]; then
                             #    echo "Postgresql cluster is in inconsistent state:"
                             #    echo "no primary instance registered!"
-<<<<<<< refs/remotes/origin/develop
-                            #    exit 40
-||||||| ancestor
-                            #    fail 40
-=======
                             #    sfFail 40
->>>>>>> Changes in features
                             #fi
                             ## A new loop to find if there is at least 2 dbhosts with the same count of master role (which can't be
                             ## automatically mitigated)
@@ -480,16 +422,8 @@ feature:
                             CMD ["postgres"]
                             EOF
 
-<<<<<<< refs/remotes/origin/develop
-                            docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || exit 192
-                            exit 0
-||||||| ancestor
-                            docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || fail 192
-                            exit 0
-=======
                             docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || sfFail 192
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     pgpool-img:
                         targets:
@@ -499,13 +433,7 @@ feature:
 
                             cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/update_password.sh <<-EOF
                             #!/bin/bash
-<<<<<<< refs/remotes/origin/develop
-                            [ \$# -ne 2 ] && echo "invalid parameters" && exit 1
-||||||| ancestor
-                            [ \$# -ne 2 ] && echo "invalid parameters" && fail 1
-=======
                             [ \$# -ne 2 ] && echo "invalid parameters" && sfFail 1
->>>>>>> Changes in features
 
                             USERNAME=\$1
                             PASSWORD="\$2"
@@ -559,16 +487,8 @@ feature:
                             ENTRYPOINT ["/sbin/tini", "--", "/my-docker-entrypoint.sh"]
                             EOF
 
-<<<<<<< refs/remotes/origin/develop
-                            docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || exit 192
-                            exit 0
-||||||| ancestor
-                            docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || fail 192
-                            exit 0
-=======
                             docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || sfFail 192
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     stack:
                         targets:
@@ -742,7 +662,7 @@ feature:
                             EOF
                             fi
                                 chmod go-rwx ${SF_ETCDIR}/postgresql4platform/stack.yml
-                            sfFail 0
+                            sfExit
 
                     reverseproxy:
                         targets:
@@ -753,13 +673,7 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
-<<<<<<< refs/remotes/origin/develop
-                            [ -z "${TARGET_DIR+x}" ] && exit 197
-||||||| ancestor
-                            [ -z "${TARGET_DIR+x}" ] && fail 197
-=======
                             [ -z "${TARGET_DIR+x}" ] && sfFail 197
->>>>>>> Changes in features
 
                             cat >${TARGET_DIR}/includes/postgresql4platform.conf <<-'EOF'
                             upstream postgresql4platform {
@@ -773,80 +687,38 @@ feature:
                             }
                             EOF
                             sfReverseProxyReload
-                            sfFail 0
+                            sfExit
 
                     network:
                         targets:
                             masters: any
                         run: |
                             if ! docker network list --filter 'name=postgresql4platform_net' | grep postgresql4platform_net; then
-<<<<<<< refs/remotes/origin/develop
-                                docker network create --attachable -d overlay --scope swarm postgresql4platform_net || exit 193
-||||||| ancestor
-                                docker network create --attachable -d overlay --scope swarm postgresql4platform_net || fail 193
-=======
                                 docker network create --attachable -d overlay --scope swarm postgresql4platform_net || sfFail 193
->>>>>>> Changes in features
                             fi
-                            sfFail 0
+                            sfExit
 
                     secrets:
                         targets:
                             masters: any
                         run: |
                             if docker secret inspect safescale.postgresql.password.password.postgres &>/dev/null; then
-<<<<<<< refs/remotes/origin/develop
-                                docker secret rm safescale.postgresql.password.postgres || exit 193
-||||||| ancestor
-                                docker secret rm safescale.postgresql.password.postgres || fail 193
-=======
                                 docker secret rm safescale.postgresql.password.postgres || sfFail 193
->>>>>>> Changes in features
                             fi
-<<<<<<< refs/remotes/origin/develop
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || exit 194
-||||||| ancestor
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || fail 194
-=======
                             echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
->>>>>>> Changes in features
                             if docker secret inspect safescale.postgresql.password.repmgr &>/dev/null; then
-<<<<<<< refs/remotes/origin/develop
-                                docker secret rm safescale.postgresql.password.repmgr || exit 195
-||||||| ancestor
-                                docker secret rm safescale.postgresql.password.repmgr || fail 195
-=======
                                 docker secret rm safescale.postgresql.password.repmgr || sfFail 195
->>>>>>> Changes in features
                             fi
-<<<<<<< refs/remotes/origin/develop
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.repmgr - || exit 196
-                            exit 0
-||||||| ancestor
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.repmgr - || fail 196
-                            exit 0
-=======
                             echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.repmgr - || sfFail 196
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     start:
                         targets:
                             masters: any
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || exit 194
-                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || exit 195
-                            exit 0
-||||||| ancestor
-                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || fail 194
-                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || fail 195
-                            exit 0
-=======
                             docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || sfFail 197
                             sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || sfFail 198
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             remove:
                 pace: stack,cleanup
@@ -856,15 +728,9 @@ feature:
                             masters: any
                         run: |
                             if [ -f ${SF_ETCDIR}/postgresql4platform/stack.yml ]; then
-<<<<<<< refs/remotes/origin/develop
-                                docker stack rm postgresql4platform || exit 192
-||||||| ancestor
-                                docker stack rm postgresql4platform || fail 192
-=======
                                 docker stack rm postgresql4platform || sfFail 192
->>>>>>> Changes in features
                             fi
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -878,6 +744,6 @@ feature:
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then
                                 rm -rf ${SF_ETCDIR}/postgresql4platform ${SF_VARDIR}/postgresql4platform
                             fi
-                            sfFail 0
+                            sfExit
 
 ...

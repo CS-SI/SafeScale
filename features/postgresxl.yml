@@ -47,16 +47,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'postgresxl:latest' || exit 192
-                            exit 0
-||||||| ancestor
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'postgresxl:latest' || fail 192
-                            exit 0
-=======
                             docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'postgresxl:latest' || sfFail 192
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             add:
                 pace: network,config,image,stack,secret,firewall,start
@@ -159,7 +151,7 @@ feature:
                             host    all             all             ${GWBRIDGE_SUBNET}  md5 # scram-sha-256
                             host    all             all             {{.CIDR}}           md5 # scram-sha-256
                             HBAEOF
-                            sfFail 0
+                            sfExit
 
                     image:
                         targets:
@@ -342,7 +334,7 @@ feature:
                             RUN ./configure --prefix=/usr/local \
                                             --sysconfdir=/etc/postgres-xl \
                                             --with-openssl \
-                                            --without-systemd || cat config.log && sfFail 0
+                                            --without-systemd || cat config.log && sfExit
 
                             RUN make -j$PARALLEL \
                              && make install
@@ -383,15 +375,9 @@ feature:
                             ENTRYPOINT ["/docker-entrypoint.sh"]
                             EOF
 
-<<<<<<< refs/remotes/origin/develop
-                            docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || exit 192
-||||||| ancestor
-                            docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || fail 192
-=======
                             docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || sfFail 192
->>>>>>> Changes in features
                             yes | docker image prune || true
-                            sfFail 0
+                            sfExit
 
                     stack:
                         targets:
@@ -596,7 +582,7 @@ feature:
                                     external: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/postgresxl/stack.yml
-                            sfFail 0
+                            sfExit
 
                     secret:
                         targets:
@@ -611,16 +597,8 @@ feature:
                             {{ else }}
                             PASSWORD="{{ .AdminPassword }}"
                             {{ end }}
-<<<<<<< refs/remotes/origin/develop
-                            echo -n "$PASSWORD" | docker secret create postgresxl.password - || exit 193
-                            exit 0
-||||||| ancestor
-                            echo -n "$PASSWORD" | docker secret create postgresxl.password - || fail 193
-                            exit 0
-=======
                             echo -n "$PASSWORD" | docker secret create postgresxl.password - || sfFail 193
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     network:
                         targets:
@@ -632,7 +610,7 @@ feature:
                             if ! docker network ls --filter 'Name=postgresxl_net' {{ "--format '{{.Name}}'" }} | grep "^postgresxl$"; then
                                 docker network create -d overlay --scope swarm --attachable postgresxl_net
                             fi
-                            sfFail 0
+                            sfExit
 
                     firewall:
                         targets:
@@ -642,16 +620,8 @@ feature:
                             nodes: no
                         run: |
                             sfFirewallAdd --zone=trusted --add-interface=docker_gwbridge
-<<<<<<< refs/remotes/origin/develop
-                            sfFirewallReload || exit 204 "Firewall problem"
-                            exit 0
-||||||| ancestor
-                            sfFirewallReload || fail 204 "Firewall problem"
-                            exit 0
-=======
                             sfFirewallReload || sfFail 204 "Firewall problem"
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     start:
                         targets:
@@ -660,31 +630,13 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker stack deploy -c ${SF_ETCDIR}/postgresxl/stack.yml postgresxl || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-master" || exit 195
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-slave" || exit 196
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-proxy" || exit 197
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_coordinator" || exit 198
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_data" || exit 199
-                            exit 0
-||||||| ancestor
-                            docker stack deploy -c ${SF_ETCDIR}/postgresxl/stack.yml postgresxl || fail 194
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-master" || fail 195
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-slave" || fail 196
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-proxy" || fail 197
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_coordinator" || fail 198
-                            sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_data" || fail 199
-                            exit 0
-=======
                             docker stack deploy -c ${SF_ETCDIR}/postgresxl/stack.yml postgresxl || sfFail 194
                             sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-master" || sfFail 195
                             sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-slave" || sfFail 196
                             sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-proxy" || sfFail 197
                             sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_coordinator" || sfFail 198
                             sfRetry 5m 5 "sfDoesDockerRunService postgresxl:latest postgresxl_data" || sfFail 199
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             remove:
                 pace: stack,cleanup
@@ -696,16 +648,8 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            sfRetry 5m 5 "docker stack rm postgresxl" || exit 200
-                            exit 0
-||||||| ancestor
-                            sfRetry 5m 5 "docker stack rm postgresxl" || fail 200
-                            exit 0
-=======
                             sfRetry 5m 5 "docker stack rm postgresxl" || sfFail 200
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     cleanup:
                         targets:
@@ -722,6 +666,6 @@ feature:
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then
                                 rm -rf ${SF_VARDIR}/postgresxl
                             fi
-                            sfFail 0
+                            sfExit
 
 ...

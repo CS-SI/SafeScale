@@ -40,13 +40,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            sfDoesDockerRunContainer docker.elastic.co/kibana/kibana:{{ .Version }} || exit 192
-||||||| ancestor
-                            sfDoesDockerRunContainer docker.elastic.co/kibana/kibana:{{ .Version }} || fail 192
-=======
                             sfDoesDockerRunContainer docker.elastic.co/kibana/kibana:{{ .Version }} || sfFail 192
->>>>>>> Changes in features
+                            sfExit
 
             add:
                 pace: config,start
@@ -89,7 +84,7 @@ feature:
                                         - ${SF_ETCDIR}/kibana/config.yml:/usr/share/kibana/config/kibana.yml
                                     restart: always
                             EOF
-                            sfFail 0
+                            sfExit
 
                     start:
                         targets:
@@ -102,16 +97,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-<<<<<<< refs/remotes/origin/develop
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || exit 193
-                            exit 0
-||||||| ancestor
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || fail 193
-                            exit 0
-=======
                             docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || sfFail 193
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             remove:
                 pace: stop,remove
@@ -128,15 +115,9 @@ feature:
                             {{ else }}
                                 OPTIONS=
                             {{ end }}
-<<<<<<< refs/remotes/origin/develop
-                                docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || exit 194
-||||||| ancestor
-                                docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || fail 194
-=======
                                 docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 194
->>>>>>> Changes in features
                             fi
-                            sfFail 0
+                            sfExit
 
                     remove:
                         targets:
@@ -146,7 +127,7 @@ feature:
                         run: |
                             docker image rm -f docker.elastic.co/kibana/kibana:{{ .Version }}
                             rm -rf ${SF_ETCDIR}/kibana ${SF_VARDIR}/kibana
-                            sfFail 0
+                            sfExit
 
     proxy:
         rules:
