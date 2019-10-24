@@ -63,7 +63,7 @@ func AddConsequence(err error, cons error) error {
 			}
 			return conseq
 		}
-		if cons != nil && err != nil {
+		if cons != nil {
 			logrus.Errorf("trying to add error [%s] to existing error [%s] but failed", cons, err)
 		}
 	}
