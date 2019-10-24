@@ -33,10 +33,7 @@ feature:
                 steps:
                     curl:
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
                             curl -Ssl -I -k https://{{ .DefaultRouteIP }}:63009/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null
 
@@ -44,7 +41,6 @@ feature:
                 pace: config,build,secrets,stack,start
                 steps:
                     config:
-                        timeout: 10
                         targets:
                             gateways: all
                         run: |
@@ -168,7 +164,7 @@ feature:
                              && cp ./safescale.jks /opt/jboss/keycloak/standalone/configuration/ \
                              && chown jboss:jboss /opt/jboss/keycloak/standalone/configuration/safescale.jks
 
-                            exec /opt/jboss/tools/docker-entrypoint.sh "\$@"
+                            exec /opt/jboss/tools/docker-entrypoint.sh -Djboss.tx.node.id={{ .Hostname }} "\$@"
                             EOF
 
                             cat >${SF_ETCDIR}/keycloak4gateway/Dockerfile <<-'EOF'
@@ -226,6 +222,8 @@ feature:
                                     image: keycloak4gateway:latest
                                     environment:
                                         - PROXY_ADDRESS_FORWARDING=true
+                                        - JGROUPS_DISCOVERY_PROTOCOL=JDBC_PING
+                                        - JGROUPS_DISCOVERY_PROPERTIES=datasource_jndi_name=java:jboss/datasources/KeycloakDS
                                         # - KEYCLOAK_LOGLEVEL=DEBUG
                                         # - ROOT_LOGLEVEL=DEBUG
                                     ports:
@@ -238,7 +236,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == gateway
                                         restart_policy:
-                                            condition: on-exiture
+                                            condition: on-failure
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
