@@ -442,11 +442,11 @@ sfPgsqlDropDatabase() {
     id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
     retcode=$?
     if [ $retcode -eq 0 -a ! -z "$id" ]; then
-        local cmd="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${dbname}'"
+        local cmd="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = '${dbname}'"
         docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
         retcode=$?
         if [ $retcode -eq 0 ]; then
-            docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "DROP DATABASE $dbname"
+            sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'DROP DATABASE IF EXISTS $dbname'"
             retcode=$?
         fi
     fi
@@ -490,8 +490,9 @@ sfPgsqlDropRole() {
     id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
     retcode=$?
     if [ $retcode -eq 0 -a ! -z "$id" ]; then
-        local cmd="DROP ROLE $rolename"
-        docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
+        sleep 1
+        local cmd="DROP ROLE IF EXISTS $rolename"
+        sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'$cmd'"
         retcode=$?
     fi
     return $retcode
