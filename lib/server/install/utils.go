@@ -50,9 +50,8 @@ function print_error() {
 }
 trap print_error ERR
 
-function fail() {
-	if [ -z "$2" ]
-	then
+function sfFail() {
+	if [ -z "$2" ]; then
 		if [ $1 -ne 0 ]; then
     		echo "An error occurred: $1"
 		fi
@@ -62,6 +61,10 @@ function fail() {
 		fi
 	fi
     exit $1
+}
+
+function sfExit() {
+    exit 0
 }
 
 set +x
