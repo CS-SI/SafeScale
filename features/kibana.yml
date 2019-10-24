@@ -40,7 +40,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer docker.elastic.co/kibana/kibana:{{ .Version }} || fail 192
+                            sfDoesDockerRunContainer docker.elastic.co/kibana/kibana:{{ .Version }} || exit 192
 
             add:
                 pace: config,start
@@ -96,7 +96,7 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || fail 193
+                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || exit 193
                             exit 0
 
             remove:
@@ -114,7 +114,7 @@ feature:
                             {{ else }}
                                 OPTIONS=
                             {{ end }}
-                                docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || fail 194
+                                docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || exit 194
                             fi
                             exit 0
 

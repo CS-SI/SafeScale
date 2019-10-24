@@ -156,7 +156,7 @@ feature:
                             echo "Waiting for database server..."
                             op=-1
                             timeout 60 bash -c "while ! $PSQL 'select 1' >/dev/null; do sleep 5; done" && op=$? || true
-                            if [ $op -ne 0 ] && echo "Database server not ready for 60s. Aborting." && fail 1
+                            if [ $op -ne 0 ] && echo "Database server not ready for 60s. Aborting." && exit 1
                             echo "Database server ready."
 
                             # # Create database if needed
@@ -207,7 +207,7 @@ feature:
                             CMD ["-b", "0.0.0.0"]
                             EOF
 
-                            docker build --network host -t keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || fail 192
+                            docker build --network host -t keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || exit 192
                             exit 0
 
                     secret:
@@ -218,8 +218,8 @@ feature:
                             nodes: no
                         run: |
                             docker secret rm safescale.keycloak.password.dbuser safescale.keycloak.password.admin &>/dev/null || true
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.password.dbuser - || fail 193
-                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || fail 194
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.keycloak.password.dbuser - || exit 193
+                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || exit 194
                             exit 0
 
                     pgsql:
@@ -227,14 +227,14 @@ feature:
                             masters: any
                         run: |
                             sfPsqlCreateDatabase keycloak4platform
-                            echo -n "{{ .KeycloakdAdminPassword }}" | sfPsqlCreateRole keycloak4platform LOGIN || fail 196
+                            echo -n "{{ .KeycloakdAdminPassword }}" | sfPsqlCreateRole keycloak4platform LOGIN || exit 196
                             exit 0
 
                     pgpool:
                         targets:
                             masters: all
                         run: |
-                            echo -n "{{ .KeycloakdAdminPassword }}" | sfPgpoolUpdatePassword keycloak4platform || fail 197
+                            echo -n "{{ .KeycloakdAdminPassword }}" | sfPgpoolUpdatePassword keycloak4platform || exit 197
                             exit 0
 
                     stack:
@@ -260,7 +260,7 @@ feature:
                                             constraints:
                                                 - node.role == manager
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -285,8 +285,8 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/keycloak4platform/stack.yml keycloak4platform || fail 197
-                            sfRetry 5m 5 "sfDoesDockerRunStack keycloak4platform" || fail 198
+                            docker stack deploy -c ${SF_ETCDIR}/keycloak4platform/stack.yml keycloak4platform || exit 197
+                            sfRetry 5m 5 "sfDoesDockerRunStack keycloak4platform" || exit 198
                             exit 0
 
             remove:
@@ -296,7 +296,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            docker stack rm keycloak4platform || fail 199
+                            docker stack rm keycloak4platform || exit 199
                             docker secret rm safescale.keycloak.password.dbuser safescale.keycloak.password.admin &>/dev/null
                             # VPL: add database keycloak4platform deletion
                             sfPgsqlDropDatabase keycloak4platform

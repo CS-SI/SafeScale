@@ -36,7 +36,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1 || fail 192
+                            sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1 || exit 192
                             exit 0
 
             add:
@@ -169,8 +169,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale up -d || fail 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1" || fail 194
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale up -d || exit 193
+                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1" || exit 194
                             exit 0
 
             remove:
@@ -183,7 +183,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale rm --stop --force || fail 195
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale rm --stop --force || exit 195
                             exit 0
 
                     cleanup:

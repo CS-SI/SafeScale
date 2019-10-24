@@ -35,7 +35,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerRunStack postgresql4platform || fail 192
+                            sfDoesDockerRunStack postgresql4platform || exit 192
                             exit 0
 
             add:
@@ -128,7 +128,7 @@ feature:
                             pg_bindir=/usr/lib/postgresql/bin
                             log_file=/var/log/repmgr.log
                             log_level=WARN
-                            failover=automatic
+                            exitover=automatic
                             reconnect_attempts=3
                             promote_command='repmgr -f /etc/postgresql/repmgr.conf standby promote --log-to-file'
                             follow_command='repmgr -f /etc/postgresql/repmgr.conf standby follow --log-to-file --upstream-node-id=%n'
@@ -164,8 +164,8 @@ feature:
                             log_destination = 'stderr'
                             print_timestamp = on
 
-                            failover_on_backend_error = on
-                            failover_command = '/bin/true'
+                            exitover_on_backend_error = on
+                            exitover_command = '/bin/true'
 
                             memory_cache_enabled = on
                             memqcache_method = 'shmem'
@@ -200,7 +200,7 @@ feature:
                             backend_port${i} = 5432
                             backend_weight${i} = 1
                             backend_data_directory${i} = '/var/lib/postgresql/data'
-                            backend_flag${i} = 'ALLOW_TO_FAILOVER'
+                            backend_flag${i} = 'ALLOW_TO_exitOVER'
                             EOF
                             done
                             chown 70:safescale ${SF_ETCDIR}/postgresql4platform/pgpool.conf.template
@@ -270,7 +270,7 @@ feature:
                                 update_pghba_conf
                                 op=-1
                                 pg_ctl start &>/dev/null && wait_for_local_postgres 60 && op=$?
-                                [ $op -ne 0 ] && echo "Failed." && fail 1
+                                [ $op -ne 0 ] && echo "exited." && exit 1
                                 echo OK
 
                                 # Checking if repmgr needs to be initialized
@@ -290,7 +290,7 @@ feature:
                                     echo -n "registering host as primary postgresql instance... "
                                     op=-1
                                     repmgr --config-file=/etc/postgresql/repmgr.conf primary register && op=$?
-                                    [ $op -ne 0 ] && echo "Failed." && fail 2
+                                    [ $op -ne 0 ] && echo "exited." && exit 2
                                     echo done
                                 fi
                                 pg_ctl stop -m fast &>/dev/null
@@ -299,7 +299,7 @@ feature:
                                 echo -n "Waiting postgresql master is ready... "
                                 op=-1
                                 wait_for_dbmaster 60 && op=$?
-                                [ $op -ne 0 ] && echo Failed && fail 3
+                                [ $op -ne 0 ] && echo exited && exit 3
                                 echo OK
                                 registered=\$(psql -qAt -h "\$REPMGR_PRIMARY_HOST" -U repmgr repmgr -c "SELECT 1 FROM repmgr.nodes WHERE node_id=\${nodeid}")
                                 if [ "\$registered" != "1" ]; then
@@ -312,17 +312,17 @@ feature:
                                     update_pghba_conf
                                     op=-1
                                     pg_ctl start &>/dev/stdout && wait_for_local_postgres 60 && op=$?
-                                    [ $op -ne 0 ] && echo "Failed to start postgresql instance." && fail 4
+                                    [ $op -ne 0 ] && echo "exited to start postgresql instance." && exit 4
                                     echo -n "Registering postgresql instance as hot-standby... "
                                     op=-1
                                     repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register && op=$?
-                                    [ $op -ne 0 ] && echo "Failed." && fail 5
+                                    [ $op -ne 0 ] && echo "exited." && exit 5
                                     echo done
                                 fi
                             fi
                             echo done
 
-                            # TODO: find a way to mitigate restarts from failure
+                            # TODO: find a way to mitigate restarts from exiture
                             # - select conninfo,type,active from repmgr.nodes then consolidate results
                             # - If current instance believes it's a master, and there is another master from the results with more active=t,
                             #   stop the current instance and follow the other master. pg_rewind needed ?
@@ -360,7 +360,7 @@ feature:
                             #if [ \$designated_master_count -lt 1 ]; then
                             #    echo "Postgresql cluster is in inconsistent state:"
                             #    echo "no primary instance registered!"
-                            #    fail 40
+                            #    exit 40
                             #fi
                             ## A new loop to find if there is at least 2 dbhosts with the same count of master role (which can't be
                             ## automatically mitigated)
@@ -422,7 +422,7 @@ feature:
                             CMD ["postgres"]
                             EOF
 
-                            docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || fail 192
+                            docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || exit 192
                             exit 0
 
                     pgpool-img:
@@ -433,7 +433,7 @@ feature:
 
                             cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/update_password.sh <<-EOF
                             #!/bin/bash
-                            [ \$# -ne 2 ] && echo "invalid parameters" && fail 1
+                            [ \$# -ne 2 ] && echo "invalid parameters" && exit 1
 
                             USERNAME=\$1
                             PASSWORD="\$2"
@@ -487,7 +487,7 @@ feature:
                             ENTRYPOINT ["/sbin/tini", "--", "/my-docker-entrypoint.sh"]
                             EOF
 
-                            docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || fail 192
+                            docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || exit 192
                             exit 0
 
                     stack:
@@ -564,7 +564,7 @@ feature:
                                             constraints:
                                                 - node.hostname == ${HOSTNAME_RADIX}-1
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -615,7 +615,7 @@ feature:
                                             constraints:
                                                 - node.hostname == ${SLAVE_HOST}
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -648,7 +648,7 @@ feature:
                                             constraints:
                                                 - node.labels.safescale.host.role == master
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 5s
                                             max_attempts: 3
                                             window: 120s
@@ -673,7 +673,7 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
-                            [ -z "${TARGET_DIR+x}" ] && fail 197
+                            [ -z "${TARGET_DIR+x}" ] && exit 197
 
                             cat >${TARGET_DIR}/includes/postgresql4platform.conf <<-'EOF'
                             upstream postgresql4platform {
@@ -694,7 +694,7 @@ feature:
                             masters: any
                         run: |
                             if ! docker network list --filter 'name=postgresql4platform_net' | grep postgresql4platform_net; then
-                                docker network create --attachable -d overlay --scope swarm postgresql4platform_net || fail 193
+                                docker network create --attachable -d overlay --scope swarm postgresql4platform_net || exit 193
                             fi
                             exit 0
 
@@ -703,21 +703,21 @@ feature:
                             masters: any
                         run: |
                             if docker secret inspect safescale.postgresql.password.password.postgres &>/dev/null; then
-                                docker secret rm safescale.postgresql.password.postgres || fail 193
+                                docker secret rm safescale.postgresql.password.postgres || exit 193
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || fail 194
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || exit 194
                             if docker secret inspect safescale.postgresql.password.repmgr &>/dev/null; then
-                                docker secret rm safescale.postgresql.password.repmgr || fail 195
+                                docker secret rm safescale.postgresql.password.repmgr || exit 195
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.repmgr - || fail 196
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.repmgr - || exit 196
                             exit 0
 
                     start:
                         targets:
                             masters: any
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || fail 194
-                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || fail 195
+                            docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || exit 194
+                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || exit 195
                             exit 0
 
             remove:
@@ -728,7 +728,7 @@ feature:
                             masters: any
                         run: |
                             if [ -f ${SF_ETCDIR}/postgresql4platform/stack.yml ]; then
-                                docker stack rm postgresql4platform || fail 192
+                                docker stack rm postgresql4platform || exit 192
                             fi
                             exit 0
 
