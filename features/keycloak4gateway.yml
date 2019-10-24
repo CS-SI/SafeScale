@@ -192,13 +192,8 @@ feature:
                             CMD ["-b", "0.0.0.0"]
                             EOF
 
-<<<<<<< refs/remotes/origin/develop
-                            docker build --network host -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || exit 192
-||||||| ancestor
-                            docker build --network host -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || fail 192
-=======
                             docker build --network host -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || sfFail 192
->>>>>>> Changes in features
+                            sfExit
 
                     secrets:
                         targets:
@@ -208,37 +203,15 @@ feature:
                                 docker secret rm safescale.keycloak.password.dbuser
                             fi
                             KC_PASSWORD=$(sfRandomString 16 "[:alnum:]")
-<<<<<<< refs/remotes/origin/develop
-                            echo -n "$KC_PASSWORD" | docker secret create safescale.keycloak.password.dbuser - || exit 193
-||||||| ancestor
-                            echo -n "$KC_PASSWORD" | docker secret create safescale.keycloak.password.dbuser - || fail 193
-=======
                             echo -n "$KC_PASSWORD" | docker secret create safescale.keycloak.password.dbuser - || sfFail 193
->>>>>>> Changes in features
                             if docker secret inspect safescale.keycloak.password.admin &>/dev/null; then
                                 docker secret rm safescale.keycloak.password.admin
                             fi
-<<<<<<< refs/remotes/origin/develop
-                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || exit 194
-||||||| ancestor
-                            echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || fail 194
-=======
                             echo -n "{{ .KeycloakAdminPassword }}" | docker secret create safescale.keycloak.password.admin - || sfFail 194
->>>>>>> Changes in features
 
-<<<<<<< refs/remotes/origin/develop
-                            echo -n $KC_PASSWORD | sfPgsqlCreateRole keycloak4gateway LOGIN || exit 195
-                            sfPgsqlCreateDatabase keycloak4gateway keycloak4gateway || exit 196
-                            exit 0
-||||||| ancestor
-                            echo -n $KC_PASSWORD | sfPgsqlCreateRole keycloak4gateway LOGIN || fail 195
-                            sfPgsqlCreateDatabase keycloak4gateway keycloak4gateway || fail 196
-                            exit 0
-=======
                             echo -n $KC_PASSWORD | sfPgsqlCreateRole keycloak4gateway LOGIN || sfFail 195
                             sfPgsqlCreateDatabase keycloak4gateway keycloak4gateway || sfFail 196
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     stack:
                         targets:
@@ -290,19 +263,9 @@ feature:
                         targets:
                             masters: any
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker stack deploy -c ${SF_ETCDIR}/keycloak4gateway/stack.yml keycloak4gateway || exit 197
-                            sfRetry 5m 5 "sfDoesDockerRunStack keycloak4gateway" || exit 198
-                            exit 0
-||||||| ancestor
-                            docker stack deploy -c ${SF_ETCDIR}/keycloak4gateway/stack.yml keycloak4gateway || fail 197
-                            sfRetry 5m 5 "sfDoesDockerRunStack keycloak4gateway" || fail 198
-                            exit 0
-=======
                             docker stack deploy -c ${SF_ETCDIR}/keycloak4gateway/stack.yml keycloak4gateway || sfFail 197
                             sfRetry 5m 5 "sfDoesDockerRunStack keycloak4gateway" || sfFail 198
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             remove:
                 pace: stack,db,image,cleanup
@@ -311,41 +274,25 @@ feature:
                         targets:
                             masters: any
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker stack rm keycloak4gateway || exit 199
-||||||| ancestor
-                            docker stack rm keycloak4gateway || fail 199
-=======
                             docker stack rm keycloak4gateway || sfFail 199
->>>>>>> Changes in features
                             docker secret rm safescale.keycloak.password.dbuser || true
                             docker secret rm safescale.keycloak.password.admin || true
-                            sfFail 0
+                            sfExit
 
                     db:
                         targets:
                             masters: any
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            sfPgsqlDropDatabase keycloak4gateway || exit 200
-                            sfPgsqlDropRole keycloak4gateway || exit 201
-                            exit 0
-||||||| ancestor
-                            sfPgsqlDropDatabase keycloak4gateway || fail 200
-                            sfPgsqlDropRole keycloak4gateway || fail 201
-                            exit 0
-=======
                             sfPgsqlDropDatabase keycloak4gateway || sfFail 200
                             sfPgsqlDropRole keycloak4gateway || sfFail 201
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     image:
                         targets:
                             gateways: all
                         run: |
                             docker image rm -f keycloak4gateway:latest || true
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -353,7 +300,7 @@ feature:
                             masters: all
                         run: |
                             rm -drf ${SF_ETCDIR}/keycloak4gateway ${SF_VARDIR}/keycloak4gateway
-                            sfFail 0
+                            sfExit
 
     proxy:
         rules:

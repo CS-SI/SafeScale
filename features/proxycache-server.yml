@@ -161,21 +161,9 @@ feature:
                             EOF
 
                             sfRetry 5m 5 docker build --rm --no-cache -t proxycache:latest --network=host . && \
-<<<<<<< refs/remotes/origin/develop
-                            cd ${SF_TMPDIR} && rm -rf proxycache.image || exit 192
-||||||| ancestor
-                            cd ${SF_TMPDIR} && rm -rf proxycache.image || fail 192
-=======
                             cd ${SF_TMPDIR} && rm -rf proxycache.image || sfFail 192
->>>>>>> Changes in features
 
-<<<<<<< refs/remotes/origin/develop
-                            docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d || exit 514
-||||||| ancestor
-                            docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d || fail 514
-=======
                             docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d || sfFail 514
->>>>>>> Changes in features
 
             remove:
                 pace: container

@@ -60,13 +60,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged OS '$LINUX_KIND'. Aborting."
-<<<<<<< refs/remotes/origin/develop
-                                    exit 1
-||||||| ancestor
-                                    fail 1
-=======
                                     sfFail 1
->>>>>>> Changes in features
                             esac
 
                     docker:
@@ -97,13 +91,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged OS '$LINUX_KIND'. Aborting."
-<<<<<<< refs/remotes/origin/develop
-                                    exit 1
-||||||| ancestor
-                                    fail 1
-=======
                                     sfFail 1
->>>>>>> Changes in features
                             esac
                             grep -vi proxy /etc/environment >/etc/environment.new
                             mv /etc/environment.new /etc/environment

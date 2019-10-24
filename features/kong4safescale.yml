@@ -70,13 +70,7 @@ feature:
                             echo "Waiting for database server..."
                             op=-1
                             timeout 60 sh -c "while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done" && op=$? || true
-<<<<<<< refs/remotes/origin/develop
-                            [ $op -ne 0 ] && echo "Database exited to respond in 60s, aborting." && exit 1
-||||||| ancestor
-                            [ $op -ne 0 ] && echo "Database failed to respond in 60s, aborting." && fail 1
-=======
                             [ $op -ne 0 ] && echo "Database exited to respond in 60s, aborting." && sfFail 1
->>>>>>> Changes in features
                             echo "Database server ready."
 
                             case \$1 in
@@ -89,7 +83,7 @@ feature:
                                         # $PSQL "CREATE DATABASE kong4safescale-gui;"
                                         echo Done
                                     fi
-                                    sfFail 0
+                                    sfExit
                                     ;;
 
                                 proxy)
@@ -118,7 +112,7 @@ feature:
                             esac
 
                             echo "Neither 'dbinit' nor 'proxy' parameter provided, stopping.""
-                            sfFail 0
+                            sfExit
                             EOF
 
                             # cat >${SF_ETCDIR}/kong4safescale/konga.userdb.data <<-EOF
@@ -177,16 +171,8 @@ feature:
 
                             CMD ["kong", "docker-start"]
                             EOF
-<<<<<<< refs/remotes/origin/develop
-                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || exit 192
-                            exit 0
-||||||| ancestor
-                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || fail 192
-                            exit 0
-=======
                             docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || sfFail 192
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     stack:
                         targets:
@@ -247,13 +233,7 @@ feature:
                                             max_attempts: 3
                                             window: 120s
                                     # healthcheck:
-<<<<<<< refs/remotes/origin/develop
-                                    #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
-||||||| ancestor
-                                    #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || fail 1"]
-=======
                                     #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || sfFail 1"]
->>>>>>> Changes in features
                                     #     interval: 5s
                                     #     retries: 10
                                     secrets:
@@ -302,7 +282,7 @@ feature:
                                 #             window: 120s
 
                             chmod go-rwx ${SF_ETCDIR}/kong4safescale/stack.yml
-                            sfFail 0
+                            sfExit
 
                     secret:
                         targets:
@@ -312,16 +292,8 @@ feature:
                             nodes: no
                         run: |
                             docker secret rm safescale.kong.db_password &>/dev/null || true
-<<<<<<< refs/remotes/origin/develop
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || exit 193
-                            exit 0
-||||||| ancestor
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || fail 193
-                            exit 0
-=======
                             echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || sfFail 193
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
                     start:
                         targets:
@@ -330,19 +302,9 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || exit 195
-                            exit 0
-||||||| ancestor
-                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || fail 194
-                            sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || fail 195
-                            exit 0
-=======
                             docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || sfFail 194
                             sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || sfFail 195
-                            sfFail 0
->>>>>>> Changes in features
+                            sfExit
 
             remove:
                 pace: stop,cleanup
@@ -354,15 +316,9 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-<<<<<<< refs/remotes/origin/develop
-                            docker stack rm kong4safescale  || exit 196
-||||||| ancestor
-                            docker stack rm kong4safescale  || fail 196
-=======
                             docker stack rm kong4safescale  || sfFail 196
->>>>>>> Changes in features
                             docker secret rm safescale.kong.db_password &>/dev/null
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -373,6 +329,6 @@ feature:
                         run: |
                             sfRemoveDockerImage kong4gateway:latest
                             rm -rf ${SF_ETCDIR}/kong4safescale
-                            sfFail 0
+                            sfExit
 
 ...

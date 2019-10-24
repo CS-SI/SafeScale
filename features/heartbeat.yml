@@ -36,7 +36,7 @@ feature:
                             nodes: no
                         run: |
                             sfDoesDockerRunContainer docker.elastic.co/beats/heartbeat:{{ .Version }} heartbeat4safescale_agent_1 || sfFail 192
-                            sfFail 0
+                            sfExit
 
             add:
                 pace: config,compose,start
@@ -99,7 +99,7 @@ feature:
                             EOF
                             chown -R safescale:safescale ${SF_ETCDIR}/heartbeat4safescale
                             chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/heartbeat4safescale
-                            sfFail 0
+                            sfExit
 
                     compose:
                         targets:
@@ -129,7 +129,7 @@ feature:
                         run: |
                             docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale up -d || sfFail 193
                             sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale_agent_1" || sfFail 194
-                            sfFail 0
+                            sfExit
 
             remove:
                 pace: stop,cleanup
@@ -142,7 +142,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale rm --stop --force || sfFail 195
-                            sfFail 0
+                            sfExit
 
                     cleanup:
                         targets:
@@ -153,6 +153,6 @@ feature:
                         run: |
                             docker image rm -f docker.elastic.co/beats/heartbeat:{{ .Version }}
                             rm -rf ${SF_ETCDIR}/heartbeat4safescale
-                            sfFail 0
+                            sfExit
 
 ...

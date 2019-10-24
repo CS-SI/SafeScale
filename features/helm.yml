@@ -38,17 +38,13 @@ feature:
                     run: |
                         cd $SF_TMPDIR
                         wget -O get_helm.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get && \
-<<<<<<< refs/remotes/origin/develop
-                        bash ./get_helm.sh || exit 192
-||||||| ancestor
-                        bash ./get_helm.sh || fail 192
-=======
                         bash ./get_helm.sh || sfFail 192
->>>>>>> Changes in features
                         rm -f get_helm.sh
                         chmod a+rx helm && \
                         chown {{.Username}} helm && \
                         mv helm ~{{.Username}}/.local/bin
+                        sfExit
+
                 config:
                     targets:
                         hosts: none
