@@ -139,8 +139,8 @@ feature:
                             cat >${SF_ETCDIR}/keycloak4gateway/my-docker-entrypoint.sh <<-EOF
                             #!/bin/bash
 
-                            export CACHE_OWNERS_COUNT={{ len .MasterIPs }}
-                            export CACHE_OWNERS_AUTH_SESSIONS_COUNT={{ len .MasterIPs }}
+                            export CACHE_OWNERS_COUNT=2
+                            export CACHE_OWNERS_AUTH_SESSIONS_COUNT=2
 
                             export KEYCLOAK_USER=admin
                             export KEYCLOAK_PASSWORD=\$(cat /run/secrets/password.admin)
