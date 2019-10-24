@@ -387,9 +387,14 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	// Get parameters
-	// FIXME: validate parameters
-	host := p["host"].(*pb.Host)
-	variables := p["variables"].(Variables)
+	host, ok := p["host"].(*pb.Host)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'host' of type '*Host'")
+	}
+	variables, ok := p["variables"].(Variables)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'variables' of type 'Variables'")
+	}
 
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
