@@ -48,18 +48,18 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    sfFail 1
                                     ;;
                             esac
                             cd ${SF_TMPDIR}
-                            wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || exit 2
+                            wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || sfFail 2
                             tar -zxvf mpich-3.2.1.tar.gz
                             cd mpich-3.2.1
                             ./configure --disable-fortran
-                            make -j${FACTS["2 3rd of threads"]} || exit 3
-                            make install || exit 4
+                            make -j${FACTS["2 3rd of threads"]} || sfFail 3
+                            make install || sfFail 4
                             rm -rf mpich-3.2.1*
-                            exit 0
+                            sfFail 0
 
             remove:
                 pace: binary

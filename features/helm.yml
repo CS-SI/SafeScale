@@ -38,7 +38,7 @@ feature:
                     run: |
                         cd $SF_TMPDIR
                         wget -O get_helm.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get && \
-                        bash ./get_helm.sh || exit 192
+                        bash ./get_helm.sh || sfFail 192
                         rm -f get_helm.sh
                         chmod a+rx helm && \
                         chown {{.Username}} helm && \

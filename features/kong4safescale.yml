@@ -68,8 +68,9 @@ feature:
 
                             # wait for database server
                             echo "Waiting for database server..."
-                            timeout 60 sh -c "while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done"
-                            [ $? -ne 0 ] && echo "Database failed to respond in 60s, aborting." && exit 1
+                            op=-1
+                            timeout 60 sh -c "while ! $PSQL -c 'select 1' >/dev/null; do sleep 5; done" && op=$? || true
+                            [ $op -ne 0 ] && echo "Database exited to respond in 60s, aborting." && sfFail 1
                             echo "Database server ready."
 
                             case \$1 in
@@ -82,7 +83,7 @@ feature:
                                         # $PSQL "CREATE DATABASE kong4safescale-gui;"
                                         echo Done
                                     fi
-                                    exit 0
+                                    sfFail 0
                                     ;;
 
                                 proxy)
@@ -111,7 +112,7 @@ feature:
                             esac
 
                             echo "Neither 'dbinit' nor 'proxy' parameter provided, stopping.""
-                            exit 0
+                            sfFail 0
                             EOF
 
                             # cat >${SF_ETCDIR}/kong4safescale/konga.userdb.data <<-EOF
@@ -170,8 +171,8 @@ feature:
 
                             CMD ["kong", "docker-start"]
                             EOF
-                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || exit 192
-                            exit 0
+                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || sfFail 192
+                            sfFail 0
 
                     stack:
                         targets:
@@ -227,12 +228,12 @@ feature:
                                             reservations:
                                                 memory: 64M
                                         restart_policy:
-                                            condition: on-failure
+                                            condition: on-exiture
                                             delay: 2s
                                             max_attempts: 3
                                             window: 120s
                                     # healthcheck:
-                                    #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
+                                    #     test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || sfFail 1"]
                                     #     interval: 5s
                                     #     retries: 10
                                     secrets:
@@ -275,13 +276,13 @@ feature:
                                 #             constraints:
                                 #                 - node.role == manager
                                 #         restart_policy:
-                                #             condition: on-failure
+                                #             condition: on-exiture
                                 #             delay: 5s
                                 #             max_attempts: 3
                                 #             window: 120s
 
                             chmod go-rwx ${SF_ETCDIR}/kong4safescale/stack.yml
-                            exit 0
+                            sfFail 0
 
                     secret:
                         targets:
@@ -291,8 +292,8 @@ feature:
                             nodes: no
                         run: |
                             docker secret rm safescale.kong.db_password &>/dev/null || true
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || exit 193
-                            exit 0
+                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.kong.db_password - &>/dev/null || sfFail 193
+                            sfFail 0
 
                     start:
                         targets:
@@ -301,9 +302,9 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || exit 195
-                            exit 0
+                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || sfFail 194
+                            sfRetry 5m 5 "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || sfFail 195
+                            sfFail 0
 
             remove:
                 pace: stop,cleanup
@@ -315,9 +316,9 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm kong4safescale  || exit 196
+                            docker stack rm kong4safescale  || sfFail 196
                             docker secret rm safescale.kong.db_password &>/dev/null
-                            exit 0
+                            sfFail 0
 
                     cleanup:
                         targets:
@@ -328,6 +329,6 @@ feature:
                         run: |
                             sfRemoveDockerImage kong4gateway:latest
                             rm -rf ${SF_ETCDIR}/kong4safescale
-                            exit 0
+                            sfFail 0
 
 ...

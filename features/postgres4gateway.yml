@@ -38,8 +38,8 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || exit 192
-                            exit 0
+                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || sfFail 192
+                            sfFail 0
 
             add:
                 # pace: config,secret,network,start
@@ -92,7 +92,7 @@ feature:
                             #         external: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/postgres4gateway/docker-compose.yml
-                            exit 0
+                            sfFail 0
 
                     # secret:
                     #     targets:
@@ -102,8 +102,8 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         docker secret rm postgres4gateway &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || exit 192
-                    #         exit 0
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || sfFail 192
+                    #         sfFail 0
 
                     # network:
                     #     targets:
@@ -113,12 +113,12 @@ feature:
                     #         nodes: no
                     #     run: |
                     #         # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
-                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
+                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || sfFail 192
                     #         # fi
                     #         if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
-                    #             docker network create --attachable -d bridge safescale-gw || exit 193
+                    #             docker network create --attachable -d bridge safescale-gw || sfFail 193
                     #         fi
-                    #         exit 0
+                    #         sfFail 0
 
                     start:
                         targets:
@@ -127,9 +127,9 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || exit 195
-                            exit 0
+                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || sfFail 194
+                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
+                            sfFail 0
 
             remove:
                 pace: compose,cleanup
@@ -141,10 +141,10 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || exit 196
+                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || sfFail 196
                             docker image rm -f postgres:11-alpine
                             # docker secret rm postgres4gateway &>/dev/null
-                            exit 0
+                            sfFail 0
 
                     cleanup:
                         targets:
@@ -157,6 +157,6 @@ feature:
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" ]; then
                                 rm -rf ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway
                             fi
-                            exit 0
+                            sfFail 0
 
 ...
