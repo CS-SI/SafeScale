@@ -68,7 +68,6 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	//FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -100,7 +99,10 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if ref == "" {
+		return scerr.InvalidParameterError("ref", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -180,7 +182,10 @@ func (handler *VolumeHandler) Inspect(
 	if handler == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if ref == "" {
+		return nil, nil, scerr.InvalidParameterError("ref", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -245,7 +250,10 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if name == "" {
+		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -317,7 +325,23 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if volumeName == "" {
+		return scerr.InvalidParameterError("volumeName", "cannot be empty!")
+	}
+
+	if hostName == "" {
+		return scerr.InvalidParameterError("hostName", "cannot be empty!")
+	}
+
+	if path == "" {
+		return scerr.InvalidParameterError("path", "cannot be empty!")
+	}
+
+	if format == "" {
+		return scerr.InvalidParameterError("format", "cannot be empty!")
+	}
+
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
 	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -611,7 +635,10 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if host == nil {
+		return nil, scerr.InvalidParameterError("host", "cannot be nil!")
+	}
 
 	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)()
 
@@ -653,7 +680,14 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+
+	if volumeName == "" {
+		return scerr.InvalidParameterError("volumeName", "cannot be empty!")
+	}
+
+	if hostName == "" {
+		return scerr.InvalidParameterError("hostName", "cannot be empty!")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
