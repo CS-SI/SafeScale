@@ -290,7 +290,7 @@ feature:
                                         echo "Alert 'gateway_down' received for gateway '$host'. Restarting gateway '$host'..."
                                         op=-1
                                         restart_host "$host" && op=$? || true
-                                        [ $op -eq 0 ] && echo "Gateway '$host' restarted." || echo "exited to restart gateway '$host'!"
+                                        [ $op -eq 0 ] && echo "Gateway '$host' restarted." || echo "failed to restart gateway '$host'!"
                                         ;;
                                     *)
                                         echo "Unknown alert '$alert' received."
