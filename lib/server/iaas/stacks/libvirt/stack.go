@@ -4,6 +4,8 @@ package local
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	libvirt "github.com/libvirt/libvirt-go"
@@ -14,6 +16,10 @@ type Stack struct {
 	LibvirtConfig  *stacks.LocalConfiguration
 	Config         *stacks.ConfigurationOptions
 	AuthOptions    *stacks.AuthenticationOptions
+}
+
+func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+	panic("implement me")
 }
 
 // Build Create and initialize a ClientAPI

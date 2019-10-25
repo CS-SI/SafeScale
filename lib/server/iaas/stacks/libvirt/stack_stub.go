@@ -20,6 +20,7 @@ package local
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
@@ -32,6 +33,10 @@ var errorStr = "libvirt Driver is not enabled, use the libvirt option while comp
 
 // Stack is the implementation of the local driver regarding to the api.ClientAPI
 type Stack struct {
+}
+
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+	return nil, fmt.Errorf(errorStr)
 }
 
 // ListAvailabilityZones stub

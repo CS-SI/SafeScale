@@ -33,6 +33,7 @@ import (
 
 func Test_Command(t *testing.T) {
 	usr, err := user.Current()
+	assert.Nil(t, err)
 	usr.Name = "oscar"
 
 	assert.Nil(t, err)

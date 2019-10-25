@@ -164,6 +164,21 @@ func (h *Host) OK() bool {
 	return h.IsConsistent()
 }
 
+func (i Image) OK() bool {
+	result := true
+	result = result && i.ID != ""
+	result = result && i.Name != ""
+	result = result && i.URL != ""
+	return result
+}
+
+func (ht HostTemplate) OK() bool {
+	result := true
+	result = result && ht.ID != ""
+	result = result && ht.Name != ""
+	return result
+}
+
 // GetAccessIP returns the IP to reach the host
 func (h *Host) GetAccessIP() string {
 	ip := h.GetPublicIP()

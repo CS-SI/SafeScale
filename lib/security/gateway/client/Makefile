@@ -1,7 +1,7 @@
 GO?=go
 EXEC:=safe-security
 
-.PHONY:	safe-security clean
+.PHONY:	safe-security clean generate
 
 all: safe-security
 

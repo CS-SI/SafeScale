@@ -47,7 +47,7 @@ func NewVolume() *Volume {
 }
 
 // OK ...
-func (v *Volume) OK() bool {
+func (v Volume) OK() bool {
 	result := true
 	result = result && v.ID != ""
 	result = result && v.Name != ""
@@ -92,4 +92,16 @@ type VolumeAttachment struct {
 	Device     string `json:"device,omitempty"`
 	MountPoint string `json:"mountpoint,omitempty"`
 	Format     string `json:"format,omitempty"`
+}
+
+func (va VolumeAttachment) OK() bool {
+	result := true
+	result = result && va.ID != ""
+	result = result && va.Name != ""
+	result = result && va.VolumeID != ""
+	result = result && va.ServerID != ""
+	result = result && va.Device != ""
+	result = result && va.MountPoint != ""
+	result = result && va.Format != ""
+	return result
 }

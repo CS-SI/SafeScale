@@ -106,6 +106,13 @@ func NewContent() *Content {
 	}
 }
 
+func (ud Content) OK() bool { // FIXME Complete function
+	result := true
+	result = result && ud.BashLibrary != ""
+	result = result && ud.HostName != ""
+	return result
+}
+
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func (ud *Content) Prepare(
 	options stacks.ConfigurationOptions, request resources.HostRequest, cidr string, defaultNetworkCIDR string,
