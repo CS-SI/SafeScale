@@ -423,7 +423,7 @@ sfPgsqlCreateDatabase() {
         return 1
     fi
     local owner=
-    if [ $# -eq 2 ] && owner=$2
+    [ $# -eq 2 ] && owner=$2
     id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
     retcode=$?
     if [ $retcode -eq 0 -a ! -z "$id" ]; then
