@@ -149,6 +149,7 @@ func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Durati
 func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
+		delay = timeout / 2
 	}
 
 	if notify == nil {
@@ -179,6 +180,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
+		delay = timeout / 2
 	}
 
 	if notify == nil {
@@ -230,6 +232,7 @@ func WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(run func() error, t
 func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duration) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
+		delay = timeout / 2
 	}
 
 	if delay <= 0 {
@@ -269,6 +272,7 @@ func WhileSuccessfulDelay5Seconds(run func() error, timeout time.Duration) error
 func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
+		delay = timeout / 2
 	}
 
 	if notify == nil {
