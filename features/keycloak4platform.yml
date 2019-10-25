@@ -316,6 +316,9 @@ feature:
                                         - published: 63009
                                           target: 8443
                                           mode: host
+                                        - published: 63010
+                                          target: 8080
+                                          mode: host
                                     deploy:
                                         mode: global
                                         placement:
