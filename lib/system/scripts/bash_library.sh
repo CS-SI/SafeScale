@@ -416,12 +416,14 @@ export -f sfIngressReload
 # This function allows to create a database on platform PostgreSQL
 # It is intended to be used on one of the platform PostgreSQL servers in the cluster
 sfPgsqlCreateDatabase() {
+    [ $# -eq 0 ] && echo "missing dbname" && return 1
     local dbname=$1
     if [ -z "$dbname" ]; then
         echo "missing dbname"
         return 1
     fi
-    local owner=$2
+    local owner=
+    if [ $# -eq 2 ] && owner=$2
     id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
     retcode=$?
     if [ $retcode -eq 0 -a ! -z "$id" ]; then
