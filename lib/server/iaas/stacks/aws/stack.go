@@ -29,23 +29,23 @@ type Stack struct {
 }
 
 func (s *Stack) CreateVIP(string, string) (*resources.VIP, error) {
-	panic("implement me")
+	panic("implement me") // FIXME Technical debt
 }
 
 func (s *Stack) AddPublicIPToVIP(*resources.VIP) error {
-	panic("implement me")
+	panic("implement me") // FIXME Technical debt
 }
 
 func (s *Stack) BindHostToVIP(*resources.VIP, *resources.Host) error {
-	panic("implement me")
+	panic("implement me") // FIXME Technical debt
 }
 
 func (s *Stack) UnbindHostFromVIP(*resources.VIP, *resources.Host) error {
-	panic("implement me")
+	panic("implement me") // FIXME Technical debt
 }
 
 func (s *Stack) DeleteVIP(*resources.VIP) error {
-	panic("implement me")
+	panic("implement me") // FIXME Technical debt
 }
 
 // FIXME Orphan method

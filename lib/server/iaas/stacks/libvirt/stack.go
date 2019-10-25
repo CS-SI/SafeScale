@@ -19,7 +19,7 @@ type Stack struct {
 }
 
 func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
-	panic("implement me")
+	panic("implement me") // FIXME Technical debt
 }
 
 // Build Create and initialize a ClientAPI

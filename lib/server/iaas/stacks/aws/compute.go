@@ -523,7 +523,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}()
 
 	if host == nil {
-		panic("Unexpected nil host")
+		return nil, nil, fmt.Errorf("unexpected nil host")
 	}
 
 	if !host.OK() {
