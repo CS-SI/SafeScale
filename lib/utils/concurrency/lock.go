@@ -163,7 +163,7 @@ func (tm *taskedLock) Lock(task Task) error {
 		tm.writeLocks[tid]++
 		return nil
 	}
-	// If already lock for read, panic
+	// If already lock for read, returns an error
 	if _, ok := tm.readLocks[tid]; ok {
 		tracer.Trace("Can't Lock, already RLocked")
 		taskID, _ := task.GetID()
