@@ -46,88 +46,6 @@ feature:
                         run: |
                             mkdir -p ${SF_ETCDIR}/keycloak4gateway/build
 
-                            # patch for v4.8.3.Final
-                            # cat >${SF_ETCDIR}/keycloak4gateway/build/standalone-ha.xml.patch <<-'EOF'
-                            # --- standalone-ha.xml	2019-07-10 15:45:31.706239257 +0200
-                            # +++ standalone-ha.xml.new	2019-07-10 15:46:06.850275164 +0200
-                            # @@ -52,6 +52,13 @@
-                            #                     <properties path="application-roles.properties" relative-to="jboss.server.config.dir"/>
-                            #                 </authorization>
-                            #             </security-realm>
-                            # +            <security-realm name="KeycloakRealm">
-                            # +                <server-identities>
-                            # +                    <ssl>
-                            # +                        <keystore path="safescale.jks" relative-to="jboss.server.config.dir" keystore-password="safescale" />
-                            # +                    </ssl>
-                            # +                </server-identities>
-                            # +            </security-realm>
-                            #         </security-realms>
-                            #         <audit-log>
-                            #             <formatters>
-                            # @@ -126,18 +133,29 @@
-                            #                         <password>sa</password>
-                            #                     </security>
-                            #                 </datasource>
-                            # -                <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true">
-                            # -                    <connection-url>jdbc:h2:${jboss.server.data.dir}/keycloak;AUTO_SERVER=TRUE</connection-url>
-                            # -                    <driver>h2</driver>
-                            # +                <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true" use-ccm="true">
-                            # +                    <connection-url>jdbc:postgresql://${env.DB_ADDR:postgres}:${env.DB_PORT:5432}/${env.DB_DATABASE:keycloak}${env.JDBC_PARAMS:}</connection-url>
-                            # +                    <driver>postgresql</driver>
-                            # +                    <pool>
-                            # +                        <flush-strategy>IdleConnections</flush-strategy>
-                            # +                    </pool>
-                            #                     <security>
-                            # -                        <user-name>sa</user-name>
-                            # -                        <password>sa</password>
-                            # +                        <user-name>${env.DB_USER:keycloak}</user-name>
-                            # +                        <password>${env.DB_PASSWORD:password}</password>
-                            #                     </security>
-                            # +                    <validation>
-                            # +                        <check-valid-connection-sql>SELECT 1</check-valid-connection-sql>
-                            # +                        <background-validation>true</background-validation>
-                            # +                        <background-validation-millis>60000</background-validation-millis>
-                            # +                    </validation>
-                            #                 </datasource>
-                            #                 <drivers>
-                            #                     <driver name="h2" module="com.h2database.h2">
-                            #                         <xa-datasource-class>org.h2.jdbcx.JdbcDataSource</xa-datasource-class>
-                            #                     </driver>
-                            # +                    <driver name="postgresql" module="org.postgresql.jdbc">
-                            # +                        <xa-datasource-class>org.postgresql.xa.PGXADataSource</xa-datasource-class>
-                            # +                    </driver>
-                            #                 </drivers>
-                            #             </datasources>
-                            #         </subsystem>
-                            # @@ -590,11 +608,11 @@
-                            #             <buffer-cache name="default"/>
-                            #             <server name="default-server">
-                            #                 <ajp-listener name="ajp" socket-binding="ajp"/>
-                            # -                <http-listener name="default" socket-binding="http" redirect-socket="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" enable-http2="true"/>
-                            # -                <https-listener name="https" socket-binding="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" security-realm="ApplicationRealm" enable-http2="true"/>
-                            # +                <http-listener name="default" socket-binding="http" redirect-socket="proxy-https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" enable-http2="true"/>
-                            # +                <https-listener name="https" socket-binding="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" security-realm="KeycloakRealm" enable-http2="true"/>
-                            #                 <host name="default-host" alias="localhost">
-                            #                     <location name="/" handler="welcome-content"/>
-                            # -                    <http-invoker security-realm="ApplicationRealm"/>
-                            # +                    <http-invoker security-realm="KeycloakRealm"/>
-                            #                 </host>
-                            #             </server>
-                            #             <servlet-container name="default">
-                            # @@ -629,8 +647,9 @@
-                            #         <socket-binding name="modcluster" multicast-address="${jboss.modcluster.multicast.address:224.0.1.105}" multicast-port="23364"/>
-                            #         <socket-binding name="txn-recovery-environment" port="4712"/>
-                            #         <socket-binding name="txn-status-manager" port="4713"/>
-                            # +        <socket-binding name="proxy-https" port="443"/>
-                            #         <outbound-socket-binding name="mail-smtp">
-                            #             <remote-destination host="localhost" port="25"/>
-                            #         </outbound-socket-binding>
-                            #     </socket-binding-group>
-                            # -</server>
-                            # \ Pas de fin de ligne à la fin du fichier
-                            # +</server>
-                            # EOF
-
                             # patch for v7.0.1
                             cat >${SF_ETCDIR}/keycloak4gateway/build/standalone-ha.xml.patch <<-'EOF'
                             --- standalone-ha.xml.orig      2019-10-24 20:24:36.500072568 +0000
@@ -322,12 +240,6 @@ feature:
                             export DB_PASSWORD=$(cat /run/secrets/password.postgres)
 
                             export ADMIN_DB_PASSWORD=$(cat /run/secrets/password.postgres)
-
-                            # cat >/root/.pgpass <<-EOF2
-                            # *:5432:*:postgres:$ADMIN_DB_PASSWORD
-                            # *:5432:keycloak4gateway:keycloak4gateway:$DB_PASSWORD
-                            # EOF2
-                            # chmod 0600 /root/.pgpass
 
                             # Generates SSL certificates
                             IP=$(ifconfig eth0 | grep inet | tr -s ' ' '#' | cut -d\# -f3 | head -n 1)
