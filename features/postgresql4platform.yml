@@ -22,6 +22,7 @@ feature:
 
     parameters:
         - PurgeOnRemoval=no
+        - PostgresPassword=
 
     install:
         bash:
@@ -433,8 +434,9 @@ feature:
                             USERNAME=\$1
                             PASSWORD="\$2"
 
-                            grep -v "^\${USERNAME}:" /etc/postgresql/pool_passwd >/tmp/pool_passwd.new
+                            grep -v "^\${USERNAME}:" /etc/postgresql/pool_passwd | grep -e ".*:md5.*" >/tmp/pool_passwd.new
                             >/etc/postgresql/pool_passwd
+
                             cat /tmp/pool_passwd.new >>/etc/postgresql/pool_passwd
                             rm /tmp/pool_passwd.new
                             pg_md5 --config-file=/etc/postgresql/pgpool.conf -m --username=\$USERNAME "\$PASSWORD"
@@ -700,7 +702,11 @@ feature:
                             if docker secret inspect safescale.postgresql.password.password.postgres &>/dev/null; then
                                 docker secret rm safescale.postgresql.password.postgres || sfFail 193
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
+                            if [ ! -z "{{ .PostgresPassword }}" ]; then
+                                echo -n "{{ .PostgresPassword }}" | | docker secret create safescale.postgresql.password.postgres - || sfFail 194
+                            else
+                                echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
+                            fi
                             if docker secret inspect safescale.postgresql.password.repmgr &>/dev/null; then
                                 docker secret rm safescale.postgresql.password.repmgr || sfFail 195
                             fi
