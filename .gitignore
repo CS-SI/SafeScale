@@ -49,6 +49,7 @@ cli/perform/version.go
 cli/safescale/version.go
 cli/safescaled/version.go
 cli/scanner/version.go
+lib/server/iaas/resources/userdata/version.go
 
 vendor
 Gopkg.lock
