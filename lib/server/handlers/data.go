@@ -252,6 +252,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		wg.Add(len(encryptedShards))
 		for j := range encryptedShards {
 			go func(j int) {
+				defer wg.Done()
 				shardName, shardBucketName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
 				bucket := bucketMap[shardBucketName]
 				_, err := bucket.WriteObject(shardName, bytes.NewReader(encryptedShards[j]), int64(len(encryptedShards[j])), nil)
@@ -259,7 +260,6 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 					errChan <- fmt.Errorf("failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
 					log.Errorf("failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
 				}
-				wg.Done()
 			}(j)
 		}
 		wg.Wait()
@@ -393,6 +393,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		wg.Add(batchNbDataShards + batchNbParityShards)
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
 			go func(j int) {
+				defer wg.Done()
 				encryptedShards[j].Reset()
 				shardName, shardBucktName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
 				bucket, ok := bucketMap[shardBucktName]
@@ -404,7 +405,6 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 						log.Errorf("failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
 					}
 				}
-				wg.Done()
 			}(j)
 		}
 		wg.Wait()
@@ -507,16 +507,19 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err er
 	}
 	nbDataShards, nbParityShards := chunkGroup.GetNbShards()
 
+	errors := []error{}
+
 	var wg sync.WaitGroup
 	wg.Add(nbDataShards + nbParityShards)
 	for i := 0; i < nbDataShards+nbParityShards; i++ {
 		go func(i int) {
+			defer wg.Done()
 			shardName, bucketName := chunkGroup.GetStorageInfo(i)
 			err = bucketMap[bucketName].DeleteObject(shardName)
 			if err != nil {
 				log.Warnf("failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
+				errors = append(errors, err)
 			}
-			wg.Done()
 		}(i)
 	}
 	wg.Wait()
@@ -524,12 +527,18 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err er
 	for _, bucketName := range chunkGroup.GetBucketNames() {
 		err = bucketMap[bucketName].DeleteObject(metadataFileName)
 		if err != nil {
+			errors = append(errors, err)
 			log.Warnf("failed to delete chunkGroup '%s' from bucket '%s'", metadataFileName, bucketName)
 		}
 		err = bucketMap[bucketName].DeleteObject(keyFileName)
 		if err != nil {
+			errors = append(errors, err)
 			log.Warnf("failed to delete keyInfo '%s' from bucket '%s'", keyFileName, bucketName)
 		}
+	}
+
+	if len(errors) > 0 {
+		return scerr.ErrListError(errors)
 	}
 
 	return nil
