@@ -253,7 +253,7 @@ feature:
 
                             cat >${SF_ETCDIR}/monitoring4platform/am-executor/scripts/execute.sh <<-'EOF'
                             #!/usr/bin/env bash
-                            set -euo pipeexit
+                            set -euo pipefail
 
                             restart_host() {
                                 safescaled &
