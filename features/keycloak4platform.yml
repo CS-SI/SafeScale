@@ -245,8 +245,7 @@ feature:
                             export ADMIN_DB_PASSWORD=$(cat /run/secrets/password.postgres)
 
                             # Generates SSL certificates
-                            IP=$(ifconfig eth0 | grep inet | tr -s ' ' '#' | cut -d\# -f3 | head -n 1)
-                                openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN=$IP" \
+                                openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN={{.HostIP}}" \
                              && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
                              && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale \
                              && cp ./safescale.jks /opt/jboss/keycloak/standalone/configuration/ \
