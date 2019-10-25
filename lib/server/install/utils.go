@@ -276,7 +276,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
 
 		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
-		if err != nil {
+		if err != nil { // no need to act on err, SAFESCALE_FORENSICS is a dev feature
 			logrus.Warnf("[TRACE] Forensics error creating %s", dumpName)
 		}
 	}

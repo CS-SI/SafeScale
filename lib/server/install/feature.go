@@ -95,6 +95,8 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
 	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
 
+	errors := []error{}
+
 	for _, path := range paths {
 		files, err := ioutil.ReadDir(path)
 		if err == nil {
@@ -102,7 +104,8 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile {
 					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if err != nil {
-						log.Error(err) // FIXME Don't hide errors
+						log.Error(err)
+						errors = append(errors, err)
 						continue
 					}
 					if _, ok := allEmbeddedMap[feature.displayName]; !ok {
@@ -111,6 +114,10 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 				}
 			}
 		}
+	}
+
+	if len(errors) > 0 {
+		return nil, scerr.ErrListError(errors)
 	}
 
 	for _, feature := range features {

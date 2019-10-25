@@ -355,13 +355,11 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 		for _, portStr := range portStrs {
 			_, err = strconv.Atoi(portStr)
 			if err != nil {
-				log.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
-				return fmt.Errorf("unable to close tunnel :%s", err.Error())
+				return fmt.Errorf("unable to close tunnel : %s : %s", fmt.Sprintf("atoi failed on pid: %s", reflect.TypeOf(err).String()), err.Error())
 			}
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
-				log.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return fmt.Errorf("unable to close tunnel :%s", err.Error())
+				return fmt.Errorf("unable to close tunnel : %s : %s", fmt.Sprintf("kill -9 failed: %s\n", reflect.TypeOf(err).String()), err.Error())
 			}
 		}
 	}

@@ -924,6 +924,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 		mh, err := metadata.LoadHost(handler.service, network.SecondaryGatewayID)
 		if err != nil {
 			logrus.Error(err)
+			return err
 		} else {
 			if network.VIP != nil {
 				mhm, merr := mh.Get()
@@ -960,6 +961,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	if network.VIP != nil {
 		err = handler.service.DeleteVIP(network.VIP)
 		if err != nil {
+			// FIXME THINK Should we exit on failure ?
 			logrus.Errorf("failed to delete VIP: %v", err)
 		}
 	}

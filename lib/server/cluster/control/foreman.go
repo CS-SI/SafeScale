@@ -1296,7 +1296,6 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		}
 		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescale", "root", "root", "0755")
 		if err != nil {
-			logrus.Errorf("failed to upload 'safescale' binary")
 			return fmt.Errorf("failed to upload 'safescale' binary': %s", err.Error())
 		}
 
@@ -1718,10 +1717,14 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	if err != nil {
 		return nil, err
 	}
+
+	errors := []error{}
+
 	for i, hostID := range masters {
 		host, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
 		if err != nil {
 			logrus.Warnf("failed to get metadata of host: %s", err.Error())
+			errors = append(errors, err)
 			continue
 		}
 		subtask, err := t.StartInSubTask(b.taskConfigureMaster, data.Map{
@@ -1729,20 +1732,19 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 			"host":  host,
 		})
 		if err != nil {
-			return nil, err
+			errors = append(errors, err)
 		}
 		subtasks = append(subtasks, subtask)
 	}
 
-	var errs []string
 	for _, s := range subtasks {
 		_, state := s.Wait()
 		if state != nil {
-			errs = append(errs, state.Error())
+			errors = append(errors, state)
 		}
 	}
-	if len(errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(errs, "\n"))
+	if len(errors) > 0 {
+		return nil, scerr.ErrListError(errors)
 	}
 
 	logrus.Debugf("[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, temporal.FormatDuration(time.Since(started)))

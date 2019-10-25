@@ -213,16 +213,19 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, e
 	_, err = f.WriteString(content)
 	if err != nil {
 		log.Warnf("Error writing string: %v", err)
+		return nil, err
 	}
 
 	err = f.Chmod(filemode)
 	if err != nil {
 		log.Warnf("Error changing directory: %v", err)
+		return nil, err
 	}
 
 	err = f.Close()
 	if err != nil {
 		log.Warnf("Error closing file: %v", err)
+		return nil, err
 	}
 
 	return f, nil
@@ -237,6 +240,7 @@ func isTunnelReady(port int) bool {
 	err = server.Close()
 	if err != nil {
 		log.Warnf("Error closing server: %v", err)
+		return false
 	}
 	return false
 
@@ -275,21 +279,6 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		return nil, err
 	}
 
-	/*
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			if cmdString != "" {
-				log.Debugf("[TRACE] %s", cmdString)
-			}
-			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
-			partials := strings.Split(f.Name(), "/")
-			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1]))
-			err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
-			if err != nil {
-				log.Warnf("[TRACE] Failure storing key in %s", dumpName)
-			}
-		}
-	*/
-
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -318,7 +307,9 @@ func (sc *SSHCommand) closeTunneling() error {
 	// Tunnels are imbricated only last error is significant
 	if err != nil {
 		log.Errorf("closeTunneling: %s", reflect.TypeOf(err).String())
+		return err
 	}
+
 	return err
 }
 

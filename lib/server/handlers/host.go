@@ -641,6 +641,8 @@ func (handler *HostHandler) Create(
 		return nil, scerr.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
 	}
 
+	errors := []error{}
+
 	// Updates host link with networks
 	for _, i := range networks {
 		err = i.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -651,12 +653,18 @@ func (handler *HostHandler) Create(
 		})
 		if err != nil {
 			log.Errorf(err.Error())
+			errors = append(errors, err)
 			continue
 		}
 		_, err = metadata.SaveNetwork(handler.service, i)
 		if err != nil {
+			errors = append(errors, err)
 			log.Errorf(err.Error())
 		}
+	}
+
+	if len(errors) > 0 {
+		return nil, scerr.ErrListError(errors)
 	}
 
 	// Executes userdata phase2 script to finalize host installation
@@ -975,10 +983,13 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	netHandler := NewNetworkHandler(handler.service)
 	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		errors := []error{}
+
 		for k := range hostNetworkV1.NetworksByID {
 			network, err := netHandler.Inspect(ctx, k)
 			if err != nil {
 				log.Errorf(err.Error())
+				errors = append(errors, err)
 				continue
 			}
 			err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
@@ -989,12 +1000,19 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 			})
 			if err != nil {
 				log.Errorf(err.Error())
+				errors = append(errors, err)
 			}
 			_, err = metadata.SaveNetwork(handler.service, network)
 			if err != nil {
 				log.Errorf(err.Error())
+				errors = append(errors, err)
 			}
 		}
+
+		if len(errors) > 0 {
+			return scerr.ErrListError(errors)
+		}
+
 		return nil
 	})
 	if err != nil {

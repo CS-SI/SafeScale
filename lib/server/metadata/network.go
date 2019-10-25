@@ -410,6 +410,7 @@ func (m *Network) ListHosts() (list []*resources.Host, err error) {
 	})
 	if err != nil {
 		log.Errorf("Error listing hosts: %+v", err)
+		return list, err
 	}
 	return list, nil
 }

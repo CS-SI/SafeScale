@@ -24,9 +24,6 @@ import (
 	"sync/atomic"
 	txttmpl "text/template"
 
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/sirupsen/logrus"
-
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
@@ -38,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	rice "github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go
@@ -379,8 +377,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	}
 	sshCfg, err := safescaleCltHost.SSHConfig(master.ID)
 	if err != nil {
-		logrus.Errorf("failed to get ssh config to connect to master '%s': %s", master.ID, err.Error())
-		return ClusterState.Error, err
+		return ClusterState.Error, scerr.Wrap(err, fmt.Sprintf("failed to get ssh config to connect to master '%s': %s", master.ID, err.Error()))
 
 	}
 	_, err = sshCfg.WaitServerReady("ready", temporal.GetContextTimeout())
@@ -389,8 +386,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	}
 	retcode, _, stderr, err = safescaleClt.SSH.Run(master.ID, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
-		logrus.Errorf("failed to run remote command to get cluster state: %v\n%s", err, stderr)
-		return ClusterState.Error, err
+		return ClusterState.Error, scerr.Wrap(err, fmt.Sprintf("failed to run remote command to get cluster state: %v\n%s", err, stderr))
 	}
 	ran = true
 
