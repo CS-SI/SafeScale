@@ -708,7 +708,7 @@ feature:
                                 docker secret rm safescale.postgresql.password.postgres || sfFail 193
                             fi
                             if [ ! -z "{{ .PostgresPassword }}" ]; then
-                                echo -n "{{ .PostgresPassword }}" | | docker secret create safescale.postgresql.password.postgres - || sfFail 194
+                                echo -n "{{ .PostgresPassword }}" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
                             else
                                 echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
                             fi
