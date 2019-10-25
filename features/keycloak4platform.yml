@@ -33,9 +33,9 @@ feature:
                 steps:
                     curl:
                         targets:
-                            gateways: all
+                            masters: all
                         run: |
-                            curl -Ssl -I -k https://{{ .DefaultRouteIP }}:63009/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null || sfFail 192
+                            curl -Ssl -I -k https://{{ .HostIP }}:63009/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null || sfFail 192
                             sfExit
 
             add:
