@@ -450,9 +450,9 @@ func edgeproxy4networkFeature() *Feature {
 	}
 }
 
-// keycloak4gatewayFeature ...
-func keycloak4gatewayFeature() *Feature {
-	name := "keycloak4gateway"
+// keycloak4platformFeature ...
+func keycloak4platformFeature() *Feature {
+	name := "keycloak4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
