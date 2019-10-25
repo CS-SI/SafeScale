@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"time"
 )
 
 //go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
@@ -94,6 +95,9 @@ type Stack interface {
 	RebootHost(id string) error
 	// Resize host
 	ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error)
+
+	// WaitHostReady waits until host defined in hostParam is reachable by SSH
+	WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error)
 
 	// CreateVolume creates a block volume
 	CreateVolume(request resources.VolumeRequest) (*resources.Volume, error)

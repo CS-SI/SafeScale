@@ -88,7 +88,11 @@ cli/perform/perform
 cli/perform/perform-cover
 cli/scanner/scanner
 cli/scanner/scanner-cover
+
+# ignore test binaries
 lib/server/cluster/tests/create_cluster
+lib/security/gateway/client/safe-security
+lib/security/gateway/daemon/safe-securityd
 
 #ignore results from scanner
 cli/scanner/Test*

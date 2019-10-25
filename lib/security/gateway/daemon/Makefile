@@ -1,14 +1,14 @@
 GO?=go
 EXEC:=safe-securityd
 
-.PHONY:	safe-securityd clean
+.PHONY:	safe-securityd clean generate
 
 all: safe-securityd
 
 vet:
 	@$(GO) vet ./...
 
-safe-securityd:	proxy.go
+safe-securityd: main.go
 	@$(GO) build -race -o $(EXEC)
 
 clean:

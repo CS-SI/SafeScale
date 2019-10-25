@@ -15,6 +15,12 @@ import (
 // LoggedProvider ...
 type LoggedProvider WrappedProvider
 
+// WaitHostReady ...
+func (w LoggedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+	defer w.prepare(w.trace("WaitHostReady"))
+	return w.InnerProvider.WaitHostReady(hostParam, timeout)
+}
+
 // Provider specific functions
 
 // Build ...

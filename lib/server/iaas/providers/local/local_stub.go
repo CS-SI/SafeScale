@@ -20,6 +20,7 @@ package local
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -42,6 +43,10 @@ type AuthOptions struct {
 
 // CfgOptions configuration options
 type CfgOptions struct {
+}
+
+func (provider *provider) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+	return nil, fmt.Errorf(errorStr)
 }
 
 func (provider *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {

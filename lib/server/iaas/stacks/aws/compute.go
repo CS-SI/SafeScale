@@ -11,6 +11,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -296,7 +298,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			}
 			return nil
 		},
-		utils.GetDefaultDelay(),
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -488,7 +490,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			host.Name = server.Name
 
 			// Wait that Host is ready, not just that the build is started
-			_, err = s.WaitHostReady(host, utils.GetLongOperationTimeout())
+			_, err = s.WaitHostReady(host, temporal.GetLongOperationTimeout())
 			if err != nil {
 				killErr := s.DeleteHost(host.ID)
 				if killErr != nil {
@@ -498,13 +500,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 			return nil
 		},
-		utils.GetLongOperationTimeout(),
+		temporal.GetLongOperationTimeout(),
 	)
 	if err != nil {
 		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
 	if desistError != nil {
-		return nil, userData, resources.ResourceAccessDeniedError(request.ResourceName, fmt.Sprintf("Error creating host: %s", desistError.Error()))
+		return nil, userData, scerr.ForbiddenError(fmt.Sprintf("Error creating host: %s", desistError.Error()))
 	}
 
 	logrus.Debugf("host resource created.")
@@ -535,7 +537,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 // Returns true if the error is of type awserr.Error
 func isSpecificAWSErr(err error, code string, message string) bool {
 	if err, ok := err.(awserr.Error); ok {
-		logrus.Warnf("Received AWS error code: %d", err.Code())
+		logrus.Warnf("Received AWS error code: %s", err.Code())
 		return err.Code() == code && strings.Contains(err.Message(), message)
 	}
 	return false
@@ -549,7 +551,7 @@ Returns true if the error matches all these conditions:
 */
 func isAWSErr(err error) bool {
 	if err, ok := err.(awserr.Error); ok {
-		logrus.Warnf("Received AWS error code: %d", err.Code())
+		logrus.Warnf("Received AWS error code: %s", err.Code())
 		return true
 	}
 

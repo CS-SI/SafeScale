@@ -28,6 +28,26 @@ type Stack struct {
 	PricingService *pricing.Pricing
 }
 
+func (s *Stack) CreateVIP(string, string) (*resources.VIP, error) {
+	panic("implement me")
+}
+
+func (s *Stack) AddPublicIPToVIP(*resources.VIP) error {
+	panic("implement me")
+}
+
+func (s *Stack) BindHostToVIP(*resources.VIP, *resources.Host) error {
+	panic("implement me")
+}
+
+func (s *Stack) UnbindHostFromVIP(*resources.VIP, *resources.Host) error {
+	panic("implement me")
+}
+
+func (s *Stack) DeleteVIP(*resources.VIP) error {
+	panic("implement me")
+}
+
 // FIXME Orphan method
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	return *s.Config

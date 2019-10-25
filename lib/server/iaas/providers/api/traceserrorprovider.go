@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -12,6 +13,15 @@ import (
 
 // ErrorTraceProvider ...
 type ErrorTraceProvider WrappedProvider
+
+func (w ErrorTraceProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (host *resources.Host, err error) {
+	defer func(prefix string) {
+		if err != nil {
+			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+		}
+	}(fmt.Sprintf("%s:WaitHostReady", w.Name))
+	return w.InnerProvider.WaitHostReady(hostParam, timeout)
+}
 
 // Provider specific functions
 

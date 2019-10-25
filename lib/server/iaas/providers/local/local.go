@@ -20,7 +20,6 @@ package local
 
 import (
 	"fmt"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"

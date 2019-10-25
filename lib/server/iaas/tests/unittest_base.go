@@ -19,6 +19,7 @@ package tests
 // TODO NOTICE Side-effects imports here
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"testing"
 	"time"
 
@@ -65,6 +66,7 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	stack = &huaweicloud.Stack{}
 	stack = &openstack.Stack{}
 	stack = &gcp.Stack{}
+	stack = &aws.Stack{}
 
 	_ = stack
 }
