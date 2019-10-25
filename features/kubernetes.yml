@@ -340,7 +340,7 @@ feature:
 
                             # waits availability of key pods
 
-                            set -u -o pipeexit
+                            set -u -o pipefail
                             sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 206
                             sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 207
                             sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 208
@@ -388,7 +388,7 @@ feature:
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 216
 
                             # waits availability of key pods
-                            set -u -o pipeexit
+                            set -u -o pipefail
                             sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 217
                             sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || sfFail 218
                             sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 219
