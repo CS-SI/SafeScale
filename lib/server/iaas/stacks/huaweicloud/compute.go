@@ -703,6 +703,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 	// Updates Host Property HostNetwork
 	return host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		errors := []error{}
+
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4
@@ -764,12 +766,18 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				network, err := s.GetNetwork(netid)
 				if err != nil {
 					log.Errorf("failed to get network '%s'", netid)
+					errors = append(errors, err)
 					continue
 				}
 				hostNetworkV1.NetworksByID[netid] = network.Name
 				hostNetworkV1.NetworksByName[network.Name] = netid
 			}
 		}
+
+		if len(errors) > 0 {
+			return scerr.ErrListError(errors)
+		}
+
 		return nil
 	})
 }

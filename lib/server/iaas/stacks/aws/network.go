@@ -203,13 +203,13 @@ func (s *Stack) DeleteNetwork(id string) error {
 			AssociationId: addr.AssociationId,
 		})
 		if err != nil {
-			logrus.Warn(err)
+			logrus.Warn(err) // FIXME Handle error groups
 		}
 		_, err = s.EC2Service.ReleaseAddress(&ec2.ReleaseAddressInput{
 			AllocationId: addr.AllocationId,
 		})
 		if err != nil {
-			logrus.Warn(err)
+			logrus.Warn(err) // FIXME Handle error groups
 		}
 	}
 

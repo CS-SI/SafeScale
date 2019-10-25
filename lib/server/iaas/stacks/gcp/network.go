@@ -381,7 +381,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	// Delete routes and firewall
 	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, subnetwork.Name)
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
-	if fws != nil && err == nil {
+	if err != nil {
+		logrus.Warn(err)
+		return err
+	}
+
+	if fws != nil {
 		opp, operr := compuService.Firewalls.Delete(s.GcpConfig.ProjectID, firewallRuleName).Do()
 		if operr == nil {
 			oco := OpContext{
@@ -394,16 +399,21 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 			if operr != nil {
 				logrus.Warn(operr)
+				return operr
 			}
+		} else {
+			return operr
 		}
-	}
-	if err != nil {
-		logrus.Warn(err)
 	}
 
 	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
 	nws, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
-	if nws != nil && err == nil {
+	if err != nil {
+		logrus.Warn(err)
+		return err
+	}
+
+	if nws != nil {
 		opp, operr := compuService.Routes.Delete(s.GcpConfig.ProjectID, natRuleName).Do()
 		if operr == nil {
 			oco := OpContext{
@@ -416,11 +426,11 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 			if operr != nil {
 				logrus.Warn(operr)
+				return operr
 			}
+		} else {
+			return operr
 		}
-	}
-	if err != nil {
-		logrus.Warn(err)
 	}
 
 	return nil

@@ -613,6 +613,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 	// Updates Host Property propsv1.HostNetwork
 	return host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		errors := []error{}
+
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4
@@ -654,7 +656,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 				net, err := s.GetNetworkByName(netname)
 				if err != nil {
-					logrus.Debugf("failed to get data for network '%s'", netname) // FIXME complementHost should be a failure
+					logrus.Debugf("failed to get data for network '%s'", netname)
+					errors = append(errors, err)
 					continue
 				}
 				networksByID[net.ID] = ""
@@ -685,9 +688,11 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				if err != nil {
 					switch err.(type) {
 					case *scerr.ErrNotFound:
-						logrus.Errorf(err.Error()) // FIXME complementHost should be a failure
+						logrus.Errorf(err.Error())
+						errors = append(errors, err)
 					default:
-						logrus.Errorf("failed to get network '%s': %v", netid, err) // FIXME complementHost should be a failure
+						logrus.Errorf("failed to get network '%s': %v", netid, err)
+						errors = append(errors, err)
 					}
 					continue
 				}
@@ -697,6 +702,10 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				hostNetworkV1.NetworksByID[netid] = net.Name
 				hostNetworkV1.NetworksByName[net.Name] = netid
 			}
+		}
+
+		if len(errors) > 0 {
+			return scerr.ErrListError(errors)
 		}
 
 		return nil

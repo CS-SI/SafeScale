@@ -327,8 +327,9 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
 	})
 	if err != nil {
 		log.Debugf("failed to count nodes: %v", err)
+		return count, err
 	}
-	return count, nil
+	return count, err
 }
 
 // ListMasters lists the names of the master nodes in the Cluster
@@ -346,8 +347,9 @@ func (c *Controller) ListMasters(task concurrency.Task) (nodelist []*clusterprop
 	})
 	if err != nil {
 		log.Errorf("failed to get list of master names: %v", err)
+		return list, err
 	}
-	return list, nil
+	return list, err
 }
 
 // ListMasterNames lists the names of the master nodes in the Cluster
@@ -413,7 +415,7 @@ func (c *Controller) ListMasterIPs(task concurrency.Task) (nodelist clusterapi.N
 		log.Errorf("failed to get list of master IPs: %v", err)
 		return nil, err
 	}
-	return list, nil
+	return list, err
 }
 
 // ListNodes lists the nodes in the Cluster
@@ -615,12 +617,13 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	found := false
 	clientHost := client.New().Host
 	list, err := c.ListNodes(task)
 	if err != nil {
 		return nil, err
 	}
+
+	found := false
 	var node *clusterpropsv2.Node
 	for _, node = range list {
 		sshCfg, err := clientHost.SSHConfig(node.ID)

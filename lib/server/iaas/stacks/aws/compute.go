@@ -513,7 +513,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if err != nil {
+		if err != nil { // FIXME Handle error groups
 			logrus.Infof("Cleanup, deleting host '%s'", host.Name)
 			derr := s.DeleteHost(host.ID)
 			if derr != nil {

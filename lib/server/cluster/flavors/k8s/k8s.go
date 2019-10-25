@@ -19,6 +19,7 @@ package k8s
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync/atomic"
 
 	txttmpl "text/template"
@@ -114,13 +115,11 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	}
 	feature, err := install.NewFeature(task, "kubernetes")
 	if err != nil {
-		logrus.Errorf("[cluster %s] failed to instanciate feature 'kubernetes': %v", clusterName, err)
-		return fmt.Errorf("failed to prepare feature 'kubernetes': %s", err.Error())
+		return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error())
 	}
 	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
-		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
-		return err
+		return scerr.Wrap(err, fmt.Sprintf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error()))
 	}
 	if !results.Successful() {
 		err = fmt.Errorf(results.AllErrorMessages())

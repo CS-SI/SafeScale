@@ -829,11 +829,14 @@ func (handler *ShareHandler) Inspect(
 		return nil, nil, nil, err
 	}
 
+	errors := []error{}
+
 	mounts := map[string]*propsv1.HostRemoteMount{}
 	for k := range share.ClientsByName {
 		client, err := hostSvc.Inspect(ctx, k)
 		if err != nil {
 			log.Errorf("%+v", err)
+			errors = append(errors, err)
 			continue
 		}
 
@@ -851,9 +854,15 @@ func (handler *ShareHandler) Inspect(
 		})
 		if err != nil {
 			log.Error(err)
+			errors = append(errors, err)
 			continue
 		}
 	}
+
+	if len(errors) > 0 {
+		return nil, nil, nil, scerr.ErrListError(errors)
+	}
+
 	return server, share, mounts, nil
 }
 

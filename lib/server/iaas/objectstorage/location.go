@@ -97,6 +97,7 @@ func (l *location) connect() error {
 	l.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
 		log.Debugf("failed dialing location: %v", err)
+		return err
 	}
 	return err
 }
