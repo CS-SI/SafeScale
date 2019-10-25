@@ -26,6 +26,7 @@ generate: sdk
 	@(cd server/iaas/resources/enums && $(MAKE) $@)
 	@(cd server && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
+	@(cd security && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
 
 lib/client:
