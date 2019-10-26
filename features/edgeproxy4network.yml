@@ -109,8 +109,14 @@ feature:
                             RUN apk update && apk add git unzip postgresql-client
                             RUN luarocks install kong-oidc \
                              && luarocks install kong-prometheus-plugin
-                            RUN mkdir -p /etc/kong/includes
-                            RUN setcap CAP_NET_BIND_SERVICE=+ep /usr/local/openresty/nginx/sbin/nginx
+
+                             RUN mkdir -p /etc/kong/includes \
+                             && setcap CAP_NET_BIND_SERVICE=+ep /usr/local/openresty/nginx/sbin/nginx \
+
+                            RUN mkdir -p /usr/local/kong/proxy_temp \
+                             && chown kong:root /usr/local/kong/proxy_temp \
+                             && chmod 0700 /usr/local/kong/proxy_temp
+
                             COPY my-docker-entrypoint.sh /
                             RUN chmod a+rx /my-docker-entrypoint.sh
                             ENTRYPOINT ["/my-docker-entrypoint.sh"]
