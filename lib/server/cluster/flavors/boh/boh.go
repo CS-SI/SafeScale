@@ -123,8 +123,10 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 
 // getTemplateBox
 func getTemplateBox() (*rice.Box, error) {
-	var b *rice.Box
-	var err error
+	var (
+		b   *rice.Box
+		err error
+	)
 	anon := templateBox.Load()
 	if anon == nil {
 		// Note: path MUST be literal for rice to work
