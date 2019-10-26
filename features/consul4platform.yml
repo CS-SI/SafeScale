@@ -396,12 +396,8 @@ feature:
                   masters: one
               content: |
                   {
-                      "paths": [
-                          "/_platform/registry/consul/"
-                      ],
-                      "service": {
-                          "id": "{{ .consul_http_svc }}"
-                      },
+                      "paths": [ "/_platform/registry/consul/" ],
+                      "service": { "id": "{{ .consul_http_svc }}" },
                       "source-control": {
                           "whitelist": [ "{{ .CIDR }}", "127.0.0.1" ]
                       }
