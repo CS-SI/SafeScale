@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync/atomic"
 	"text/template"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -64,7 +65,8 @@ set -x
 `
 )
 
-var featureScriptTemplate *template.Template
+// var featureScriptTemplate *template.Template
+var featureScriptTemplate atomic.Value
 
 // parseTargets validates targets on the cluster from the feature specification
 // Without error, returns 'master target', 'private node target' and 'public node target'
@@ -294,27 +296,27 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
 func normalizeScript(params map[string]interface{}) (string, error) {
-	var err error
+	var (
+		err error
+		tmplContent string
+	)
 
-	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
-		featureScriptTemplateContentEnhanced := strings.Replace(featureScriptTemplateContent, "set -u -o pipefail", "set -Eeuxo pipefail", 1)
-		if featureScriptTemplate == nil {
-			// parse then execute the template
-			tmpl := fmt.Sprintf(featureScriptTemplateContentEnhanced, srvutils.LogFolder, srvutils.LogFolder)
-			featureScriptTemplate, err = template.New("normalize_script").Parse(tmpl)
-			if err != nil {
-				return "", fmt.Errorf("error parsing bash template: %s", err.Error())
-			}
+	anon := featureScriptTemplate.Load()
+	if anon == nil {
+		if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
+			featureScriptTemplateContent = strings.Replace(featureScriptTemplateContent, "set -u -o pipefail", "set -Eeuxo pipefail", 1)
+		} else {
+			tmplContent = featureScriptTemplateContent
 		}
-	} else {
-		if featureScriptTemplate == nil {
-			// parse then execute the template
-			tmpl := fmt.Sprintf(featureScriptTemplateContent, srvutils.LogFolder, srvutils.LogFolder)
-			featureScriptTemplate, err = template.New("normalize_script").Parse(tmpl)
-			if err != nil {
-				return "", fmt.Errorf("error parsing bash template: %s", err.Error())
-			}
+
+		// parse then execute the template
+		tmpl := fmt.Sprintf(featureScriptTemplateContent, srvutils.LogFolder, srvutils.LogFolder)
+		result, err := template.New("normalize_script").Parse(tmpl)
+		if err != nil {
+			return "", fmt.Errorf("error parsing bash template: %s", err.Error())
 		}
+		featureScriptTemplate.Store(result)
+		anon = featureScriptTemplate.Load()
 	}
 
 	// Configures BashLibrary template var
@@ -325,7 +327,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 	params["reserved_BashLibrary"] = bashLibrary
 
 	dataBuffer := bytes.NewBufferString("")
-	err = featureScriptTemplate.Execute(dataBuffer, params)
+	err = anon.(*template.Template).Execute(dataBuffer, params)
 	if err != nil {
 		return "", err
 	}
