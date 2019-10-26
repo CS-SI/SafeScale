@@ -336,8 +336,10 @@ export -f sfDropzoneSync
 # Moves all files in drop zone to folder (1st parameter)
 # if 2nd parameter is set, moves only the file on folder
 sfDropzonePop() {
+    [ $# -eq 0 ] && return 1
     local dest="$1"
-    local file="$2"
+    local file=
+    [ $# -eq 2 ] && file="$2"
     __create_dropzone &>/dev/null
     mkdir -p "$dest" &>/dev/null
     if [ $# -eq 1 ]; then
