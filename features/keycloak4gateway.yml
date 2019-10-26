@@ -256,14 +256,17 @@ feature:
                             # FROM jboss/keycloak:4.8.3.Final
                             FROM jboss/keycloak:7.0.1
 
-                            WORKDIR /opt/jboss
                             USER root
 
-                            # need psql in my-docker-entrypoint.sh and patch
-                            #RUN yum install -q -y postgresql patch net-tools
                             RUN microdnf update -y \
-                             && microdnf install -y patch net-tools \
-                             && microdnf clean all
+                            && microdnf install -y patch net-tools \
+                            && microdnf clean all
+
+                            WORKDIR /usr/local/bin
+                            ADD https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 ./jq
+                            RUN chmod a+rx jq
+
+                            WORKDIR /opt/jboss
 
                             # Updates configuration
                             COPY standalone-ha.xml.patch keycloak/standalone/configuration/
