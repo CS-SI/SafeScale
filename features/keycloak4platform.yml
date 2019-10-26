@@ -250,12 +250,17 @@ feature:
                             cat >${SF_ETCDIR}/keycloak4platform/build/Dockerfile <<-'EOF'
                             FROM jboss/keycloak:7.0.1
 
-                            WORKDIR /opt/jboss
                             USER root
 
                             RUN microdnf update -y \
-                             && microdnf install -y patch net-tools \
-                             && microdnf clean all
+                            && microdnf install -y patch net-tools \
+                            && microdnf clean all
+
+                            WORKDIR /usr/local/bin
+                            ADD https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 ./jq
+                            RUN chmod a+rx jq
+
+                            WORKDIR /opt/jboss
 
                             # Generates SSL certificates
                             RUN openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN={{.HostIP}}" \
