@@ -19,6 +19,7 @@ package commands
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 
@@ -139,11 +140,12 @@ var shareDelete = cli.Command{
 		}
 
 		var (
-			wg        sync.WaitGroup
-			errs      int
-			shareList []string
+			wg         sync.WaitGroup
+			errs       int32
+			shareList  []string
+			errMessage atomic.Value
 		)
-		errMessage := ""
+		errMessage.Store("")
 
 		shareList = append(shareList, c.Args().First())
 		shareList = append(shareList, c.Args().Tail()...)
@@ -153,8 +155,10 @@ var shareDelete = cli.Command{
 			err := client.New().Share.Delete(aname, temporal.GetExecutionTimeout())
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
-				errMessage += fmt.Sprintf("error while deleting share %s: %s", aname, utils.Capitalize(err.Error()))
-				errs++
+				msgs := errMessage.Load().(string)
+				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, utils.Capitalize(err.Error()))
+				errMessage.Store(msgs)
+				atomic.AddInt32(&errs, 1)
 			}
 		}
 
@@ -165,7 +169,7 @@ var shareDelete = cli.Command{
 		wg.Wait()
 
 		if errs > 0 {
-			return clitools.FailureResponse(clitools.ExitOnRPC(errMessage))
+			return clitools.FailureResponse(clitools.ExitOnRPC(errMessage.Load().(string)))
 		}
 		return clitools.SuccessResponse(nil)
 	},
