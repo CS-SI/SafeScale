@@ -296,12 +296,21 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
 func normalizeScript(params map[string]interface{}) (string, error) {
-	var err error
+	var (
+		err         error
+		tmplContent string
+	)
 
 	anon := featureScriptTemplate.Load()
 	if anon == nil {
+		if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
+			tmplContent = strings.Replace(featureScriptTemplateContent, "set -u -o pipefail", "set -Eeuxo pipefail", 1)
+		} else {
+			tmplContent = featureScriptTemplateContent
+		}
+
 		// parse then execute the template
-		tmpl := fmt.Sprintf(featureScriptTemplateContent, srvutils.LogFolder, srvutils.LogFolder)
+		tmpl := fmt.Sprintf(tmplContent, srvutils.LogFolder, srvutils.LogFolder)
 		result, err := template.New("normalize_script").Parse(tmpl)
 		if err != nil {
 			return "", fmt.Errorf("error parsing bash template: %s", err.Error())
