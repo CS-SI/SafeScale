@@ -221,6 +221,7 @@ feature:
                             nginx_stream_include = /etc/kong/includes/*.conf
                             anonymous_reports = off
                             EOF
+                            sfExit
 
                     # secret:
                     #     targets:
@@ -258,6 +259,7 @@ feature:
                             # sfFirewallAdd --zone=trusted --add-interface=${KONG_PUB_BRIDGE} && \
                             # sfFirewallAdd --zone=trusted --add-interface=${KONG_DB_BRIDGE} && \
                             sfFirewallAdd --zone=public --add-service=https && sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfExit
 
                     start:
                         targets:

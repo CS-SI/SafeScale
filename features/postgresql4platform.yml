@@ -22,6 +22,7 @@ feature:
 
     parameters:
         - PurgeOnRemoval=no
+        - PostgresPassword=
 
     install:
         bash:
@@ -170,7 +171,7 @@ feature:
                             memory_cache_enabled = on
                             memqcache_method = 'shmem'
 
-                            connection_cache = on
+                            connection_cache = off
 
                             replication_mode = off
 
@@ -431,19 +432,20 @@ feature:
                         run: |
                             mkdir -p ${SF_ETCDIR}/postgresql4platform/build/pgpool
 
-                            cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/update_password.sh <<-EOF
+                            cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/update_password.sh <<-'EOF'
                             #!/bin/bash
-                            [ \$# -ne 2 ] && echo "invalid parameters" && sfFail 1
+                            [ $# -ne 2 ] && echo "invalid parameters" && exit 1
 
-                            USERNAME=\$1
-                            PASSWORD="\$2"
+                            USERNAME=$1
+                            PASSWORD="$2"
 
-                            grep -v "^\${USERNAME}:" /etc/postgresql/pool_passwd >/tmp/pool_passwd.new
+                            grep -v "^${USERNAME}:" /etc/postgresql/pool_passwd | grep -e ".*:md5.*" >/tmp/pool_passwd.new
                             >/etc/postgresql/pool_passwd
+
                             cat /tmp/pool_passwd.new >>/etc/postgresql/pool_passwd
                             rm /tmp/pool_passwd.new
-                            pg_md5 --config-file=/etc/postgresql/pgpool.conf -m --username=\$USERNAME "\$PASSWORD"
-                            exit \$?
+                            pg_md5 --config-file=/etc/postgresql/pgpool.conf -m --username=$USERNAME "$PASSWORD"
+                            exit $?
                             EOF
 
                             cat >${SF_ETCDIR}/postgresql4platform/build/pgpool/my-docker-entrypoint.sh <<-EOF
@@ -705,7 +707,11 @@ feature:
                             if docker secret inspect safescale.postgresql.password.password.postgres &>/dev/null; then
                                 docker secret rm safescale.postgresql.password.postgres || sfFail 193
                             fi
-                            echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
+                            if [ ! -z "{{ .PostgresPassword }}" ]; then
+                                echo -n "{{ .PostgresPassword }}" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
+                            else
+                                echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.postgresql.password.postgres - || sfFail 194
+                            fi
                             if docker secret inspect safescale.postgresql.password.repmgr &>/dev/null; then
                                 docker secret rm safescale.postgresql.password.repmgr || sfFail 195
                             fi

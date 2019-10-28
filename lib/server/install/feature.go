@@ -585,6 +585,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 
 		// v["Hostname"] = host.Name
 		// v["HostIP"] = host.PrivateIp
+		// FIXME:
 		gw := gatewayFromHost(host)
 		if gw != nil {
 			v["GatewayIP"] = gw.PrivateIp
