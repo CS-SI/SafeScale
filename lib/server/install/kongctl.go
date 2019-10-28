@@ -155,7 +155,10 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 // Currently, support rule types service, route and upstream
 // Returns rule name and error
 func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variables) (string, error) {
-	ruleType := rule["type"].(string)
+	ruleType, ok := rule["type"].(string)
+	if !ok {
+		return "", scerr.InvalidParameterError("rule['type']", "is not a string")
+	}
 
 	ruleName, err := k.realizeRuleData(strings.Trim(rule["name"].(string), "\n"), *values)
 	if err != nil {
@@ -316,7 +319,10 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 	}
 	if kongdata, ok := result["data"].([]interface{}); ok && len(kongdata) > 0 {
 		for _, i := range kongdata {
-			plugin := i.(map[string]interface{})
+			plugin, ok := i.(map[string]interface{})
+			if !ok {
+				return scerr.InvalidParameterError("result['data']", "is an invalid map[string]")
+			}
 			if plugin["name"] == "ip-restriction" {
 				ref = plugin["id"].(string)
 				break

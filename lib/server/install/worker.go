@@ -666,7 +666,10 @@ func (w *worker) validateClusterSizing() error {
 
 	sizing := w.feature.specs.GetStringMap(yamlKey)
 	if anon, ok := sizing["masters"]; ok {
-		request := anon.(string)
+		request, ok := anon.(string)
+		if !ok {
+			return fmt.Errorf("invalid masters key")
+		}
 		count, _, _, err := w.parseClusterSizingRequest(request)
 		if err != nil {
 			return err
@@ -681,7 +684,10 @@ func (w *worker) validateClusterSizing() error {
 		}
 	}
 	if anon, ok := sizing["nodes"]; ok {
-		request := anon.(string)
+		request, ok := anon.(string)
+		if !ok {
+			return fmt.Errorf("invalid nodes key")
+		}
 		count, _, _, err := w.parseClusterSizingRequest(request)
 		if err != nil {
 			return err
@@ -754,7 +760,10 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 	for _, r := range rules {
 		targets := stepTargets{}
-		rule := r.(map[interface{}]interface{})
+		rule, ok := r.(map[interface{}]interface{})
+		if !ok {
+			return scerr.InvalidParameterError("r", "is not a rule (map)")
+		}
 		anon, ok := rule["targets"].(map[interface{}]interface{})
 		if !ok {
 			// If no 'targets' key found, applies on host only
@@ -821,11 +830,24 @@ func (w *worker) setReverseProxy() (err error) {
 }
 
 func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, err error) {
-	ctrl := params.(data.Map)["ctrl"].(*KongController)
-	rule := params.(data.Map)["rule"].(map[interface{}]interface{})
-	vars := params.(data.Map)["vars"].(*Variables)
+	ctrl, ok := params.(data.Map)["ctrl"].(*KongController)
+	if !ok {
+		return nil, scerr.InvalidParameterError("ctrl", "is not a *KongController")
+	}
+	rule, ok := params.(data.Map)["rule"].(map[interface{}]interface{})
+	if !ok {
+		return nil, scerr.InvalidParameterError("rule", "is not a map")
+	}
+	vars, ok := params.(data.Map)["vars"].(*Variables)
+	if !ok {
+		return nil, scerr.InvalidParameterError("vars", "is not a *Variables")
+	}
 
-	hostName := (*vars)["Hostname"].(string)
+	hostName, ok := (*vars)["Hostname"].(string)
+	if !ok {
+		return nil, scerr.InvalidParameterError("Hostname", "is not a string")
+	}
+
 	ruleName, err := ctrl.Apply(rule, vars)
 
 	if err != nil {

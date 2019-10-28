@@ -40,7 +40,10 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 	}
 	var tenant map[string]interface{}
 	for _, t := range tenants {
-		tenantTmp := t.(map[string]interface{})
+		tenantTmp, ok := t.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid tenant file format")
+		}
 		name, found := tenantTmp["name"].(string)
 		_, found2 := tenantTmp["objectstorage"]
 		if found && found2 && name == tenantName {

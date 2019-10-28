@@ -1591,13 +1591,16 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	}
 
 	// Convert and validate parameters
-	p := params.(data.Map)
+	p, ok := params.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
+	}
+
 	var (
 		index   uint
 		def     *pb.HostDefinition
 		timeout time.Duration
 		nokeep  bool
-		ok      bool
 	)
 	if index, ok = p["index"].(uint); !ok {
 		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
@@ -1759,14 +1762,17 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Convert and validate params
-	p := params.(data.Map)
+	p, ok := params.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
+	}
+
 	if p == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
 	var (
 		index  uint
 		pbHost *pb.Host
-		ok     bool
 	)
 	if index, ok = p["index"].(uint); !ok {
 		return nil, scerr.InvalidParameterError("params[index]", "is missing")
@@ -2065,11 +2071,13 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 	}
 
 	// Convert and validate parameters
-	p := params.(data.Map)
+	p, ok := params.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
+	}
 	var (
 		index  uint
 		pbHost *pb.Host
-		ok     bool
 	)
 	if index, ok = p["index"].(uint); !ok {
 		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an integer")

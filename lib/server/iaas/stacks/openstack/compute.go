@@ -386,12 +386,17 @@ func (s *Stack) DeleteKeyPair(id string) error {
 func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 	hostSize := propsv1.NewHostSize()
 	if i, ok := flavor["id"]; ok {
-		fid := i.(string)
+		fid, ok := i.(string)
+		if !ok {
+			return nil
+		}
 		tpl, err := s.GetTemplate(fid)
 		if err == nil {
 			hostSize.Cores = tpl.Cores
 			hostSize.DiskSize = tpl.DiskSize
 			hostSize.RAMSize = tpl.RAMSize
+		} else {
+			return nil
 		}
 	} else if _, ok := flavor["vcpus"]; ok {
 		hostSize.Cores = flavor["vcpus"].(int)
@@ -529,7 +534,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
 func (s *Stack) interpretAddresses(
 	addresses map[string]interface{},
-) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
+) ([]string, map[IPVersion.Enum]map[string]string, string, string, error) {
 	var (
 		networks    = []string{}
 		addrs       = map[IPVersion.Enum]map[string]string{}
@@ -543,9 +548,18 @@ func (s *Stack) interpretAddresses(
 	for n, obj := range addresses {
 		networks = append(networks, n)
 		for _, networkAddresses := range obj.([]interface{}) {
-			address := networkAddresses.(map[string]interface{})
-			version := address["version"].(float64)
-			fixedIP := address["addr"].(string)
+			address, ok := networkAddresses.(map[string]interface{})
+			if !ok {
+				return networks, addrs, AcccessIPv4, AcccessIPv6, fmt.Errorf("invalid network address")
+			}
+			version, ok := address["version"].(float64)
+			if !ok {
+				return networks, addrs, AcccessIPv4, AcccessIPv6, fmt.Errorf("invalid version")
+			}
+			fixedIP, ok := address["addr"].(string)
+			if !ok {
+				return networks, addrs, AcccessIPv4, AcccessIPv6, fmt.Errorf("invalid addr")
+			}
 			if n == s.cfgOpts.ProviderNetwork {
 				switch version {
 				case 4:
@@ -564,7 +578,7 @@ func (s *Stack) interpretAddresses(
 
 		}
 	}
-	return networks, addrs, AcccessIPv4, AcccessIPv6
+	return networks, addrs, AcccessIPv4, AcccessIPv6, nil
 }
 
 // complementHost complements Host data with content of server parameter
@@ -573,7 +587,10 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 		return scerr.InvalidInstanceError()
 	}
 
-	networks, addresses, ipv4, ipv6 := s.interpretAddresses(server.Addresses)
+	networks, addresses, ipv4, ipv6, err := s.interpretAddresses(server.Addresses)
+	if err != nil {
+		return err
+	}
 
 	// Updates intrinsic data of host if needed
 	if host.ID == "" {
@@ -589,7 +606,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property propsv1.HostDescription
-	err := host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
 		hpDescriptionV1 := v.(*propsv1.HostDescription)
 		hpDescriptionV1.Created = server.Created
 		hpDescriptionV1.Updated = server.Updated
@@ -734,7 +751,11 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
 	if found && len(serverList) > 0 {
 		for _, anon := range serverList {
-			entry := anon.(map[string]interface{})
+			entry, ok := anon.(map[string]interface{})
+			if !ok {
+				logrus.Warn("invalid server in serverlist !")
+				continue
+			}
 			if entry["name"].(string) == name {
 				host := resources.NewHost()
 				host.ID = entry["id"].(string)

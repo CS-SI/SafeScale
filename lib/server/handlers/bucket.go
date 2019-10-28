@@ -152,16 +152,16 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 
 	authOpts, _ := handler.service.GetAuthenticationOptions()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
-	authurl := authurlCfg.(string)
+	authurl, _ := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
 	tenantCfg, _ := authOpts.Config("TenantName")
-	tenant := tenantCfg.(string)
+	tenant, _ := tenantCfg.(string)
 	loginCfg, _ := authOpts.Config("Login")
-	login := loginCfg.(string)
+	login, _ := loginCfg.(string)
 	passwordCfg, _ := authOpts.Config("Password")
-	password := passwordCfg.(string)
+	password, _ := passwordCfg.(string)
 	regionCfg, _ := authOpts.Config("Region")
-	region := regionCfg.(string)
+	region, _ := regionCfg.(string)
 
 	objStorageProtocol := handler.service.GetType()
 	if objStorageProtocol == "swift" {

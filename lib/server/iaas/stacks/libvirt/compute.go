@@ -133,7 +133,10 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 		return nil, fmt.Errorf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
 	}
 
-	imagesJSON := result["images"].([]interface{})
+	imagesJSON, ok := result["images"].([]interface{})
+	if !ok {
+		return nil, scerr.InvalidParameterError("result['images']]", "is not an array")
+	}
 	images = []resources.Image{}
 	for _, imageJSON := range imagesJSON {
 		image := resources.Image{
@@ -175,7 +178,10 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		return nil, fmt.Errorf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
 	}
 
-	imagesJSON := result["images"].([]interface{})
+	imagesJSON, ok := result["images"].([]interface{})
+	if !ok {
+		return nil, scerr.InvalidParameterError("result['images']]", "is not an array")
+	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, ok := imageJSON.(map[string]interface{})["imageID"]; ok && imageID == id {
 			return &resources.Image{
@@ -222,7 +228,10 @@ func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) 
 		return nil, fmt.Errorf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())
 	}
 
-	templatesJSON := result["templates"].([]interface{})
+	templatesJSON, ok := result["templates"].([]interface{})
+	if !ok {
+		return nil, scerr.InvalidParameterError("result['templates']]", "is not an array")
+	}
 	templates = []resources.HostTemplate{}
 	for _, templateJSON := range templatesJSON {
 		template := resources.HostTemplate{
@@ -266,7 +275,10 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 		return nil, fmt.Errorf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())
 	}
 
-	templatesJSON := result["templates"].([]interface{})
+	templatesJSON, ok := result["templates"].([]interface{})
+	if !ok {
+		return nil, scerr.InvalidParameterError("result['templates']", "is not an array")
+	}
 	for _, templateJSON := range templatesJSON {
 		if templateID, _ := templateJSON.(map[string]interface{})["templateID"]; templateID == id {
 			return &resources.HostTemplate{
@@ -378,10 +390,16 @@ func getImagePathFromID(s *Stack, id string) (path string, err error) {
 		return "", fmt.Errorf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
 	}
 
-	imagesJSON := result["images"].([]interface{})
+	imagesJSON, ok := result["images"].([]interface{})
+	if !ok {
+		return "", scerr.InvalidParameterError("result['images']", "is not an array")
+	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
-			path := imageJSON.(map[string]interface{})["imagePath"].(string)
+			path, ok := imageJSON.(map[string]interface{})["imagePath"].(string)
+			if !ok {
+				return "", scerr.InvalidParameterError("imagePath", "is not a string")
+			}
 			// check parent directory first
 			parentDir := filepath.Dir(path)
 			if _, err := os.Stat(parentDir); os.IsNotExist(err) {
@@ -391,18 +409,26 @@ func getImagePathFromID(s *Stack, id string) (path string, err error) {
 			}
 			// download if image file isn't there
 			if _, err := os.Stat(path); os.IsNotExist(err) {
-				err := downloadImage(path, imageJSON.(map[string]interface{})["download"].(map[string]interface{}))
+				downloadPath, ok := imageJSON.(map[string]interface{})["download"]
+				if !ok {
+					return "", fmt.Errorf("invalid json")
+				}
+				mapDownload, ok := downloadPath.(map[string]interface{})
+				if !ok {
+					return "", fmt.Errorf("invalid json")
+				}
+				err := downloadImage(path, mapDownload)
 				if err != nil {
 					return "", fmt.Errorf("failed to download image : %s", err.Error())
 				}
 			} else if err != nil {
-				return "", fmt.Errorf("Unable to check if the file %s exists or not : %s", filepath.Base(path), err.Error())
+				return "", fmt.Errorf("unable to check if the file %s exists or not : %s", filepath.Base(path), err.Error())
 			}
 			return path, nil
 		}
 	}
 
-	return "", fmt.Errorf("Image with id=%s not found", id)
+	return "", fmt.Errorf("image with id=%s not found", id)
 }
 
 // getDiskFromID retrieve the disk with root partition of an image from this image ID
@@ -427,7 +453,10 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 		return "", fmt.Errorf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
 	}
 
-	imagesJSON := result["images"].([]interface{})
+	imagesJSON, ok := result["images"].([]interface{})
+	if !ok {
+		return "", scerr.InvalidParameterError("result['images']]", "is not an array")
+	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
 			return imageJSON.(map[string]interface{})["disk"].(string), nil

@@ -231,7 +231,10 @@ func upgradePropertyNodesIfNeeded(t concurrency.Task, c *control.Controller) err
 				nodesV2 := v.(*clusterpropsv2.Nodes)
 
 				return properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-					nodesV1 := v.(*clusterpropsv1.Nodes)
+					nodesV1, ok := v.(*clusterpropsv1.Nodes)
+					if !ok {
+						return fmt.Errorf("invalid metadata")
+					}
 
 					for _, v := range nodesV1.Masters {
 						nodesV2.GlobalLastIndex++
