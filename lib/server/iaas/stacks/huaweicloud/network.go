@@ -479,7 +479,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 			if err != nil {
 				err = scerr.InconsistentError("response is not json")
 			} else {
-				code := body["code"].(string)
+				code, _ := body["code"].(string)
 				switch code {
 				case "VPC.0003":
 					err = scerr.NotFoundError("VPC has vanished")

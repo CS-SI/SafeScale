@@ -155,8 +155,14 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	}
 	nets, found := r.Body.(map[string]interface{})["networks"].([]interface{})
 	if found && len(nets) > 0 {
-		entry := nets[0].(map[string]interface{})
-		id := entry["id"].(string)
+		entry, ok := nets[0].(map[string]interface{})
+		if !ok {
+			return nil, scerr.InvalidParameterError("Body['networks']", "is not a map[string]")
+		}
+		id, ok := entry["id"].(string)
+		if !ok {
+			return nil, scerr.InvalidParameterError("entry['id']", "is not a string")
+		}
 		return s.GetNetwork(id)
 	}
 	return nil, resources.ResourceNotFoundError("network", name)

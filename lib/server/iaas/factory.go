@@ -19,6 +19,7 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"regexp"
 
 	log "github.com/sirupsen/logrus"
@@ -198,7 +199,10 @@ func UseService(tenantName string) (Service, error) {
 			if !found {
 				return nil, fmt.Errorf("missing configuration option 'MetadataBucketName'")
 			}
-			bucketName := anon.(string)
+			bucketName, ok := anon.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid bucket name, it's not a string")
+			}
 			found, err = metadataLocation.FindBucket(bucketName)
 			if err != nil {
 				return nil, fmt.Errorf("error accessing metadata location: %s", err.Error())
@@ -329,7 +333,10 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 			if !found {
 				return nil, fmt.Errorf("missing configuration option 'MetadataBucketName'")
 			}
-			bucketName := anon.(string)
+			bucketName, ok := anon.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid bucket name, it's not a string")
+			}
 			found, err = metadataLocation.FindBucket(bucketName)
 			if err != nil {
 				return nil, fmt.Errorf("error accessing metadata location: %s", err.Error())
@@ -376,7 +383,10 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 
 // validatRegexps validates regexp values from tenants file
 func validateRegexps(svc *service, tenant map[string]interface{}) error {
-	compute := tenant["compute"].(map[string]interface{})
+	compute, ok := tenant["compute"].(map[string]interface{})
+	if !ok {
+		return scerr.InvalidParameterError("tenant['compute']", "is not a map")
+	}
 
 	if reStr, ok := compute["WhitelistTemplateRegexp"].(string); ok {
 		// Validate regular expression

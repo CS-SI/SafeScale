@@ -289,8 +289,11 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.N
 			return nil
 		})
 	} else {
-		_ = c.GetProperties(task).LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
-			networkV1 := v.(*clusterpropsv1.Network)
+		err = c.GetProperties(task).LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
+			networkV1, ok := v.(*clusterpropsv1.Network)
+			if !ok {
+				return fmt.Errorf("invalid metadata")
+			}
 			config = clusterpropsv2.Network{
 				NetworkID:      networkV1.NetworkID,
 				CIDR:           networkV1.CIDR,
@@ -859,9 +862,11 @@ func (c *Controller) AddNodes(task concurrency.Task, count uint, req *pb.HostDef
 		if err != nil {
 			errors = append(errors, err.Error())
 		} else {
-			hostName := result.(string)
-			if hostName != "" {
-				hosts = append(hosts, hostName)
+			hostName, ok := result.(string)
+			if ok {
+				if hostName != "" {
+					hosts = append(hosts, hostName)
+				}
 			}
 		}
 	}
@@ -1251,11 +1256,19 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	}
 
 	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		funcErr := c.DeleteSpecificNode(t, params.(string), "")
+		hostId, ok := params.(string)
+		if !ok {
+			return nil, scerr.InvalidParameterError("params", "is not a string")
+		}
+		funcErr := c.DeleteSpecificNode(t, hostId, "")
 		return nil, funcErr
 	}
 	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		funcErr := c.deleteMaster(t, params.(string))
+		hostId, ok := params.(string)
+		if !ok {
+			return nil, scerr.InvalidParameterError("params", "is not a string")
+		}
+		funcErr := c.deleteMaster(t, hostId)
 		return nil, funcErr
 	}
 

@@ -105,7 +105,10 @@ func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, e
 		return nil, err
 	}
 
-	serverMap := base["server"].(map[string]interface{})
+	serverMap, ok := base["server"].(map[string]interface{})
+	if !ok {
+		return nil, scerr.InvalidParameterError("base['server']", "is not a map[string]")
+	}
 
 	blkDevices := make([]map[string]interface{}, len(opts.BlockDevice))
 
@@ -1101,15 +1104,22 @@ func (s *Stack) getOpenstackPortID(host *resources.Host) (*string, error) {
 // toHostSize converts flavor attributes returned by OpenStack driver into resources.HostProperty.v1.HostSize
 func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 	if i, ok := flavor["id"]; ok {
-		fid := i.(string)
-		tpl, _ := s.GetTemplate(fid)
+		fid, ok := i.(string)
+		if !ok {
+			return nil
+		}
+		tpl, err := s.GetTemplate(fid)
+		if err != nil {
+			return nil
+		}
 		return converters.ModelHostTemplateToPropertyHostSize(tpl)
 	}
 	hostSize := propsv1.NewHostSize()
 	if _, ok := flavor["vcpus"]; ok {
-		hostSize.Cores = flavor["vcpus"].(int)
-		hostSize.DiskSize = flavor["disk"].(int)
-		hostSize.RAMSize = flavor["ram"].(float32) / 1000.0
+		hostSize.Cores, _ = flavor["vcpus"].(int)
+		hostSize.DiskSize, _ = flavor["disk"].(int)
+		hostSize.RAMSize, _ = flavor["ram"].(float32)
+		hostSize.RAMSize = hostSize.RAMSize / 1000.0
 	}
 	return hostSize
 }

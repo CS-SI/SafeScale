@@ -318,6 +318,10 @@ func (handler *NetworkHandler) Create(
 
 	primaryResult, primaryErr := primaryTask.Wait()
 	if primaryErr == nil {
+		if _, ok := primaryResult.(data.Map); !ok {
+			return nil, scerr.InvalidParameterError("primaryResult", "must be a data.Map")
+		}
+
 		primaryGateway = primaryResult.(data.Map)["host"].(*resources.Host)
 		primaryUserdata = primaryResult.(data.Map)["userdata"].(*userdata.Content)
 		primaryMetadata = primaryResult.(data.Map)["metadata"].(*metadata.Gateway)
@@ -353,6 +357,10 @@ func (handler *NetworkHandler) Create(
 	if failover && secondaryTask != nil {
 		secondaryResult, secondaryErr = secondaryTask.Wait()
 		if secondaryErr == nil {
+			if _, ok := secondaryResult.(data.Map); !ok {
+				return nil, scerr.InvalidParameterError("secondaryResult", "must be a data.Map")
+			}
+
 			secondaryGateway = secondaryResult.(data.Map)["host"].(*resources.Host)
 			secondaryUserdata = secondaryResult.(data.Map)["userdata"].(*userdata.Content)
 			secondaryMetadata = secondaryResult.(data.Map)["metadata"].(*metadata.Gateway)
@@ -530,9 +538,18 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
 	// name := inputs["name"].(string)
-	request := inputs["request"].(resources.GatewayRequest)
-	sizing := inputs["sizing"].(resources.SizingRequirements)
-	primary := inputs["primary"].(bool)
+	request, ok := inputs["request"].(resources.GatewayRequest)
+	if !ok {
+		return nil, scerr.InvalidParameterError("request", "must be a resources.GatewayRequest")
+	}
+	sizing, ok := inputs["sizing"].(resources.SizingRequirements)
+	if !ok {
+		return nil, scerr.InvalidParameterError("sizing", "must be a resources.SizingRequirements")
+	}
+	primary, ok := inputs["primary"].(bool)
+	if !ok {
+		return nil, scerr.InvalidParameterError("primary", "must be a bool")
+	}
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
 	gw, userData, err := handler.service.CreateGateway(request)

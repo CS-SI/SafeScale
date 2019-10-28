@@ -131,7 +131,7 @@ var clusterListCommand = cli.Command{
 
 		var formatted []interface{}
 		for _, value := range list {
-			c := value.(api.Cluster)
+			c, _ := value.(api.Cluster)
 			converted, err := convertToMap(c)
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name)))
@@ -144,7 +144,7 @@ var clusterListCommand = cli.Command{
 
 // formatClusterConfig...
 func formatClusterConfig(value interface{}, detailed bool) map[string]interface{} {
-	core := value.(map[string]interface{})
+	core, _ := value.(map[string]interface{}) // FIXME Unnoticed panic
 
 	delete(core, "keypair")
 	if !detailed {
@@ -237,7 +237,10 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	}
 	if !properties.Lookup(Property.DefaultsV2) {
 		err = properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
-			defaultsV1 := v.(*clusterpropsv1.Defaults)
+			defaultsV1, ok := v.(*clusterpropsv1.Defaults)
+			if !ok {
+				return fmt.Errorf("invalid metadata")
+			}
 			result["defaults"] = map[string]interface{}{
 				"image":  defaultsV1.Image,
 				"master": defaultsV1.MasterSizing,
@@ -247,7 +250,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		})
 	} else {
 		err = properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
-			defaultsV2 := v.(*clusterpropsv2.Defaults)
+			defaultsV2, _ := v.(*clusterpropsv2.Defaults)
 			result["defaults"] = map[string]interface{}{
 				"image":   defaultsV2.Image,
 				"gateway": defaultsV2.GatewaySizing,
@@ -262,7 +265,10 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	}
 
 	err = properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
-		nodesV2 := v.(*clusterpropsv2.Nodes)
+		nodesV2, ok := v.(*clusterpropsv2.Nodes)
+		if !ok {
+			return fmt.Errorf("invalid metadata")
+		}
 		result["nodes"] = map[string]interface{}{
 			"masters": nodesV2.Masters,
 			"nodes":   nodesV2.PrivateNodes,
@@ -1207,7 +1213,11 @@ var clusterNodeListCommand = cli.Command{
 
 // formatNodeConfig...
 func formatNodeConfig(value interface{}) map[string]interface{} {
-	core := value.(map[string]interface{})
+	core, ok := value.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
 	return core
 }
 
