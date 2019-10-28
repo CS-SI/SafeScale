@@ -40,7 +40,7 @@ func init() {
 		remoteDesktopFeature(),
 		postgres4gatewayFeature(),
 		edgeproxy4networkFeature(),
-		keycloak4gatewayFeature(),
+		keycloak4platformFeature(),
 		kubernetesFeature(),
 		proxycacheServerFeature(),
 		proxycacheClientFeature(),

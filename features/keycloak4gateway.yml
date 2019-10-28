@@ -44,15 +44,16 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/keycloak4gateway
+                            mkdir -p ${SF_ETCDIR}/keycloak4gateway/build
 
-                            cat >${SF_ETCDIR}/keycloak4gateway/standalone-ha.xml.patch <<-'EOF'
-                            --- standalone-ha.xml	2019-07-10 15:45:31.706239257 +0200
-                            +++ standalone-ha.xml.new	2019-07-10 15:46:06.850275164 +0200
-                            @@ -52,6 +52,13 @@
-                                                <properties path="application-roles.properties" relative-to="jboss.server.config.dir"/>
-                                            </authorization>
-                                        </security-realm>
+                            # patch for v7.0.1
+                            cat >${SF_ETCDIR}/keycloak4gateway/build/standalone-ha.xml.patch <<-'EOF'
+                            --- standalone-ha.xml.orig      2019-10-24 20:24:36.500072568 +0000
+                            +++ standalone-ha.xml   2019-10-24 20:26:23.097061527 +0000
+                            @@ -56,6 +56,13 @@
+                                                 <properties path="application-roles.properties" relative-to="jboss.server.config.dir"/>
+                                             </authorization>
+                                         </security-realm>
                             +            <security-realm name="KeycloakRealm">
                             +                <server-identities>
                             +                    <ssl>
@@ -60,86 +61,175 @@ feature:
                             +                    </ssl>
                             +                </server-identities>
                             +            </security-realm>
-                                    </security-realms>
-                                    <audit-log>
-                                        <formatters>
-                            @@ -126,18 +133,29 @@
-                                                    <password>sa</password>
-                                                </security>
-                                            </datasource>
-                            -                <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true">
+                                     </security-realms>
+                                     <audit-log>
+                                         <formatters>
+                            @@ -134,17 +141,28 @@
+                                                 </security>
+                                             </datasource>
+                                             <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true" statistics-enabled="${wildfly.datasources.statistics-enabled:${wildfly.statistics-enabled:false}}">
                             -                    <connection-url>jdbc:h2:${jboss.server.data.dir}/keycloak;AUTO_SERVER=TRUE</connection-url>
                             -                    <driver>h2</driver>
-                            +                <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true" use-ccm="true">
                             +                    <connection-url>jdbc:postgresql://${env.DB_ADDR:postgres}:${env.DB_PORT:5432}/${env.DB_DATABASE:keycloak}${env.JDBC_PARAMS:}</connection-url>
                             +                    <driver>postgresql</driver>
                             +                    <pool>
                             +                        <flush-strategy>IdleConnections</flush-strategy>
                             +                    </pool>
-                                                <security>
+                                                 <security>
                             -                        <user-name>sa</user-name>
                             -                        <password>sa</password>
                             +                        <user-name>${env.DB_USER:keycloak}</user-name>
                             +                        <password>${env.DB_PASSWORD:password}</password>
-                                                </security>
+                                                 </security>
                             +                    <validation>
                             +                        <check-valid-connection-sql>SELECT 1</check-valid-connection-sql>
                             +                        <background-validation>true</background-validation>
                             +                        <background-validation-millis>60000</background-validation-millis>
                             +                    </validation>
-                                            </datasource>
-                                            <drivers>
-                                                <driver name="h2" module="com.h2database.h2">
-                                                    <xa-datasource-class>org.h2.jdbcx.JdbcDataSource</xa-datasource-class>
-                                                </driver>
+                                             </datasource>
+                                             <drivers>
+                                                 <driver name="h2" module="com.h2database.h2">
+                                                     <xa-datasource-class>org.h2.jdbcx.JdbcDataSource</xa-datasource-class>
+                                                 </driver>
                             +                    <driver name="postgresql" module="org.postgresql.jdbc">
                             +                        <xa-datasource-class>org.postgresql.xa.PGXADataSource</xa-datasource-class>
                             +                    </driver>
-                                            </drivers>
-                                        </datasources>
-                                    </subsystem>
-                            @@ -590,11 +608,11 @@
-                                        <buffer-cache name="default"/>
-                                        <server name="default-server">
-                                            <ajp-listener name="ajp" socket-binding="ajp"/>
-                            -                <http-listener name="default" socket-binding="http" redirect-socket="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" enable-http2="true"/>
+                                             </drivers>
+                                         </datasources>
+                                     </subsystem>
+                            @@ -609,10 +627,10 @@
+                                         <server name="default-server">
+                                             <ajp-listener name="ajp" socket-binding="ajp"/>
+                                             <http-listener name="default" socket-binding="http" redirect-socket="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" enable-http2="true"/>
                             -                <https-listener name="https" socket-binding="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" security-realm="ApplicationRealm" enable-http2="true"/>
-                            +                <http-listener name="default" socket-binding="http" redirect-socket="proxy-https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" enable-http2="true"/>
                             +                <https-listener name="https" socket-binding="https" proxy-address-forwarding="${env.PROXY_ADDRESS_FORWARDING:false}" security-realm="KeycloakRealm" enable-http2="true"/>
-                                            <host name="default-host" alias="localhost">
-                                                <location name="/" handler="welcome-content"/>
+                                             <host name="default-host" alias="localhost">
+                                                 <location name="/" handler="welcome-content"/>
                             -                    <http-invoker security-realm="ApplicationRealm"/>
                             +                    <http-invoker security-realm="KeycloakRealm"/>
-                                            </host>
-                                        </server>
-                                        <servlet-container name="default">
-                            @@ -629,8 +647,9 @@
-                                    <socket-binding name="modcluster" multicast-address="${jboss.modcluster.multicast.address:224.0.1.105}" multicast-port="23364"/>
-                                    <socket-binding name="txn-recovery-environment" port="4712"/>
-                                    <socket-binding name="txn-status-manager" port="4713"/>
+                                             </host>
+                                         </server>
+                                         <servlet-container name="default">
+                            @@ -635,6 +653,9 @@
+                                     <interface name="private">
+                                         <inet-address value="${jboss.bind.address.private:127.0.0.1}"/>
+                                     </interface>
+                            +        <interface name="eth0">
+                            +            <nic name="eth0"/>
+                            +        </interface>
+                                 </interfaces>
+                                 <socket-binding-group name="standard-sockets" default-interface="public" port-offset="${jboss.socket.binding.port-offset:0}">
+                                     <socket-binding name="management-http" interface="management" port="${jboss.management.http.port:9990}"/>
+                            @@ -643,15 +664,16 @@
+                                     <socket-binding name="http" port="${jboss.http.port:8080}"/>
+                                     <socket-binding name="https" port="${jboss.https.port:8443}"/>
+                                     <socket-binding name="jgroups-mping" interface="private" multicast-address="${jboss.default.multicast.address:230.0.0.4}" multicast-port="45700"/>
+                            -        <socket-binding name="jgroups-tcp" interface="private" port="7600"/>
+                            -        <socket-binding name="jgroups-tcp-fd" interface="private" port="57600"/>
+                            +        <socket-binding name="jgroups-tcp" interface="eth0" port="7600"/>
+                            +        <socket-binding name="jgroups-tcp-fd" interface="eth0" port="57600"/>
+                                     <socket-binding name="jgroups-udp" interface="private" port="55200" multicast-address="${jboss.default.multicast.address:230.0.0.4}" multicast-port="45688"/>
+                                     <socket-binding name="jgroups-udp-fd" interface="private" port="54200"/>
+                                     <socket-binding name="modcluster" multicast-address="${jboss.modcluster.multicast.address:224.0.1.105}" multicast-port="23364"/>
+                                     <socket-binding name="txn-recovery-environment" port="4712"/>
+                                     <socket-binding name="txn-status-manager" port="4713"/>
                             +        <socket-binding name="proxy-https" port="443"/>
-                                    <outbound-socket-binding name="mail-smtp">
-                                        <remote-destination host="localhost" port="25"/>
-                                    </outbound-socket-binding>
-                                </socket-binding-group>
+                                     <outbound-socket-binding name="mail-smtp">
+                                         <remote-destination host="localhost" port="25"/>
+                                     </outbound-socket-binding>
+                                 </socket-binding-group>
                             -</server>
-                            \ Pas de fin de ligne à la fin du fichier
+                            \ No newline at end of file
                             +</server>
                             EOF
+                            sfExit
 
                     build:
                         timeout: 10
                         targets:
                             gateways: all
                         run: |
-                            cat >${SF_ETCDIR}/keycloak4gateway/my-docker-entrypoint.sh <<-EOF
+                            cat >${SF_ETCDIR}/keycloak4gateway/build/TCP_PING.cli <<-'EOF'
+                            embed-server --server-config=standalone-ha.xml --std-out=echo
+                            batch
+
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=sessions:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=authenticationSessions:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=offlineSessions:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=loginFailures:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+
+                            /subsystem=jgroups/stack=udp:remove()
+
+                            /subsystem=jgroups/stack=tcp/protocol=MPING:remove()
+                            /subsystem=jgroups/stack=tcp/protocol=$keycloak_jgroups_discovery_protocol:add(add-index=0, properties=$keycloak_jgroups_discovery_protocol_properties)
+
+                            /subsystem=jgroups/channel=ee:write-attribute(name=stack, value="tcp")
+
+                            /subsystem=jgroups/stack=tcp/transport=TCP/property=external_addr/:add(value=${env.JGROUPS_DISCOVERY_EXTERNAL_IP:127.0.0.1})
+
+                            run-batch
+                            stop-embedded-server
+                            EOF
+
+                            cat >${SF_ETCDIR}/keycloak4gateway/build/JDBC_PING.cli <<-'EOF'
+                            embed-server --server-config=standalone-ha.xml --std-out=echo
+
+                            batch
+
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=sessions:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=authenticationSessions:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=offlineSessions:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+                            /subsystem=infinispan/cache-container=keycloak/distributed-cache=loginFailures:write-attribute(name=owners, value=${env.CACHE_OWNERS:2})
+
+                            /subsystem=jgroups/stack=tcp:remove()
+                            /subsystem=jgroups/stack=tcp:add()
+                            /subsystem=jgroups/stack=tcp/transport=TCP:add(socket-binding="jgroups-tcp")
+                            /subsystem=jgroups/stack=tcp/protocol=JDBC_PING:add()
+                            /subsystem=jgroups/stack=tcp/protocol=JDBC_PING/property=datasource_jndi_name:add(value=java:jboss/datasources/KeycloakDS)
+
+                            /subsystem=jgroups/stack=tcp/protocol=JDBC_PING/property=initialize_sql:add(value="CREATE TABLE IF NOT EXISTS JGROUPSPING ( own_addr varchar(200) NOT NULL, cluster_name varchar(200) NOT NULL, ping_data bytea DEFAULT NULL, added timestamp DEFAULT NOW(), PRIMARY KEY (own_addr, cluster_name))")
+
+                            /subsystem=jgroups/stack=tcp/protocol=MERGE3:add()
+                            /subsystem=jgroups/stack=tcp/protocol=FD_SOCK:add(socket-binding="jgroups-tcp-fd")
+                            /subsystem=jgroups/stack=tcp/protocol=FD:add()
+                            /subsystem=jgroups/stack=tcp/protocol=VERIFY_SUSPECT:add()
+                            /subsystem=jgroups/stack=tcp/protocol=pbcast.NAKACK2:add()
+                            /subsystem=jgroups/stack=tcp/protocol=UNICAST3:add()
+                            /subsystem=jgroups/stack=tcp/protocol=pbcast.STABLE:add()
+                            /subsystem=jgroups/stack=tcp/protocol=pbcast.GMS:add()
+                            /subsystem=jgroups/stack=tcp/protocol=pbcast.GMS/property=max_join_attempts:add(value=5)
+                            /subsystem=jgroups/stack=tcp/protocol=MFC:add()
+                            /subsystem=jgroups/stack=tcp/protocol=FRAG3:add()
+
+                            /subsystem=jgroups/stack=udp:remove()
+                            /subsystem=jgroups/channel=ee:write-attribute(name=stack, value=tcp)
+                            /socket-binding-group=standard-sockets/socket-binding=jgroups-mping:remove()
+
+                            run-batch
+
+                            try
+                                :resolve-expression(expression=${env.JGROUPS_DISCOVERY_EXTERNAL_IP})
+                                /subsystem=jgroups/stack=tcp/transport=TCP/property=external_addr/:add(value=${env.JGROUPS_DISCOVERY_EXTERNAL_IP})
+                            catch
+                                echo "JGROUPS_DISCOVERY_EXTERNAL_IP maybe not set."
+                            end-try
+
+                            stop-embedded-server
+                            EOF
+
+                            cat >${SF_ETCDIR}/keycloak4gateway/build/my-docker-entrypoint.sh <<-'EOF'
                             #!/bin/bash
 
+                            # Keycloak settings
                             export CACHE_OWNERS_COUNT=2
                             export CACHE_OWNERS_AUTH_SESSIONS_COUNT=2
+                            export JGROUPS_DISCOVERY_PROTOCOL=JDBC_PING
+                            export JGROUPS_DISCOVERY_EXTERNAL_IP=$(hostname -s)
+                            export JGROUPS_DISCOVERY_PROPERTIES=datasource_jndi_name=java:jboss/datasources/KeycloakDS
+                            export PROXY_ADDRESS_FORWARDING=true
 
                             export KEYCLOAK_USER=admin
-                            export KEYCLOAK_PASSWORD=\$(cat /run/secrets/password.admin)
+                            export KEYCLOAK_PASSWORD=$(cat /run/secrets/password.admin)
                             export DB_ADDR={{ .DefaultRouteIP }}
                             export DB_PORT=63008
                             export DB_VENDOR=postgres
@@ -147,48 +237,51 @@ feature:
                             #FIXME: Using postgres user because for now keycloak4gateway doesn't have enough rights to do the job
                             # export DB_USER=keycloak4gateway
                             export DB_USER=postgres
-                            export DB_PASSWORD=\$(cat /run/secrets/password.postgres)
-                            export ADMIN_DB_PASSWORD=\$(cat /run/secrets/password.postgres)
+                            export DB_PASSWORD=$(cat /run/secrets/password.postgres)
 
-                            cat >/root/.pgpass <<-EOF2
-                            *:5432:*:postgres:\$ADMIN_DB_PASSWORD
-                            *:5432:keycloak4gateway:keycloak4gateway:\$DB_PASSWORD
-                            EOF2
-                            chmod 0600 /root/.pgpass
+                            export ADMIN_DB_PASSWORD=$(cat /run/secrets/password.postgres)
 
                             # Generates SSL certificates
-                            IP=\$(ifconfig eth0 | grep inet | tr -s ' ' '#' | cut -d\# -f3 | head -n 1)
-                                openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN=\$IP" \
+                            IP=$(ifconfig eth0 | grep inet | tr -s ' ' '#' | cut -d\# -f3 | head -n 1)
+                                openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN=$IP" \
                              && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
                              && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale \
                              && cp ./safescale.jks /opt/jboss/keycloak/standalone/configuration/ \
                              && chown jboss:jboss /opt/jboss/keycloak/standalone/configuration/safescale.jks
 
-                            exec /opt/jboss/tools/docker-entrypoint.sh -Djboss.tx.node.id={{ .Hostname }} "\$@"
+                            exec /opt/jboss/tools/docker-entrypoint.sh -Djboss.tx.node.id={{ .Hostname }} $@
                             EOF
 
-                            cat >${SF_ETCDIR}/keycloak4gateway/Dockerfile <<-'EOF'
-                            FROM jboss/keycloak:4.8.3.Final
+                            cat >${SF_ETCDIR}/keycloak4gateway/build/Dockerfile <<-'EOF'
+                            # FROM jboss/keycloak:4.8.3.Final
+                            FROM jboss/keycloak:7.0.1
 
                             WORKDIR /opt/jboss
                             USER root
 
                             # need psql in my-docker-entrypoint.sh and patch
-                            RUN yum install -q -y postgresql patch net-tools
+                            #RUN yum install -q -y postgresql patch net-tools
+                            RUN microdnf update -y \
+                             && microdnf install -y patch net-tools \
+                             && microdnf clean all
 
                             # Updates configuration
                             COPY standalone-ha.xml.patch keycloak/standalone/configuration/
                             RUN cd keycloak/standalone/configuration/ \
-                             && patch -l <./standalone-ha.xml.patch \
-                             && chown jboss:jboss standalone-ha.xml
+                             && patch -l <./standalone-ha.xml.patch #\
+                            #  && chown jboss:jboss standalone-ha.xml
+
+                            ADD ./TCP_PING.cli /opt/jboss/tools/cli/jgroups/discovery/
+                            ADD ./JDBC_PING.cli /opt/jboss/tools/cli/jgroups/discovery/
 
                             COPY my-docker-entrypoint.sh /
                             RUN chmod 0550 /my-docker-entrypoint.sh
+
                             ENTRYPOINT [ "/my-docker-entrypoint.sh" ]
-                            CMD ["-b", "0.0.0.0"]
+                            # CMD ["-b", "0.0.0.0"]
                             EOF
 
-                            docker build --network host -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway || sfFail 192
+                            docker build --network host -t keycloak4gateway:latest ${SF_ETCDIR}/keycloak4gateway/build || sfFail 192
                             sfExit
 
                     secrets:
@@ -220,12 +313,11 @@ feature:
                             services:
                                 server:
                                     image: keycloak4gateway:latest
-                                    environment:
-                                        - PROXY_ADDRESS_FORWARDING=true
-                                        - JGROUPS_DISCOVERY_PROTOCOL=JDBC_PING
-                                        - JGROUPS_DISCOVERY_PROPERTIES=datasource_jndi_name=java:jboss/datasources/KeycloakDS
-                                        # - KEYCLOAK_LOGLEVEL=DEBUG
-                                        # - ROOT_LOGLEVEL=DEBUG
+                                    # environment:
+                                    #     - KEYCLOAK_LOGLEVEL=DEBUG
+                                    #     - ROOT_LOGLEVEL=DEBUG
+                                    networks:
+                                        - net
                                     ports:
                                         - published: 63009
                                           target: 8443
@@ -255,6 +347,10 @@ feature:
                                 password.admin:
                                     external: true
                                     name: safescale.keycloak.password.admin
+
+                            networks:
+                                net:
+                                    driver: overlay
                             EOF
 
                     start:
@@ -309,7 +405,14 @@ feature:
               content: |
                   {
                       "target": "{{.HostIP}}:63009",
-                      "weight": 100
+                      "weight": 100,
+                      "algorithm": "consistent-hashing",
+                      "hash_on": "ip",
+                      "healthchecks": {
+                          "passive": {
+                              "type": "https"
+                          }
+                      }
                   }
 
             - name: keycloak4gateway_svc
