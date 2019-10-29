@@ -267,7 +267,7 @@ feature:
                                         # endpoint_mode: dnsrr
                                         update_config:
                                             parallelism: 1
-                                            exiture_action: rollback
+                                            failure_action: rollback
                                             delay: 30s
                                         restart_policy:
                                             condition: any
@@ -304,7 +304,7 @@ feature:
                                         # endpoint_mode: dnsrr
                                         update_config:
                                             parallelism: 1
-                                            exiture_action: rollback
+                                            failure_action: rollback
                                             delay: 30s
                                         restart_policy:
                                             condition: any
