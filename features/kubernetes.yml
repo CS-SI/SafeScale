@@ -498,10 +498,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 223 "exiture purging kubernetes"
+                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 223 "failure purging kubernetes"
                                     ;;
                                 redhat|centos)
-                                    yum remove -y kubectl kubeadm kubelet || sfFail 224 "exiture purging kubernetes"
+                                    yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
                                     ;;
                             esac
                             sfFirewallReload || sfFail 204 "Firewall problem"
