@@ -323,7 +323,7 @@ feature:
                             fi
                             echo done
 
-                            # TODO: find a way to mitigate restarts from exiture
+                            # TODO: find a way to mitigate restarts from failure
                             # - select conninfo,type,active from repmgr.nodes then consolidate results
                             # - If current instance believes it's a master, and there is another master from the results with more active=t,
                             #   stop the current instance and follow the other master. pg_rewind needed ?
