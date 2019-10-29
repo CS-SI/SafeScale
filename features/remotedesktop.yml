@@ -519,7 +519,7 @@ feature:
                             </service>
                             EOF
 
-                            cat >/usr/lib/firewalld/zones/safescale_remotedesktop.xml <<-'EOF'
+                            cat >/usr/lib/firewalld/zones/sf_remotedesktop.xml <<-'EOF'
                             <?xml version="1.0" encoding="utf-8"?>
                             <zone target="DROP">
                                 <short>Drop any connection to SafeScale remote desktop</short>
@@ -528,11 +528,11 @@ feature:
                             sfFirewallReload || sfFail 204 "Firewall problem"
 
                             # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
-                            sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem"
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 204 "Firewall problem"
                             {{ if .SecondaryGatewayIP }}
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 204 "Firewall problem"
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 204 "Firewall problem"
                             {{ end }}
                             sfFirewallReload || sfFail 204 "Firewall problem"
                             # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.DefaultRouteIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
@@ -554,6 +554,7 @@ feature:
                     image:
                         targets:
                             hosts: yes
+                            masters: all
                         run: |
                             docker rm -f remotedesktop
                             docker image rm remotedesktop:latest
