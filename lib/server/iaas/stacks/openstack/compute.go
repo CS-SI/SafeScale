@@ -1128,7 +1128,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 		return HostState.ERROR, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {

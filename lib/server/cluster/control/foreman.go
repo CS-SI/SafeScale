@@ -1468,7 +1468,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), false).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), concurrency.IsLogActive("Trace.Controller")).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -178,7 +178,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 // GetService returns the service from the provider
 func (c *Controller) GetService(task concurrency.Task) (srv iaas.Service) {
 	var err error
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", concurrency.IsLogActive("Trace.Controller")).TraceMessage(""), &err)()
 
 	if c == nil {
 		err = scerr.InvalidInstanceError()
@@ -210,7 +210,7 @@ func (c *Controller) GetIdentity(task concurrency.Task) (id identity.Identity) {
 	}
 
 	var err error
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", concurrency.IsLogActive("Trace.Controller")).TraceMessage(""), &err)()
 
 	if c == nil {
 		err = scerr.InvalidInstanceError()
@@ -242,7 +242,7 @@ func (c *Controller) GetProperties(task concurrency.Task) (props *serialize.JSON
 	}
 
 	var err error
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", concurrency.IsLogActive("Trace.Controller")).TraceMessage(""), &err)()
 
 	if c == nil {
 		err = scerr.InvalidInstanceError()
@@ -277,7 +277,7 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.N
 		task = concurrency.RootTask()
 	}
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", concurrency.IsLogActive("Trace.Controller")).TraceMessage(""), &err)()
 
 	if c == nil {
 		return config, scerr.InvalidInstanceError()
@@ -320,7 +320,7 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
 		task = concurrency.RootTask()
 	}
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, "", concurrency.IsLogActive("Trace.Controller")).TraceMessage(""), &err)()
 
 	var count uint
 
