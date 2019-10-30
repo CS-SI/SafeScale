@@ -160,7 +160,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 	return empty, nil
 }
 
-//StorageTenants strcture handle tenants names and storages services for a group of storage tenants
+//StorageTenants structure handle tenants names and storages services for a group of storage tenants
 type StorageTenants struct {
 	names           []string
 	StorageServices *iaas.StorageServices
