@@ -1072,6 +1072,10 @@ func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
 					break
 				}
 			}
+
+			if toSkip >= 6 { // Unlikely to reach this point
+				break
+			}
 		}
 	}
 
