@@ -1058,11 +1058,19 @@ func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
 		}
 	}
 
-	// if 'in' is empty, recover function name from caller
 	if len(in) == 0 {
-		if pc, _, _, ok := runtime.Caller(2); ok {
-			if f := runtime.FuncForPC(pc); f != nil {
-				in = filepath.Base(f.Name())
+		// if 'in' is empty, recover function name from caller
+		toSkip := 0
+		for {
+			if pc, _, line, ok := runtime.Caller(toSkip); ok {
+				if f := runtime.FuncForPC(pc); f != nil {
+					if strings.Contains(f.Name(), "scerr.OnExitLogError") {
+						toSkip++
+						continue
+					}
+					in = filepath.Base(f.Name() + fmt.Sprintf(",%d", line))
+					break
+				}
 			}
 		}
 	}
