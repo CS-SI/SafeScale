@@ -57,6 +57,11 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 		name = strings.Replace(name, ".", "-", -1)
 	}
 
+	// FIXME AWS, Remove specific driver code
+	if driver == "aws" {
+		name = strings.Replace(name, ".", "-", -1)
+	}
+
 	name = strings.ToLower(name)
 
 	return name, nil
