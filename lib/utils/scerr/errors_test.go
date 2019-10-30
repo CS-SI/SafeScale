@@ -213,7 +213,7 @@ func getNotFoundErrorWithLog() (err error) {
 	return NotFoundError("not there !!!")
 }
 
-func TestShowMe(t *testing.T) {
+func TestExitLogError(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -232,6 +232,93 @@ func TestShowMe(t *testing.T) {
 	tk := string(out)
 
 	if !strings.Contains(tk, "getNotFoundErrorWithLog") {
+		t.Fail()
+	}
+}
+
+func callToSomethingThatReturnsErr() error {
+	return getNotFoundErrorWithLog()
+}
+
+func callToSomethingThatReturnsErrButLogsIt() (err error) {
+	// FIXME This does NOT report the same
+	defer OnExitLogErrorWithLevel("", &err, logrus.WarnLevel)()
+	err = getNotFoundError()
+	return err
+}
+
+func callToSomethingThatReturnsErrButLogItWithWarning() (err error) {
+	// FIXME This does NOT report the same
+	defer OnExitLogError("", &err)()
+	err = getNotFoundError()
+	return err
+}
+
+func TestShowMeTheMoney(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	logrus.SetOutput(w)
+
+	err := callToSomethingThatReturnsErr()
+	if err == nil {
+		t.Fail()
+	}
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	tk := string(out)
+
+	if !strings.Contains(tk, "getNotFoundErrorWithLog") {
+		t.Fail()
+	}
+}
+
+func TestShowMeTheMoneyAgain(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	logrus.SetOutput(w)
+
+	err := callToSomethingThatReturnsErrButLogsIt()
+	if err == nil {
+		t.Fail()
+	}
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	tk := string(out)
+
+	if !strings.Contains(tk, "callToSomethingThatReturnsErrButLogsIt") {
+		t.Fail()
+	}
+}
+
+func TestShowMeTheMoneyAgainAlt(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	logrus.SetOutput(w)
+
+	err := callToSomethingThatReturnsErrButLogItWithWarning()
+	if err == nil {
+		t.Fail()
+	}
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	tk := string(out)
+
+	if !strings.Contains(tk, "callToSomethingThatReturnsErrButLogItWithWarning") {
 		t.Fail()
 	}
 }
