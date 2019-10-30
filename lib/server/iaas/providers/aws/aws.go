@@ -84,12 +84,27 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	// FIXME Use the network to change default "safescale" network
 	// network, _ := params["network"].(map[string]interface{})
 
-	region, _ := computeCfg["Region"].(string)
-	zone, _ := computeCfg["Zone"].(string)
+	region, ok := computeCfg["Region"].(string)
+	if !ok {
+		return &provider{}, fmt.Errorf("no compute region found in tenants.toml")
+	}
+	zone, ok := computeCfg["Zone"].(string)
+	if !ok {
+		return &provider{}, fmt.Errorf("no compute zone found in tenants.toml")
+	}
 
-	s3Endpoint, _ := computeCfg["S3"].(string)
-	ec2Endpoint, _ := computeCfg["EC2"].(string)
-	ssmEndpoint, _ := computeCfg["SSM"].(string)
+	s3Endpoint, ok := computeCfg["S3"].(string)
+	if !ok {
+		return &provider{}, fmt.Errorf("no s3 endpoint found in tenants.toml")
+	}
+	ec2Endpoint, ok := computeCfg["EC2"].(string)
+	if !ok {
+		return &provider{}, fmt.Errorf("no ec2 endpoint found in tenants.toml")
+	}
+	ssmEndpoint, ok := computeCfg["SSM"].(string)
+	if !ok {
+		return &provider{}, fmt.Errorf("no ssm endpoint found in tenants.toml")
+	}
 
 	awsConf := stacks.AWSConfiguration{
 		S3Endpoint:  s3Endpoint,
@@ -104,8 +119,21 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		username, _ = identityCfg["User"].(string)
 	}
 	password, _ := identityCfg["Password"].(string)
-	secretKey, _ := identityCfg["SecretKey"].(string)
-	identityEndpoint, _ := identityCfg["auth_uri"].(string)
+
+	accessKeyID, ok := identityCfg["AccessKeyID"].(string)
+	if !ok || accessKeyID == "" {
+		return &provider{}, fmt.Errorf("no secret key id provided in tenants.toml")
+	}
+
+	secretAccessKey, ok := identityCfg["SecretAccessKey"].(string)
+	if !ok || secretAccessKey == "" {
+		return &provider{}, fmt.Errorf("no secret access key provided in tenants.toml")
+	}
+
+	identityEndpoint, ok := identityCfg["auth_uri"].(string)
+	if !ok || identityEndpoint == "" {
+		return &provider{}, fmt.Errorf("no identity endpoint provided in tenants.toml")
+	}
 
 	projectName, _ := computeCfg["ProjectName"].(string)
 	projectID, _ := computeCfg["ProjectID"].(string)
@@ -121,7 +149,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
 		Password:         password,
-		SecretAccessKey:  secretKey,
+		AccessKeyID:      accessKeyID,
+		SecretAccessKey:  secretAccessKey,
 		Region:           region,
 		ProjectName:      projectName,
 		ProjectID:        projectID,

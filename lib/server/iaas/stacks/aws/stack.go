@@ -69,32 +69,32 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 
 	// FIXME Validate region against endpoints.UsWest2RegionID // UsWest2RegionID      = "us-west-2"      // US West (Oregon).
 
-	userId := auth.Username
-	secretKey := auth.SecretAccessKey
+	accessKeyID := auth.AccessKeyID
+	secretAccessKey := auth.SecretAccessKey
 
 	s := session.Must(session.NewSession(&aws.Config{
-		Credentials:      credentials.NewStaticCredentials(userId, secretKey, ""),
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
 		S3ForcePathStyle: aws.Bool(true),
 		Region:           aws.String(localCfg.Region),
 		Endpoint:         aws.String(localCfg.S3Endpoint),
 	}))
 
 	sec2 := session.Must(session.NewSession(&aws.Config{
-		Credentials:      credentials.NewStaticCredentials(userId, secretKey, ""),
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
 		S3ForcePathStyle: aws.Bool(true),
 		Region:           aws.String(localCfg.Region),
 		Endpoint:         aws.String(localCfg.Ec2Endpoint),
 	}))
 
 	sssm := session.Must(session.NewSession(&aws.Config{
-		Credentials:      credentials.NewStaticCredentials(userId, secretKey, ""),
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
 		S3ForcePathStyle: aws.Bool(true),
 		Region:           aws.String(localCfg.Region),
 		Endpoint:         aws.String(localCfg.SsmEndpoint),
 	}))
 
 	spricing := session.Must(session.NewSession(&aws.Config{
-		Credentials:      credentials.NewStaticCredentials(userId, secretKey, ""),
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
 		S3ForcePathStyle: aws.Bool(true),
 		Region:           aws.String(endpoints.UsEast1RegionID),
 	}))
