@@ -718,7 +718,7 @@ func score(d int, rsize int) float64 {
 	return float64(rsize-1) / float64(d)
 }
 
-// SimilarityScore computes a similariy score between 2 strings
+// SimilarityScore computes a similarity score between 2 strings
 func SimilarityScore(ref string, s string) float64 {
 	size := len(s)
 	rsize := len(ref)
