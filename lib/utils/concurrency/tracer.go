@@ -18,6 +18,7 @@ package concurrency
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -38,6 +39,13 @@ type Tracer struct {
 	inDone       bool
 	outDone      bool
 	sw           temporal.Stopwatch
+}
+
+func IsLogActive(key string) bool {
+	if logs := os.Getenv("SAFESCALE_OPTIONAL_LOGS"); logs != "" {
+		return strings.Contains(logs, key)
+	}
+	return false
 }
 
 // NewTracer creates a new Tracer instance
