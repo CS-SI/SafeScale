@@ -66,7 +66,7 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 		return scerr.InvalidParameterError("apply", "cannot be nil")
 	}
 
-	defer scerr.OnExitTraceError(concurrency.NewTracer(nil, "", false).TraceMessage(""), &err)()
+	defer scerr.OnExitTraceError(concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Json")).TraceMessage(""), &err)()
 	// To capture panics that may occur
 	defer scerr.OnPanic(&err)()
 

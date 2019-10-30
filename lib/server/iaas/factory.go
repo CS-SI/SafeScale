@@ -81,7 +81,9 @@ func UseStorages(tenantNames []string) (*StorageServices, error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName string) (Service, error) {
+func UseService(tenantName string) (newService Service, err error) {
+	defer scerr.OnExitLogError("", &err)()
+
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -186,7 +188,7 @@ func UseService(tenantName string) (Service, error) {
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			// FIXME This requires tunning too
+			// FIXME This requires tuning too
 			metadataLocationConfig, err := initMetadataLocationConfig(tenant)
 			if err != nil {
 				return nil, err

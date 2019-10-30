@@ -64,7 +64,7 @@ func (m *Metadata) Written() bool {
 // Carry links metadata with cluster struct
 func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 	var err error
-	tracer := concurrency.NewTracer(task, "", false)
+	tracer := concurrency.NewTracer(task, "", concurrency.IsLogActive("Trace.Controller"))
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {
@@ -183,7 +183,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 
 // Get returns the content of the metadata
 func (m *Metadata) Get() (_ *Controller, err error) {
-	tracer := concurrency.NewTracer(nil, "", false)
+	tracer := concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Controller"))
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {
