@@ -311,6 +311,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 }
 
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+	defer scerr.OnPanic(&err)()
+
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName

@@ -93,6 +93,7 @@ func (handler *ShareHandler) Create(
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	// Check if a share already exists with the same name
 	server, _, _, err := handler.Inspect(ctx, shareName)
@@ -259,6 +260,7 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	// Retrieve info about the share
 	server, share, _, err := handler.ForceInspect(ctx, name)
@@ -340,6 +342,7 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	shares := map[string]map[string]*propsv1.HostShare{}
 
@@ -386,7 +389,7 @@ func (handler *ShareHandler) Mount(
 	shareName, hostName, path string,
 	withCache bool,
 ) (mount *propsv1.HostRemoteMount, err error) {
-
+	defer scerr.OnPanic(&err)()
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -641,6 +644,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	server, share, _, err := handler.ForceInspect(ctx, shareName)
 	if err != nil {
@@ -778,7 +782,6 @@ func (handler *ShareHandler) Inspect(
 	ctx context.Context,
 	shareName string,
 ) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
-
 	if handler == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
@@ -790,6 +793,7 @@ func (handler *ShareHandler) Inspect(
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	hostName, err := metadata.LoadShare(handler.service, shareName)
 	if err != nil {

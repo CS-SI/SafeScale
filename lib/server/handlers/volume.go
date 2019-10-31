@@ -107,6 +107,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
@@ -190,6 +191,7 @@ func (handler *VolumeHandler) Inspect(
 	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
@@ -345,6 +347,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
 	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
@@ -692,6 +695,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	// Load volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)

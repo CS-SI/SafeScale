@@ -326,6 +326,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer scerr.OnPanic(&err)()
 
 	userData = userdata.NewContent()
 

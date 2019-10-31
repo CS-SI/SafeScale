@@ -228,6 +228,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 
+	defer scerr.OnPanic(&err)()
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName
@@ -271,7 +272,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		err = defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 			hostNetworkV1 := v.(*propsv1.HostNetwork)
 			defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 			defaultGatewayID = defaultGateway.ID
@@ -644,6 +645,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+
+	defer scerr.OnPanic(&err)()
 
 	switch hostParam := hostParam.(type) {
 	case string:

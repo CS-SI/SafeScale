@@ -65,6 +65,7 @@ func NewSSHHandler(svc iaas.Service) *SSHHandler {
 
 // GetConfig creates SSHConfig to connect to an host
 func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (sshConfig *system.SSHConfig, err error) {
+	defer scerr.OnPanic(&err)()
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
