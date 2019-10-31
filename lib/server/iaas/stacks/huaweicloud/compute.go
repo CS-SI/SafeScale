@@ -266,6 +266,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	userData = userdata.NewContent()
 
@@ -289,7 +290,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		err = defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 			hostNetworkV1 := v.(*propsv1.HostNetwork)
 			defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 			defaultGatewayID = defaultGateway.ID
@@ -677,7 +678,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 }
 
 // complementHost complements Host data with content of server parameter
-func (s *Stack) complementHost(host *resources.Host, server *servers.Server) error {
+func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (err error) {
+	defer scerr.OnPanic(&err)()
+
 	networks, addresses, ipv4, ipv6, err := s.collectAddresses(host)
 	if err != nil {
 		return err

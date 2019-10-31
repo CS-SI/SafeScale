@@ -212,6 +212,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -298,6 +299,7 @@ func (handler *HostHandler) Create(
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -886,6 +888,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {

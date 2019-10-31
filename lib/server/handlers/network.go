@@ -530,6 +530,8 @@ func (handler *NetworkHandler) Create(
 }
 
 func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	defer scerr.OnPanic(&err)()
+
 	var (
 		inputs data.Map
 		ok     bool
@@ -537,6 +539,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	if inputs, ok = params.(data.Map); !ok {
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
+
 	// name := inputs["name"].(string)
 	request, ok := inputs["request"].(resources.GatewayRequest)
 	if !ok {
@@ -846,6 +849,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {

@@ -330,6 +330,7 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 	tracer := concurrency.NewTracer(nil, "("+host.Name+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	network, err := m.Get()
 	if err != nil {
@@ -355,6 +356,7 @@ func (m *Network) DetachHost(hostID string) (err error) {
 	tracer := concurrency.NewTracer(nil, "('"+hostID+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	network, err := m.Get()
 	if err != nil {
@@ -384,6 +386,7 @@ func (m *Network) ListHosts() (list []*resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	network, err := m.Get()
 	if err != nil {

@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/sirupsen/logrus"
 )
 
 // KeyPair represents a SSH key pair
@@ -189,8 +190,16 @@ func (h *Host) GetAccessIP() string {
 }
 
 // GetPublicIP computes public IP of the host
-func (h *Host) GetPublicIP() string {
+func (h *Host) GetPublicIP() (pubIp string) {
 	var ip string
+
+	defer func() {
+		if x := recover(); x != nil {
+			logrus.Warnf("runtime panic occurred: %+v", x)
+			pubIp = ""
+		}
+	}()
+
 	err := h.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(value interface{}) error {
 		hostNetworkV1 := value.(*propsv1.HostNetwork)
 		ip = hostNetworkV1.PublicIPv4
@@ -206,8 +215,16 @@ func (h *Host) GetPublicIP() string {
 }
 
 // GetPrivateIP ...
-func (h *Host) GetPrivateIP() string {
+func (h *Host) GetPrivateIP() (privateIp string) {
 	var ip string
+
+	defer func() {
+		if x := recover(); x != nil {
+			logrus.Warnf("runtime panic occurred: %+v", x)
+			privateIp = ""
+		}
+	}()
+
 	err := h.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if len(hostNetworkV1.IPv4Addresses) > 0 {

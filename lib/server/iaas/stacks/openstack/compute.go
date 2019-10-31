@@ -582,10 +582,12 @@ func (s *Stack) interpretAddresses(
 }
 
 // complementHost complements Host data with content of server parameter
-func (s *Stack) complementHost(host *resources.Host, server *servers.Server) error {
+func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (err error) {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
+
+	defer scerr.OnPanic(&err)()
 
 	networks, addresses, ipv4, ipv6, err := s.interpretAddresses(server.Addresses)
 	if err != nil {
@@ -774,6 +776,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer scerr.OnPanic(&err)()
 
 	userData = userdata.NewContent()
 

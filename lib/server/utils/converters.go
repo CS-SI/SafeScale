@@ -17,6 +17,7 @@
 package utils
 
 import (
+	"github.com/sirupsen/logrus"
 	"math"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -156,13 +157,20 @@ func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[st
 }
 
 // ToPBHost convert an host from api to protocolbuffer format
-func ToPBHost(in *resources.Host) *pb.Host {
+func ToPBHost(in *resources.Host) (pbHost *pb.Host) {
 	var (
 		hostNetworkV1 *propsv1.HostNetwork
 		hostSizingV1  *propsv1.HostSizing
 		hostVolumesV1 *propsv1.HostVolumes
 		volumes       []string
 	)
+
+	defer func() {
+		if x := recover(); x != nil {
+			logrus.Warnf("runtime panic occurred: %+v", x)
+			pbHost = nil
+		}
+	}()
 
 	err := in.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 = v.(*propsv1.HostNetwork)

@@ -642,7 +642,9 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.HostNet
 }
 
 // getHostFromDomain build a resources.Host struct representing a Domain
-func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (*resources.Host, error) {
+func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, err error) {
+	defer scerr.OnPanic(&err)()
+
 	id, err := domain.GetUUIDString()
 	if err != nil {
 		return nil, fmt.Errorf(fmt.Sprintf("failed to fetch id from domain : %s", err.Error()))
@@ -727,10 +729,12 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*resources.Host, *libvirt.D
 	return host, domain, nil
 }
 
-func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) error {
+func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (err error) {
 	if host == nil || newHost == nil {
 		return fmt.Errorf("both host and newHost have to be set")
 	}
+
+	defer scerr.OnPanic(&err)()
 
 	host.ID = newHost.ID
 	if host.Name == "" {
@@ -738,7 +742,7 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) er
 	}
 	host.LastState = newHost.LastState
 
-	err := host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		newHostNetworkV1 := propsv1.NewHostNetwork()
 		readlockErr := newHost.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 			newHostNetworkV1 = v.(*propsv1.HostNetwork)
@@ -806,6 +810,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+
+	defer scerr.OnPanic(&err)()
 
 	resourceName := request.ResourceName
 	hostName := request.HostName
