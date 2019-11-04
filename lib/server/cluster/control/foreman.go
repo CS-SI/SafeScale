@@ -75,7 +75,7 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (uint, uint, uint) // returns masterCount, pruvateNodeCount, publicNodeCount
+	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (uint, uint, uint) // returns masterCount, privateNodeCount, publicNodeCount
 	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) pb.HostDefinition  // sizing of Gateway(s)
 	DefaultMasterSizing         func(task concurrency.Task, b Foreman) pb.HostDefinition  // default sizing of master(s)
 	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition  // default sizing of node(s)
@@ -1374,7 +1374,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 		return nil
 	}
 
-	collected := []string{}
+	var collected []string
 	if stdout != "" {
 		errLines := strings.Split(stdout, "\n")
 		for _, errline := range errLines {
@@ -1721,7 +1721,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 		return nil, err
 	}
 
-	errors := []error{}
+	var errors []error
 
 	for i, hostID := range masters {
 		host, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
@@ -1860,10 +1860,10 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 		logrus.Debugf("[cluster %s] no nodes to create.", clusterName)
 		return nil, nil
 	}
-	logrus.Debugf("[cluster %s] creating %d node%s...", clusterName, count, utils.Plural(uint(count)))
+	logrus.Debugf("[cluster %s] creating %d node%s...", clusterName, count, utils.Plural(count))
 
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
-	var subtasks []concurrency.Task
+	var subTasks []concurrency.Task
 	for i := uint(1); i <= count; i++ {
 		subtask, err := t.StartInSubTask(b.taskCreateNode, data.Map{
 			"index":   i,
@@ -1875,11 +1875,11 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 		if err != nil {
 			return nil, err
 		}
-		subtasks = append(subtasks, subtask)
+		subTasks = append(subTasks, subtask)
 	}
 
 	var errs []string
-	for _, s := range subtasks {
+	for _, s := range subTasks {
 		_, state := s.Wait()
 		if state != nil {
 			errs = append(errs, state.Error())
@@ -1889,7 +1889,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 		return nil, fmt.Errorf(strings.Join(errs, "\n"))
 	}
 
-	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, utils.Plural(uint(count)))
+	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, utils.Plural(count))
 	return nil, nil
 }
 

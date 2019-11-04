@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 )
 
-// provider is the provider implementation of the Gcp provider
+// provider is the provider implementation of the Aws provider
 type provider struct {
 	*aws.Stack
 }
@@ -62,7 +62,7 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 	panic("implement me") // FIXME Technical debt
 }
 
-// New creates a new instance of gcp provider
+// New creates a new instance of aws provider
 func New() apiprovider.Provider {
 	return &provider{}
 }
