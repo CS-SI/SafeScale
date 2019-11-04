@@ -313,7 +313,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
-	// THos _lust not_ happen if err == nil
+	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if volume == nil {
 		return nil, scerr.Wrap(scerr.NotFoundError(fmt.Sprintf("volume '%s' not found", ref)), "cannot inspect volume").ToGRPCStatus()
 	}

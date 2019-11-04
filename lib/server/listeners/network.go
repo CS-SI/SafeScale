@@ -197,7 +197,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot inspect network").ToGRPCStatus()
 	}
-	// FIXME: this _must not_ happen if err == nil
+	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if network == nil {
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect network '%s': not found", ref))
 	}
