@@ -924,7 +924,7 @@ func decorateWithCallTrace(prefix, what, why string) string {
 
 	msg := prefix
 	if prefix == "" {
-		prefix = missingPrefixMessage
+		msg = missingPrefixMessage
 	}
 
 	if what != "" {
