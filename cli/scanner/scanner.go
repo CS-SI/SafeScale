@@ -278,17 +278,16 @@ func RunScanner(targetedTenant string) {
 func isTenantScannable(tenant map[string]interface{}) (isScannable bool, err error) {
 	tenantCompute, found := tenant["compute"].(map[string]interface{})
 	if !found {
-		return false, nil
+		return false, fmt.Errorf("malformed tenant structure")
 	}
 	isScannable, found = tenantCompute["Scannable"].(bool)
 	if !found {
-		return false, nil
+		return false, fmt.Errorf("malformed tenant structure")
 	}
 	return isScannable, nil
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
-	// FIXME Add trace
 	if group != nil {
 		defer group.Done()
 	}
