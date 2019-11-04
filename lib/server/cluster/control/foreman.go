@@ -1155,6 +1155,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 	return nil
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
 func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, selectedMasterID string) error {
 	if selectedMasterID == "" {
 		var err error
@@ -2234,7 +2235,7 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 			return inErr
 		}
 
-		inErr = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+		_ = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 			_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
 			return nil
 		})

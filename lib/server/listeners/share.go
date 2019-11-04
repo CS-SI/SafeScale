@@ -34,6 +34,8 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
+// FIXME Technical debt Input verification, ctx cannot be nil
+
 // ShareHandler ...
 var ShareHandler = handlers.NewShareHandler
 

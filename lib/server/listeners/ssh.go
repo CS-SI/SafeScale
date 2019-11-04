@@ -32,6 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
+// FIXME Technical debt Input verification, ctx cannot be nil
+
 // SSHHandler exists to ease integration tests
 var SSHHandler = handlers.NewSSHHandler
 

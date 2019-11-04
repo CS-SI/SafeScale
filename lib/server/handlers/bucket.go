@@ -40,6 +40,8 @@ type BucketAPI interface {
 	Unmount(context.Context, string, string) error
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // BucketHandler bucket service
 type BucketHandler struct {
 	service iaas.Service
@@ -51,7 +53,7 @@ func NewBucketHandler(svc iaas.Service) BucketAPI {
 }
 
 // List retrieves all available buckets
-func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error) {
+func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error) { // FIXME Unused ctx
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -65,7 +67,7 @@ func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error)
 }
 
 // Create a bucket
-func (handler *BucketHandler) Create(ctx context.Context, name string) (err error) {
+func (handler *BucketHandler) Create(ctx context.Context, name string) (err error) { // FIXME Unused ctx
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -94,7 +96,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 }
 
 // Delete a bucket
-func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) {
+func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -107,7 +109,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 }
 
 // Inspect a bucket
-func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
+func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -126,7 +128,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 }
 
 // Mount a bucket on an host on the given mount point
-func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
+func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) { // FIXME Make sure ctx is propagated
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -193,7 +195,7 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 }
 
 // Unmount a bucket
-func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
+func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) { // FIXME Make sure ctx is propagated
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()

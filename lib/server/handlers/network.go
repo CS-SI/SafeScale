@@ -59,6 +59,9 @@ type NetworkAPI interface {
 	Delete(context.Context, string) error
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+// FIXME Technical debt Input verification
+
 // NetworkHandler an implementation of NetworkAPI
 type NetworkHandler struct {
 	service   iaas.Service
@@ -805,7 +808,7 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resou
 }
 
 // List returns the network list
-func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*resources.Network, err error) {
+func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*resources.Network, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -831,7 +834,7 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*r
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
-func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *resources.Network, err error) {
+func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *resources.Network, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -845,7 +848,7 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network
 }
 
 // Delete deletes network referenced by ref
-func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err error) {
+func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()

@@ -31,6 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
+// FIXME Technical debt Input verification, ctx cannot be nil
+
 // ImageHandler ...
 var ImageHandler = handlers.NewImageHandler
 

@@ -19,7 +19,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/security/model"
 )
 
-var ctx = context.Background()
+var globalCtx = context.Background()
 var verifier *oidc.IDTokenVerifier
 var cfg *proxyConfig
 var config oauth2.Config
@@ -61,7 +61,7 @@ func authenticate(token string) (string, int) {
 		return "", http.StatusTemporaryRedirect
 	}
 
-	idToken, err := verifier.Verify(ctx, token)
+	idToken, err := verifier.Verify(globalCtx, token)
 	if err != nil {
 		return "", http.StatusForbidden
 	}
@@ -302,7 +302,7 @@ func Start(bindingURL string, failure chan bool) {
 		return
 	}
 
-	provider, err := oidc.NewProvider(ctx, cfg.OpenIDURL)
+	provider, err := oidc.NewProvider(globalCtx, cfg.OpenIDURL)
 	if err != nil {
 		log.Error(err)
 		return

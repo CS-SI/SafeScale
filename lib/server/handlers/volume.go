@@ -51,6 +51,8 @@ type VolumeAPI interface {
 	Detach(ctx context.Context, volume string, host string) error
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // VolumeHandler volume service
 type VolumeHandler struct {
 	service iaas.Service
@@ -64,7 +66,7 @@ func NewVolumeHandler(svc iaas.Service) VolumeAPI {
 }
 
 // List returns the network list
-func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) {
+func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) { // FIXME Unused ctx
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -95,7 +97,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
-func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) {
+func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -248,7 +250,7 @@ func (handler *VolumeHandler) Inspect(
 }
 
 // Create a volume
-func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (volume *resources.Volume, err error) {
+func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (volume *resources.Volume, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -323,7 +325,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 }
 
 // Attach a volume to an host
-func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) {
+func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -634,7 +636,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	return nil
 }
 
-func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (set mapset.Set, err error) {
+func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (set mapset.Set, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -679,7 +681,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) (err error) {
+func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) (err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}

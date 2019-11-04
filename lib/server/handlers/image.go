@@ -37,6 +37,8 @@ type ImageAPI interface {
 	Filter(ctx context.Context, osfilter string) ([]resources.Image, error)
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // ImageHandler image service
 type ImageHandler struct {
 	service iaas.Service
@@ -50,7 +52,7 @@ func NewImageHandler(svc iaas.Service) ImageAPI {
 }
 
 // List returns the image list
-func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) {
+func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -59,11 +61,11 @@ func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resou
 }
 
 // Select selects the image that best fits osname
-func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *resources.Image, err error) {
+func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *resources.Image, err error) { // FIXME Unused ctx
 	return nil, nil
 }
 
 // Filter filters the images that do not fit osname
-func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []resources.Image, err error) {
+func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []resources.Image, err error) { // FIXME Unused ctx
 	return nil, nil
 }

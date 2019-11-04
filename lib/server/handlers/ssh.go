@@ -51,6 +51,8 @@ type SSHAPI interface {
 	GetConfig(context.Context, interface{}) (*system.SSHConfig, error)
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // SSHHandler SSH service
 type SSHHandler struct {
 	service iaas.Service
@@ -64,7 +66,7 @@ func NewSSHHandler(svc iaas.Service) *SSHHandler {
 }
 
 // GetConfig creates SSHConfig to connect to an host
-func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (sshConfig *system.SSHConfig, err error) {
+func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (sshConfig *system.SSHConfig, err error) { // FIXME Make sure ctx is propagated
 	defer scerr.OnPanic(&err)()
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -147,7 +149,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) {
+func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -170,7 +172,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) {
+func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
@@ -200,33 +202,45 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 		return 0, "", "", err
 	}
 
-	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
-		func() error {
-			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
-			return err
-		},
-		temporal.GetHostTimeout(),
-		func(t retry.Try, v Verdict.Enum) {
-			if v == Verdict.Retry {
-				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostName)
-			}
-		},
-	)
-	if retryErr != nil {
-		return retCode, stdOut, stdErr, retryErr
+	echan := make(chan error)
+
+	go func() {
+		retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
+			func() error {
+				retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
+				return err
+			},
+			temporal.GetHostTimeout(),
+			func(t retry.Try, v Verdict.Enum) {
+				if v == Verdict.Retry {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostName)
+				}
+			},
+		)
+		echan <- retryErr
+	}()
+
+	select {
+	case errFromChan := <-echan:
+		if errFromChan != nil {
+			return retCode, stdOut, stdErr, errFromChan
+		}
+	case <-ctx.Done():
+		return 0, "", "", retry.AbortedError("SSH operation cancelled by user", nil)
 	}
 
 	return retCode, stdOut, stdErr, err
 }
 
 // run executes command on the host
+// This function can lock, use runwithTimeout instead
 func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
 	// Create the command
 	sshCmd, err := ssh.Command(cmd)
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.Run(nil) // FIXME It CAN lock, use RunWithTimeout instead
+	return sshCmd.Run(nil)
 }
 
 // run executes command on the host
@@ -274,7 +288,7 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy copy file/directory
-func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) {
+func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
