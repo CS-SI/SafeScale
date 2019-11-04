@@ -540,6 +540,30 @@ sfPgsqlUpdatePassword() {
     return $retcode
 }
 
+# sfKeycloakRun allows to execute keycloak admin command
+# Intended to be use on target masters:any
+sfKeycloakRun() {
+    local heredoc
+    read -t 1 heredoc
+    local id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep keycloak4platform_server | cut -d: -f2)
+    [ $? -ne 0 -o -z ${id+x} ] && echo "failed to find keycloak container" && return 1
+    local params=$@
+
+echo "heredoc='$heredoc'"
+
+    if [ -z ${heredoc+x} ]; then
+        docker exec $id bash <<BASH
+/opt/jboss/keycloak/bin/kcadm.sh --no-config --server http://{{ .HostIP }}:63010/auth $params
+BASH
+    else
+        docker exec $id bash <<BASH
+/opt/jboss/keycloak/bin/kcadm.sh --no-config --server http://{{ .HostIP }}:63010/auth $params <<KCADM
+$heredoc
+KCADM
+BASH
+    fi
+}
+
 # sfService abstracts the command to use to manipulate services
 sfService() {
     [ $# -ne 2 ] && return 1
@@ -586,6 +610,25 @@ sfService() {
     return 1
 }
 export -f sfService
+
+# Displays the subnet of the docker bridge
+sfSubnetOfDockerBridge() {
+    sfSubnetOfDockerNetwork bridge
+}
+export -f sfSubnetOfDockerBridge
+
+# Displays the subnet of the docker swarm bridge
+sfSubnetOfDockerSwarmBridge() {
+    sfSubnetOfDockerNetwork docker_gwbridge
+}
+export -f sfSubnetOfDockerSwarmBridge
+
+# Displays the subnet of a docker network
+sfSubnetOfDockerNetwork() {
+    [ $# -ne 1 ] && return 1
+    docker network inspect $1 {{ "--format '{{json .}}'" }} | jq -r .[0].IPAM.Config[0].Subnet
+}
+export -f sfSubnetOfDockerNetwork
 
 # tells if a container using a specific image (and optionnaly name) is running in standalone mode
 sfDoesDockerRunContainer() {
@@ -656,6 +699,29 @@ sfRemoveDockerImage() {
     return 0
 }
 export -f sfRemoveDockerImage
+
+sfUpdateDockerSecret() {
+    [ $# -ne 1 ] & return 1
+    local password=
+    read -t 1 password
+    [ -z ${password+x} ] && return 1
+
+    if docker secret inspect $1 &>/dev/null; then
+        docker secret rm $1 || return 1
+    fi
+    echo -n "$password" | docker secret create $1 -
+}
+export -f sfUpdateDockerSecret
+
+sfRemoveDockerSecret() {
+    [ $# -ne 1 ] && return 1
+    if docker secret inspect $1 &>/dev/null; then
+        docker secret rm $1
+        return $?
+    fi
+    return 0
+}
+export -f sfRemoveDockerSecret
 
 sfIsPodRunning() {
     local pod=${1%@*}
