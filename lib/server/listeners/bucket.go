@@ -179,7 +179,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot inspect bucket").ToGRPCStatus()
 	}
-	// FIXME: This _must not_ happen if err == nil...
+	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if resp == nil {
 		return nil, status.Errorf(codes.NotFound, "cannot inspect bucket '%s': not found", in.GetName())
 	}
