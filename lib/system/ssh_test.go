@@ -17,6 +17,7 @@
 package system_test
 
 import (
+	"context"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/stretchr/testify/require"
@@ -82,7 +83,7 @@ func Test_Command(t *testing.T) {
 		ssh_conf.GatewayConfig = &gateway
 		cmd, err := ssh_conf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
 		require.Nil(t, err)
-		errc, vibra, _, err := cmd.RunWithTimeout(nil, 2*time.Minute)
+		errc, vibra, _, err := cmd.RunWithTimeout(context.TODO(), nil, 2*time.Minute)
 		if errc != 0 {
 			fmt.Println(string(vibra))
 		}

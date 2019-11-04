@@ -450,7 +450,7 @@ func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) (int, string, string, error) {
+func (sc *SSHCommand) RunWithTimeout(ctx context.Context, t concurrency.Task, timeout time.Duration) (int, string, string, error) { // CRITICAL FIXME Robutsness, this must run with a context
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
@@ -525,6 +525,8 @@ func (sc *SSHCommand) RunWithTimeout(t concurrency.Task, timeout time.Duration) 
 		errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
 		log.Warnf(errMsg)
 		return 0, string(msgOut[:]), string(msgErr[:]), fmt.Errorf(errMsg)
+	case <-ctx.Done():
+		return 0, string(msgOut[:]), string(msgErr[:]), retry.AbortedError("operation aborted by user", nil)
 	}
 
 	return 0, string(msgOut[:]), string(msgErr[:]), nil
@@ -681,7 +683,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				return err
 			}
 
-			retcode, stdout, stderr, err = cmd.RunWithTimeout(nil, timeout)
+			retcode, stdout, stderr, err = cmd.RunWithTimeout(context.TODO(), nil, timeout)
 			if err != nil {
 				return err
 			}
