@@ -50,6 +50,8 @@ type ShareAPI interface {
 	Unmount(context.Context, string, string) error
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // ShareHandler nas service
 type ShareHandler struct {
 	service iaas.Service
@@ -248,7 +250,7 @@ func (handler *ShareHandler) Create(
 }
 
 // Delete a share from host
-func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) {
+func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -334,7 +336,7 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 }
 
 // List return the list of all shares from all servers
-func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[string]*propsv1.HostShare, err error) {
+func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[string]*propsv1.HostShare, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -628,7 +630,7 @@ func (handler *ShareHandler) Mount(
 }
 
 // Unmount a share from local directory of an host
-func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) {
+func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}

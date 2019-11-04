@@ -26,6 +26,8 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // Stack is the interface to cloud stack
 type Stack interface {
 	// ListAvailabilityZones lists the usable Availability Zones
@@ -114,7 +116,7 @@ type Stack interface {
 	GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error)
 	// ListVolumeAttachments lists available volume attachment
 	ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error)
-	// DeleteVolumeAttachment deletes the volume attachment identifed by id
+	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) error
 }
 

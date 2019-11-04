@@ -43,7 +43,7 @@ var (
 )
 
 // JobRegister ...
-func JobRegister(ctx context.Context, cancelFunc func(), command string) error {
+func JobRegister(ctx context.Context, cancelFunc func(), command string) error { // FIXME Unused ctx
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return fmt.Errorf("no uuid in grpc metadata")
@@ -79,7 +79,7 @@ func JobDeregisterUUID(uuid string) {
 }
 
 // JobDeregister ...
-func JobDeregister(ctx context.Context) {
+func JobDeregister(ctx context.Context) { // FIXME Unused ctx
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		logrus.Errorf("Trying to deregister a job without uuid!")

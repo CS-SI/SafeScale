@@ -41,6 +41,7 @@ type ssh struct {
 	session *Session
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
 // Run ...
 func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	var (
@@ -249,7 +250,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 }
 
 // getSSHConfigFromName ...
-func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.SSHConfig, error) {
+func (s *ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConfig, error) {
 	// conn := utils.GetConnection()
 	// defer conn.Close()
 	s.session.Connect()
@@ -267,6 +268,7 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 	return conv.ToSystemSSHConfig(sshConfig), nil
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
 // Connect ...
 func (s *ssh) Connect(name string, timeout time.Duration) error {
 	sshCfg, err := s.getSSHConfigFromName(name, timeout)

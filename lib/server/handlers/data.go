@@ -54,6 +54,8 @@ type DataAPI interface {
 	Delete(ctx context.Context, fileName string) error
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // DataHandler bucket service
 type DataHandler struct {
 	storageServices *iaas.StorageServices
@@ -119,7 +121,7 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*srvutils
 }
 
 //Push ...
-func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) (err error) {
+func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) (err error) { // FIXME Unused ctx
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -298,7 +300,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 }
 
 //Get ...
-func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) (err error) {
+func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileName string) (err error) { // FIXME Unused ctx
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -476,7 +478,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 }
 
 // Delete ...
-func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err error) {
+func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err error) { // FIXME Unused ctx
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}

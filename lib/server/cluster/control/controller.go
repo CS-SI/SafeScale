@@ -1229,6 +1229,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv2.Node
 	return nil
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
 // Delete destroys everything related to the infrastructure built for the Cluster
 func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if c == nil {

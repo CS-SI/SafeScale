@@ -31,6 +31,8 @@ type JobManagerAPI interface {
 	Stop(ctx context.Context, uuid string)
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // JobManagerHandler service
 type JobManagerHandler struct {
 	service iaas.Service
@@ -44,11 +46,11 @@ func NewJobHandler(svc iaas.Service) JobManagerAPI {
 }
 
 // List returns the Running Process list
-func (pmh *JobManagerHandler) List(ctx context.Context) (map[string]string, error) {
+func (pmh *JobManagerHandler) List(ctx context.Context) (map[string]string, error) { // FIXME Unused ctx
 	return srvutils.JobList(), nil
 }
 
 // Stop stop the designed Process
-func (pmh *JobManagerHandler) Stop(ctx context.Context, uuid string) {
+func (pmh *JobManagerHandler) Stop(ctx context.Context, uuid string) { // FIXME Unused ctx
 	srvutils.JobCancelUUID(uuid)
 }

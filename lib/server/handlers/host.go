@@ -64,6 +64,8 @@ type HostAPI interface {
 	Stop(ctx context.Context, ref string) error
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
+
 // HostHandler host service
 type HostHandler struct {
 	service iaas.Service
@@ -77,7 +79,7 @@ func NewHostHandler(svc iaas.Service) HostAPI {
 }
 
 // Start starts a host
-func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
+func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -120,7 +122,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 }
 
 // Stop stops a host
-func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
+func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -161,8 +163,9 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	return err
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
 // Reboot reboots a host
-func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) {
+func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -208,7 +211,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 }
 
 // Resize ...
-func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) {
+func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -286,11 +289,9 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	return newHost, err
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
 // Create creates a host
-// func (handler *HostHandler) Create(
-// 	ctx context.Context,
-// 	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32,
-// 	force bool,
+// func (handler *HostHandler) Create( ctx context.Context, name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool)
 func (handler *HostHandler) Create(
 	ctx context.Context,
 	name string, net string, los string, public bool, sizingParam interface{}, force bool,
@@ -707,6 +708,7 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
+	// FIXME ROBUSTNESS All functions MUST propagate context
 	// Wait like 2 min for the machine to reboot
 	_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
 	if err != nil {
@@ -809,7 +811,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 }
 
 // List returns the host list
-func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resources.Host, err error) {
+func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resources.Host, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -849,7 +851,7 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
-func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) {
+func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -875,7 +877,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 			return nil, scerr.Wrap(err, fmt.Sprintf("failed to inspect host [%s]", ref))
 		}
 	}
-	// FIXME: this _must not_ happen
+	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if host == nil {
 		return nil, scerr.NewError(fmt.Sprintf("failed to inspect host [%s]", ref), nil, nil)
 	}
@@ -884,7 +886,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 }
 
 // Delete deletes host referenced by ref
-func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
+func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) { // FIXME Make sure ctx is propagated
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()

@@ -34,6 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
+// FIXME Technical debt Input verification, ctx cannot be nil
+
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
 // safescale volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
 // safescale volume detach v1
@@ -47,7 +49,7 @@ import (
 // VolumeHandler ...
 var VolumeHandler = handlers.NewVolumeHandler
 
-// VolumeListener is the volume service grps server
+// VolumeListener is the volume service grpc server
 type VolumeListener struct{}
 
 // List the available volumes

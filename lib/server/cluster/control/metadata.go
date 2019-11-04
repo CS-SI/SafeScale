@@ -142,6 +142,7 @@ func (m *Metadata) Write() error {
 	return m.item.Write(m.name)
 }
 
+// FIXME ROBUSTNESS All functions MUST propagate context
 // Reload reloads the metadata from ObjectStorage
 // It's a good idea to do that just after an Acquire() to be sure to have the latest data
 func (m *Metadata) Reload(task concurrency.Task) error {
