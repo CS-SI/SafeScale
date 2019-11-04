@@ -18,6 +18,7 @@ package nfs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -135,7 +136,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr := sshconfig.Command("which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(nil, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(context.TODO(), nil, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -146,7 +147,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr = sshconfig.SudoCommand("which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(nil, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(context.TODO(), nil, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {

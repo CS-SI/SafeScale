@@ -207,7 +207,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 	go func() {
 		retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 			func() error {
-				retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
+				retCode, stdOut, stdErr, err = handler.runWithTimeout(ctx, ssh, cmd, temporal.GetHostTimeout())
 				return err
 			},
 			temporal.GetHostTimeout(),
@@ -244,13 +244,13 @@ func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, 
 }
 
 // run executes command on the host
-func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (int, string, string, error) {
+func (handler *SSHHandler) runWithTimeout(ctx context.Context, ssh *system.SSHConfig, cmd string, duration time.Duration) (int, string, string, error) {
 	// Create the command
 	sshCmd, err := ssh.Command(cmd)
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.RunWithTimeout(nil, duration)
+	return sshCmd.RunWithTimeout(ctx, nil, duration)
 }
 
 func extracthostName(in string) (string, error) {
