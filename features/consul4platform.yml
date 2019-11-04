@@ -17,7 +17,6 @@
 ---
 feature:
     suitableFor:
-        host: no
         cluster: all
 
     parameters:
@@ -30,10 +29,7 @@ feature:
                 steps:
                     stack:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: any
-                            nodes: no
                         run: |
                             sfDoesDockerRunStack consul4platform || sfFail 192
                             sfExit
@@ -44,7 +40,6 @@ feature:
                     config-all:
                         targets:
                             gateways: all
-                            hosts: no
                             masters: all
                             nodes: all
                         run: |
@@ -52,10 +47,7 @@ feature:
 
                     config-masters:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: all
-                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
 
@@ -172,9 +164,6 @@ feature:
                     config-gws:
                         targets:
                             gateways: all
-                            hosts: no
-                            masters: no
-                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/consul4platform/consul.d ${SF_VARDIR}/consul4platform
 
@@ -226,10 +215,7 @@ feature:
 
                     stack:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: all
-                            nodes: no
                         run: |
                             cat >${SF_ETCDIR}/consul4platform/stack.yml <<-EOF
                             version: '3.3'
@@ -320,10 +306,7 @@ feature:
 
                     start:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: any
-                            nodes: no
                         run: |
                             # if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul4platform_net"; then
                             #     docker network create -d overlay consul4platform_net || sfFail 194
@@ -333,10 +316,7 @@ feature:
 
                     ready:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: any
-                            nodes: no
                         run: |
                             sfRetry 5m 5 sfDoesDockerRunStack consul4platform || sfFail 197
                             sfExit
@@ -346,10 +326,7 @@ feature:
                 steps:
                     stop:
                         targets:
-                            gateways: no
-                            hosts: no
                             masters: any
-                            nodes: no
                         run: |
                             docker stack rm consul4platform || sfFail 200
                             sfExit
@@ -357,7 +334,6 @@ feature:
                     cleanup:
                         targets:
                             gateways: all
-                            hosts: no
                             masters: all
                             nodes: all
                         run: |
@@ -367,10 +343,9 @@ feature:
 
     proxy:
         rules:
-            - name: consul_http_backend
+            - name: consul4platform_http_backend
               type: upstream
               targets:
-                  hosts: no
                   masters: all
               content: |
                   {
@@ -378,18 +353,17 @@ feature:
                       "weight": 100
                   }
 
-            - name: consul_http_svc
+            - name: consul4platform_http_svc
               type: service
               targets:
-                  hosts: no
                   masters: one
               content: |
                   {
                       "protocol": "http",
-                      "host": "consul_http_backend"
+                      "host": "consul4platform_http_backend"
                   }
 
-            - name: consul_http_route
+            - name: consul4platform_http_route
               type: route
               targets:
                   hosts: no
@@ -397,7 +371,7 @@ feature:
               content: |
                   {
                       "paths": [ "/_platform/registry/consul/" ],
-                      "service": { "id": "{{ .consul_http_svc }}" },
+                      "service": { "id": "{{ .consul4platform_http_svc }}" },
                       "source-control": {
                           "whitelist": [ "{{ .CIDR }}", "127.0.0.1" ]
                       }
