@@ -16,7 +16,7 @@ EXECS=cli/safescale/safescale cli/safescale/safescale-cover cli/safescaled/safes
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v /vendor/)
 # List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v lib/security/ | grep -v providers/aws | grep -v stacks/aws | grep -v sandbox)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v lib/security/ | grep -v sandbox)
 
 
 # DEPENDENCIES MANAGEMENT
