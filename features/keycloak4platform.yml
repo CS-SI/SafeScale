@@ -17,8 +17,8 @@
 ---
 feature:
     suitableFor:
-        host: no
         cluster: all
+
     requirements:
         features:
             - postgresql4platform
@@ -146,7 +146,6 @@ feature:
                             sfExit
 
                     image:
-                        timeout: 10
                         targets:
                             masters: all
                         run: |
@@ -282,7 +281,7 @@ feature:
                             ENTRYPOINT [ "/my-docker-entrypoint.sh" ]
                             EOF
 
-                            docker build --network host -t keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || sfFail 192
+                            docker build --network host -t safescale/keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || sfFail 192
                             sfExit
 
                     secrets:
@@ -311,7 +310,7 @@ feature:
                             version: '3.7'
                             services:
                                 server:
-                                    image: keycloak4platform:latest
+                                    image: safescale/keycloak4platform:latest
                                     # environment:
                                     #     - KEYCLOAK_LOGLEVEL=DEBUG
                                     #     - ROOT_LOGLEVEL=DEBUG
@@ -390,7 +389,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            docker image rm -f keycloak4platform:latest || true
+                            docker image rm -f safescale/keycloak4platform:latest || true
                             sfExit
 
                     cleanup:

@@ -352,7 +352,7 @@ feature:
                             ENTRYPOINT ["/prometheus-am-executor"]
                             EOF
 
-                            docker build --network host -t am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || sfFail 193
+                            docker build --network host -t safescale/am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || sfFail 193
                             sfExit
 
                     alertmanager:
@@ -406,10 +406,7 @@ feature:
 
                     karma:
                         targets:
-                            hosts: no
-                            gateways: no
                             masters: all
-                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/monitoring4platform/karma
 
@@ -423,10 +420,7 @@ feature:
 
                     grafana:
                         targets:
-                            hosts: no
-                            gateways: no
                             masters: all
-                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/monitoring4platform/grafana/provisioning/datasources
                             mkdir -p ${SF_ETCDIR}/monitoring4platform/grafana/provisioning/dashboards
@@ -475,10 +469,7 @@ feature:
 
                     stack:
                         targets:
-                            hosts: no
-                            gateways: no
                             masters: all
-                            nodes: no
                         run: |
                             cat >${SF_ETCDIR}/monitoring4platform/stack.yml <<-EOF
                             version: '3.3'
@@ -628,7 +619,7 @@ feature:
                                                 memory: 64M
 
                                 am-executor:
-                                    image: am-executor:latest
+                                    image: safescale/am-executor:latest
                                     command:
                                         - /scripts/execute.sh
                                     environment:
@@ -817,9 +808,7 @@ feature:
                 steps:
                     stop:
                         targets:
-                            hosts: yes
                             masters: any
-                            nodes: no
                         run: |
                             if [ -f ${SF_ETCDIR}/monitoring4platform/stack.yml ]; then
                                 docker stack rm monitoring4platform || sfFail 200
@@ -828,22 +817,21 @@ feature:
 
                     cleanup:
                         targets:
-                            hosts: yes
                             masters: all
-                            nodes: no
                         run: |
                             sfRemoveDockerImage prom/prometheus:{{ .PrometheusVersion }}
                             sfRemoveDockerImage prom/node-exporter:{{ .NodeExporterVersion }}
                             sfRemoveDockerImage prom/alertmanager:{{ .AlertmanagerVersion }}
                             sfRemoveDockerImage grafana/grafana:{{ .GrafanaVersion }}
+                            sfRemoveDockerImage safescale/am-executor:latest
                             # sfRemoveDockerImage portainer/agent
                             # sfRemoveDockerImage portainer/portainer
-                            sfRemoveDockerImage cloudflare/karma:latest
+                            sfRemoveDockerImage lmierzwa/karma:latest
                             sfRemoveDockerImage google/cadvisor
 
                             purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
-                            [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/monitoring4platform ${SF_VARDIR}/monitoring4platform
+                            [ "$purge" = "yes" -o "$purge" = "true" ] && rm -rf ${SF_ETCDIR}/monitoring4platform ${SF_VARDIR}/monitoring4platform
                             sfExit
 
     proxy:
