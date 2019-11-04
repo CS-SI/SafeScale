@@ -254,7 +254,7 @@ func callToSomethingThatReturnsErrButLogItWithWarning() (err error) {
 	return err
 }
 
-func TestShowMeTheMoney(t *testing.T) {
+func TestOnExit(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -277,7 +277,7 @@ func TestShowMeTheMoney(t *testing.T) {
 	}
 }
 
-func TestShowMeTheMoneyAgain(t *testing.T) {
+func TestOnExitAndLog(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -300,7 +300,7 @@ func TestShowMeTheMoneyAgain(t *testing.T) {
 	}
 }
 
-func TestShowMeTheMoneyAgainAlt(t *testing.T) {
+func TestOnExitAndLogWithWarning(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -319,6 +319,63 @@ func TestShowMeTheMoneyAgainAlt(t *testing.T) {
 	tk := string(out)
 
 	if !strings.Contains(tk, "callToSomethingThatReturnsErrButLogItWithWarning") {
+		t.Fail()
+	}
+}
+
+func TestUncathegorizedError(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	logrus.SetOutput(w)
+
+	err := func() error {
+		return InconsistentError("")
+	}()
+	if err == nil {
+		t.Fail()
+	}
+
+	logrus.Warn(err.Error())
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	tk := string(out)
+
+	if !strings.Contains(tk, "uncategorized error occurred:") {
+		t.Fail()
+	}
+}
+
+func TestNotUncathegorizedError(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	logrus.SetOutput(w)
+
+	err := func() error {
+		return InconsistentError("something")
+	}()
+	if err == nil {
+		t.Fail()
+	}
+
+	logrus.Warn(err.Error())
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	tk := string(out)
+
+	if strings.Contains(tk, "uncategorized error occurred:") {
+		t.Fail()
+	}
+	if !strings.Contains(tk, "something") {
 		t.Fail()
 	}
 }
