@@ -43,7 +43,25 @@ feature:
                         run: |
                             mkdir -p ${SF_ETCDIR}/sparkmaster4platform/build
 
-                            cat >${SF_ETCDIR}/sparkmaster4platform/build/Dockerfile <<-EOF
+                            cat >${SF_ETCDIR}/sparkmaster4platform/build/spark.sh <<-'EOF'
+                            export SPARK_HOME=/usr/local/spark
+                            export PYSPARK_DRIVER_PYTHON=python3
+                            export PYSPARK_PYTHON=python3
+                            export SPARK_MASTER_WEBUI_PORT=8081
+                            export _PYSPARK_DRIVER_CONN_INFO_PATH=/tmp/pyspark.conn
+                            EOF
+
+                            cat >${SF_ETCDIR}/sparkmaster4platform/build/startup.sh <<-'EOF'
+                            #!/bin/bash
+                            source /etc/profile.d/spark.sh
+
+                            export SPARK_NO_DAEMONIZE=
+
+                            # start spark
+                            exec $SPARK_HOME/sbin/start-master.sh
+                            EOF
+
+                            cat >${SF_ETCDIR}/sparkmaster4platform/build/Dockerfile <<-'EOF'
                             FROM alpine
                             LABEL maintainer="CS SI"
 
@@ -58,8 +76,8 @@ feature:
                             # -----------------------------------------------
                             # Install tini, tiny init script built for docker
                             # -----------------------------------------------
-                            ARG TINI_SparkRelease=v0.18.0
-                            ADD https://github.com/krallin/tini/releases/download/${TINI_SparkRelease}/tini-static /tini
+                            ARG TINI_VERSION=v0.18.0
+                            ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static /tini
                             RUN chmod u+rx /tini
 
                             # -------------------
@@ -80,7 +98,7 @@ feature:
                             COPY spark.sh /etc/profile.d/
                             RUN chmod +x /etc/profile.d/spark.sh
 
-                            RUN echo "source /etc/profile.d/spark.sh" >> /root/.bashrc
+                            RUN echo "source /etc/profile.d/spark.sh" >>/root/.bashrc
 
                             # ------------------------------
                             # Installs and configure startup
@@ -98,13 +116,13 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/spark/stack.yml <<-EOF
-                            SparkRelease: "3.7"
+                            mkdir -p ${SF_ETCDIR}/sparkmaster4platform/stack.yml <<-EOF
+                            version: "3.7"
 
                             networks:
                                 net:
+                                    name: spark_net
                                     driver: overlay
-                                    attachable: true
 
                             services:
                                 master:
@@ -183,7 +201,7 @@ feature:
               content: |
                   {
                       "protocol": "http",
-                      "host": sparkmaster4platform_backend"
+                      "host": "sparkmaster4platform_backend"
                   }
 
             - name: sparkmaster4platform_route
