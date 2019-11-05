@@ -33,8 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // BucketHandler ...
 var BucketHandler = handlers.NewBucketHandler
 
@@ -52,6 +50,9 @@ type BucketListener struct{}
 func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (bl *pb.BucketList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -88,6 +89,9 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
@@ -123,6 +127,9 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
@@ -156,6 +163,9 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetName()
@@ -195,6 +205,9 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().GetName()
@@ -229,6 +242,9 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetBucket()

@@ -33,8 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // Tenant structure to handle name and clientAPI for a tenant
 type Tenant struct {
 	name    string
@@ -76,6 +74,9 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (_
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -108,6 +109,9 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (_ 
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -137,6 +141,10 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 	if in == nil {
 		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	name := in.GetName()
 	// FIXME: validate parameters
 
@@ -202,6 +210,9 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 	if s == nil {
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -239,6 +250,9 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 	if s == nil {
 		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -268,6 +282,9 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 	}
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()

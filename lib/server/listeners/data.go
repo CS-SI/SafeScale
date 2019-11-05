@@ -33,8 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // DataHandler ...
 var DataHandler = handlers.NewDataHandler
 
@@ -45,6 +43,9 @@ type DataListener struct{}
 func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.FileList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -79,6 +80,9 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 	}
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	objectName := in.GetName()
@@ -115,6 +119,9 @@ func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *google_pro
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
@@ -149,6 +156,9 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_p
 	}
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	objectName := in.GetName()

@@ -31,8 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // TemplateHandler exists to ease integration tests
 var TemplateHandler = handlers.NewTemplateHandler
 
@@ -46,6 +44,10 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	all := in.GetAll()
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
