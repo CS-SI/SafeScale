@@ -81,6 +81,10 @@ func Unsuccessful() Arbiter {
 				return Verdict.Done, t.Err
 			}
 
+			if _, ok := t.Err.(*ErrAborted); ok {
+				return Verdict.Done, t.Err
+			}
+
 			return Verdict.Retry, nil
 		}
 		return Verdict.Done, nil
@@ -93,6 +97,10 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
 			if _, ok := t.Err.(ErrAborted); ok {
+				return Verdict.Done, t.Err
+			}
+
+			if _, ok := t.Err.(*ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 
@@ -113,6 +121,10 @@ func Successful() Arbiter {
 				return Verdict.Done, t.Err
 			}
 
+			if _, ok := t.Err.(*ErrAborted); ok {
+				return Verdict.Done, t.Err
+			}
+
 			return Verdict.Retry, nil
 		}
 		return Verdict.Done, nil
@@ -124,6 +136,10 @@ func Timeout(limit time.Duration) Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
 			if _, ok := t.Err.(ErrAborted); ok {
+				return Verdict.Done, t.Err
+			}
+
+			if _, ok := t.Err.(*ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 
@@ -141,6 +157,10 @@ func Max(limit uint) Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
 			if _, ok := t.Err.(ErrAborted); ok {
+				return Verdict.Done, t.Err
+			}
+
+			if _, ok := t.Err.(*ErrAborted); ok {
 				return Verdict.Done, t.Err
 			}
 
