@@ -46,7 +46,7 @@ feature:
                         run: |
                             mkdir -p ${SF_ETCDIR}/geoserver4platform/build
 
-                            cat >${SF_ETCDIR}/geoserver/build/web.xml <<-EOF
+                            cat >${SF_ETCDIR}/geoserver4platform/build/web.xml <<-EOF
                             <?xml version="1.0" encoding="UTF-8"?>
                             <!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
                             <web-app>
@@ -248,7 +248,7 @@ feature:
                             # Caused by: java.lang.IllegalStateException: Unable to complete the scan for annotations for web application [/geoserver] due to
                             # a StackOverflowError. Possible root causes include a too low setting for -Xss and illegal cyclic inheritance dependencies. The
                             # class hierarchy being processed was [org.sqlite.SQLiteConnection->org.sqlite.jdbc4.JDBC4Connection->org.sqlite.jdbc3.JDBC3Connection->org.sqlite.SQLiteConnection]
-                            RUN rm /usr/local/tomcat/webapps/geoserver/WEB-INF/lib/sqlite-jdbc-3.23.1.jar
+                            RUN rm /usr/local/tomcat/webapps/geoserver/WEB-INF/lib/sqlite-jdbc-*.jar
                             EOF
 
                             docker build --network host -t safescale/geoserver:latest ${SF_ETCDIR}/geoserver4platform/build || sfFail 193
@@ -262,7 +262,7 @@ feature:
                             if docker secret inspect safescale.geoserver.password.admin &>/dev/null; then
                                 docker secret rm safescale.geoserver.password.admin
                             fi
-                            echo -n "{{ .AdminPassword }} | docker secret create safescale.geoserver.password.admin - || sfFail 194
+                            echo -n "{{ .AdminPassword }}" | docker secret create safescale.geoserver.password.admin - || sfFail 194
                             sfExit
 
                     stack:
@@ -273,7 +273,7 @@ feature:
                             version: '3.7'
 
                             networks:
-                                spark4platform_net:
+                                spark_net:
                                     external: true
 
                             secrets:
@@ -289,10 +289,12 @@ feature:
                                     volumes:
                                         - /shared/data:/shared/data
                                     networks:
-                                        spark4platform_net:
+                                        spark_net:
                                             - geoserver
                                     ports:
-                                        - '8080:8080'
+                                        - published: 63012
+                                          target: 8080
+                                          mode: host
                                     deploy:
                                         mode: replicated
                                         replicas: 1
@@ -353,7 +355,7 @@ feature:
                   {
                       "algorithm": "consistent-hashing",
                       "hash_on": "ip",
-                      "target": "{{.HostIP}}:8080",
+                      "target": "{{.HostIP}}:63012",
                       "weight": 100
                   }
 

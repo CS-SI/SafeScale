@@ -27,14 +27,11 @@ feature:
     install:
         bash:
             check:
-                pace: docker
+                pace: stack
                 steps:
-                    docker:
+                    stack:
                         targets:
-                            hosts: no
-                            gateways: no
                             masters: any
-                            nodes: no
                         run: |
                             sfDoesDockerRunStack postgresql4platform || sfFail 192
                             sfExit
