@@ -628,7 +628,7 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	_, err = sshCfg.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
+	_, err = sshCfg.WaitServerReady(ctx, "phase1", temporal.GetHostCreationTimeout())
 	if err != nil {
 		derr := err
 		err = nil
@@ -710,7 +710,7 @@ func (handler *HostHandler) Create(
 
 	// FIXME ROBUSTNESS All functions MUST propagate context
 	// Wait like 2 min for the machine to reboot
-	_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
+	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetConnectSSHTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, err

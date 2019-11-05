@@ -1439,7 +1439,13 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	if err != nil {
 		return nil, err
 	}
-	_, err = sshCfg.WaitServerReady("ready", temporal.GetHostTimeout())
+
+	ctx, err := t.GetContext()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetHostTimeout())
 	if err != nil {
 		return nil, err
 	}

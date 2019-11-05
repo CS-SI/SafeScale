@@ -415,12 +415,12 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			}()
 
 			sshSvc := handlers.NewSSHHandler(serviceProvider)
-			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
+			ssh, err := sshSvc.GetConfig(context.Background(), host.ID) // FIXME Remove context.Background()
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			_, nerr := ssh.WaitServerReady("ready", time.Duration(6+concurrency-1)*time.Minute)
+			_, nerr := ssh.WaitServerReady(context.Background(), "ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
 				log.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr

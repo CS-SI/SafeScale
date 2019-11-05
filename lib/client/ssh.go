@@ -380,6 +380,6 @@ func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
 		return err
 	}
 
-	_, err = sshCfg.WaitServerReady("ready", timeout)
+	_, err = sshCfg.WaitServerReady(context.TODO(), "ready", timeout) // FIXME Remove context.TODO()
 	return err
 }

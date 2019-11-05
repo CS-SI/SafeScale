@@ -380,7 +380,13 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 		return ClusterState.Error, scerr.Wrap(err, fmt.Sprintf("failed to get ssh config to connect to master '%s': %s", master.ID, err.Error()))
 
 	}
-	_, err = sshCfg.WaitServerReady("ready", temporal.GetContextTimeout())
+
+	ctx, err := task.GetContext()
+	if err != nil {
+		return ClusterState.Error, scerr.Wrap(err, fmt.Sprintf("failed to get valid context : %s", err.Error()))
+	}
+
+	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetContextTimeout())
 	if err != nil {
 		return ClusterState.Error, err
 	}

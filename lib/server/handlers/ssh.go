@@ -170,7 +170,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 			echan <- err
 			return
 		}
-		_, waitErr := ssh.WaitServerReady("ready", timeout)
+		_, waitErr := ssh.WaitServerReady(ctx, "ready", timeout)
 		echan <- waitErr
 		return
 	}()
@@ -214,11 +214,15 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 		return 0, "", "", err
 	}
 
+	desist := false
 	echan := make(chan error)
 
 	go func() {
 		retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 			func() error {
+				if desist {
+					return retry.AbortedError("operation aborted by user", nil)
+				}
 				retCode, stdOut, stdErr, err = handler.runWithTimeout(ctx, ssh, cmd, temporal.GetHostTimeout())
 				return err
 			},
@@ -238,6 +242,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 			return retCode, stdOut, stdErr, errFromChan
 		}
 	case <-ctx.Done():
+		desist = true
 		return 0, "", "", retry.AbortedError("SSH operation cancelled by user", nil)
 	}
 
@@ -289,7 +294,7 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy copy file/directory
-func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) { // FIXME Make sure ctx is propagated
+func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
@@ -360,6 +365,6 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 		return 0, "", "", err
 	}
 
-	cRc, cStcOut, cStdErr, cErr := ssh.Copy(remotePath, localPath, upload)
+	cRc, cStcOut, cStdErr, cErr := ssh.Copy(ctx, remotePath, localPath, upload)
 	return cRc, cStcOut, cStdErr, cErr
 }
