@@ -90,7 +90,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetName()
@@ -128,7 +128,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetName()
@@ -200,13 +200,13 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetBucket()
@@ -238,13 +238,13 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetBucket()

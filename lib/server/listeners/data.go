@@ -82,7 +82,7 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	objectName := in.GetName()
@@ -120,7 +120,7 @@ func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *google_pro
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	objectName := in.GetName()
@@ -158,7 +158,7 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_p
 		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	objectName := in.GetName()
