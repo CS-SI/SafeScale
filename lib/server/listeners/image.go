@@ -56,7 +56,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *p
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Images"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}

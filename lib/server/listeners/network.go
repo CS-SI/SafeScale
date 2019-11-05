@@ -67,7 +67,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create network "+networkName); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -139,7 +139,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List networks"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -188,7 +188,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -236,7 +236,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}

@@ -70,7 +70,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create share "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -111,7 +111,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete share "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -150,7 +150,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List shares "); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -201,7 +201,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Mount share "+in.GetShare().GetName()+" on host "+in.GetHost().GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -245,7 +245,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Unmount share "+shareRef+" from host "+hostRef); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -285,7 +285,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect share "+shareRef); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}

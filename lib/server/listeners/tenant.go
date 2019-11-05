@@ -83,7 +83,7 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (_
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenants List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -118,7 +118,7 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (_ 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant Get"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -153,7 +153,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant Set "+name); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -219,7 +219,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageList"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -259,7 +259,7 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageGet"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
@@ -292,7 +292,7 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
+	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames())); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
