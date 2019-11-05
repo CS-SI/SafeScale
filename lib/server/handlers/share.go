@@ -153,7 +153,7 @@ func (handler *ShareHandler) Create(
 		serverSharesV1 := v.(*propsv1.HostShares)
 		if len(serverSharesV1.ByID) == 0 {
 			// Host doesn't have shares yet, so install NFS
-			err = nfsServer.Install()
+			err = nfsServer.Install(ctx)
 			if err != nil {
 				return err
 			}
@@ -163,13 +163,13 @@ func (handler *ShareHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	err = nfsServer.AddShare(sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
+	err = nfsServer.AddShare(ctx, sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			err2 := nfsServer.RemoveShare(sharePath)
+			err2 := nfsServer.RemoveShare(ctx, sharePath)
 			if err2 != nil {
 				log.Warn("failed to RemoveShare")
 				err = scerr.AddConsequence(err, err2)
@@ -296,7 +296,7 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 		if err != nil {
 			return err
 		}
-		err = nfsServer.RemoveShare(share.Path)
+		err = nfsServer.RemoveShare(ctx, share.Path)
 		if err != nil {
 			return err
 		}
@@ -499,12 +499,12 @@ func (handler *ShareHandler) Mount(
 		if err != nil {
 			return err
 		}
-		err = nfsClient.Install()
+		err = nfsClient.Install(ctx)
 		if err != nil {
 			return err
 		}
 
-		err = nfsClient.Mount(export, mountPath, withCache)
+		err = nfsClient.Mount(ctx, export, mountPath, withCache)
 		if err != nil {
 			return err
 		}
@@ -531,13 +531,13 @@ func (handler *ShareHandler) Mount(
 				err = scerr.AddConsequence(err, derr)
 			}
 
-			derr = nfsClient.Install()
+			derr = nfsClient.Install(ctx)
 			if derr != nil {
 				log.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 
-			derr = nfsClient.Unmount(export)
+			derr = nfsClient.Unmount(ctx, export)
 			if derr != nil {
 				log.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
@@ -698,7 +698,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 		if err != nil {
 			return err
 		}
-		err = nfsClient.Unmount(server.GetAccessIP() + ":" + share.Path)
+		err = nfsClient.Unmount(ctx, server.GetAccessIP()+":"+share.Path)
 		if err != nil {
 			return err
 		}

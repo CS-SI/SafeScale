@@ -57,7 +57,7 @@ func getTemplateBox() (*rice.Box, error) {
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-func executeScript(sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
+func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
 	bashLibrary, err := system.GetBashLibrary()
 	if err != nil {
 		return 255, "", "", err
@@ -119,7 +119,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	filename := "/opt/safescale/var/tmp/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
+			retcode, stdout, stderr, err := sshconfig.Copy(ctx, filename, f.Name(), true)
 			if err != nil {
 				return fmt.Errorf("ssh operation failed: %s", err.Error())
 			}
