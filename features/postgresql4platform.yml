@@ -415,7 +415,7 @@ feature:
                             CMD ["postgres"]
                             EOF
 
-                            docker build --network host -t pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || sfFail 192
+                            docker build --network host -t safescale/pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || sfFail 192
                             sfExit
 
                     pgpool-img:
@@ -523,7 +523,7 @@ feature:
 
                             services:
                                 dbmaster:
-                                    image: pgsql4platform:latest
+                                    image: safescale/pgsql4platform:latest
                                     environment:
                                         - REPMGR_PRIMARY_HOST=dbmaster
                                         - REPMGR_PARTNER_NODES=${DBNODES}
@@ -580,7 +580,7 @@ feature:
                                     cat >>${SF_ETCDIR}/postgresql4platform/stack.yml <<-EOF
 
                                 ${DBSLAVE}:
-                                    image: pgsql4platform:latest
+                                    image: safescale/pgsql4platform:latest
                                     environment:
                                         - REPMGR_PRIMARY_HOST=dbmaster
                                         - REPMGR_PARTNER_NODES=${DBNODES}
@@ -626,7 +626,7 @@ feature:
 
                                 cat >>${SF_ETCDIR}/postgresql4platform/stack.yml <<-EOF
                                 pooler:
-                                    image: pgpool4platform:latest
+                                    image: safescale/pgpool4platform:latest
                                     volumes:
                                         - ${SF_ETCDIR}/postgresql4platform/pgpool.conf.template:/etc/postgresql/pgpool.conf.template:ro
                                         - ${SF_VARDIR}/postgresql4platform/pgpool/pool_passwd:/etc/postgresql/pool_passwd
@@ -734,8 +734,8 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            sfDeleteDockerImage pgsql4platform:latest || true
-                            sfDeleteDockerImage pgpool4platform:latest || true
+                            sfDeleteDockerImage safescale/pgsql4platform:latest || true
+                            sfDeleteDockerImage safescale/pgpool4platform:latest || true
                             docker network rm postgresql4platform_net || true
                             docker secret rm safescale.postgresql.password.postgres safescale.postgresql.password.repmgr || true
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
