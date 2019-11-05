@@ -164,6 +164,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 
 	echan := make(chan error)
 	go func() {
+		defer close(echan)
 		sshSvc := NewSSHHandler(handler.service)
 		ssh, err := sshSvc.GetConfig(ctx, hostParam)
 		if err != nil {
@@ -218,6 +219,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 	echan := make(chan error)
 
 	go func() {
+		defer close(echan)
 		retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 			func() error {
 				if desist {
