@@ -97,7 +97,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
-func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) { // FIXME Make sure ctx is propagated
+func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -158,7 +158,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 		return err
 	}
 
-	select {
+	select { // FIXME Unorthodox usage of context
 	case <-ctx.Done():
 		logrus.Warnf("Volume deletion cancelled by user")
 		volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
@@ -325,7 +325,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 }
 
 // Attach a volume to an host
-func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) { // FIXME Make sure ctx is propagated
+func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -624,7 +624,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		}
 	}()
 
-	select {
+	select { // FIXME Unorthodox usage of context
 	case <-ctx.Done():
 		logrus.Warnf("Volume attachment cancelled by user")
 		err = fmt.Errorf("volume attachment cancelled by user")
@@ -681,7 +681,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) (err error) { // FIXME Make sure ctx is propagated
+func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -825,7 +825,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 		return err
 	}
 
-	select {
+	select { // FIXME Unorthodox usage of context
 	case <-ctx.Done():
 		logrus.Warnf("Volume detachment cancelled by user")
 		// Currently format is not registered anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
