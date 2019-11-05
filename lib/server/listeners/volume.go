@@ -34,8 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
 // safescale volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
 // safescale volume detach v1
@@ -60,6 +58,10 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	all := in.GetAll()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
@@ -102,6 +104,10 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	name := in.GetName()
 	speed := in.GetSpeed()
 	size := in.GetSize()
@@ -143,6 +149,10 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference for volume"), "cannot attach volume").ToGRPCStatus()
@@ -199,6 +209,9 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference for volume"), "cannot detach volume").ToGRPCStatus()
@@ -244,6 +257,9 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference"), "cannot delete volume").ToGRPCStatus()
@@ -285,6 +301,9 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {

@@ -32,8 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // SSHHandler exists to ease integration tests
 var SSHHandler = handlers.NewSSHHandler
 
@@ -52,6 +50,9 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	host := in.GetHost().GetName()
 	command := in.GetCommand()
@@ -94,6 +95,9 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	source := in.Source
 	dest := in.Destination

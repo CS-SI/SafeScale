@@ -35,8 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // HostHandler ...
 var HostHandler = handlers.NewHostHandler
 
@@ -75,6 +73,9 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, scerr.InvalidParameterError("ref", "cannot be empty string").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -116,6 +117,9 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 	if ref == "" {
 		return empty, scerr.InvalidRequestError("cannot stop host: neither name nor id of host has been provided").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -154,6 +158,9 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	if ref == "" {
 		return empty, scerr.InvalidParameterError("ref", "cannot be empty string").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -186,6 +193,9 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb.HostList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	all := in.GetAll()
 
@@ -228,6 +238,9 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	name := in.GetName()
 
@@ -288,6 +301,9 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 	name := in.GetName()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
@@ -331,6 +347,9 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, scerr.InvalidRequestError("cannot get host status: neither name nor id given as reference").ToGRPCStatus()
@@ -368,6 +387,9 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -408,6 +430,9 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
@@ -446,6 +471,9 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {

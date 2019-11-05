@@ -32,8 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // JobManagerHandler ...
 var JobManagerHandler = handlers.NewJobHandler
 
@@ -49,6 +47,10 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	uuid := in.Uuid
 	if in.Uuid == "" {
 		return empty, scerr.InvalidRequestError("cannot stop job: job id not set")
@@ -83,6 +85,9 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *pb.JobList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()

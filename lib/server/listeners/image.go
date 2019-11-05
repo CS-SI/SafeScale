@@ -31,8 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // ImageHandler ...
 var ImageHandler = handlers.NewImageHandler
 
@@ -48,6 +46,9 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *p
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()

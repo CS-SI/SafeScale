@@ -34,8 +34,6 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // ShareHandler ...
 var ShareHandler = handlers.NewShareHandler
 
@@ -57,6 +55,10 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	shareName := in.GetName()
 	hostRef := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
@@ -97,6 +99,10 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	if in == nil {
 		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	shareName := in.GetName()
 	// FIXME: validate parameters
 
@@ -134,6 +140,9 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.ShareList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -177,6 +186,10 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
@@ -217,6 +230,10 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	if in == nil {
 		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
@@ -256,6 +273,10 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	shareRef := srvutils.GetReference(in)
 	// FIXME: validate parameters
 

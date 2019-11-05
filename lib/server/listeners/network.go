@@ -35,8 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// FIXME Technical debt Input verification, ctx cannot be nil
-
 // NetworkHandler ...
 var NetworkHandler = handlers.NewNetworkHandler
 
@@ -55,6 +53,9 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	}
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	networkName := in.GetName()
 	if networkName == "" {
@@ -129,6 +130,9 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -170,6 +174,10 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 	if in == nil {
 		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, scerr.InvalidRequestError("cannot inspect network: neither name nor id given as reference").ToGRPCStatus()
@@ -214,6 +222,10 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 	if in == nil {
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, scerr.InvalidRequestError("cannot delete network: neither name nor id given as reference")
