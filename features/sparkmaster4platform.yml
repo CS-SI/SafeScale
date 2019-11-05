@@ -21,6 +21,7 @@ feature:
 
     parameters:
         - SparkRelease=2.3.2
+        - ConsolePort=63013
 
     install:
         bash:
@@ -41,6 +42,8 @@ feature:
                         targets:
                             masters: all
                         run: |
+                            cat "sparkmaster\t{{ .ConsolePort }}/tcp\t# Spark Master console" >>/opt/safescale/etc/services
+
                             mkdir -p ${SF_ETCDIR}/sparkmaster4platform/build
 
                             cat >${SF_ETCDIR}/sparkmaster4platform/build/spark.sh <<-'EOF'
@@ -116,7 +119,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/sparkmaster4platform/stack.yml <<-EOF
+                            cat >${SF_ETCDIR}/sparkmaster4platform/stack.yml <<-EOF
                             version: "3.7"
 
                             networks:
@@ -129,13 +132,14 @@ feature:
                                     image: safescale/sparkmaster:{{ .SparkRelease }}
                                     networks:
                                         net:
-                                            sparkmaster
+                                            aliases:
+                                                - sparkmaster
                                     ports:
-                                        - published: 8081
+                                        - published: {{ .ConsolePort }}
                                           target: 8081
                                           mode: host
-                                        - published: 7077
-                                          target: 7077
+                                        # - published: 7077
+                                        #   target: 7077
                                     deploy:
                                         mode: replicated
                                         replicas: 1
@@ -174,7 +178,7 @@ feature:
                             docker stack rm sparkmaster4platform || sfFail 192
                             sfExit
 
-                    image:
+                    cleanup:
                         targets:
                             masters: all
                         run: |
