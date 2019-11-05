@@ -24,6 +24,7 @@ feature:
     parameters:
         - AdminPassword
         - RootURL=/geoserver/
+        - Port=63012
 
     install:
         bash:
@@ -44,9 +45,9 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/geoserver4platform/build
+                            mkdir -p ${SF_ETCDIR}/geoserver/build
 
-                            cat >${SF_ETCDIR}/geoserver4platform/build/web.xml <<-EOF
+                            cat >${SF_ETCDIR}/geoserver/build/web.xml <<-EOF
                             <?xml version="1.0" encoding="UTF-8"?>
                             <!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
                             <web-app>
@@ -63,7 +64,7 @@ feature:
 
                                 <context-param>
                                     <param-name>PROXY_BASE_URL</param-name>
-                                    <param-value>https://{{ .EndpointIP }}/geoserver/</param-value>
+                                    <param-value>https://{{ .EndpointIP }}{{ .RootURL }}</param-value>
                                 </context-param>
 
                                 <context-param>
@@ -238,7 +239,7 @@ feature:
                             </web-app>
                             EOF
 
-                            cat >${SF_ETCDIR}/geoserver4platform/build/Dockerfile <<-EOF
+                            cat >${SF_ETCDIR}/geoserver/build/Dockerfile <<-EOF
                             FROM kartoza/geoserver:2.15.2
 
                             # Overrides existing web.xml with our own configuration
@@ -251,7 +252,7 @@ feature:
                             RUN rm /usr/local/tomcat/webapps/geoserver/WEB-INF/lib/sqlite-jdbc-*.jar
                             EOF
 
-                            docker build --network host -t safescale/geoserver:latest ${SF_ETCDIR}/geoserver4platform/build || sfFail 193
+                            docker build --network host -t safescale/geoserver:latest ${SF_ETCDIR}/geoserver/build || sfFail 193
                             sfExit
 
                     secret:
@@ -269,7 +270,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            cat >${SF_ETCDIR}/geoserver4platform/stack.yml <<-EOF
+                            cat >${SF_ETCDIR}/geoserver/stack.yml <<-EOF
                             version: '3.7'
 
                             networks:
@@ -283,7 +284,7 @@ feature:
 
                             services:
                                 geoserver:
-                                    image: safescale/geoserver4platform:latest
+                                    image: safescale/geoserver:latest
                                     # environment:
                                     #     - GEOSERVER_ADMIN_PASSWORD="${GEOSERVER_ADMIN_PASSWORD}"
                                     volumes:
@@ -292,7 +293,7 @@ feature:
                                         spark_net:
                                             - geoserver
                                     ports:
-                                        - published: 63012
+                                        - published: {{ .Port }}
                                           target: 8080
                                           mode: host
                                     deploy:
@@ -316,14 +317,14 @@ feature:
                             hosts: no
                             masters: one
                         run: |
-                            docker stack up -c ${SF_ETCDIR}/geoserver4platform/stack.yml geoserver4platform || sfFail 195
+                            docker stack up -c ${SF_ETCDIR}/geoserver/stack.yml geoserver || sfFail 195
                             sfExit
 
                     ready:
                         targets:
                             masters: one
                         run: |
-                            sfDoesDockerStackRun geoserver4platform || sfFail 196
+                            sfDoesDockerStackRun geoserver || sfFail 196
                             exit 0
 
             remove:
@@ -333,7 +334,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            docker stack rm geoserver4platform || sfFail 192
+                            docker stack rm geoserver || sfFail 192
                             sfExit 0
 
                     cleanup:
@@ -342,12 +343,12 @@ feature:
                         run: |
                             docker secret rm safescale.geoserver.password.admin || sfFail 193
                             docker image rm -f safescale/geoserver:latest || sfFail 194
-                            rm -rf ${SF_ETCDIR}/geoserver4platform
+                            rm -rf ${SF_ETCDIR}/geoserver
                             sfExit
 
     proxy:
         rules:
-            - name: geoserver4platform_backends
+            - name: geoserver_backends
               type: upstream
               targets:
                   masters: one
@@ -355,29 +356,29 @@ feature:
                   {
                       "algorithm": "consistent-hashing",
                       "hash_on": "ip",
-                      "target": "{{.HostIP}}:63012",
+                      "target": "{{.HostIP}}:{{ .Port }}",
                       "weight": 100
                   }
 
-            - name: geoserver4platform_svc
+            - name: geoserver_svc
               type: service
               targets:
                   masters: one
               content: |
                   {
-                      "host": "geoserver4platform_backends",
+                      "host": "geoserver_backends",
                       "path": "/geoserver"
 
                   }
 
-            - name: geoserver4platform_route
+            - name: geoserver_route
               type: route
               targets:
                   masters: one
               content: |
                   {
                       "paths": ["{{ .RootURL }}"],
-                      "service": { "id": "{{.geoserver4platform_svc}}" }
+                      "service": { "id": "{{.geoserver_svc}}" }
                   }
 
 ...
