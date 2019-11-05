@@ -195,7 +195,7 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 }
 
 // Unmount a bucket
-func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) { // FIXME Make sure ctx is propagated
+func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()

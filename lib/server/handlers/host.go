@@ -886,7 +886,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 }
 
 // Delete deletes host referenced by ref
-func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) { // FIXME Make sure ctx is propagated
+func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1061,7 +1061,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		return fmt.Errorf("Unable to find the host even if it is described by metadatas\nIncoherent metadatas have been supressed")
 	}
 
-	select {
+	select { // FIXME Unorthodox usage of context
 	case <-ctx.Done():
 		log.Warnf("Host delete cancelled by safescale")
 		var hostBis *resources.Host

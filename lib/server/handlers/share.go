@@ -250,7 +250,7 @@ func (handler *ShareHandler) Create(
 }
 
 // Delete a share from host
-func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) { // FIXME Make sure ctx is propagated
+func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -321,7 +321,7 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 		return err
 	}
 
-	select {
+	select { // FIXME Unorthodox usage of context
 	case <-ctx.Done():
 		log.Warnf("Share deletion cancelled by user")
 		_, err = handler.Create(context.Background(), share.Name, server.Name, share.Path, []string{}, false, false, false, false, false, false, false)
@@ -630,7 +630,7 @@ func (handler *ShareHandler) Mount(
 }
 
 // Unmount a share from local directory of an host
-func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) { // FIXME Make sure ctx is propagated
+func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -736,7 +736,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 		}
 	}
 
-	select {
+	select { // FIXME Unorthodox usage of context
 	case <-ctx.Done():
 		log.Warnf("Share unmount cancelled by user")
 		_, err = handler.Mount(context.Background(), shareName, hostName, mountPath, false)
