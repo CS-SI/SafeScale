@@ -648,7 +648,7 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
-func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out string, err error) {
+func (ssh *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, err error) {
 	if ssh == nil {
 		return "", scerr.InvalidInstanceError()
 	}
@@ -671,41 +671,62 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		phase = "phase2"
 	}
 
+	// FIXME Use echan here
+	echan := make(chan error)
+
 	var (
 		retcode        int
 		stdout, stderr string
 	)
-	begins := time.Now()
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-		func() error {
-			cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
-			if err != nil {
-				return err
-			}
 
-			retcode, stdout, stderr, err = cmd.RunWithTimeout(context.TODO(), nil, timeout)
-			if err != nil {
-				return err
-			}
-			if retcode != 0 {
-				if retcode == 255 {
-					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
+	desist := false
+	begins := time.Now()
+
+	go func() {
+		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+			func() error {
+				if desist {
+					return retry.AbortedError("operation aborted by user", nil)
 				}
-				return fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
-			}
-			return nil
-		},
-		timeout,
-	)
-	if retryErr != nil {
-		return stdout, retryErr
+
+				cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
+				if err != nil {
+					return err
+				}
+
+				retcode, stdout, stderr, err = cmd.RunWithTimeout(context.TODO(), nil, timeout)
+				if err != nil {
+					return err
+				}
+				if retcode != 0 {
+					if retcode == 255 {
+						return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
+					}
+					return fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
+				}
+				return nil
+			},
+			timeout,
+		)
+		echan <- retryErr
+	}()
+
+	select {
+	case retryErr := <-echan:
+		if retryErr != nil {
+			return stdout, retryErr
+		}
+	case <-ctx.Done():
+		desist = true
+		return stdout, retry.AbortedError("operation aborted by user", nil)
 	}
+
 	log.Debugf("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 
 // Copy copies a file/directory from/to local to/from remote
-func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, string, string, error) {
+func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, isUpload bool) (errc int, stdout string, stderr string, err error) { // FIXME Use context here
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		return 0, "", "", fmt.Errorf("unable to create tunnels : %s", err.Error())
@@ -753,7 +774,18 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		keyFile: identityfile,
 	}
 
-	return sshCommand.Run(nil) // FIXME It CAN lock, use .RunWithTimeout instead
+	echan := make(chan error)
+	go func() {
+		errc, stdout, stderr, err = sshCommand.Run(nil) // FIXME It CAN lock, use .RunWithTimeout instead
+		echan <- err
+	}()
+
+	select {
+	case <-ctx.Done():
+		return 0, stdout, stderr, retry.AbortedError("operation cancelled by user", nil)
+	case err := <-echan:
+		return errc, stdout, stderr, err
+	}
 }
 
 // Exec executes the cmd using ssh

@@ -591,7 +591,14 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (_ *clusterprops
 			log.Errorf("failed to get ssh config for master '%s': %s", master.ID, err.Error())
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
+
+		ctx, err := task.GetContext()
+		if err != nil {
+			log.Errorf("failed to get context: %s", err.Error())
+			continue
+		}
+
+		_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				lastError = err
@@ -634,7 +641,14 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2
 			log.Errorf("failed to get ssh config of node '%s': %s", node.ID, err.Error())
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
+
+		ctx, err := task.GetContext()
+		if err != nil {
+			log.Errorf("failed to get context: %s", err.Error())
+			continue
+		}
+
+		_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
