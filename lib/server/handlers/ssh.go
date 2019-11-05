@@ -149,7 +149,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) { // FIXME Make sure ctx is propagated
+func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -162,13 +162,25 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	sshSvc := NewSSHHandler(handler.service)
-	ssh, err := sshSvc.GetConfig(ctx, hostParam)
-	if err != nil {
-		return err
+	echan := make(chan error)
+	go func() {
+		sshSvc := NewSSHHandler(handler.service)
+		ssh, err := sshSvc.GetConfig(ctx, hostParam)
+		if err != nil {
+			echan <- err
+			return
+		}
+		_, waitErr := ssh.WaitServerReady("ready", timeout)
+		echan <- waitErr
+		return
+	}()
+
+	select {
+	case <-ctx.Done():
+		return retry.AbortedError("operation aborted by user", nil)
+	case withErr := <-echan:
+		return withErr
 	}
-	_, waitErr := ssh.WaitServerReady("ready", timeout)
-	return waitErr
 }
 
 // Run tries to execute command 'cmd' on the host
@@ -230,17 +242,6 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 	}
 
 	return retCode, stdOut, stdErr, err
-}
-
-// run executes command on the host
-// This function can lock, use runwithTimeout instead
-func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
-	// Create the command
-	sshCmd, err := ssh.Command(cmd)
-	if err != nil {
-		return 0, "", "", err
-	}
-	return sshCmd.Run(nil)
 }
 
 // run executes command on the host

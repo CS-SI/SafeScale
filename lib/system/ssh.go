@@ -450,7 +450,7 @@ func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(ctx context.Context, t concurrency.Task, timeout time.Duration) (int, string, string, error) { // CRITICAL FIXME Robutsness, this must run with a context
+func (sc *SSHCommand) RunWithTimeout(ctx context.Context, t concurrency.Task, timeout time.Duration) (int, string, string, error) {
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
