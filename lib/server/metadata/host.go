@@ -222,15 +222,20 @@ func (mh *Host) Delete() (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
-	// FIXME Merge errors
+	errList := []error{}
+
 	err1 := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
 	err2 := mh.item.DeleteFrom(ByNameFolderName, *mh.name)
 
 	if err1 != nil {
-		return err1
+		errList = append(errList, err1)
 	}
-	if err != nil {
-		return err2
+	if err2 != nil {
+		errList = append(errList, err2)
+	}
+
+	if len(errList) > 0 {
+		return scerr.ErrListError(errList)
 	}
 
 	return nil
