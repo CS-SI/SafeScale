@@ -128,7 +128,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 }
 
 // Mount a bucket on an host on the given mount point
-func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) { // FIXME Make sure ctx is propagated
+func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()

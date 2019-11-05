@@ -671,7 +671,6 @@ func (ssh *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout
 		phase = "phase2"
 	}
 
-	// FIXME Use echan here
 	echan := make(chan error)
 
 	var (
@@ -683,6 +682,7 @@ func (ssh *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout
 	begins := time.Now()
 
 	go func() {
+		defer close(echan)
 		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 			func() error {
 				if desist {
@@ -726,7 +726,7 @@ func (ssh *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout
 }
 
 // Copy copies a file/directory from/to local to/from remote
-func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, isUpload bool) (errc int, stdout string, stderr string, err error) { // FIXME Use context here
+func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, isUpload bool) (errc int, stdout string, stderr string, err error) {
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		return 0, "", "", fmt.Errorf("unable to create tunnels : %s", err.Error())
@@ -776,6 +776,7 @@ func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, is
 
 	echan := make(chan error)
 	go func() {
+		defer close(echan)
 		errc, stdout, stderr, err = sshCommand.Run(nil) // FIXME It CAN lock, use .RunWithTimeout instead
 		echan <- err
 	}()

@@ -57,7 +57,7 @@ func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
 	return tplcmd, nil
 }
 
-// Execute the given script (embeded in a rice-box) with the given data on the host identified by hostid
+// Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
 func exec(ctx context.Context, script string, data interface{}, hostid string, svc iaas.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
@@ -70,14 +70,23 @@ func exec(ctx context.Context, script string, data interface{}, hostid string, s
 		return err
 	}
 
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		return err
-	}
-	_, err = cmd.Output()
+	echan := make(chan error)
+	go func() {
+		defer close(echan)
+		cmd, err := ssh.SudoCommand(scriptCmd)
+		if err != nil {
+			echan <- err
+			return
+		}
+		_, err = cmd.Output()
+		echan <- err
+		return
+	}()
 
-	if err != nil {
+	select {
+	case <-ctx.Done():
+		return scerr.AbortedError("operation aborted by user", nil)
+	case err := <-echan:
 		return err
 	}
-	return nil
 }
