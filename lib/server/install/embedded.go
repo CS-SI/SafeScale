@@ -525,9 +525,9 @@ func monitoring4platformFeature() *Feature {
 	}
 }
 
-// geoserver4platformFeature ...
-func geoserver4platformFeature() *Feature {
-	name := "geoserver4platform"
+// geoserverFeature ...
+func geoserverFeature() *Feature {
+	name := "geoserver"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
