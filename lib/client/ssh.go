@@ -65,7 +65,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	_, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	ctx, cancel, err := utils.GetTimeoutContext(executionTimeout)
 	if err != nil {
 		return -1, "", "", err
 	}
@@ -80,7 +80,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 				return err
 			}
 
-			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(context.TODO(), nil, executionTimeout)
+			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(ctx, nil, executionTimeout)
 
 			// If an error occurred, stop the loop and propagates this error
 			if err != nil {
@@ -213,7 +213,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		connectionTimeout = executionTimeout
 	}
 
-	_, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	ctx, cancel, err := utils.GetTimeoutContext(executionTimeout)
 	if err != nil {
 		return -1, "", "", err
 	}
@@ -225,7 +225,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err = sshCfg.Copy(remotePath, localPath, upload)
+			retcode, stdout, stderr, err = sshCfg.Copy(ctx, remotePath, localPath, upload)
 			// If an error occurred, stop the loop and propagates this error
 			if err != nil {
 				retcode = -1

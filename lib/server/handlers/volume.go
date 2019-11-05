@@ -499,7 +499,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				if err != nil {
 					return err
 				}
-				volumeUUID, err = server.MountBlockDevice(deviceName, mountPoint, format, doNotFormat)
+				volumeUUID, err = server.MountBlockDevice(ctx, deviceName, mountPoint, format, doNotFormat)
 				if err != nil {
 					return err
 				}
@@ -516,7 +516,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Starting from here, unmount block device if exiting with error
 				defer func() {
 					if err != nil {
-						derr := server.UnmountBlockDevice(volumeUUID)
+						derr := server.UnmountBlockDevice(ctx, volumeUUID)
 						if derr != nil {
 							logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							err = scerr.AddConsequence(err, derr)
@@ -542,7 +542,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 
 	defer func() {
 		if err != nil {
-			derr := server.UnmountBlockDevice(volumeUUID)
+			derr := server.UnmountBlockDevice(ctx, volumeUUID)
 			if derr != nil {
 				logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				err = scerr.AddConsequence(err, derr)
@@ -774,7 +774,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				if err != nil {
 					return err
 				}
-				err = nfsServer.UnmountBlockDevice(attachment.Device)
+				err = nfsServer.UnmountBlockDevice(ctx, attachment.Device)
 				if err != nil {
 					// FIXME Think about this
 					logrus.Error(err)

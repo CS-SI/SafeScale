@@ -17,6 +17,7 @@
 package nfs
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -41,27 +42,27 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 }
 
 // Install installs NFS client on remote host
-func (c *Client) Install() error {
-	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
+func (c *Client) Install(ctx context.Context) error {
+	retcode, stdout, stderr, err := executeScript(ctx, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install NFS client")
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(export string, mountPoint string, withCache bool) error {
+func (c *Client) Mount(ctx context.Context, export string, mountPoint string, withCache bool) error {
 	data := map[string]interface{}{
 		"Export":      export,
 		"MountPoint":  mountPoint,
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
-	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_mount.sh", data)
+	retcode, stdout, stderr, err := executeScript(ctx, *c.SSHConfig, "nfs_client_share_mount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
 }
 
 // Unmount a nfs share from NFS server
-func (c *Client) Unmount(export string) error {
+func (c *Client) Unmount(ctx context.Context, export string) error {
 	data := map[string]interface{}{
 		"Export": export,
 	}
-	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_unmount.sh", data)
+	retcode, stdout, stderr, err := executeScript(ctx, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unmount remote NFS share")
 }

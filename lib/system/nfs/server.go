@@ -17,6 +17,7 @@
 package nfs
 
 import (
+	"context"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
@@ -47,13 +48,13 @@ func (s *Server) GetHost() string {
 }
 
 // Install installs and configure NFS service on the remote host
-func (s *Server) Install() error {
-	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+func (s *Server) Install(ctx context.Context) error {
+	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 }
 
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
+func (s *Server) AddShare(ctx context.Context, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
 	share, err := NewShare(s, path)
 	if err != nil {
 		return fmt.Errorf("failed to create the share : %s", err.Error())
@@ -93,36 +94,36 @@ func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSqu
 
 	share.AddACL(acl)
 
-	return share.Add()
+	return share.Add(ctx)
 }
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
-func (s *Server) RemoveShare(path string) error {
+func (s *Server) RemoveShare(ctx context.Context, path string) error {
 	data := map[string]interface{}{
 		"Path": path,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(deviceName, mountPoint, format string, doNotFormat bool) (string, error) {
+func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool) (string, error) {
 	data := map[string]interface{}{
 		"Device":      deviceName,
 		"MountPoint":  mountPoint,
 		"FileSystem":  format,
 		"DoNotFormat": doNotFormat,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "block_device_mount.sh", data)
+	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
 	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
 	return stdout, err
 }
 
 // UnmountBlockDevice unmounts a local block device on the remote system
-func (s *Server) UnmountBlockDevice(volumeUUID string) error {
+func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) error {
 	data := map[string]interface{}{
 		"UUID": volumeUUID,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "block_device_unmount.sh", data)
+	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }

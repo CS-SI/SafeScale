@@ -17,6 +17,7 @@
 package nfs
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -79,7 +80,7 @@ func (s *Share) AddACL(acl ExportACL) {
 }
 
 //Add configures and exports the share
-func (s *Share) Add() error {
+func (s *Share) Add(ctx context.Context) error {
 	var acls string
 	for _, a := range s.ACLs {
 		acl := a.Host + "("
@@ -141,6 +142,6 @@ func (s *Share) Add() error {
 		"AccessRights": strings.TrimSpace(acls),
 	}
 
-	retcode, stdout, stderr, err := executeScript(*s.Server.SSHConfig, "nfs_server_path_export.sh", data)
+	retcode, stdout, stderr, err := executeScript(ctx, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }
