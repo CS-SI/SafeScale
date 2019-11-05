@@ -55,7 +55,7 @@ func init() {
 		elassandraFeature(),
 		consul4platformFeature(),
 		monitoring4platformFeature(),
-		geoserver4platformFeature(),
+		geoserverFeature(),
 	}
 
 	for _, item := range allEmbedded {
