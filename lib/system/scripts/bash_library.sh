@@ -393,6 +393,7 @@ sfProbeGPU() {
 		[ ! -z "$val" ] && FACTS["nVidia GPU"]=$val || true
 	fi
 }
+export -f sfProbeGPU
 
 sfEdgeProxyReload() {
     id=$(sfGetFact "edgeproxy4network_docker_id")
@@ -435,10 +436,11 @@ sfPgsqlCreateDatabase() {
         local cmd="CREATE DATABASE $dbname"
         [ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
         docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
-        retcode=$?
+        return $?
     fi
     return 1
 }
+export -f sfPgsqlCreateDatabase
 
 sfPgsqlDropDatabase() {
     local dbname=$1
@@ -458,6 +460,7 @@ sfPgsqlDropDatabase() {
     fi
     return $retcode
 }
+export -f sfPgsqlDropDatabase
 
 # This function allows to create a database on platform PostgreSQL
 # Role name and optional options are passed as parameter, password is passed in stdin. example:
@@ -480,6 +483,7 @@ sfPgsqlCreateRole() {
     [ ! -z "$options" ] && cmd="$cmd $options"
     docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd" && echo -n "$password" | sfPgsqlUpdatePassword $rolename
 }
+export -f sfPgsqlCreateRole
 
 # This function allows to drop a database on platform PostgreSQL
 # Role name is passed as parameter
@@ -493,6 +497,7 @@ sfPgsqlDropRole() {
     local cmd="DROP ROLE IF EXISTS $rolename"
     sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'$cmd'"
 }
+export -f sfPgsqlDropRole
 
 __cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
 
@@ -530,30 +535,80 @@ sfPgsqlUpdatePassword() {
     fi
     return $retcode
 }
+export -f sfPgsqlUpdatePassword
 
 # sfKeycloakRun allows to execute keycloak admin command
 # Intended to be use on target masters:any
 sfKeycloakRun() {
-    local heredoc
-    read -t 1 heredoc
-    local id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep keycloak4platform_server | cut -d: -f2)
+    local id=$(sfGetFact "keycloak4platform_docker_id")
     [ $? -ne 0 -o -z ${id+x} ] && echo "failed to find keycloak container" && return 1
-    local params=$@
 
-echo "heredoc='$heredoc'"
+    local _stdin=
+    local _fc
+    read -N1 -t1 _fc && {
+        [ $? -le 128 ] && {
+            IFS= read -rd '' _stdin
+            _stdin="$_fc$_stdin"
+        }
+    }
 
-    if [ -z ${heredoc+x} ]; then
-        docker exec $id bash <<BASH
-/opt/jboss/keycloak/bin/kcadm.sh --no-config --server http://{{ .HostIP }}:63010/auth $params
+    if [ -z "$_stdin" ]; then
+        docker exec -i $id bash <<BASH
+/opt/jboss/keycloak/bin/kcadm.sh $@ --no-config --server http://{{ .HostIP }}:63010/auth
 BASH
     else
-        docker exec $id bash <<BASH
-/opt/jboss/keycloak/bin/kcadm.sh --no-config --server http://{{ .HostIP }}:63010/auth $params <<KCADM
-$heredoc
+        docker exec -i $id bash <<BASH
+/opt/jboss/keycloak/bin/kcadm.sh $@ --no-config --server http://{{ .HostIP }}:63010/auth -f - <<KCADM
+$_stdin
 KCADM
 BASH
     fi
 }
+export -f sfKeycloakRun
+
+# Returns all the information about the client passed as first parameters
+# Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
+sfKeycloakGetClient() {
+    [ $# -eq 0 ] && return 1
+    local name=$1
+    shift
+    sfKeycloakRun get clients $@ | tail -n +1 | jq ".[] | select(.clientId == \"$name\")"
+}
+export -f sfKeycloakGetClient
+
+sfKeycloakDeleteClient() {
+    [ $# -eq 0 ] && return 1
+    local name=$1
+    shift
+
+    local clientID=$(sfKeycloakGetClient $name $@)
+    [ -z "$clientID" ] && return 1
+
+    sfKeycloakRun delete clients/$clientID $@
+}
+export -f sfKeycloakDeleteClient
+
+# Returns all the information about the group passed as first parameters
+# Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
+sfKeycloakGetGroup() {
+    [ $# -eq 0 ] && return 1
+    local name=$1
+    shift
+    sfKeycloakRun get groups $@ | tail -n +1 | jq ".[] | select(.name == \"$name\")"
+}
+export -f sfKeycloakGetGroup
+
+sfKeycloakDeleteGroup() {
+    [ $# -eq 0 ] && return 1
+    local name=$1
+    shift
+
+    local clientID=$(sfKeycloakGetGroup $name $@)
+    [ -z "$clientID" ] && return 1
+
+    sfKeycloakRun delete clients/$clientID $@
+}
+export -f sfKeycloakDeleteGroup
 
 # sfService abstracts the command to use to manipulate services
 sfService() {
@@ -617,7 +672,7 @@ export -f sfSubnetOfDockerSwarmBridge
 # Displays the subnet of a docker network
 sfSubnetOfDockerNetwork() {
     [ $# -ne 1 ] && return 1
-    docker network inspect $1 {{ "--format '{{json .}}'" }} | jq -r .[0].IPAM.Config[0].Subnet
+    docker network inspect $1 {{ "--format '{{json .}}'" }} | jq -r .IPAM.Config[0].Subnet
 }
 export -f sfSubnetOfDockerNetwork
 
@@ -691,16 +746,24 @@ sfRemoveDockerImage() {
 }
 export -f sfRemoveDockerImage
 
+# Allows to create or update a docker secret
+# password can be passed as second parameter or through stdin (prefered option)
 sfUpdateDockerSecret() {
-    [ $# -ne 1 ] & return 1
-    local password=
-    read -t 1 password
-    [ -z ${password+x} ] && return 1
+    [ $# -lt 1 ] && return 1
+    local name=$1
+    shift
 
-    if docker secret inspect $1 &>/dev/null; then
-        docker secret rm $1 || return 1
+    local password=
+    [ $# -eq 1 ] && password="$1"
+    local _stdin=
+    IFS= read -t 1 _stdin
+    [ -z "$_stdin" -a -z "$password" ] && return 1
+    [ ! -z "$_stdin" ] && password="$_stdin"
+
+    if docker secret inspect $name &>/dev/null; then
+        docker secret rm $name || return 1
     fi
-    echo -n "$password" | docker secret create $1 -
+    echo -n "$password" | docker secret create $name -
 }
 export -f sfUpdateDockerSecret
 
