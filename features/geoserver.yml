@@ -285,13 +285,12 @@ feature:
                             services:
                                 geoserver:
                                     image: safescale/geoserver:latest
-                                    # environment:
-                                    #     - GEOSERVER_ADMIN_PASSWORD="${GEOSERVER_ADMIN_PASSWORD}"
                                     volumes:
                                         - /shared/data:/shared/data
                                     networks:
                                         spark_net:
-                                            - geoserver
+                                            aliases:
+                                                - geoserver
                                     ports:
                                         - published: {{ .Port }}
                                           target: 8080
@@ -310,7 +309,7 @@ feature:
                                     secrets:
                                         - admin.password
                             EOF
-                            exit 0
+                            sfExit
 
                     start:
                         targets:
@@ -324,26 +323,26 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            sfDoesDockerStackRun geoserver || sfFail 196
-                            exit 0
+                            sfDoesDockerRunStack geoserver || sfFail 196
+                            sfExit
 
             remove:
-                pace: stack,cleanup
+                pace: shared,cleanup
                 steps:
-                    stack:
+                    shared:
                         targets:
                             masters: one
                         run: |
                             docker stack rm geoserver || sfFail 192
-                            sfExit 0
+                            sfRemoveDockerSecret safescale.geoserver.password.admin || sfFail 193
+                            sfExit
 
                     cleanup:
                         targets:
                             masters: all
                         run: |
-                            docker secret rm safescale.geoserver.password.admin || sfFail 193
-                            docker image rm -f safescale/geoserver:latest || sfFail 194
-                            rm -rf ${SF_ETCDIR}/geoserver
+                            sfRemoveDockerImage safescale/geoserver:latest || sfFail 194
+                            rm -rf ${SF_ETCDIR}/geoserver || true
                             sfExit
 
     proxy:
