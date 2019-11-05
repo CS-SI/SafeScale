@@ -395,12 +395,12 @@ sfProbeGPU() {
 }
 
 sfEdgeProxyReload() {
-    id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }})
-    # legacy...
-    [ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
-    [ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }})
-
-    [ ! -z "$id" ] && docker exec $id kong reload >/dev/null
+    id=$(sfGetFact "edgeproxy4network_docker_id")
+    if [ ! -z ${id+x} ]; then
+        docker exec $id kong reload >/dev/null
+        return $?
+    fi
+    return 1
 }
 export -f sfEdgeProxyReload
 
@@ -410,8 +410,12 @@ sfReverseProxyReload() {
 export -f sfReverseProxyReload
 
 sfIngressReload() {
-    id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }})
-    [ ! -z "$id" ] && docker exec $id kong reload >/dev/null
+    id=$(sfGetFact "ingress4platform_docker_id")
+    if [ ! -z ${id+x} ]; then
+        docker exec $id kong reload >/dev/null
+        return $?
+    fi
+    return 1
 }
 export -f sfIngressReload
 
@@ -426,15 +430,14 @@ sfPgsqlCreateDatabase() {
     fi
     local owner=
     [ $# -eq 2 ] && owner=$2
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
-    retcode=$?
-    if [ $retcode -eq 0 -a ! -z "$id" ]; then
+    id=$(sfGetFact "postgresql4platform_docker_id")
+    if [ ! -z ${id+x} ]; then
         local cmd="CREATE DATABASE $dbname"
         [ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
         docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
         retcode=$?
     fi
-    return $retcode
+    return 1
 }
 
 sfPgsqlDropDatabase() {
@@ -443,16 +446,15 @@ sfPgsqlDropDatabase() {
         echo "missing dbname"
         return 1
     fi
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
+    id=$(sfGetFact "postgresql4platform_docker_id")
+    [ -z ${id+x} ] && return 1
+
+    local cmd="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = '${dbname}'"
+    docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
     retcode=$?
-    if [ $retcode -eq 0 -a ! -z "$id" ]; then
-        local cmd="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = '${dbname}'"
-        docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
+    if [ $retcode -eq 0 ]; then
+        sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'DROP DATABASE IF EXISTS $dbname'"
         retcode=$?
-        if [ $retcode -eq 0 ]; then
-            sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'DROP DATABASE IF EXISTS $dbname'"
-            retcode=$?
-        fi
     fi
     return $retcode
 }
@@ -471,19 +473,12 @@ sfPgsqlCreateRole() {
     local password=
     read -t 1 password
 
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
-    retcode=$?
-    if [ $retcode -eq 0 -a ! -z "$id" ]; then
-        local cmd="CREATE ROLE $rolename"
-        [ ! -z "$options" ] && cmd="$cmd $options"
-        docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
-        retcode=$?
-    fi
-    if [ $retcode -eq 0 -a ! -z "$password" ]; then
-        echo -n "$password" | sfPgsqlUpdatePassword $rolename
-        retcode=$?
-    fi
-    return $retcode
+    id=$(sfGetFact "postgresql4platform_docker_id")
+    [ -z ${id+x} ] && return 1
+
+    local cmd="CREATE ROLE $rolename"
+    [ ! -z "$options" ] && cmd="$cmd $options"
+    docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd" && echo -n "$password" | sfPgsqlUpdatePassword $rolename
 }
 
 # This function allows to drop a database on platform PostgreSQL
@@ -491,15 +486,12 @@ sfPgsqlCreateRole() {
 # It is intended to be used on one of the platform PostgreSQL servers in the cluster
 sfPgsqlDropRole() {
     local rolename=$1
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
-    retcode=$?
-    if [ $retcode -eq 0 -a ! -z "$id" ]; then
-        sleep 1
-        local cmd="DROP ROLE IF EXISTS $rolename"
-        sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'$cmd'"
-        retcode=$?
-    fi
-    return $retcode
+    id=$(sfGetFact "postgresql4platform_docker_id")
+    [ -z ${id+x} ] && return 1
+
+    sleep 1
+    local cmd="DROP ROLE IF EXISTS $rolename"
+    sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'$cmd'"
 }
 
 __cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
@@ -520,15 +512,14 @@ sfPgsqlUpdatePassword() {
     read -t 1 password
     [ -z "$password" ] && echo "missing password from pipe" && return 1
 
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_db | cut -d: -f2)
+    id=$(sfGetFact "postgresql4platform_docker_id")
+    [ -z ${id+x} ] && return 1
+
+    docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "ALTER USER $username WITH PASSWORD '$password'"
     retcode=$?
-    if [ $retcode -eq 0 -a ! -z "$id" ]; then
-        docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "ALTER USER $username WITH PASSWORD '$password'"
-        retcode=$?
-    fi
     if [ $retcode -eq 0 ]; then
         for i in {{ range .MasterIPs }}{{.}} {{end}}; do
-            id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} | grep postgresql4platform_pooler | cut -d: -f2)
+            id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_pooler | cut -d: -f2)
             retcode=$?
             if [ $retcode -eq 0 -a ! -z "$id" ]; then
                 ssh $__cluster_admin_ssh_options__ cladm@$i docker exec $id /usr/local/bin/update_password.sh $username "$password"
@@ -823,9 +814,27 @@ sfDetectFacts() {
     [ $val -le 0 ] && val=1
     FACTS["2/3_of_threads"]=$val
 
-    FACTS["docker_version"]=
+    FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }})
+
     sfProbeGPU
 
+    # Some facts about installed features
+    id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+    # legacy...
+    [ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+    [ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+    FACTS["edgeproxy4network_docker_id"]=$id
+
+    id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+    FACTS["ingress4platform_docker_id"]=$id
+
+    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2)
+    FACTS["postgresql4platform_docker_id"]=$id
+
+    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2)
+    FACTS["keycloak4platform_docker_id"]=$id
+
+    # "Serialize" facts to file
     declare -p FACTS >"${SERIALIZED_FACTS}"
     return 0
 }
