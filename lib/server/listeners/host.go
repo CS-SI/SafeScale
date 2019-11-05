@@ -75,7 +75,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 		return empty, scerr.InvalidParameterError("ref", "cannot be empty string").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -118,7 +118,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 		return empty, scerr.InvalidRequestError("cannot stop host: neither name nor id of host has been provided").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -129,7 +129,9 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop Host "+ref); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -159,7 +161,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, scerr.InvalidParameterError("ref", "cannot be empty string").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -170,7 +172,9 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Reboot Host "+ref); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -207,7 +211,9 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Hosts"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -252,7 +258,9 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -314,7 +322,9 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Resize Host "+name); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -363,7 +373,9 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Status of Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -404,7 +416,9 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -431,7 +445,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -446,7 +460,9 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -488,7 +504,9 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH config of Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

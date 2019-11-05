@@ -70,7 +70,9 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create network "+networkName); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -142,7 +144,9 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List networks"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -191,7 +195,9 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -223,7 +229,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	ref := srvutils.GetReference(in)
@@ -239,7 +245,9 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

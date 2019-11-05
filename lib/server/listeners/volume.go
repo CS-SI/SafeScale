@@ -72,7 +72,9 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -210,7 +212,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
@@ -229,7 +231,9 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume detach "+volumeRef+" from host "+hostRef); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -258,7 +262,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -273,7 +277,9 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume delete "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -318,7 +324,9 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

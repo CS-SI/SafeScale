@@ -59,7 +59,9 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *p
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Images"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

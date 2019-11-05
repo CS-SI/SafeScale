@@ -48,7 +48,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	uuid := in.Uuid
@@ -66,7 +66,9 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop job "+uuid); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -98,7 +100,9 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Processes"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

@@ -86,7 +86,9 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (_
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenants List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenants, err := iaas.GetTenantNames()
 	if err != nil {
@@ -121,7 +123,9 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (_ 
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant Get"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	getCurrentTenant()
 	if currentTenant == nil {
@@ -142,7 +146,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	name := in.GetName()
@@ -156,7 +160,9 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant Set "+name); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
@@ -222,7 +228,9 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageList"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	tenants, err := iaas.GetTenants()
 	if err != nil {
@@ -262,7 +270,9 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageGet"); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	getCurrentStorageTenants()
 	if currentStorageTenants == nil {
@@ -284,7 +294,7 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -295,7 +305,9 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 	// FIXME: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames())); err == nil {
 		defer srvutils.JobDeregister(ctx)
-	}
+	} /* else {
+		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	}*/
 
 	storageServices, err := iaas.UseStorages(in.GetNames())
 	if err != nil {
