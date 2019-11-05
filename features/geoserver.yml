@@ -366,7 +366,7 @@ feature:
               content: |
                   {
                       "host": "geoserver_backends",
-                      "path": "/geoserver"
+                      "path": "/geoserver/"
 
                   }
 
