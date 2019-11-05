@@ -39,7 +39,7 @@ install_common_requirements() {
     useradd -s /bin/bash -m -d /home/cladm cladm
     groupadd -r -f docker &>/dev/null
     usermod -aG docker cladm
-    echo "cladm:{{ .CladmPassword }}" | chpasswd
+    echo -e "{{ .CladmPassword }}\n{{ .CladmPassword }}" | passwd cladm
     mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
     echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
     echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
