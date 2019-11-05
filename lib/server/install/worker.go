@@ -421,201 +421,266 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
-		_, stepErr, continuation, breaking := func() (res Results, inner error, cont bool, brea bool) {
-			defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), k), &inner)()
-			defer temporal.NewStopwatch().OnExitLogWithLevel(
-				fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), k),
-				fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), k),
-				logrus.DebugLevel,
-			)()
-
-			stepKey := stepsKey + "." + k
-			var (
-				runContent string
-				stepT      = stepTargets{}
-				options    = map[string]string{}
-				ok         bool
-				anon       interface{}
-			)
-			stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
-			if !ok {
-				msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-				return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey), false, false
-			}
-
-			// Determine list of hosts concerned by the step
-			var hostsList []*pb.Host
-			if w.target.Type() == "node" {
-				hostsList, inner = w.identifyHosts(map[string]string{"hosts": "1"})
-			} else {
-				anon, ok = stepMap[yamlTargetsKeyword]
-				if ok {
-					for i, j := range anon.(map[string]interface{}) {
-						switch j.(type) {
-						case bool:
-							if j.(bool) {
-								stepT[i] = "true"
-							} else {
-								stepT[i] = "false"
-							}
-						case string:
-							stepT[i] = j.(string)
-						}
-					}
-				} else {
-					msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-					return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword), false, false
-				}
-
-				hostsList, inner = w.identifyHosts(stepT)
-			}
-			if inner != nil {
-				return nil, inner, false, false
-			}
-			if len(hostsList) == 0 {
-				return nil, nil, true, false
-			}
-
-			// Get the content of the action based on method
-			keyword := yamlRunKeyword
-			switch w.method {
-			case Method.Apt:
-				fallthrough
-			case Method.Yum:
-				fallthrough
-			case Method.Dnf:
-				keyword = yamlPackageKeyword
-			}
-			anon, ok = stepMap[keyword]
-			if ok {
-				runContent = anon.(string)
-				// If 'run' content has to be altered, do it
-				if w.commandCB != nil {
-					runContent = w.commandCB(runContent)
-				}
-			} else {
-				msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-				return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlRunKeyword), false, false
-			}
-
-			// If there is an options file (for now specific to DCOS), upload it to the remote host
-			optionsFileContent := ""
-			anon, ok = stepMap[yamlOptionsKeyword]
-			if ok {
-				for i, j := range anon.(map[string]interface{}) {
-					options[i] = j.(string)
-				}
-				var (
-					avails  = map[string]interface{}{}
-					ok      bool
-					content interface{}
-				)
-				complexity := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
-				for k, anon := range options {
-					avails[strings.ToLower(k)] = anon
-				}
-				if content, ok = avails[complexity]; !ok {
-					if complexity == strings.ToLower(Complexity.Large.String()) {
-						complexity = Complexity.Normal.String()
-					}
-					if complexity == strings.ToLower(Complexity.Normal.String()) {
-						if content, ok = avails[complexity]; !ok {
-							content, ok = avails[Complexity.Small.String()]
-						}
-					}
-				}
-				if ok {
-					optionsFileContent = content.(string)
-					v["options"] = fmt.Sprintf("--options=%s/options.json", srvutils.TempFolder)
-				}
-			} else {
-				v["options"] = ""
-			}
-
-			wallTime := temporal.GetLongOperationTimeout()
-			anon, ok = stepMap[yamlTimeoutKeyword]
-			if ok {
-				if _, ok := anon.(int); ok {
-					wallTime = time.Duration(anon.(int)) * time.Minute
-				} else {
-					wallTimeConv, inner := strconv.Atoi(anon.(string))
-					if inner != nil {
-						logrus.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
-					} else {
-						wallTime = time.Duration(wallTimeConv) * time.Minute
-					}
-				}
-			}
-
-			templateCommand, inner := normalizeScript(Variables{
-				"reserved_Name":    w.feature.DisplayName(),
-				"reserved_Content": runContent,
-				"reserved_Action":  strings.ToLower(w.action.String()),
-				"reserved_Step":    k,
-			})
-			if inner != nil {
-				return nil, inner, false, false
-			}
-
-			// Checks if step can be performed in parallel on selected hosts
-			serial := false
-			anon, ok = stepMap[yamlSerialKeyword]
-			if ok {
-				value, ok := anon.(string)
-				if ok {
-					if strings.ToLower(value) == "yes" || strings.ToLower(value) != "true" {
-						serial = true
-					}
-				}
-			}
-
-			step := step{
-				Worker:             w,
-				Name:               k,
-				Action:             w.action,
-				Targets:            stepT,
-				Script:             templateCommand,
-				WallTime:           wallTime,
-				OptionsFileContent: optionsFileContent,
-				YamlKey:            stepKey,
-				Serial:             serial,
-			}
-			results[k], inner = step.Run(hostsList, w.variables, w.settings)
-			// If an error occurred, don't do the remaining steps, fail immediately
-			if inner != nil {
-				return nil, inner, false, true
-			}
-
-			if !results[k].Successful() {
-				// If there are some not completed steps, reports them and break
-				if !results[k].Completed() {
-					logrus.Warnf(fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), k, results[k].UncompletedEntries()))
-					return nil, fmt.Errorf(results[k].ErrorMessages()), false, true
-				}
-				// not successful but completed, if action is check means the feature is not install, it's not a failure)
-				if strings.Contains(w.action.String(), "Check") {
-					return nil, nil, false, false
-				}
-				// For any other situations, raise error and break
-				return nil, fmt.Errorf(results[k].ErrorMessages()), false, true
-			}
-
-			return results, nil, false, false
-		}()
-
-		if stepErr != nil {
-			return results, stepErr
+		stepKey := stepsKey + "." + k
+		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
+		if !ok {
+			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
+			return results, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey)
+		}
+		params := data.Map{
+			"stepName":  k,
+			"stepKey":   stepKey,
+			"stepMap":   stepMap,
+			"variables": v,
 		}
 
-		if breaking {
-			break
+		subtask, err := w.feature.task.New()
+		if err != nil {
+			return results, err
 		}
 
-		if continuation {
-			continue
+		subtask, err = subtask.Start(w.taskLaunchStep, params)
+		if err != nil {
+			return results, err
+		}
+
+		var result *StepResults
+		tr, err := subtask.Wait()
+		if tr != nil {
+			result = tr.(*StepResults)
+			results[k] = *result
+		}
+		if err != nil {
+			return results, err
 		}
 	}
-	return results, err
+	return results, nil
+}
+
+// taskLaunchStep starts the step
+func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, err error) {
+	if w == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "can't be nil")
+	}
+
+	var (
+		anon              interface{}
+		stepName, stepKey string
+		stepMap           map[string]interface{}
+		vars              Variables
+		ok                bool
+	)
+	p := params.(data.Map)
+
+	if anon, ok = p["stepName"]; !ok {
+		return nil, scerr.InvalidParameterError("params[stepName]", "is missing")
+	}
+	if stepName, ok = anon.(string); !ok {
+		return nil, scerr.InvalidParameterError("param[stepName]", "must be a string")
+	}
+	if stepName == "" {
+		return nil, scerr.InvalidParameterError("param[stepName]", "cannot be an empty string")
+	}
+	if anon, ok = p["stepKey"]; !ok {
+		return nil, scerr.InvalidParameterError("params[stepKey]", "is missing")
+	}
+	if stepKey, ok = anon.(string); !ok {
+		return nil, scerr.InvalidParameterError("param[stepKey]", "must be a string")
+	}
+	if stepKey == "" {
+		return nil, scerr.InvalidParameterError("param[stepKey]", "cannot be an empty string")
+	}
+	if anon, ok = p["stepMap"]; !ok {
+		return nil, scerr.InvalidParameterError("params[stepMap]", "is missing")
+	}
+	if stepMap, ok = anon.(map[string]interface{}); !ok {
+		return nil, scerr.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
+	}
+	if anon, ok = p["variables"]; !ok {
+		return nil, scerr.InvalidParameterError("params[variables]", "is missing")
+	}
+	if vars, ok = p["variables"].(Variables); !ok {
+		return nil, scerr.InvalidParameterError("params[variables]", "must be a data.Map")
+	}
+	if vars == nil {
+		return nil, scerr.InvalidParameterError("params[variables]", "cannot be nil")
+	}
+
+	defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)()
+	defer temporal.NewStopwatch().OnExitLogWithLevel(
+		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
+		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
+		logrus.DebugLevel,
+	)()
+
+	var (
+		runContent string
+		stepT      = stepTargets{}
+		options    = map[string]string{}
+	)
+
+	// Determine list of hosts concerned by the step
+	var hostsList []*pb.Host
+	if w.target.Type() == "node" {
+		hostsList, err = w.identifyHosts(map[string]string{"hosts": "1"})
+	} else {
+		anon, ok = stepMap[yamlTargetsKeyword]
+		if ok {
+			for i, j := range anon.(map[string]interface{}) {
+				switch j.(type) {
+				case bool:
+					if j.(bool) {
+						stepT[i] = "true"
+					} else {
+						stepT[i] = "false"
+					}
+				case string:
+					stepT[i] = j.(string)
+				}
+			}
+		} else {
+			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
+			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
+		}
+
+		hostsList, err = w.identifyHosts(stepT)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(hostsList) == 0 {
+		return nil, nil
+	}
+
+	// Get the content of the action based on method
+	keyword := yamlRunKeyword
+	switch w.method {
+	case Method.Apt:
+		fallthrough
+	case Method.Yum:
+		fallthrough
+	case Method.Dnf:
+		keyword = yamlPackageKeyword
+	}
+	anon, ok = stepMap[keyword]
+	if ok {
+		runContent = anon.(string)
+		// If 'run' content has to be altered, do it
+		if w.commandCB != nil {
+			runContent = w.commandCB(runContent)
+		}
+	} else {
+		msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
+		return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlRunKeyword)
+	}
+
+	// If there is an options file (for now specific to DCOS), upload it to the remote host
+	optionsFileContent := ""
+	anon, ok = stepMap[yamlOptionsKeyword]
+	if ok {
+		for i, j := range anon.(map[string]interface{}) {
+			options[i] = j.(string)
+		}
+		var (
+			avails  = map[string]interface{}{}
+			ok      bool
+			content interface{}
+		)
+		complexity := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
+		for k, anon := range options {
+			avails[strings.ToLower(k)] = anon
+		}
+		if content, ok = avails[complexity]; !ok {
+			if complexity == strings.ToLower(Complexity.Large.String()) {
+				complexity = Complexity.Normal.String()
+			}
+			if complexity == strings.ToLower(Complexity.Normal.String()) {
+				if content, ok = avails[complexity]; !ok {
+					content, ok = avails[Complexity.Small.String()]
+				}
+			}
+		}
+		if ok {
+			optionsFileContent = content.(string)
+			vars["options"] = fmt.Sprintf("--options=%s/options.json", srvutils.TempFolder)
+		}
+	} else {
+		vars["options"] = ""
+	}
+
+	wallTime := temporal.GetLongOperationTimeout()
+	anon, ok = stepMap[yamlTimeoutKeyword]
+	if ok {
+		if _, ok := anon.(int); ok {
+			wallTime = time.Duration(anon.(int)) * time.Minute
+		} else {
+			wallTimeConv, inner := strconv.Atoi(anon.(string))
+			if inner != nil {
+				logrus.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+			} else {
+				wallTime = time.Duration(wallTimeConv) * time.Minute
+			}
+		}
+	}
+
+	templateCommand, err := normalizeScript(Variables{
+		"reserved_Name":    w.feature.DisplayName(),
+		"reserved_Content": runContent,
+		"reserved_Action":  strings.ToLower(w.action.String()),
+		"reserved_Step":    stepName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Checks if step can be performed in parallel on selected hosts
+	serial := false
+	anon, ok = stepMap[yamlSerialKeyword]
+	if ok {
+		value, ok := anon.(string)
+		if ok {
+			if strings.ToLower(value) == "yes" || strings.ToLower(value) != "true" {
+				serial = true
+			}
+		}
+	}
+
+	stepInstance := step{
+		Worker:             w,
+		Name:               stepName,
+		Action:             w.action,
+		Targets:            stepT,
+		Script:             templateCommand,
+		WallTime:           wallTime,
+		OptionsFileContent: optionsFileContent,
+		YamlKey:            stepKey,
+		Serial:             serial,
+	}
+	r, err := stepInstance.Run(hostsList, vars, w.settings)
+	// If an error occurred, don't do the remaining steps, fail immediately
+	if err != nil {
+		return nil, err
+	}
+
+	if !r.Successful() {
+		// If there are some not completed steps, reports them and break
+		if !r.Completed() {
+			logrus.Warnf(fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.UncompletedEntries()))
+			return &r, fmt.Errorf(r.ErrorMessages())
+		}
+		// not successful but completed, if action is check means the feature is not install, it's an information not a failure
+		if strings.Contains(w.action.String(), "Check") {
+			return &r, nil
+		}
+
+		// For any other situations, raise error and break
+		return &r, fmt.Errorf(r.ErrorMessages())
+	}
+
+	return &r, nil
 }
 
 // validateContextForCluster checks if the flavor of the cluster is listed in feature specification
