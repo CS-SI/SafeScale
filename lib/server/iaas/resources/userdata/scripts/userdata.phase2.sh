@@ -502,7 +502,7 @@ install_keepalived() {
             ;;
 
         redhat|centos)
-            yum install -qy keepalived || return 1
+            yum install -q -y keepalived || return 1
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
