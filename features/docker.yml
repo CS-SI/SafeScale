@@ -107,7 +107,8 @@ feature:
                             # else
                                 DRIVER=cgroupfs
                             # fi
-                            cat >/etc/docker/daemon.json <<-EOF
+                            if [ "$(sfGetFact redhat_like)" = "1" ]; then
+                                cat > /etc/docker/daemon.json <<-EOF
                             {
                                 "iptables": false,
                                 "exec-opts": [
@@ -122,17 +123,31 @@ feature:
                                 "experimental": true,
                                 "metrics-addr": "0.0.0.0:9323",
                                 "storage-driver": "overlay2",
-                            EOF
-
-                            if [ "$(sfGetFact redhat_like)" = "1" ]; then
-                                cat >>/etc/docker/daemon.json <<-EOF
                                 "userland-proxy": false,
                                 "storage-opts": [
                                     "overlay2.override_kernel_check=true"
                                 ]
+                            }
+                            EOF
+                            else
+                                cat > /etc/docker/daemon.json <<-EOF
+                            {
+                                "iptables": false,
+                                "exec-opts": [
+                                    "native.cgroupdriver=${DRIVER}"
+                                ],
+                                "no-new-privileges": false,
+                                "log-driver": "json-file",
+                                "log-level":"info",
+                                "log-opts": {
+                                    "max-size": "100m"
+                                },
+                                "experimental": true,
+                                "metrics-addr": "0.0.0.0:9323",
+                                "storage-driver": "overlay2"
+                            }
                             EOF
                             fi
-                            echo "}" >>/etc/docker/daemon.json
                             sfExit
 
                     firewall:
