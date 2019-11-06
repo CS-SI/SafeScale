@@ -55,7 +55,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Templates List"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {

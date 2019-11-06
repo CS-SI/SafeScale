@@ -241,14 +241,12 @@ func callToSomethingThatReturnsErr() error {
 }
 
 func callToSomethingThatReturnsErrButLogsIt() (err error) {
-	// FIXME This does NOT report the same
 	defer OnExitLogErrorWithLevel("", &err, logrus.WarnLevel)()
 	err = getNotFoundError()
 	return err
 }
 
 func callToSomethingThatReturnsErrButLogItWithWarning() (err error) {
-	// FIXME This does NOT report the same
 	defer OnExitLogError("", &err)()
 	err = getNotFoundError()
 	return err

@@ -163,7 +163,6 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) { 
 	return err
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
 // Reboot reboots a host
 func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -289,7 +288,6 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	return newHost, err
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
 // Create creates a host
 // func (handler *HostHandler) Create( ctx context.Context, name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool)
 func (handler *HostHandler) Create(
@@ -708,7 +706,6 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	// FIXME ROBUSTNESS All functions MUST propagate context
 	// Wait like 2 min for the machine to reboot
 	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetConnectSSHTimeout())
 	if err != nil {

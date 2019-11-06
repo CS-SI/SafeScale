@@ -126,7 +126,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop Host "+ref); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -169,7 +169,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Reboot Host "+ref); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -208,7 +208,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Hosts"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -255,7 +255,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Create Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -319,7 +319,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Resize Host "+name); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -370,7 +370,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Status of Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -413,7 +413,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -457,7 +457,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -501,7 +501,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH config of Host "+in.GetName()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {

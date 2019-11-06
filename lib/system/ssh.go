@@ -33,7 +33,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"text/template"
 	"time"
 
@@ -407,6 +406,8 @@ func (sc *SSHCommand) Display() string {
 //
 // If the command starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
+//
+// WARNING : This function CAN lock, use .RunWithTimeout instead
 func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
@@ -536,8 +537,7 @@ func (sc *SSHCommand) cleanup() error {
 	err1 := sc.closeTunneling()
 	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
-		log.Errorf("closeTunneling() failed: %s", reflect.TypeOf(err1).String())
-		return fmt.Errorf("unable to close SSH tunnels: %s", err1.Error())
+		return fmt.Errorf("unable to close SSH tunnels: %s: %s", fmt.Sprintf("closeTunneling() failed: %s", reflect.TypeOf(err1).String()), err1.Error())
 	}
 	if err2 != nil {
 		return fmt.Errorf("unable to close SSH tunnels: %s", err2.Error())
@@ -777,7 +777,7 @@ func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, is
 	echan := make(chan error)
 	go func() {
 		defer close(echan)
-		errc, stdout, stderr, err = sshCommand.Run(nil) // FIXME It CAN lock, use .RunWithTimeout instead
+		errc, stdout, stderr, err = sshCommand.Run(nil)
 		echan <- err
 	}()
 
@@ -787,64 +787,6 @@ func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, is
 	case err := <-echan:
 		return errc, stdout, stderr, err
 	}
-}
-
-// Exec executes the cmd using ssh
-func (ssh *SSHConfig) Exec(cmdString string) error {
-	tunnels, sshConfig, err := ssh.CreateTunneling()
-	if err != nil {
-		for _, t := range tunnels {
-			nerr := t.Close()
-			if nerr != nil {
-				log.Warnf("Error closing ssh tunnel: %v", nerr)
-			}
-		}
-		return fmt.Errorf("unable to create command : %s", err.Error())
-	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
-	if err != nil {
-		for _, t := range tunnels {
-			nerr := t.Close()
-			if nerr != nil {
-				log.Warnf("Error closing ssh tunnel: %v", nerr)
-			}
-		}
-		if keyFile != nil {
-			nerr := utils.LazyRemove(keyFile.Name())
-			if nerr != nil {
-				log.Warnf("Error removing file %v", nerr)
-			}
-		}
-		return fmt.Errorf("unable to create command : %s", err.Error())
-	}
-	bash, err := exec.LookPath("bash")
-	if err != nil {
-		for _, t := range tunnels {
-			nerr := t.Close()
-			if nerr != nil {
-				log.Warnf("Error closing ssh tunnel: %v", nerr)
-			}
-		}
-		if keyFile != nil {
-			nerr := utils.LazyRemove(keyFile.Name())
-			if nerr != nil {
-				log.Warnf("Error removing file %v", nerr)
-			}
-		}
-		return fmt.Errorf("unable to create command : %s", err.Error())
-	}
-	var args []string
-	if cmdString == "" {
-		args = []string{sshCmdString}
-	} else {
-		args = []string{"-c", sshCmdString}
-	}
-	err = syscall.Exec(bash, args, nil)
-	nerr := utils.LazyRemove(keyFile.Name())
-	if nerr != nil {
-		log.Warnf("Error removing (lazy) file %v", nerr)
-	}
-	return err
 }
 
 // Enter Enter to interactive shell

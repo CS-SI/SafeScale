@@ -53,7 +53,7 @@ func NewBucketHandler(svc iaas.Service) BucketAPI {
 }
 
 // List retrieves all available buckets
-func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error) { // FIXME Unused ctx
+func (handler *BucketHandler) List(_ context.Context) (rv []string, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -109,7 +109,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 }
 
 // Inspect a bucket
-func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) { // FIXME Unused ctx
+func (handler *BucketHandler) Inspect(_ context.Context, name string) (mb *resources.Bucket, err error) {
 	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
