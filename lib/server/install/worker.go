@@ -434,12 +434,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 			"variables": v,
 		}
 
-		subtask, err := w.feature.task.New()
-		if err != nil {
-			return results, err
-		}
-
-		subtask, err = subtask.Start(w.taskLaunchStep, params)
+		subtask, err := w.feature.task.StartInSubTask(w.taskLaunchStep, params)
 		if err != nil {
 			return results, err
 		}
