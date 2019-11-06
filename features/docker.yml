@@ -132,7 +132,7 @@ feature:
                                 ]
                             EOF
                             fi
-                            echo "}" >>/etc/docker/daemon.json"
+                            echo "}" >>/etc/docker/daemon.json
                             sfExit
 
                     firewall:
