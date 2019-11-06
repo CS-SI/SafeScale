@@ -757,7 +757,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	}
 
 	sshDefaultTimeout := temporal.GetHostTimeout()
-	_, err = ssh.WaitServerReady(ctx, "ready", sshDefaultTimeout) // CRITICAL FIXME Remove context.TODO()
+	_, err = ssh.WaitServerReady(ctx, "ready", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, err

@@ -63,7 +63,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 	tracer.Trace("Receiving stop order for job '%s'...", uuid)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop job "+uuid); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {
@@ -97,7 +97,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle jobregister error
+	// LATER: handle jobregister error
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Processes"); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	} /* else {

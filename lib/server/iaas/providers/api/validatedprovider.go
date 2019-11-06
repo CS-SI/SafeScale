@@ -12,32 +12,43 @@ import (
 // ValidatedProvider ...
 type ValidatedProvider WrappedProvider
 
-func (w ValidatedProvider) CreateVIP(string, string) (*resources.VIP, error) {
-	panic("implement me") // FIXME Technical debt
+func (w ValidatedProvider) CreateVIP(netID string, name string) (*resources.VIP, error) {
+	// FIXME Add OK method to vip, then check return value
+	return w.InnerProvider.CreateVIP(netID, name)
 }
 
-func (w ValidatedProvider) AddPublicIPToVIP(*resources.VIP) error {
-	panic("implement me") // FIXME Technical debt
+func (w ValidatedProvider) AddPublicIPToVIP(vip *resources.VIP) error {
+	// FIXME Add OK method to vip
+	return w.InnerProvider.AddPublicIPToVIP(vip)
 }
 
-func (w ValidatedProvider) BindHostToVIP(*resources.VIP, *resources.Host) error {
-	panic("implement me") // FIXME Technical debt
+func (w ValidatedProvider) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+	// FIXME Add OK method to vip
+	if !host.OK() {
+		logrus.Warnf("Invalid host: %v", host)
+	}
+	return w.InnerProvider.BindHostToVIP(vip, host)
 }
 
-func (w ValidatedProvider) UnbindHostFromVIP(*resources.VIP, *resources.Host) error {
-	panic("implement me") // FIXME Technical debt
+func (w ValidatedProvider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+	// FIXME Add OK method to vip
+	if !host.OK() {
+		logrus.Warnf("Invalid host: %v", host)
+	}
+	return w.InnerProvider.UnbindHostFromVIP(vip, host)
 }
 
-func (w ValidatedProvider) DeleteVIP(*resources.VIP) error {
-	panic("implement me") // FIXME Technical debt
+func (w ValidatedProvider) DeleteVIP(vip *resources.VIP) error {
+	// FIXME Add OK method to vip
+	return w.InnerProvider.DeleteVIP(vip)
 }
 
 func (w ValidatedProvider) GetCapabilities() providers.Capabilities {
-	panic("implement me") // FIXME Technical debt
+	return w.InnerProvider.GetCapabilities()
 }
 
 func (w ValidatedProvider) GetTenantParameters() map[string]interface{} {
-	panic("implement me") // FIXME Technical debt
+	return w.InnerProvider.GetTenantParameters()
 }
 
 // Provider specific functions

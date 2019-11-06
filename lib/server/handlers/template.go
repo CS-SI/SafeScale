@@ -35,8 +35,6 @@ type TemplateAPI interface {
 	List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
-
 // TemplateHandler template service
 type TemplateHandler struct {
 	service iaas.Service
@@ -50,7 +48,7 @@ func NewTemplateHandler(svc iaas.Service) TemplateAPI {
 }
 
 // List returns the template list
-func (handler *TemplateHandler) List(ctx context.Context, all bool) (tlist []resources.HostTemplate, err error) { // FIXME Unused ctx
+func (handler *TemplateHandler) List(_ context.Context, all bool) (tlist []resources.HostTemplate, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()

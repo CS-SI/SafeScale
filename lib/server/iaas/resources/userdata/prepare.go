@@ -106,7 +106,7 @@ func NewContent() *Content {
 	}
 }
 
-func (ud Content) OK() bool { // FIXME Complete function
+func (ud Content) OK() bool { // FIXME Complete function, mark struct fields as optional, then validate
 	result := true
 	result = result && ud.BashLibrary != ""
 	result = result && ud.HostName != ""
