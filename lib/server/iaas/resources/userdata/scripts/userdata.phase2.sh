@@ -559,8 +559,20 @@ vrrp_instance vrrp_group_gws_internal {
 # }
 EOF
 
-    sfService enable keepalived
-    sfService restart keepalived || return 1
+    if [ "$(sfGetFact "use_systemd")" = "1" ]; then
+        # Use systemd to ensure keepalived is restarted if network is restarted
+        # (otherwise, keepalived is in undetermined state)
+        mkdir -p /etc/systemd/system/keepalived.service.d
+        cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+[Unit]
+Requires=network.service
+PartOf=network.service
+EOF
+
+        systemctl daemon-reload
+    fi
+
+    sfService enable keepalived && sfService restart keepalived || return 1
     return 0
 }
 
