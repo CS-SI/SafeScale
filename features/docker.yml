@@ -113,8 +113,8 @@ feature:
                                 "exec-opts": [
                                     "native.cgroupdriver=${DRIVER}"
                                 ],
-                                “icc”: false,
-                                “disable-legacy-registry”: true,
+                                "icc": false,
+                                "disable-legacy-registry": true,
                                 "no-new-privileges": false,
                                 "log-driver": "json-file",
                                 "log-level":"info",
