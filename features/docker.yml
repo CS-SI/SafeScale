@@ -34,9 +34,11 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     dpkg -l | grep docker-ce &>/dev/null || sfFail 1
+                                    docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 centos|rhel)
                                     rpm -qa | grep docker-ce &>/dev/null || sfFail 1
+                                    docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
