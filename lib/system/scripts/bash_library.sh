@@ -433,7 +433,7 @@ sfPgsqlCreateDatabase() {
     [ $# -eq 2 ] && owner=$2
     id=$(sfGetFact "postgresql4platform_docker_id")
     if [ ! -z ${id+x} ]; then
-        local cmd="CREATE DATABASE $dbname"
+        local cmd="CREATE DATABASE \"$dbname\""
         [ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
         docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
         return $?
@@ -455,7 +455,7 @@ sfPgsqlDropDatabase() {
     docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
     retcode=$?
     if [ $retcode -eq 0 ]; then
-        sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'DROP DATABASE IF EXISTS $dbname'"
+        sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "DROP DATABASE IF EXISTS \"$dbname\""
         retcode=$?
     fi
     return $retcode
