@@ -111,12 +111,19 @@ feature:
                                 cat > /etc/docker/daemon.json <<-EOF
                             {
                                 "iptables": false,
-                                "exec-opts": ["native.cgroupdriver=${DRIVER}"],
+                                "exec-opts": [
+                                    "native.cgroupdriver=${DRIVER}"
+                                ],
+                                "no-new-privileges": false,
                                 "log-driver": "json-file",
+                                "log-level":"info",
                                 "log-opts": {
                                     "max-size": "100m"
                                 },
+                                "experimental": true,
+                                "metrics-addr": "0.0.0.0:9323",
                                 "storage-driver": "overlay2",
+                                "userland-proxy": false,
                                 "storage-opts": [
                                     "overlay2.override_kernel_check=true"
                                 ]
@@ -126,11 +133,17 @@ feature:
                                 cat > /etc/docker/daemon.json <<-EOF
                             {
                                 "iptables": false,
-                                "exec-opts": ["native.cgroupdriver=${DRIVER}"],
+                                "exec-opts": [
+                                    "native.cgroupdriver=${DRIVER}"
+                                ],
+                                "no-new-privileges": false,
                                 "log-driver": "json-file",
+                                "log-level":"info",
                                 "log-opts": {
                                     "max-size": "100m"
                                 },
+                                "experimental": true,
+                                "metrics-addr": "0.0.0.0:9323",
                                 "storage-driver": "overlay2"
                             }
                             EOF

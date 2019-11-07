@@ -1,0 +1,383 @@
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    suitableFor:
+        cluster: swarm
+
+    requirements:
+        features:
+            - sparkmaster4platform
+
+    parameters:
+        - AdminPassword
+        - RootURL=/geoserver/
+        - Port=63012
+
+    install:
+        bash:
+            check:
+                pace: image
+                steps:
+                    image:
+                        targets:
+                            masters: all
+                        run: |
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'safescale/geoserver:latest' &>/dev/null || sfFail 192
+                            sfExit
+
+            add:
+                pace: image,stack,secret,start,ready
+                steps:
+                    image:
+                        targets:
+                            masters: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/geoserver/build
+
+                            cat >${SF_ETCDIR}/geoserver/build/web.xml <<-EOF
+                            <?xml version="1.0" encoding="UTF-8"?>
+                            <!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
+                            <web-app>
+                                <display-name>GeoServer</display-name>
+                                <context-param>
+                                    <param-name>serviceStrategy</param-name>
+                                    <param-value>PARTIAL-BUFFER2</param-value>
+                                </context-param>
+
+                                <context-param>
+                                    <param-name>PARTIAL_BUFFER_STRATEGY_SIZE</param-name>
+                                    <param-value>50</param-value>
+                                </context-param>
+
+                                <context-param>
+                                    <param-name>PROXY_BASE_URL</param-name>
+                                    <param-value>https://{{ .EndpointIP }}{{ .RootURL }}</param-value>
+                                </context-param>
+
+                                <context-param>
+                                    <param-name>contextConfigLocation</param-name>
+                                    <param-value>classpath*:/applicationContext.xml classpath*:/applicationSecurityContext.xml</param-value>
+                                </context-param>
+
+                                <filter>
+                                    <filter-name>FlushSafeFilter</filter-name>
+                                    <filter-class>org.geoserver.filters.FlushSafeFilter</filter-class>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>Set Character Encoding</filter-name>
+                                    <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+                                    <init-param>
+                                        <param-name>encoding</param-name>
+                                        <param-value>UTF-8</param-value>
+                                    </init-param>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>SessionDebugger</filter-name>
+                                    <filter-class>org.geoserver.filters.SessionDebugFilter</filter-class>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>filterChainProxy</filter-name>
+                                    <filter-class> org.springframework.web.filter.DelegatingFilterProxy</filter-class>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>xFrameOptionsFilter</filter-name>
+                                    <filter-class>org.geoserver.filters.XFrameOptionsFilter</filter-class>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>GZIP Compression Filter</filter-name>
+                                    <filter-class>org.geoserver.filters.GZIPFilter</filter-class>
+                                    <init-param>
+                                        <param-name>compressed-types</param-name>
+                                        <param-value>text/.*,.*xml.*,application/json,application/x-javascript</param-value>
+                                    </init-param>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>Request Logging Filter</filter-name>
+                                    <filter-class>org.geoserver.filters.LoggingFilter</filter-class>
+                                    <init-param>
+                                        <param-name>enabled</param-name>
+                                        <param-value>false</param-value>
+                                    </init-param>
+                                    <init-param>
+                                        <param-name>log-request-bodies</param-name>
+                                        <param-value>false</param-value>
+                                    </init-param>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>Advanced Dispatch Filter</filter-name>
+                                    <filter-class>org.geoserver.platform.AdvancedDispatchFilter</filter-class>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>Spring Delegating Filter</filter-name>
+                                    <filter-class>org.geoserver.filters.SpringDelegatingFilter</filter-class>
+                                </filter>
+
+                                <filter>
+                                    <filter-name>Thread locals cleanup filter</filter-name>
+                                    <filter-class>org.geoserver.filters.ThreadLocalsCleanupFilter</filter-class>
+                                </filter>
+
+                                <filter-mapping>
+                                    <filter-name>Set Character Encoding</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>FlushSafeFilter</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>SessionDebugger</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>GZIP Compression Filter</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>xFrameOptionsFilter</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>Request Logging Filter</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>filterChainProxy</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>Advanced Dispatch Filter</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>Spring Delegating Filter</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <filter-mapping>
+                                    <filter-name>Thread locals cleanup filter</filter-name>
+                                    <url-pattern>/*</url-pattern>
+                                </filter-mapping>
+
+                                <listener>
+                                    <listener-class>org.geoserver.GeoserverInitStartupListener</listener-class>
+                                </listener>
+
+                                <listener>
+                                    <listener-class>org.geoserver.logging.LoggingStartupContextListener</listener-class>
+                                </listener>
+
+                                <listener>
+                                    <listener-class>org.geoserver.platform.GeoServerContextLoaderListener</listener-class>
+                                </listener>
+
+                                <listener>
+                                    <listener-class>org.geoserver.platform.GeoServerHttpSessionListenerProxy</listener-class>
+                                </listener>
+
+                                <listener>
+                                    <listener-class>org.springframework.web.context.request.RequestContextListener</listener-class>
+                                </listener>
+
+                                <servlet>
+                                    <servlet-name>dispatcher</servlet-name>
+                                    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+                                </servlet>
+
+                                <servlet-mapping>
+                                    <servlet-name>dispatcher</servlet-name>
+                                    <url-pattern>/*</url-pattern>
+                                </servlet-mapping>
+
+                                <mime-mapping>
+                                    <extension>xsl</extension>
+                                    <mime-type>text/xml</mime-type>
+                                </mime-mapping>
+
+                                <mime-mapping>
+                                    <extension>sld</extension>
+                                    <mime-type>text/xml</mime-type>
+                                </mime-mapping>
+
+                                <mime-mapping>
+                                    <extension>json</extension>
+                                    <mime-type>application/json</mime-type>
+                                </mime-mapping>
+
+                                <welcome-file-list>
+                                    <welcome-file>index.html</welcome-file>
+                                </welcome-file-list>
+                            </web-app>
+                            EOF
+
+                            cat >${SF_ETCDIR}/geoserver/build/Dockerfile <<-EOF
+                            FROM kartoza/geoserver:2.15.2
+
+                            # Overrides existing web.xml with our own configuration
+                            COPY web.xml /usr/local/tomcat/webapps/geoserver/WEB-INF/
+
+                            # Fixes a bug with new version of GeoServer
+                            # Caused by: java.lang.IllegalStateException: Unable to complete the scan for annotations for web application [/geoserver] due to
+                            # a StackOverflowError. Possible root causes include a too low setting for -Xss and illegal cyclic inheritance dependencies. The
+                            # class hierarchy being processed was [org.sqlite.SQLiteConnection->org.sqlite.jdbc4.JDBC4Connection->org.sqlite.jdbc3.JDBC3Connection->org.sqlite.SQLiteConnection]
+                            RUN rm /usr/local/tomcat/webapps/geoserver/WEB-INF/lib/sqlite-jdbc-*.jar
+                            EOF
+
+                            docker build --network host -t safescale/geoserver:latest ${SF_ETCDIR}/geoserver/build || sfFail 193
+                            sfExit
+
+                    secret:
+                        targets:
+                            masters: any
+                        run: |
+                            # Generates GEOSERVER_ADMIN_PASSWORD and stores it
+                            if docker secret inspect safescale.geoserver.password.admin &>/dev/null; then
+                                docker secret rm safescale.geoserver.password.admin
+                            fi
+                            echo -n "{{ .AdminPassword }}" | docker secret create safescale.geoserver.password.admin - || sfFail 194
+                            sfExit
+
+                    stack:
+                        targets:
+                            masters: all
+                        run: |
+                            cat >${SF_ETCDIR}/geoserver/stack.yml <<-EOF
+                            version: '3.7'
+
+                            networks:
+                                spark_net:
+                                    external: true
+
+                            secrets:
+                                admin.password:
+                                    external: true
+                                    name: safescale.geoserver.password.admin
+
+                            services:
+                                geoserver:
+                                    image: safescale/geoserver:latest
+                                    volumes:
+                                        - /shared/data:/shared/data
+                                    networks:
+                                        spark_net:
+                                            aliases:
+                                                - geoserver
+                                    ports:
+                                        - published: {{ .Port }}
+                                          target: 8080
+                                          mode: host
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        restart_policy:
+                                            condition: on-failure
+                                            delay: 5s
+                                            max_attempts: 3
+                                            window: 120s
+                                    secrets:
+                                        - admin.password
+                            EOF
+                            sfExit
+
+                    start:
+                        targets:
+                            hosts: no
+                            masters: one
+                        run: |
+                            docker stack up -c ${SF_ETCDIR}/geoserver/stack.yml geoserver || sfFail 195
+                            sfExit
+
+                    ready:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDoesDockerRunStack geoserver || sfFail 196
+                            sfExit
+
+            remove:
+                pace: shared,cleanup
+                steps:
+                    shared:
+                        targets:
+                            masters: one
+                        run: |
+                            docker stack rm geoserver || sfFail 192
+                            sfRemoveDockerSecret safescale.geoserver.password.admin || sfFail 193
+                            sfExit
+
+                    cleanup:
+                        targets:
+                            masters: all
+                        run: |
+                            sfRemoveDockerImage safescale/geoserver:latest || sfFail 194
+                            rm -rf ${SF_ETCDIR}/geoserver || true
+                            sfExit
+
+    proxy:
+        rules:
+            - name: geoserver_backends
+              type: upstream
+              targets:
+                  masters: one
+              content: |
+                  {
+                      "algorithm": "consistent-hashing",
+                      "hash_on": "ip",
+                      "target": "{{.HostIP}}:{{ .Port }}",
+                      "weight": 100
+                  }
+
+            - name: geoserver_svc
+              type: service
+              targets:
+                  masters: one
+              content: |
+                  {
+                      "host": "geoserver_backends",
+                      "path": "/geoserver/"
+
+                  }
+
+            - name: geoserver_route
+              type: route
+              targets:
+                  masters: one
+              content: |
+                  {
+                      "paths": ["{{ .RootURL }}"],
+                      "service": { "id": "{{.geoserver_svc}}" }
+                  }
+
+...

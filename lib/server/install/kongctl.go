@@ -310,7 +310,8 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 
 	// Determine if source-control is already set
 	ref := ""
-	url += fmt.Sprintf("%s/plugins", resourceID)
+	// url += fmt.Sprintf("%s/plugins", resourceID)
+	url += "/plugins"
 	result, _, err := k.get(ruleName, url)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); !ok {

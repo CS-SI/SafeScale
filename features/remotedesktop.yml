@@ -25,7 +25,7 @@ feature:
     parameters:
         - Username
         - Password
-        - GuacamolePort=9080
+        - GuacamolePort=63011
         - TomcatPort=9009
 
     install:
@@ -38,15 +38,27 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            if ! docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null; then
+                            if ! docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'safescale/remotedesktop:latest' &>/dev/null; then
                                 sfFail 1
                             fi
                             sfExit
 
             add:
                 #pace: desktop+deps,tigervnc+guacamole,start
-                pace: desktop,tigervnc,deps,guacamole,start
+                pace: user,desktop,tigervnc,deps,guacamole,start
                 steps:
+                    user:
+                        targets:
+                            hosts: yes
+                        run: |
+                            {{ if not .ClusterFlavor }}
+                            id {{ .Username }} &>/dev/null && sfExit
+
+                            useradd {{ .Username }} --home-dir /home/{{ .Username }} --shell /bin/bash --comment "" --create-home || sfFail 192
+                            echo "{{ .Username }}:{{ .Password }}" | chpasswd || sfFail 193
+                            {{ end }}
+                            sfExit
+
                     desktop:
                         targets:
                             hosts: yes
@@ -86,27 +98,24 @@ feature:
                             tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195
                             rm -rf ${SF_TMPDIR}/tigervnc.tgz
 
-                            if [ ! -d ~{{.Username}} ]; then
-                                echo "Homedir of user {{.Username}} not found"
-                                sfFail 196
-                            fi
+                            [ ! -d ~{{ .Username }} ] && sfFail 196 "Homedir of user {{ .Username }} not found"
 
                             # Configurations
-                            mkdir -p ~{{.Username}}/.vnc
-                            cat >~{{.Username}}/.vnc/xstartup <<-'EOF'
+                            mkdir -p ~{{ .Username }}/.vnc
+                            cat >~{{ .Username }}/.vnc/xstartup <<-'EOF'
                             #!/bin/sh
                             unset SESSION_MANAGER
                             unset DBUS_SESSION_BUS_ADDRESS
                             export DISPLAY=:0
-                            cd ~{{.Username}}
+                            cd ~{{ .Username }}
                             exec startxfce4
                             EOF
-                            chmod u+rx ~{{.Username}}/.vnc/xstartup
+                            chmod u+rx ~{{ .Username }}/.vnc/xstartup
 
-                            cat >~{{.Username}}/.vnc/config <<-'EOF'
+                            cat >~{{ .Username }}/.vnc/config <<-'EOF'
                             screen=0 1600x900x24
                             geometry=1600x900
-                            desktop={{.Hostname}}
+                            desktop={{ .Hostname }}
                             passwordfile=
                             extension=GLX
                             noreset
@@ -121,7 +130,7 @@ feature:
 
                             [Service]
                             Type=simple
-                            User={{.Username}}
+                            User={{ .Username }}
                             PIDFile=/home/%u/.vnc/%H%i.pid
                             ExecStartPre=/bin/bash -c '/usr/bin/vncserver -kill %i &>/dev/null || :'
                             ExecStart=/usr/bin/vncserver %i -fg -SecurityTypes None
@@ -138,7 +147,7 @@ feature:
 
                             [Service]
                             Type=simple
-                            User={{.Username}}
+                            User={{ .Username }}
                             ExecStartPre=/bin/sleep 5
                             ExecStart=/usr/bin/vncconfig -display %i -nowin
 
@@ -251,9 +260,9 @@ feature:
                             6DxAL5QxcUg11XgF202lp4xtaGE6Ztp54kOJl0q2WnF0147fJuLhKZ6xH4C3AAAAnOC4P8r+AxMA
                             AYsrgOADAIsbpW6xxGf7AgAAAAAEWVo=
                             EOF
-                            cat ${SF_TMPDIR}/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
+                            cat ${SF_TMPDIR}/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{ .Username }} && \
                             rm -f ${SF_TMPDIR}/xfce_conf.encoded
-                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || sfFail 197
+                            chown -R {{ .Username }}:{{ .Username }} ~{{ .Username }} || sfFail 197
 
                             systemctl daemon-reload && \
                             systemctl enable vncserver\@:0.service && \
@@ -282,9 +291,7 @@ feature:
                             masters: all
                         timeout: 10
                         run: |
-                            cd ${SF_ETCDIR}/remotedesktop/build
-
-                            cat >supervisord.conf <<-'EOF'
+                            cat >${SF_ETCDIR}/remotedesktop/build/supervisord.conf <<-'EOF'
                             [supervisord]
                             nodaemon=true
 
@@ -319,7 +326,7 @@ feature:
                             stopsignal=QUIT
                             EOF
 
-                            cat >logback.xml <<-'EOF'
+                            cat >${SF_ETCDIR}/remotedesktop/build/logback.xml <<-'EOF'
                             <configuration>
                                 <!-- Appender for debugging -->
                                 <appender name="GUAC-DEBUG" class="ch.qos.logback.core.ConsoleAppender">
@@ -342,7 +349,7 @@ feature:
                             </configuration>
                             EOF
 
-                            cat >tomcat-users.xml <<-'EOF'
+                            cat >${SF_ETCDIR}/remotedesktop/build/tomcat-users.xml <<-'EOF'
                             <?xml version='1.0' encoding='utf-8'?>
                             <tomcat-users>
                                 <role rolename="admin-gui"/>
@@ -355,7 +362,7 @@ feature:
                             </tomcat-users>
                             EOF
 
-                            cat >user-mapping.xml <<'EOF'
+                            cat >${SF_ETCDIR}/remotedesktop/build/user-mapping.xml <<'EOF'
                             <user-mapping>
                                 <authorize
                                     username="{{ .Username }}"
@@ -378,12 +385,12 @@ feature:
                             </user-mapping>
                             EOF
 
-                            cat >startup.sh <<-'EOF'
+                            cat >${SF_ETCDIR}/remotedesktop/build/startup.sh <<-'EOF'
                             #!/bin/bash
                             exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
                             EOF
 
-                            cat >Dockerfile <<-'EOF'
+                            cat >${SF_ETCDIR}/remotedesktop/build/Dockerfile <<-'EOF'
                             FROM debian:stable-slim AS Builder
                             LABEL maintainer "CS SI"
 
@@ -479,7 +486,7 @@ feature:
                             EOF
 
                             # build image
-                            docker build -t remotedesktop:latest --network=host . || sfFail 202
+                            docker build --network=host -t safescale/remotedesktop:latest ${SF_ETCDIR}/remotedesktop/build || sfFail 202
                             sfExit
 
                     start:
@@ -488,10 +495,10 @@ feature:
                             masters: all
                         run: |
                             # Guacd need sshd to authorize password authentication...
-                            DOCKER0_SUBNET=$(docker network inspect bridge {{ "--format '{{json .}}'" }} | jq -r .IPAM.Config[0].Subnet)
+                            # DOCKER0_SUBNET=$(docker network inspect bridge {{ "--format '{{json .}}'" }} | jq -r .IPAM.Config[0].Subnet)
                             cat >>/etc/ssh/sshd_config <<-EOF
                             # Allow Password Authentication from user {{.Username}} for guacd to work
-                            Match User {{.Username}} Address ${DOCKER0_SUBNET}
+                            Match User {{.Username}} Address $(sfSubnetOfDockerBridge)
                                 PasswordAuthentication yes
                             EOF
                             systemctl reload sshd
@@ -501,7 +508,7 @@ feature:
 
                             services:
                                 server:
-                                    image: remotedesktop
+                                    image: safescale/remotedesktop:latest
                                     network_mode: "bridge"
                                     ports:
                                         - {{ .HostIP }}:{{ .GuacamolePort }}:8080
@@ -519,7 +526,7 @@ feature:
                             </service>
                             EOF
 
-                            cat >/usr/lib/firewalld/zones/safescale_remotedesktop.xml <<-'EOF'
+                            cat >/usr/lib/firewalld/zones/sf_remotedesktop.xml <<-'EOF'
                             <?xml version="1.0" encoding="utf-8"?>
                             <zone target="DROP">
                                 <short>Drop any connection to SafeScale remote desktop</short>
@@ -528,20 +535,14 @@ feature:
                             sfFirewallReload || sfFail 204 "Firewall problem"
 
                             # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
-                            sfFirewall --zone=safescale_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem"
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 204 "Firewall problem"
                             {{ if .SecondaryGatewayIP }}
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 204 "Firewall problem"
-                            sfFirewall --zone=safescale_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 204 "Firewall problem"
                             {{ end }}
                             sfFirewallReload || sfFail 204 "Firewall problem"
-                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.DefaultRouteIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
-                            # {{ if .SecondaryGatewayIP }}
-                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.PrimaryGatewayIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
-                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source address="{{.SecondaryGatewayIP}}" port protocol="tcp" port="{{.GuacamolePort}}" accept'
-                            # {{ end }}
-                            # sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" port protocol="tcp" port="{{.GuacamolePort}}" reject'
-                            # sfFirewallReload
+
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
@@ -554,13 +555,16 @@ feature:
                     image:
                         targets:
                             hosts: yes
+                            masters: all
                         run: |
-                            docker rm -f remotedesktop
-                            docker image rm remotedesktop:latest
+                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml || sfFail 192
+                            docker image rm safescale/remotedesktop:latest || sfFail 193
+                            rm -rf ${SF_ETCDIR}/remotedesktop
+                            sfExit
 
     proxy:
         rules:
-            - name: remotedesktop_guacamole_{{ .Hostname }}
+            - name: remotedesktop_guacamole_{{ .Hostname }}_service
               type: service
               targets:
                   hosts: true
@@ -570,15 +574,15 @@ feature:
                       "url": "http://{{.HostIP}}:{{.GuacamolePort}}/guacamole/"
                   }
 
-            - name: remotedesktop_{{ .Hostname }}
+            - name: remotedesktop_{{ .Hostname }}_route
               type: route
               targets:
                   hosts: true
                   masters: all
               content: |
                   {
-                      "paths": ["/_platform/remotedesktop/{{.Hostname}}"],
+                      "paths": ["/_platform/remotedesktop/{{ .Hostname }}"],
                       "strip_path": true,
-                      "service": { "name": "remotedesktop_guacamole_{{ .Hostname }}" }
+                      "service": { "name": "remotedesktop_guacamole_{{ .Hostname }}_service" }
                   }
 ...

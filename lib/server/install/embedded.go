@@ -255,9 +255,9 @@ func helmFeature() *Feature {
 	}
 }
 
-// sparkFeature ...
-func sparkFeature() *Feature {
-	name := "spark"
+// sparkmaster4platformFeature ...
+func sparkmaster4platformFeature() *Feature {
+	name := "sparkmaster4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
@@ -513,6 +513,21 @@ func consul4platformFeature() *Feature {
 // monitoring4platformFeature ...
 func monitoring4platformFeature() *Feature {
 	name := "monitoring4platform"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// geoserverFeature ...
+func geoserverFeature() *Feature {
+	name := "geoserver"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
