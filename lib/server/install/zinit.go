@@ -51,10 +51,11 @@ func init() {
 		filebeatFeature(),
 		kibanaFeature(),
 		helmFeature(),
-		sparkFeature(),
+		sparkmaster4platformFeature(),
 		elassandraFeature(),
 		consul4platformFeature(),
 		monitoring4platformFeature(),
+		geoserverFeature(),
 	}
 
 	for _, item := range allEmbedded {

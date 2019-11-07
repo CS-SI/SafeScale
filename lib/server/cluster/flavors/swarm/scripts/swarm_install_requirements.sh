@@ -24,7 +24,7 @@ install_common_requirements() {
     groupadd -r -f docker &>/dev/null
     usermod -aG docker safescale
     usermod -aG docker cladm
-    echo "cladm:{{ .CladmPassword }}" | chpasswd
+    echo -e "{{ .CladmPassword }}\n{{ .CladmPassword }}" | passwd cladm
     mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
     echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
     echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
@@ -58,7 +58,7 @@ install_common_requirements() {
         pathappend /opt/mesosphere/bin
 EOF
     chown -R cladm:cladm ~cladm
-    
+
     for i in ~cladm/.hushlogin ~cladm/.cloud-warnings.skip; do
         touch $i
         chown root:cladm $i

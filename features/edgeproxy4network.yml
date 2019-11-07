@@ -17,7 +17,6 @@
 ---
 feature:
     suitableFor:
-        host: no
         cluster: all
     requirements:
         features:
@@ -44,10 +43,7 @@ feature:
                     config:
                         timeout: 10
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/edgeproxy4network/includes
                             ln -s ${SF_ETCDIR}/edgeproxy4network ${SF_ETCDIR}/kong4gateway
@@ -236,10 +232,7 @@ feature:
 
                     networks:
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
                             # {{ if .ClusterFlavor }}
                             # IMAGE=kong4safescale
@@ -263,10 +256,7 @@ feature:
 
                     start:
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
                             docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network up -d || sfFail 193
                             sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || sfFail 194
@@ -277,10 +267,7 @@ feature:
                 steps:
                     compose:
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
                             if [ -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml ]; then
                                 docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network rm --stop --force || sfFail 195
@@ -304,10 +291,7 @@ feature:
 
                     networks:
                         targets:
-                            hosts: no
                             gateways: all
-                            masters: no
-                            nodes: no
                         run: |
                             # {{ if .ClusterFlavor }}
                             # KONG_PUB_BRIDGE=br_k4s_pub
