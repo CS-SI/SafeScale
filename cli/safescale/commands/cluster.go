@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -903,7 +904,7 @@ func executeCommand(command string) error {
 	i := 0
 	for _, m := range masters {
 		i++
-		retcode, stdout, stderr, err := safescalessh.Run(m, command, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		retcode, stdout, stderr, err := safescalessh.Run(context.TODO(), m, command, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "failed to execute command on master #%d: %s", i, err.Error())
 			if i < cMasters {

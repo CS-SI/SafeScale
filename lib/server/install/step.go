@@ -396,6 +396,11 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'variables' of type 'Variables'")
 	}
 
+	ctx, err := t.GetContext()
+	if err != nil {
+		return nil, err
+	}
+
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
@@ -432,7 +437,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	// Executes the script on the remote host
-	retcode, outrun, _, err := client.New().SSH.Run(host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, err := client.New().SSH.Run(ctx, host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{err: err, output: outrun}, nil
 	}

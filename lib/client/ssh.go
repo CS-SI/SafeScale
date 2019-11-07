@@ -44,7 +44,7 @@ type ssh struct {
 
 // FIXME ROBUSTNESS All functions MUST propagate context
 // Run ...
-func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Run(ctx context.Context, hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) { // CRITICAL FIXME Use context here
 	var (
 		retcode        int
 		stdout, stderr string
@@ -65,7 +65,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	ctx, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	runctx, cancel, err := utils.GetTimeoutContext(ctx, executionTimeout)
 	if err != nil {
 		return -1, "", "", err
 	}
@@ -80,7 +80,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 				return err
 			}
 
-			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(ctx, nil, executionTimeout)
+			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(runctx, nil, executionTimeout)
 
 			// If an error occurred, stop the loop and propagates this error
 			if err != nil {
@@ -155,7 +155,7 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy ...
-func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Copy(ctx context.Context, from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) { // FIXME CRITICAL Use context
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -213,7 +213,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		connectionTimeout = executionTimeout
 	}
 
-	ctx, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	ctx, cancel, err := utils.GetTimeoutContext(context.TODO(), executionTimeout)
 	if err != nil {
 		return -1, "", "", err
 	}
