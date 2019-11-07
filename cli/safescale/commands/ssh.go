@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -79,7 +80,7 @@ var sshRun = cli.Command{
 			timeout = temporal.GetHostTimeout()
 
 		}
-		retcode, stdout, stderr, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), temporal.GetConnectionTimeout(), timeout)
+		retcode, stdout, stderr, err := client.New().SSH.Run(context.TODO(), c.Args().Get(0), c.String("c"), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
@@ -124,7 +125,7 @@ var sshCopy = cli.Command{
 		} else {
 			timeout = temporal.GetHostTimeout()
 		}
-		retcode, _, _, err := client.New().SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := client.New().SSH.Copy(context.TODO(), normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))

@@ -51,6 +51,8 @@ type VolumeAPI interface {
 	Detach(ctx context.Context, volume string, host string) error
 }
 
+// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+
 // FIXME ROBUSTNESS All functions MUST propagate context
 
 // VolumeHandler volume service
@@ -66,7 +68,7 @@ func NewVolumeHandler(svc iaas.Service) VolumeAPI {
 }
 
 // List returns the network list
-func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) { // FIXME Unused ctx
+func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -75,26 +77,40 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if all {
-		volumes, err := handler.service.ListVolumes()
-		return volumes, err
+	echan := make(chan error)
+	go func() {
+		defer close(echan)
+		if all {
+			listedVolumes, err := handler.service.ListVolumes()
+			volumes = listedVolumes
+
+			echan <- err
+			return
+		}
+
+		mv, err := metadata.NewVolume(handler.service)
+		if err != nil {
+			echan <- err
+			return
+		}
+		err = mv.Browse(func(volume *resources.Volume) error {
+			volumes = append(volumes, *volume)
+			return nil
+		})
+		echan <- err
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, scerr.AbortedError("operation aborted by user", nil)
+	case err := <-echan:
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	mv, err := metadata.NewVolume(handler.service)
-	if err != nil {
-		return nil, err
-	}
-	err = mv.Browse(func(volume *resources.Volume) error {
-		volumes = append(volumes, *volume)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
 	return volumes, nil
 }
-
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
 func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) {

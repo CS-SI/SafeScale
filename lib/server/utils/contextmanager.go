@@ -43,8 +43,11 @@ func GetContext(storeUUID bool) (context.Context, error) {
 }
 
 // GetTimeoutContext return a context for grpc commands
-func GetTimeoutContext(timeout time.Duration) (context.Context, context.CancelFunc, error) {
-	// Contact the server and print out its response.
+func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, error) {
+	if parentCtx != context.TODO() {
+		ctx, cancel := context.WithTimeout(parentCtx, timeout)
+		return ctx, cancel, nil
+	}
 
 	aContext, err := GetContext(true)
 	if err != nil {
