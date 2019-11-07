@@ -563,12 +563,19 @@ EOF
         # Use systemd to ensure keepalived is restarted if network is restarted
         # (otherwise, keepalived is in undetermined state)
         mkdir -p /etc/systemd/system/keepalived.service.d
-        cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+        if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+            cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
 [Unit]
 Requires=network.service
 PartOf=network.service
 EOF
-
+        else
+            cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+[Unit]
+Requires=systemd-networkd.service
+PartOf=systemd-networkd.service
+EOF
+        fi
         systemctl daemon-reload
     fi
 
