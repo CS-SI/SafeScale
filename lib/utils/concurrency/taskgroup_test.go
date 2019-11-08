@@ -167,7 +167,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	var tasks []Task
 
-	for ind := 0; ind < 800; ind++ {
+	for ind := 0; ind < 2800; ind++ {
 		rt, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
 			rint := tools.RandomInt(5, 25)
 			time.Sleep(time.Duration(rint) * time.Millisecond)

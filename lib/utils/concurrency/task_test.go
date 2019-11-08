@@ -353,7 +353,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	}
 	funk(3, 5, 1, true)
 	funk(3, 5, 8, true)
-	funk(5, 2, 1, true)
+	funk(5, 3, 1, true)
 
 	funk(5, 2, 3, false)
 
