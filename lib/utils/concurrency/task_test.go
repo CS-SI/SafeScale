@@ -239,7 +239,7 @@ func TestSingleTaskTryWaitKO(t *testing.T) {
 	require.NotNil(t, res)
 	require.NotNil(t, err)
 
-	if end >= (time.Millisecond * 100) {
+	if end >= (time.Millisecond * 150) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
 }
@@ -262,14 +262,16 @@ func TestSingleTaskWait(t *testing.T) {
 	require.NotNil(t, res)
 	require.Nil(t, err)
 
-	if end >= (time.Millisecond*40) || end < (time.Millisecond*20) {
-		t.Errorf("It should have finished near 30s but it didn't !!")
+	if end >= (time.Millisecond*50) || end < (time.Millisecond*20) {
+		t.Errorf("It should have finished near 30 ms but it didn't !!")
 	}
 }
 
 func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	funk := func(timeout uint, sleep uint, trigger uint, witherror bool) {
 		ctx, cafu := context.WithTimeout(context.TODO(), time.Duration(timeout*10)*time.Millisecond)
+		defer cafu()
+
 		single, err := NewTaskWithContext(ctx, nil)
 		require.NotNil(t, single)
 		require.Nil(t, err)
@@ -308,9 +310,13 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 			}
 			require.True(t, st != ABORTED)
 		}
+
+		if !((err != nil) == witherror) {
+			t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+		}
 		require.True(t, (err != nil) == witherror)
 
-		if end > time.Millisecond*time.Duration(10*(trigger+1)) {
+		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
 			t.Errorf("We waited too much !")
 		}
 	}
@@ -356,17 +362,17 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 		}
 		require.True(t, (err != nil) == witherror)
 
-		if end > time.Millisecond*time.Duration(10*(trigger+1)) {
+		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
 			t.Errorf("We waited too much !")
 		}
 	}
 	funk(3, 5, 1, true)
-	funk(3, 5, 8, true)
+	funk(3, 5, 9, true)
 	funk(5, 3, 1, true)
 
 	funk(5, 1, 3, false)
 
-	funk(4, 3, 1, true)
+	funk(7, 3, 1, true)
 	funk(4, 1, 3, false)
 	funk(14, 2, 4, false)
 	funk(14, 4, 2, true)
