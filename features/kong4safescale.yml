@@ -119,7 +119,7 @@ feature:
                             # module.exports = [
                             #     {
                             #         "username": "safescale",
-                            #         "email": "cladm@safescale",
+                            #         "email": "{{ .ClusterAdminUsername }}@safescale",
                             #         "firstName": "SafeScale",
                             #         "lastName": "Administrator",
                             #         "node_id": "https://127.0.0.1:8444",
