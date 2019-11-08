@@ -148,7 +148,7 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 	end := time.Since(begin)
 
 	if end >= (time.Millisecond * 200) {
-		t.Errorf("It should have finished in 10s but it didn't !!")
+		t.Errorf("It should have finished near 200 ms but it didn't !!")
 	}
 
 	require.False(t, waited)
@@ -240,7 +240,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	end := time.Since(begin)
 
 	if end >= (time.Millisecond * 10 * 12) {
-		t.Errorf("It should have finished in 10s but it didn't !!")
+		t.Errorf("It should have finished near 100 ms but it didn't !!")
 	}
 
 	if waited {
