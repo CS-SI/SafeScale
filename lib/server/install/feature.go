@@ -536,10 +536,8 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		v["MasterNames"] = cluster.ListMasterNames(f.task)
 		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
 		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
-		if _, ok := v["Username"]; !ok {
-			v["Username"] = "cladm"
-			v["Password"] = identity.AdminPassword
-		}
+		v["ClusterAdminUsername"] = "cladm"
+		v["ClusterAdminPassword"] = identity.AdminPassword
 	} else {
 		var host *pb.Host
 		if nT != nil {
