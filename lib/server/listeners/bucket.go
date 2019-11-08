@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/asaskevich/govalidator"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -55,6 +56,13 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (b
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -66,7 +74,6 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (b
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		logrus.Info("Can't list buckets: no tenant set")
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no tenant set")
 	}
 
@@ -93,6 +100,13 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -105,7 +119,6 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		logrus.Info("Can't create bucket: no tenant set")
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot create bucket: no tenant set")
 	}
 
@@ -131,6 +144,13 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -143,7 +163,6 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		// logrus.Info("Can't delete buckets: no tenant set")
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot delete bucket: no tenant set")
 	}
 
@@ -168,6 +187,13 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -180,7 +206,6 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		// logrus.Info("Can't inspect bucket: no tenant set")
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect bucket: no tenant set")
 	}
 
@@ -209,6 +234,13 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
@@ -222,7 +254,6 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		// logrus.Info("Can't mount buckets: no tenant set")
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot mount bucket: no tenant set")
 	}
 
@@ -247,6 +278,13 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
@@ -260,7 +298,6 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		logrus.Info("Can't unmount bucket: no tenant set")
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot unmount bucket: no tenant set")
 	}
 

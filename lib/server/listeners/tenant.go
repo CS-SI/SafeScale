@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/asaskevich/govalidator"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -78,6 +79,13 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (_
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -115,6 +123,13 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (_ 
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -149,8 +164,14 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	name := in.GetName()
-	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -220,6 +241,13 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -262,6 +290,13 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -295,6 +330,13 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 	}
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()

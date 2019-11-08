@@ -19,6 +19,8 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -59,11 +61,17 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	shareName := in.GetName()
 	hostRef := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
 	shareType := in.GetType()
-	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -105,8 +113,14 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	shareName := in.GetName()
-	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -147,6 +161,13 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ 
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -196,11 +217,17 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -242,11 +269,17 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	hostRef := srvutils.GetReference(in.GetHost())
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -287,8 +320,14 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	shareRef := srvutils.GetReference(in)
-	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", shareRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()

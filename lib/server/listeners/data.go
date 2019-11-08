@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/asaskevich/govalidator"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
@@ -46,6 +47,13 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			log.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -83,6 +91,13 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 	}
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			log.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	objectName := in.GetName()
@@ -123,6 +138,13 @@ func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *google_pro
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			log.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	objectName := in.GetName()
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -159,6 +181,13 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_p
 	}
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			log.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	objectName := in.GetName()

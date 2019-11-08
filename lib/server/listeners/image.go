@@ -18,6 +18,8 @@ package listeners
 
 import (
 	"context"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,6 +51,13 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *p
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
