@@ -1,6 +1,9 @@
 package objectstorage
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestBuildMetadataBucketName(t *testing.T) {
 	type args struct {
@@ -9,6 +12,12 @@ func TestBuildMetadataBucketName(t *testing.T) {
 		domain  string
 		project string
 	}
+
+	suffix := ""
+	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
+		suffix = "." + suffix
+	}
+
 	tests := []struct {
 		name    string
 		args    args
@@ -20,19 +29,19 @@ func TestBuildMetadataBucketName(t *testing.T) {
 			region:  "b",
 			domain:  "c",
 			project: "d",
-		}, "0.safescale-449a7986e14ff78da8c3053229f4f1d2", false},
+		}, "0.safescale-449a7986e14ff78da8c3053229f4f1d2" + suffix, false},
 		{"second", args{
 			driver:  "a",
 			region:  "c",
 			domain:  "b",
 			project: "d",
-		}, "0.safescale-39aa5fec414ff78da8c3028953851096", false},
+		}, "0.safescale-39aa5fec414ff78da8c3028953851096" + suffix, false},
 		{"second insensitive", args{
 			driver:  "a",
 			region:  "c",
 			domain:  "b",
 			project: "D",
-		}, "0.safescale-39aa5fec414ff78da8c3028953851096", false},
+		}, "0.safescale-39aa5fec414ff78da8c3028953851096" + suffix, false},
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {

@@ -297,9 +297,15 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 
 		if witherror {
 			st, _ := single.GetStatus()
+			if st != ABORTED {
+				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+			}
 			require.True(t, st == ABORTED)
 		} else {
 			st, _ := single.GetStatus()
+			if st == ABORTED {
+				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+			}
 			require.True(t, st != ABORTED)
 		}
 		require.True(t, (err != nil) == witherror)
@@ -345,6 +351,9 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 			}
 		}
 
+		if !((err != nil) == witherror) {
+			t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+		}
 		require.True(t, (err != nil) == witherror)
 
 		if end > time.Millisecond*time.Duration(10*(trigger+1)) {
@@ -355,10 +364,10 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	funk(3, 5, 8, true)
 	funk(5, 3, 1, true)
 
-	funk(5, 2, 3, false)
+	funk(5, 1, 3, false)
 
-	funk(4, 2, 1, true)
-	funk(4, 2, 3, false)
+	funk(4, 3, 1, true)
+	funk(4, 1, 3, false)
 	funk(14, 2, 4, false)
 	funk(14, 4, 2, true)
 }
@@ -393,7 +402,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 
 		require.True(t, (err != nil) == witherror)
 
-		if end > time.Millisecond*time.Duration(10*(trigger+1)) {
+		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
 			t.Errorf("We waited too much !")
 		}
 	}
