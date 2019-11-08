@@ -5,6 +5,7 @@ package local
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -19,7 +20,7 @@ type Stack struct {
 }
 
 func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
-	panic("implement me") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("WaitHostReady not implemented yet!") // FIXME Technical debt
 }
 
 // Build Create and initialize a ClientAPI
