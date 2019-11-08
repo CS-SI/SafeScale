@@ -19,6 +19,8 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
@@ -57,6 +59,14 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	networkName := in.GetName()
 	if networkName == "" {
 		return nil, scerr.InvalidRequestError("cannot create network: name can't be empty string")
@@ -136,6 +146,13 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -180,6 +197,13 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	ref := srvutils.GetReference(in)
@@ -230,6 +254,13 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 	}
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	ref := srvutils.GetReference(in)

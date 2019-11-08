@@ -19,6 +19,8 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
@@ -49,6 +51,13 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 	}
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	uuid := in.Uuid
@@ -90,6 +99,13 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()

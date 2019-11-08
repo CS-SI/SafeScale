@@ -19,6 +19,8 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
@@ -60,6 +62,13 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	all := in.GetAll()
@@ -110,10 +119,16 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	name := in.GetName()
 	speed := in.GetSpeed()
 	size := in.GetSize()
-	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -153,6 +168,13 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
 	}
 
 	volumeRef := srvutils.GetReference(in.GetVolume())
@@ -214,6 +236,14 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference for volume"), "cannot detach volume").ToGRPCStatus()
@@ -264,6 +294,14 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference"), "cannot delete volume").ToGRPCStatus()
@@ -311,6 +349,14 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
 	ref := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference"), CANNOT).ToGRPCStatus()
