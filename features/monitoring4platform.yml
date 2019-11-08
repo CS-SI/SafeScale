@@ -22,8 +22,8 @@ feature:
 
     requirements:
         features:
-            - docker
             - consul4platform
+            - postgresql4platform
 
     parameters:
         - PrometheusVersion=v2.11.1
@@ -50,7 +50,7 @@ feature:
 
             add:
                 # pace: prometheus,am-executor,alertmanager,karma,grafana,portainer,stack,secrets,network,start,running
-                pace: node-exporter,prometheus,am-executor,alertmanager,karma,grafana,stack,start,running
+                pace: node-exporter,prometheus,am-executor,alertmanager,karma,grafana,stack,database,start,running
                 steps:
                     node-exporter:
                         targets:
@@ -451,14 +451,24 @@ feature:
                             router_logging = true
 
                             [security]
-                            admin_user = cladm
-                            admin_password = {{ .CladmAdminPassword }}
+                            # admin_user = {{ .ClusterAdminUsername }}
+                            # admin_password = {{ .ClusterAdminPassword }}
+                            admin_user = admin
+                            admin_password = admin
 
                             [users]
                             allow_sign_up = false
                             allow_org_create = false
                             auto_assign_org = true
                             viewers_can_edit = false
+
+                            [database]
+                            type = postgres
+                            host = {{ .DefaultRouteIP }}:63008
+                            name = grafana4platform
+                            #user = grafana4platform
+                            user = postgres
+
                             EOF
 
                             # id=472 is the user used to run grafana in container
@@ -481,7 +491,7 @@ feature:
                             masters: all
                         run: |
                             cat >${SF_ETCDIR}/monitoring4platform/stack.yml <<-EOF
-                            version: '3.3'
+                            version: '3.7'
 
                             networks:
                                 consul4platform_net:
@@ -496,9 +506,12 @@ feature:
                             #     task_rules:
                             #         file: ${SF_ETCDIR}/monitoring4platform/prometheus/rules/swarm_task.yml
 
-                            # secrets:
-                            #     safescale.portainer-ui.admin_password:
-                            #         external: true
+                            secrets:
+                                postgres.password:
+                                    external: true
+                                    name: safescale.postgresql.password.postgres
+                            #   - safescale.portainer-ui.password.admin:
+                            #       external: true
 
                             services:
                                 # node-exporter:
@@ -577,11 +590,6 @@ feature:
                                         - ${SF_ETCDIR}/monitoring4platform/prometheus/config.yml:/etc/prometheus/prometheus.yml
                                         - ${SF_ETCDIR}/monitoring4platform/prometheus/rules.d:/etc/prometheus/rules.d
                                         - ${SF_VARDIR}/monitoring4platform/prometheus:/prometheus
-                                    # configs:
-                                    #     - source: node_rules
-                                    #       target: /etc/prometheus/swarm_node.rules.yml
-                                    #     - source: task_rules
-                                    #       target: /etc/prometheus/swarm_task.rules.yml
                                     deploy:
                                         mode: replicated
                                         replicas: 1
@@ -667,10 +675,11 @@ feature:
                                           target: 3000
                                           mode: host
                                     environment:
-                                        - GF_SECURITY_ADMIN_USER={{ .ClusterUsername }}
-                                        - GF_SECURITY_ADMIN_PASSWORD={{ .ClusterPassword }}
-                                        #- GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/safescale.monitoring.grafana.password
-                                        - GF_USERS_ALLOW_SIGN_UP=false
+                                        - GF_DATABASE_PASSWORD__FILE=/run/secrets/postgres.password
+                                    ##     - GF_SECURITY_ADMIN_USER={{ .ClusterAdminUsername }}
+                                    ##     - GF_SECURITY_ADMIN_PASSWORD={{ .ClusterAdminPassword }}
+                                    ##     - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/safescale.monitoring.grafana.password
+                                    ##     - GF_USERS_ALLOW_SIGN_UP=false
                                     volumes:
                                         - ${SF_ETCDIR}/monitoring4platform/grafana/config.ini:/etc/grafana/grafana.ini
                                         - ${SF_ETCDIR}/monitoring4platform/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
@@ -693,6 +702,8 @@ feature:
                                                 memory: 128M
                                             reservations:
                                                 memory: 64M
+                                    secrets:
+                                        - postgres.password
 
                                 karma:
                                     image: lmierzwa/karma:latest
@@ -794,6 +805,15 @@ feature:
                     #         echo "{{.ClusterAdminPassword}}" | docker secret create safescale.portainer-ui.admin_password -
                     #         sfExit
 
+                    database:
+                        targets:
+                            masters: any
+                        run: |
+                            # sfPgsqlCreateRole grafana4platform || sfFail 198
+                            # sfPgsqlCreateDatabase grafana4platform grafana4platform || sf 199
+                            sfPgsqlCreateDatabase grafana4platform || sf 199
+                            sfExit
+
                     start:
                         targets:
                             hosts: no
@@ -822,6 +842,11 @@ feature:
                             if [ -f ${SF_ETCDIR}/monitoring4platform/stack.yml ]; then
                                 docker stack rm monitoring4platform || sfFail 200
                             fi
+                            purge={{ .PurgeOnRemoval }}
+                            purge=${purge,,}
+                            [ "$purge" = "yes" -o "$purge" = "true" ] && {
+                                sfPgsqlDropDatabase grafana4platform || sfFail 201
+                            }
                             sfExit
 
                     cleanup:
