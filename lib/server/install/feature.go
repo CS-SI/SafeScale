@@ -567,10 +567,8 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		_, values = extractKeysAndValuesFromMap(listMap)
 		v["MasterIPs"] = values
 
-		if _, ok := v["Username"]; !ok {
-			v["Username"] = "cladm"
-			v["Password"] = identity.AdminPassword
-		}
+		v["ClusterAdminUsername"] = "cladm"
+		v["ClusterAdminPassword"] = identity.AdminPassword
 	} else {
 		var host *pb.Host
 		if nT != nil {
