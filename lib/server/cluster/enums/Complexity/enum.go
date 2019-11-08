@@ -16,6 +16,8 @@
 
 package Complexity
 
+//go:generate stringer -type=Enum
+
 import (
 	"fmt"
 	"strings"
@@ -61,12 +63,4 @@ func Parse(v string) (Enum, error) {
 	}
 	return e, nil
 
-}
-
-// String returns a string representation of an Enum
-func (e Enum) String() string {
-	if str, found := enumMap[e]; found {
-		return str
-	}
-	panic(fmt.Sprintf("failed to find a Complexity.Enum string corresponding to value '%d'!", e))
 }

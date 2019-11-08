@@ -132,7 +132,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 
 	status, _ := tg.task.GetStatus()
 	if status != READY && status != RUNNING {
-		panic(fmt.Sprintf("Can't start new task in group '%s': neither ready nor running!", tid))
+		return nil, fmt.Errorf("can't start new task in group '%s': neither ready nor running", tid)
 	}
 
 	tg.last++

@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sirupsen/logrus"
 )
@@ -247,11 +248,13 @@ func (h *Host) Serialize() ([]byte, error) {
 }
 
 // Deserialize reads json code and reinstantiates an Host
-func (h *Host) Deserialize(buf []byte) error {
+func (h *Host) Deserialize(buf []byte) (err error) {
+	defer scerr.OnPanic(&err)()
+
 	if h.Properties == nil {
 		h.Properties = serialize.NewJSONProperties("resources.host")
 	}
-	err := serialize.FromJSON(buf, h)
+	err = serialize.FromJSON(buf, h)
 	if err != nil {
 		return err
 	}

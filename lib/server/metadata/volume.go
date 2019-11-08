@@ -59,7 +59,9 @@ func NewVolume(svc iaas.Service) (*Volume, error) {
 }
 
 // Carry links a Volume instance to the Metadata instance
-func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
+func (mv *Volume) Carry(volume *resources.Volume) (rv *Volume, err error) {
+	defer scerr.OnPanic(&err)()
+
 	if mv == nil {
 		return nil, scerr.InvalidInstanceError()
 	}

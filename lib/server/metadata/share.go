@@ -280,27 +280,29 @@ func (ms *Share) Browse(callback func(string, string) error) error {
 // Acquire waits until the write lock is available, then locks the metadata.
 //
 // May panic (see scerr.OnPanic() usage to intercept and translate it to an error)
-func (ms *Share) Acquire() {
+func (ms *Share) Acquire() error {
 	if ms == nil {
-		panic("invalid instance")
+		return scerr.InvalidInstanceError()
 	}
 	if ms.item == nil {
-		panic("invalid instance content: ms.item cannot be nil")
+		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
 	ms.item.Acquire()
+	return nil
 }
 
 // Release unlocks the metadata
 //
 // May panic (see scerr.OnPanic() usage to intercept and translate it to an error)
-func (ms *Share) Release() {
+func (ms *Share) Release() error {
 	if ms == nil {
-		panic("invalid instance")
+		return scerr.InvalidInstanceError()
 	}
 	if ms.item == nil {
-		panic("invalid instance content: ms.item cannot be nil")
+		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
 	ms.item.Release()
+	return nil
 }
 
 // SaveShare saves the Nas definition in Object Storage

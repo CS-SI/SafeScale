@@ -75,5 +75,5 @@ func (e Enum) String() string {
 	if str, found := enumMap[e]; found {
 		return str
 	}
-	panic(fmt.Sprintf("failed to find a string matching with Flavor '%d'!", e))
+	return ""
 }
