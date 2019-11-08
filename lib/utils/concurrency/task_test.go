@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-// FIXME The whole file task_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
+// NOTICE The whole file task_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
 
 func TestNewTask(t *testing.T) {
 	got, err := NewTask(nil)
@@ -434,7 +434,7 @@ func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 	}
 	end := time.Since(begin)
 
-	if end >= (time.Millisecond * 11) {
-		t.Errorf("It should have finished in 10s but it didn't !!")
+	if end >= (time.Millisecond * 15) {
+		t.Errorf("It should have finished near 15 ms but it didn't !!")
 	}
 }
