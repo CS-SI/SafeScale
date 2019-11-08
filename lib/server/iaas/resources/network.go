@@ -19,6 +19,7 @@ package resources
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sirupsen/logrus"
 )
@@ -105,13 +106,15 @@ func (n *Network) Serialize() ([]byte, error) {
 }
 
 // Deserialize reads json code and reinstantiates an Host
-func (n *Network) Deserialize(buf []byte) error {
+func (n *Network) Deserialize(buf []byte) (err error) {
+	defer scerr.OnPanic(&err)()
+
 	if n.Properties == nil {
 		n.Properties = serialize.NewJSONProperties("resources.network")
 	} else {
 		n.Properties.SetModule("resources.network")
 	}
-	err := serialize.FromJSON(buf, n)
+	err = serialize.FromJSON(buf, n)
 	if err != nil {
 		return err
 	}

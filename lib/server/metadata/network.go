@@ -76,10 +76,13 @@ func (m *Network) GetPath() (string, error) {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (m *Network) Carry(network *resources.Network) (*Network, error) {
+func (m *Network) Carry(network *resources.Network) (rn *Network, err error) {
 	if m == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+
+	defer scerr.OnPanic(&err)()
+
 	if network == nil {
 		return nil, scerr.InvalidParameterError("network", "cannot be nil")
 	}

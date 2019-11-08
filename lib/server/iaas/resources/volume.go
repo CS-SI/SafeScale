@@ -19,6 +19,7 @@ package resources
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -62,13 +63,15 @@ func (v *Volume) Serialize() ([]byte, error) {
 }
 
 // Deserialize reads json code and restores an Host
-func (v *Volume) Deserialize(buf []byte) error {
+func (v *Volume) Deserialize(buf []byte) (err error) {
+	defer scerr.OnPanic(&err)()
+
 	if v.Properties == nil {
 		v.Properties = serialize.NewJSONProperties("resources.volume")
 	} else {
 		v.Properties.SetModule("resources.volume")
 	}
-	err := serialize.FromJSON(buf, v)
+	err = serialize.FromJSON(buf, v)
 	if err != nil {
 		return err
 	}

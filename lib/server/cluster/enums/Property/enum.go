@@ -16,9 +16,12 @@
 
 package Property
 
+//Enum represents the type of a node
+type Enum string
+
 const (
 	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
-	DescriptionV1 = "1"
+	DescriptionV1 Enum = "1"
 	// DefaultsV1 contains additional info about default settings (node sizing, default image, ...)
 	// Deprecated by DefaultsV2 (but kept for compatibility)
 	DefaultsV1 = "2"

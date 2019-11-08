@@ -54,7 +54,9 @@ func NewHost(svc iaas.Service) (*Host, error) {
 }
 
 // Carry links an host instance to the Metadata instance
-func (mh *Host) Carry(host *resources.Host) (*Host, error) {
+func (mh *Host) Carry(host *resources.Host) (rh *Host, err error) {
+	defer scerr.OnPanic(&err)()
+
 	if host == nil {
 		return nil, scerr.InvalidParameterError("host", "cannot be nil!")
 	}

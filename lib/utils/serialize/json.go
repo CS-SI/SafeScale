@@ -242,10 +242,12 @@ func (x *JSONProperties) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implement json.Unmarshaller
 // Note: DO NOT LOCK property here, deadlock risk
-func (x *JSONProperties) UnmarshalJSON(b []byte) error {
+func (x *JSONProperties) UnmarshalJSON(b []byte) (err error) {
+	defer scerr.OnPanic(&err)()
+
 	// Decode JSON data
 	unjsoned := map[string]string{}
-	err := FromJSON(b, &unjsoned)
+	err = FromJSON(b, &unjsoned)
 	if err != nil {
 		return err
 	}

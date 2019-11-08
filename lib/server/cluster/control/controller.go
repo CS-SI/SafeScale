@@ -60,7 +60,9 @@ type Controller struct {
 }
 
 // NewController ...
-func NewController(svc iaas.Service) (*Controller, error) {
+func NewController(svc iaas.Service) (src *Controller, err error) {
+	defer scerr.OnPanic(&err)()
+
 	metadata, err := NewMetadata(svc)
 	if err != nil {
 		return nil, err

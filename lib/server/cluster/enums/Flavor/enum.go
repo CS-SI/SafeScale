@@ -16,6 +16,8 @@
 
 package Flavor
 
+//go:generate stringer -type=Enum
+
 import (
 	"fmt"
 	"strings"
@@ -70,12 +72,4 @@ func Parse(v string) (Enum, error) {
 	}
 	return e, nil
 
-}
-
-// String returns a string representation of an Enum
-func (e Enum) String() string {
-	if str, found := enumMap[e]; found {
-		return str
-	}
-	panic(fmt.Sprintf("failed to find a string matching with Flavor '%d'!", e))
 }
