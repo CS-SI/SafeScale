@@ -95,3 +95,9 @@ cli/scanner/Test*
 Test Results - client_test_go\.html
 
 
+
+lib/security/gateway/client/safe-security
+
+lib/server/iaas/resources/userdata/version.go
+
+lib/system/version.go
