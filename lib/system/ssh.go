@@ -694,7 +694,7 @@ func (ssh *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout
 					return err
 				}
 
-				retcode, stdout, stderr, err = cmd.RunWithTimeout(context.TODO(), nil, timeout)
+				retcode, stdout, stderr, err = cmd.RunWithTimeout(ctx, nil, timeout)
 				if err != nil {
 					return err
 				}
