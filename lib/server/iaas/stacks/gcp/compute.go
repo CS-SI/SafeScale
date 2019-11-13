@@ -410,7 +410,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 				if gerr, ok := err.(*googleapi.Error); ok {
 					logrus.Warnf("Received GCP errorcode: %d", gerr.Code)
-					if gerr.Code == 403 {
+
+					if !(gerr.Code == 200 || gerr.Code == 429 || gerr.Code == 500 || gerr.Code == 503) {
 						desistError = gerr
 						return nil
 					}
