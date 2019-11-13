@@ -59,18 +59,18 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
-                                    sfRetry 5m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail 192
-                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193
+                                    sfRetry 7m 3 "sfApt update" || sfFail 192 "Unable to update sources"
+                                    sfRetry 7m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg" || sfFail 192 "Unable to install gnupg requirement for docker-ce"
+                                    sfRetry 7m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail 192 "Error installing docker pre-requirements"
+                                    sfRetry 7m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193 "Error preparing docker sources"
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -qqy docker-ce" || sfFail 194
+                                    sfRetry 10m 3 "sfApt update" || sfFail 194 "Error updating sources"
+                                    sfRetry 7m 3 "sfApt install -qqy docker-ce" || sfFail 194 "Error installing docker-ce"
                                     ;;
                                 centos|rhel)
-                                    sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
-                                    sfRetry 7m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
-                                    sfRetry 7m 3 yum install -y docker-ce || sfFail 194
+                                    sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192 "Error installing docker pre-requirements"
+                                    sfRetry 7m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193 "Error preparing docker sources"
+                                    sfRetry 7m 3 yum install -y docker-ce || sfFail 194 "Error installing docker-ce"
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -88,9 +88,9 @@ feature:
                         run: |
                             op=-1
                             VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
-                            [ $op -ne 0 ] && sfFail 192
+                            [ $op -ne 0 ] && sfFail 192 "Unable to retrieve last docker-compose version"
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                            sfDownload "$URL" docker-compose 3m 5 || sfFail 193
+                            sfDownload "$URL" docker-compose 3m 5 || sfFail 193 "Unable to download last docker-compose"
                             chmod +x docker-compose && mv docker-compose /usr/bin
                             sfExit
 
