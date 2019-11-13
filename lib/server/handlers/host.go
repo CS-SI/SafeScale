@@ -668,6 +668,8 @@ func (handler *HostHandler) Create(
 		return nil, scerr.ErrListError(errors)
 	}
 
+	log.Infof("Userdata phase 2 in progress in host '%s'", host.Name)
+
 	// Executes userdata phase2 script to finalize host installation
 	userDataPhase2, err := userData.Generate("phase2")
 	if err != nil {
@@ -699,6 +701,7 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
+	log.Infof("Rebooting host '%s'", host.Name)
 	// Reboot host
 	command = "sudo systemctl reboot"
 	_, _, stderr, err = sshHandler.Run(ctx, host.Name, command)
@@ -706,8 +709,9 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	// Wait like 2 min for the machine to reboot
-	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetConnectSSHTimeout())
+	log.Infof("Waiting for reboot... of host '%s'", host.Name)
+	// Wait like 5 min for the machine to reboot
+	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetHostTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, err
