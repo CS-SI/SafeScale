@@ -151,9 +151,14 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	}, nil)
 	require.NotNil(t, err)
 
-	time.Sleep(time.Duration(50) * time.Millisecond)
-
-	single, err = single.Reset()
+	err = nil
+	for {
+		time.Sleep(time.Duration(80) * time.Millisecond)
+		if singleReplacement, err := single.Reset(); err == nil {
+			single = singleReplacement
+			break
+		}
+	}
 	require.Nil(t, err)
 
 	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
@@ -326,7 +331,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	funk(4, 2, 1, true)
 	funk(4, 2, 3, false)
 	funk(14, 2, 4, false)
-	funk(14, 4, 2, true)
+	funk(14, 5, 1, true)
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
