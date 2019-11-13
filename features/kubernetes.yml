@@ -449,20 +449,20 @@ feature:
                             # apiVersion: v1
                             # kind: ServiceAccount
                             # metadata:
-                            #   name: cladm
+                            #   name: {{ .ClusterAdminUsername }}
                             #   namespace: kube-system
                             # ---
                             # apiVersion: rbac.authorization.k8s.io/v1
                             # kind: ClusterRoleBinding
                             # metadata:
-                            #   name: cladm
+                            #   name: {{ .ClusterAdminUsername }}
                             # roleRef:
                             #   apiGroup: rbac.authorization.k8s.io
                             #   kind: ClusterRole
                             #   name: cluster-admin
                             # subjects:
                             #   - kind: ServiceAccount
-                            #     name: cladm
+                            #     name: {{ .ClusterAdminUsername }}
                             #     namespace: kube-system
                             # EOF
                             sfExit
