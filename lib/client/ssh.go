@@ -213,7 +213,7 @@ func (s *ssh) Copy(ctx context.Context, from, to string, connectionTimeout, exec
 		connectionTimeout = executionTimeout
 	}
 
-	ctx, cancel, err := utils.GetTimeoutContext(context.TODO(), executionTimeout)
+	ctx, cancel, err := utils.GetTimeoutContext(ctx, executionTimeout)
 	if err != nil {
 		return -1, "", "", err
 	}
