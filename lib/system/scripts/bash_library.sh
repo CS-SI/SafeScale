@@ -35,16 +35,19 @@ sfFail() {
     fi
     exit $1
 }
+export -f sfFail
 
 function sfExit() {
     exit 0
 }
+export -f sfExit
 
 sfFinishPreviousInstall() {
     local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
     if [[ "$unfinished" == 0 ]]; then
-        echo "good"
+        echo "no unfinished packages"
     else
+        echo "there are unconfigured packages !"
         sudo dpkg --configure -a --force-all
     fi
 }
@@ -59,7 +62,9 @@ export -f sfWaitForApt
 
 # sfApt does exactly what apt does, but we call sfWaitForApt first
 sfApt() {
+    echo "waiting for apt lock..."
     sfWaitForApt
+    echo "running apt $@"
     DEBIAN_FRONTEND=noninteractive apt "$@"
 }
 export -f sfApt
@@ -96,6 +101,7 @@ sfIP2long() {
     IFS=. read -r a b c d <<<$*
     echo $(((((((a << 8) | b) << 8) | c) << 8) | d))
 }
+export -f sfIP2long
 
 sfLong2IP() {
     local ui32=$1
@@ -106,6 +112,7 @@ sfLong2IP() {
     done
     echo $ip
 }
+export -f sfLong2IP
 
 # Convert netmask to CIDR
 sfNetmask2cidr() {
@@ -901,6 +908,7 @@ sfDetectFacts() {
     declare -p FACTS >"${SERIALIZED_FACTS}"
     return 0
 }
+export -f sfDetectFacts
 
 sfGetFact() {
 	[ $# -eq 0 ] && return
