@@ -87,7 +87,7 @@ export -f install_common_requirements
 
 case $(sfGetFact "linux_kind") in
     debian|ubuntu)
-        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip"
+        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip" || sfFail 192 "Problem installing k8s requirements"
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cd rclone-*-linux-amd64 && \
@@ -97,20 +97,20 @@ case $(sfGetFact "linux_kind") in
         chmod 755 /usr/bin/rclone && \
         mkdir -p /usr/local/share/man/man1 && \
         cp rclone.1 /usr/local/share/man/man1/ && \
-        mandb
+        mandb || sfFail 192 "Problem installing k8s requirements"
 
         ;;
     redhat|centos)
-        yum makecache fast
-        yum install -y wget curl time rclone jq unzip
+        yum makecache fast || sfFail 192 "Problem updating sources"
+        yum install -y wget curl time rclone jq unzip || sfFail 192 "Problem installing k8s requirements"
         ;;
     fedora)
-        dnf install wget curl time rclone jq unzip
+        dnf install wget curl time rclone jq unzip || sfFail 192 "Problem installing k8s requirements"
         ;;
     *)
-        echo "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
-        exit 1
+        sfFail 1 "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
         ;;
 esac
 
-/usr/bin/time -p bash -c -x install_common_requirements
+# /usr/bin/time -p bash -c -x install_common_requirements
+install_common_requirements

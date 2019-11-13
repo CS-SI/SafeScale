@@ -69,12 +69,12 @@ export -f install_common_requirements
 
 case $LINUX_KIND in
     centos|redhat)
-        yum makecache fast
-        yum install -y curl wget time jq rclone unzip
+        yum makecache fast || sfFail 192 "Problem updating sources"
+        yum install -y curl wget time jq rclone unzip || sfFail 192 "Problem installing boh requirements"
         ;;
     debian|ubuntu)
-        sfApt update && \
-        sfApt install -y curl wget time jq unzip
+        sfApt update || sfFail 192 "Problem updating sources"
+        sfApt install -y curl wget time jq unzip || sfFail 192 "Problem installing boh requirements"
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cp rclone-*-linux-amd64/rclone /usr/bin/ && \
@@ -83,11 +83,11 @@ case $LINUX_KIND in
         chmod 755 /usr/bin/rclone && \
         mkdir -p /usr/local/share/man/man1 && \
         cp rclone.1 /usr/local/share/man/man1/ && \
-        mandb
+        mandb || sfFail 192 "Problem installing boh requirements"
         ;;
     *)
-        echo "unmanaged Linux distribution '$LINUX_KIND'"
-        exit 1
+        sfFail 1 "unmanaged Linux distribution '$LINUX_KIND'"
 esac
 
-/usr/bin/time -p bash -c install_common_requirements
+# /usr/bin/time -p bash -c -x install_common_requirements
+install_common_requirements
