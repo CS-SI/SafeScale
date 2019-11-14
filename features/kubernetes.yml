@@ -317,10 +317,10 @@ feature:
                             cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1) || sfFail 201
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
-                            mkdir -p ~{{.Username}}/.kube
-                            cp -f /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
-                            chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
-                            chmod -R go-rwx ~{{.Username}}/.kube
+                            mkdir -p ~{{.ClusterAdminUsername}}/.kube
+                            cp -f /etc/kubernetes/admin.conf ~{{.ClusterAdminUsername}}/.kube/config
+                            chown -R {{.ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}/.kube && \
+                            chmod -R go-rwx ~{{.ClusterAdminUsername}}/.kube
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
