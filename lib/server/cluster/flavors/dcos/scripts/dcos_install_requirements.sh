@@ -126,4 +126,4 @@ yum makecache fast
 yum install -y time
 
 # /usr/bin/time -p bash -c -x install_common_requirements
-install_common_requirements
+install_common_requirements || sfFail $? "Problem installing common requirements"
