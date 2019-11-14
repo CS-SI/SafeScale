@@ -202,10 +202,6 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index uint, h
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	if retcode == 0 {
-		return nil
-	}
-
 	richErrc := fmt.Sprintf("%d", retcode)
 	if retcode < int(ErrorCode.NextErrorCode) {
 		errCode := ErrorCode.Enum(retcode)
@@ -239,7 +235,12 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 		if err != nil {
 			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
 		}
-		return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+
+		if retcode != 0 {
+			return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+		}
+
+		return nil
 	}
 }
 

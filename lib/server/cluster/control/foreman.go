@@ -1389,19 +1389,10 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		return err
 	}
 
-	if retcode != 0 {
-		return handleExecuteScriptReturn(retcode, stdout, stderr, err, fmt.Sprintf("[%s] system requirements installation failed", hostLabel))
-	}
-
-	logrus.Debugf("[%s] system requirements installation successful.", hostLabel)
-	return nil
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, fmt.Sprintf("[%s] system requirements installation failed", hostLabel))
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	if retcode == 0 {
-		return nil
-	}
-
 	var collected []string
 	if stdout != "" {
 		errLines := strings.Split(stdout, "\n")
@@ -1422,9 +1413,13 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 
 	if len(collected) > 0 {
 		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
+			return scerr.Wrap(err, fmt.Sprintf("%s: return code [%d], std error [%s]", msg, retcode, collected))
 		}
-		return fmt.Errorf("%s: std error [%s]", msg, strings.Join(collected, ";"))
+		return fmt.Errorf("%s: return code [%d], std error [%s]", msg, retcode, strings.Join(collected, ";"))
+	}
+
+	if retcode != 0 {
+		return fmt.Errorf("%s: nonzero return code [%d]", msg, retcode)
 	}
 
 	return nil

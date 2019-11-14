@@ -450,10 +450,6 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	if retcode == 0 {
-		return nil
-	}
-
 	richErrc := fmt.Sprintf("%d", retcode)
 
 	collected := []string{}
@@ -483,6 +479,11 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 		if err != nil {
 			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
 		}
-		return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+
+		if retcode != 0 {
+			return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+		}
+
+		return nil
 	}
 }

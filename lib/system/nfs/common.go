@@ -227,18 +227,34 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	if err != nil {
-		collected := ""
+	var collected []string
+	if stdout != "" {
+		errLines := strings.Split(stdout, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred") {
+				collected = append(collected, errline)
+			}
+		}
+	}
+	if stderr != "" {
 		errLines := strings.Split(stderr, "\n")
 		for _, errline := range errLines {
 			if strings.Contains(errline, "An error occurred") {
-				collected += errline + ";"
+				collected = append(collected, errline)
 			}
 		}
-		return scerr.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
 	}
+
+	if len(collected) > 0 {
+		if err != nil {
+			return scerr.Wrap(err, fmt.Sprintf("%s: return code [%d], std error [%s]", msg, retcode, collected))
+		}
+		return fmt.Errorf("%s: return code [%d], std error [%s]", msg, retcode, strings.Join(collected, ";"))
+	}
+
 	if retcode != 0 {
-		return fmt.Errorf("%s: Errorcode [%d], std error [%s], std output [%s]", msg, retcode, stderr, stdout)
+		return fmt.Errorf("%s: nonzero return code [%d]", msg, retcode)
 	}
+
 	return nil
 }
