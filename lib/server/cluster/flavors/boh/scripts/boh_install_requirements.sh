@@ -78,11 +78,11 @@ case $LINUX_KIND in
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cp rclone-*-linux-amd64/rclone /usr/bin/ && \
-        rm -rf rclone-* && \
         chown root:root /usr/bin/rclone && \
         chmod 755 /usr/bin/rclone && \
         mkdir -p /usr/local/share/man/man1 && \
-        cp rclone.1 /usr/local/share/man/man1/ && \
+        cp rclone-*-linux-amd64/rclone.1 /usr/local/share/man/man1/ && \
+        rm -rf rclone-* && \
         mandb || sfFail 192 "Problem installing boh requirements"
         ;;
     *)
