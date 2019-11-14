@@ -26,8 +26,8 @@ install_common_requirements() {
     usermod -aG docker cladm
     echo -e "{{ .CladmPassword }}\n{{ .CladmPassword }}" | passwd cladm
     mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
-    echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
-    echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
+    echo "{{ .SSHPublicKey }}" > ~cladm/.ssh/authorized_keys
+    echo "{{ .SSHPrivateKey }}" > ~cladm/.ssh/id_rsa
     chmod 0400 ~cladm/.ssh/*
     echo "cladm ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
     chmod o-rwx /etc/sudoers.d/10-admins
@@ -90,4 +90,4 @@ case $LINUX_KIND in
 esac
 
 # /usr/bin/time -p bash -c -x install_common_requirements
-install_common_requirements
+install_common_requirements || sfFail $? "Problem installing common requirements"
