@@ -1814,7 +1814,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 		pbHost *pb.Host
 	)
 	if index, ok = p["index"].(uint); !ok {
-		return nil, scerr.InvalidParameterError("params[index]", "is missing")
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
 	}
 	if index < 1 {
 		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
@@ -1911,7 +1911,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	var subTasks []concurrency.Task
 	for i := uint(1); i <= count; i++ {
 		subtask, err := t.StartInSubTask(b.taskCreateNode, data.Map{
-			"index":   i,
+			"index": i,
 			// "type":    NodeType.Node,
 			"nodeDef": def,
 			"timeout": timeout,
@@ -1959,22 +1959,13 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
 	var (
-		index   int
-		def     *pb.HostDefinition
-		timeout time.Duration
-		nokeep  bool
-	)
-	if index, ok = p["index"].(int); !ok {
-		return nil, scerr.InvalidParameterError("params[index]", "is missing or not an integer")
-	}
-	var (
 		index   uint
 		def     *pb.HostDefinition
 		timeout time.Duration
 		nokeep  bool
 	)
 	if index, ok = p["index"].(uint); !ok {
-		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
 	}
 	if def, ok = p["nodeDef"].(*pb.HostDefinition); !ok {
 		return nil, scerr.InvalidParameterError("params[def]", "is missing or is not a *pb.HostDefinition")
@@ -2141,7 +2132,7 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 		pbHost *pb.Host
 	)
 	if index, ok = p["index"].(uint); !ok {
-		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an integer")
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
 	}
 	if index < 1 {
 		return nil, scerr.InvalidParameterError("params[index]", "cannot be an integer less than 1")
