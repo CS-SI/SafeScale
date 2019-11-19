@@ -21,8 +21,8 @@ feature:
         cluster: all
     parameters:
         - Version=7.2.0
-        - ElasticsearchURL=http://{{ .HostIP }}:9200/
-        - KibanaURL=http://{{ .HostIP }}:5061/
+        - ElasticsearchURL=undefined
+        - KibanaURL=undefined
 
     install:
         bash:
@@ -36,7 +36,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1 || sfFail 192
+                            sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1 || sfFail 192
                             sfExit
 
             add:
@@ -49,9 +49,9 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            mkdir -p ${SF_ETCDIR}/metricbeat4safescale/modules.d
+                            mkdir -p ${SF_ETCDIR}/metricbeat/modules.d
 
-                            cat >${SF_ETCDIR}/metricbeat4safescale/modules.d/system.yml <<-'EOF'
+                            cat >${SF_ETCDIR}/metricbeat/modules.d/system.yml <<-'EOF'
                             - module: system
                               enabled: true
                               metricsets: ["cpu", "load", "memory", "network", "process", "process_summary", "core", "diskio", "socket"]
@@ -80,7 +80,7 @@ feature:
                                   - uptime
                             EOF
 
-                            cat >${SF_ETCDIR}/metricbeat4safescale/modules.d/docker.yml <<-'EOF'
+                            cat >${SF_ETCDIR}/metricbeat/modules.d/docker.yml <<-'EOF'
                             - module: docker
                               metricsets: ["container", "cpu", "diskio", "healthcheck", "info", "memory", "network", "image"]
                               hosts: ["unix:///var/run/docker.sock"]
@@ -88,7 +88,7 @@ feature:
                               enabled: true
                             EOF
 
-                            cat >${SF_ETCDIR}/metricbeat4safescale/config.yml <<-'EOF'
+                            cat >${SF_ETCDIR}/metricbeat/config.yml <<-'EOF'
                             metricbeat:
                                 config:
                                     modules:
@@ -108,28 +108,35 @@ feature:
 
                             output.elasticsearch:
                                 hosts:
-                            {{- if .ClusterFlavor }}
+                            {{ if eq .ElasticsearchURL "undefined" }}
+                              {{- if .ClusterFlavor }}
                                 {{- range .MasterIPs }}
                                     - "http://{{ . }}:9200/"
                                 {{ end -}}
+                              {{ else }}
+                                    - "http://{{ .HostIP }}:9200/"
+                              {{ end -}}
                             {{ else }}
                                     - "{{ .ElasticsearchURL }}"
-                            {{ end -}}
+                            {{ end }}
                             setup.dashboards:
                                 enabled: true
                             setup.kibana:
-                            {{- if .ClusterFlavor }}
+                            {{ if eq .KibanaURL "undefined" }}
+                              {{ if .ClusterFlavor }}
                                 host: "https://{{ .DefaultRouteIP }}/monitoring/kibana/"
+                              {{ else }}
+                                host: "http://{{ .HostIP }}:5061/"
+                              {{ end }}
                             {{ else }}
-                                host: "{{.KibanaURL}}"
-                            {{ end -}}
-
+                                host: "{{ .KibanaURL }}"
+                            {{ end }}
                             xpack:
                                 monitoring.enabled: true
                                 ml.enabled: false
                             EOF
-                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat4safescale
-                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat4safescale/config.yml
+                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat
+                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat/config.yml
 
                     compose:
                         targets:
@@ -138,7 +145,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            cat >${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml <<-EOF
+                            cat >${SF_ETCDIR}/metricbeat/docker-compose.yml <<-EOF
                             version: '2.1'
 
                             services:
@@ -146,8 +153,8 @@ feature:
                                     image: docker.elastic.co/beats/metricbeat:{{ .Version }}
                                     command: "metricbeat -e -strict.perms=false"
                                     volumes:
-                                        - ${SF_ETCDIR}/metricbeat4safescale/modules.d:/etc/beat/modules.d:ro
-                                        - ${SF_ETCDIR}/metricbeat4safescale/config.yml:/usr/share/metricbeat/metricbeat.yml:ro
+                                        - ${SF_ETCDIR}/metricbeat/modules.d:/etc/beat/modules.d:ro
+                                        - ${SF_ETCDIR}/metricbeat/config.yml:/usr/share/metricbeat/metricbeat.yml:ro
                                         - /var/run/docker.sock:/var/run/docker.sock:ro
                                         - /:/hostfs:ro
                                         - /proc:/hostfs/proc:ro
@@ -159,8 +166,8 @@ feature:
                                         - dac_read_search
                                     restart: always
                             EOF
-                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat4safescale
-                            chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat4safescale
+                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat
+                            chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat
 
                     start:
                         targets:
@@ -169,8 +176,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale up -d || sfFail 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1" || sfFail 194
+                            docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d || sfFail 193
+                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
                             sfExit
 
             remove:
@@ -183,7 +190,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale rm --stop --force || sfFail 195
+                            docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat rm --stop --force || sfFail 195
                             sfExit
 
                     cleanup:
@@ -194,7 +201,7 @@ feature:
                             nodes: all
                         run: |
                             docker image rm -f docker.elastic.co/beats/metricbeat:{{ .Version }}
-                            rm -rf ${SF_ETCDIR}/metricbeat4safescale
+                            rm -rf ${SF_ETCDIR}/metricbeat
                             sfExit
 
 ...
