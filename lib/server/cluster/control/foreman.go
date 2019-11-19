@@ -1633,7 +1633,17 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert params
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if t == nil {
+		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
+	// Convert and validate params
 	p := params.(data.Map)
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
@@ -1666,12 +1676,39 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert params
-	p := params.(data.Map)
-	count := p["count"].(int)
-	public := p["public"].(bool)
-	def := p["nodeDef"].(*pb.HostDefinition)
-	nokeep := p["nokeep"].(bool)
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if t == nil {
+		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
+	// Convert and validate params
+	p, ok := params.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
+	}
+	var (
+		count  int
+		public bool
+		def    *pb.HostDefinition
+		nokeep bool
+	)
+	if count, ok = p["count"].(int); !ok {
+		return nil, scerr.InvalidParameterError("params[count]", "is missing or not an integer")
+	}
+	if public, ok = p["public"].(bool); !ok {
+		return nil, scerr.InvalidParameterError("params[public]", "is missing or not a bool")
+	}
+	if def, ok = p["nodeDef"].(*pb.HostDefinition); !ok {
+		return nil, scerr.InvalidParameterError("params[nodeDef]", "is missing or not a *pb.HostDefinition")
+	}
+	if nokeep, ok = p["nokeep"].(bool); !ok {
+		return nil, scerr.InvalidParameterError("params[nokeep]", "is missing or not a bool")
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1693,8 +1730,8 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 			return nil, err
 		}
 		subtask, err = subtask.Start(b.taskCreateNode, data.Map{
-			"index":   i,
-			"type":    NodeType.Node,
+			"index": i,
+			// "type":    NodeType.Node,
 			"nodeDef": def,
 			"timeout": timeout,
 			"nokeep":  nokeep,
@@ -1723,19 +1760,39 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 // taskCreateNode creates a Node in the Cluster
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	// Convert parameters
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if t == nil {
+		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
+	// Convert and validate params
 	p, ok := params.(data.Map)
 	if !ok {
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
-	if p == nil {
-		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	var (
+		index   int
+		def     *pb.HostDefinition
+		timeout time.Duration
+		nokeep  bool
+	)
+	if index, ok = p["index"].(int); !ok {
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or not an integer")
 	}
-	// FIME: validate parameters
-	index := p["index"].(int)
-	def := p["nodeDef"].(*pb.HostDefinition)
-	timeout := p["timeout"].(time.Duration)
-	nokeep := p["nokeep"].(bool)
+	if def, ok = p["nodeDef"].(*pb.HostDefinition); !ok {
+		return nil, scerr.InvalidParameterError("params[nodeDef]", "is missing or not a *pb.HostDefinition")
+	}
+	if timeout, ok = p["timeout"].(time.Duration); !ok {
+		return nil, scerr.InvalidParameterError("params[timeout]", "is missing or not a time.Duration")
+	}
+	if nokeep, ok = p["nokeep"].(bool); !ok {
+		return nil, scerr.InvalidParameterError("params[nokeep]", "is missing or not a bool")
+	}
 
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
