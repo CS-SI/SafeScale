@@ -1786,6 +1786,16 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if t == nil {
+		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", params), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1842,6 +1852,12 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if t == nil {
+		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	}
 	if params == nil {
 		return nil, scerr.InvalidParameterError("params", "cannot be nil")
 	}
@@ -1896,7 +1912,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	for i := uint(1); i <= count; i++ {
 		subtask, err := t.StartInSubTask(b.taskCreateNode, data.Map{
 			"index":   i,
-			"type":    NodeType.Node,
+			// "type":    NodeType.Node,
 			"nodeDef": def,
 			"timeout": timeout,
 			"nokeep":  nokeep,
@@ -1925,6 +1941,16 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 // taskCreateNode creates a Node in the Cluster
 // This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+	if b == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if t == nil {
+		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	}
+	if params == nil {
+		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	}
+
 	defer scerr.OnPanic(&err)()
 
 	// Convert then validate parameters
@@ -1932,8 +1958,14 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	if !ok {
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
-	if p == nil {
-		return nil, scerr.InvalidParameterError("params", "cannot be nil")
+	var (
+		index   int
+		def     *pb.HostDefinition
+		timeout time.Duration
+		nokeep  bool
+	)
+	if index, ok = p["index"].(int); !ok {
+		return nil, scerr.InvalidParameterError("params[index]", "is missing or not an integer")
 	}
 	var (
 		index   uint
