@@ -32,7 +32,6 @@ import (
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -848,7 +847,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count uint, req *pb.HostDef
 	}
 
 	var (
-		nodeType    NodeType.Enum
+		// nodeType    NodeType.Enum
 		nodeTypeStr string
 		errors      []string
 	)
@@ -863,10 +862,11 @@ func (c *Controller) AddNodes(task concurrency.Task, count uint, req *pb.HostDef
 	var subtasks []concurrency.Task
 	for i := uint(0); i < count; i++ {
 		subtask, err := task.StartInSubTask(c.foreman.taskCreateNode, data.Map{
-			"index":   i + 1,
-			"type":    nodeType,
+			"index": i + 1,
+			// "type":    nodeType,
 			"nodeDef": nodeDef,
 			"timeout": timeout,
+			"nokeep":  false,
 		})
 		if err != nil {
 			return nil, err
