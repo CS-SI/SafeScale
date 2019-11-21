@@ -74,6 +74,7 @@ var ClusterCommand = cli.Command{
 		clusterShrinkCommand,
 		clusterDcosCommand,
 		clusterKubectlCommand,
+		clusterHelmCommand,
 		clusterListFeaturesCommand,
 		clusterCheckFeatureCommand,
 		clusterAddFeatureCommand,
@@ -926,6 +927,37 @@ var clusterKubectlCommand = cli.Command{
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i kubectl " + strings.Join(args, " ")
+		err = executeCommand(cmdStr)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var clusterHelmCommand = cli.Command{
+	Name:      "helm",
+	Category:  "Administrative commands",
+	Usage:     "helm CLUSTERNAME [COMMAND ...]",
+	ArgsUsage: "CLUSTERNAME",
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> kubectl [-- <arg>...]`,
+	// 		Description: `
+	// Executes kubectl cli on the cluster.
+	// Is meaningful only for a cluster where Kubernetes service is installed and running.`,
+	// 	},
+
+	Action: func(c *cli.Context) error {
+		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
+		err := extractClusterArgument(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		args := c.Args().Tail()
+		cmdStr := "sudo -u cladm -i helm " + strings.Join(args, " ")
 		err = executeCommand(cmdStr)
 		if err != nil {
 			return clitools.FailureResponse(err)
