@@ -1,0 +1,78 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        cluster: K8S
+
+    parameters:
+        - Namespace=default
+        - Version=0.9.0
+
+    requirements:
+        - kubernetes
+        - helm
+
+    install:
+        bash:
+            add:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            helm install local_chart_monitoring/kibana \
+                                --name kibana-log \
+                                --namespace "{{ .Namespace }}" \
+                                --version {{ .VERSION }} \
+                                --tls \
+                                --set image.pullSecrets[0].name="local-harbor" \
+                                --set image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/kibana" \
+                                --set image.tag=${IMAGE_TAG} \
+                                --set files.'kibana\.yml'.'elasticsearch\.hosts'="http://elasticsearch-processing-log-elasticsearch-coordinating-only:9200" \
+                                --set files.'kibana\.yml'.'server\.basePath'="/kibana-log" \
+                                --set files.'kibana\.yml'.'server\.rewriteBasePath'="true" \
+                                --set metrics.serviceMonitor.enabled=true \
+                                --set metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \
+                                --set ingress.enabled="true" \
+                                --set ingress.hosts[0]="${*}/kibana-log" \
+                                --set ingress.controller="kong" \
+                                --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
+                                || sfFail 192
+
+                            helm install local_chart_monitoring/kibana \
+                                --name kibana-trace \
+                                --namespace {{ .Namespace }} \
+                                --version {{ .VERSION }} \
+                                --tls \
+                                --set image.pullSecrets[0].name="local-harbor" \
+                                --set image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/kibana" \
+                                --set image.tag=${IMAGE_TAG} \
+                                --set files.'kibana\.yml'.'elasticsearch\.hosts'="http://elasticsearch-processing-trace-elasticsearch-coordinating-only:9200" \
+                                --set files.'kibana\.yml'.'server\.basePath'="/kibana-trace" \
+                                --set files.'kibana\.yml'.'server\.rewriteBasePath'="true" \
+                                --set metrics.serviceMonitor.enabled=true \
+                                --set metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \
+                                --set ingress.enabled="true" \
+                                --set ingress.hosts[0]="${*}/kibana-trace" \
+                                --set ingress.controller="kong" \
+                                --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
+                                || sfFail 193
+                            sfExit
+
+---

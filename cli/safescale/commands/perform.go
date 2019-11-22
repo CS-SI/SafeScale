@@ -60,7 +60,7 @@ var performCreateCommand = cli.Command{
 			Usage: "Defines the sizing of the platform: Normal, Large",
 		},
 		cli.StringFlag{
-			Name:  "Kind, K",
+			Name:  "kind, K",
 			Usage: "This parameter defines the additional software to install on platform: K8S-Monitored",
 		},
 	},
@@ -96,13 +96,20 @@ var performCreateCommand = cli.Command{
 
 // create_monitored_k8s creates a K8S platform and installs monitoring software
 func createMonitoredK8S(complexity string) error {
-	// Create cluster with deploy
+	// Create cluster
 	cmdStr := fmt.Sprintf("safescale platform create %s -F K8S -C %s -N 192.168.0.0/16", clusterName, complexity)
 	err := runCommand(cmdStr)
 	if err != nil {
 		return err
 	}
 
+	// Install helm
+	cmdStr := fmt.Sprintf("safescale platform add-feature %s helm", SafescaleCmd, clusterName)
+
+	// Adds harbour repo to Kubernetes
+	cmdStr := fmt.Sprintf("safescale ssh run %s su - cladm -i kubectl ...platform add-feature %s ")
+
+	cmdStr := fmt.Sprintf("safescale platform add-feature %s monitored-k8s")
 	// // Installs feature Spark
 	// cmdStr = fmt.Sprintf("safescale platform add-feature %s sparkmaster", clusterName)
 	// err = runCommand(cmdStr)

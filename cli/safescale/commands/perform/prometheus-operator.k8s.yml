@@ -1,0 +1,86 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        cluster: K8S
+
+    parameters:
+        - Namespace=default
+        - StorageSize=10Gi
+        - Version=1.10.0
+
+    requirements:
+        - kubernetes
+        - helm
+
+    install:
+        bash:
+            add:
+                pace: secret,helm
+                steps:
+                    secret:
+                        targets:
+                            masters: any
+                        run: |
+                            sfKubectl create secret generic etcd-client \
+                                --from-file=/etc/kubernetes/pki/etcd/ca.crt \
+                                --from-file=/etc/kubernetes/pki/etcd/server.key \
+                                --from-file=/etc/kubernetes/pki/etcd/server.crt \
+                                --namespace {{ .Namespace }} \
+                                || sfFail 192
+                            sfExit
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            helm install local_chart_monitoring/prometheus-operator \
+                                --name prometheus-operator \
+                                --namespace "{{ .Namespace }}" \
+                                --version {{ .Version }} \
+                                --tls \
+                                --set global.imagePullSecrets[0].name="local-harbor" \
+                                --set alertmanager.alertmanagerSpec.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/prometheus-alertmanager" \
+                                --set prometheusOperator.tlsProxy.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/ghostunnel" \
+                                --set prometheusOperator.admissionWebhooks.patch.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/kube-webhook-certgen" \
+                                --set prometheusOperator.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/prometheus-operator" \
+                                --set prometheusOperator.configmapReloadImage.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/prometheus-operator-configmap-reload" \
+                                --set prometheusOperator.prometheusConfigReloaderImage.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/prometheus-operator-config-reloader" \
+                                --set prometheusOperator.hyperkubeImage.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/hyperkube" \
+                                --set prometheusOperator.prometheusSpec.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/prometheus" \
+                                --set prometheus-node-exporter.PrometheusNodeExporter.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/prometheus-exporter/prometheus-node-exporter" \
+                                --set prometheus-k8s-exporter.PrometheusK8sExporter.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/prometheus-exporter/prometheus-k8s-exporter" \
+                                --set prometheus.prometheusSpec.externalUrl=https://{{ .EndpointIP }}/prometheus/ \
+                                --set alertmanager.alertmanagerSpec.externalUrl=https://{{ .EndpointIP }}/prometheus/ \
+                                --set kubeEtcd.serviceMonitor.scheme="https" \
+                                --set kubeEtcd.serviceMonitor.caFile="/etc/prometheus/secrets/etcd-client/ca.crt" \
+                                --set kubeEtcd.serviceMonitor.keyFile="/etc/prometheus/secrets/etcd-client/server.key" \
+                                --set kubeEtcd.serviceMonitor.certFile="/etc/prometheus/secrets/etcd-client/server.crt" \
+                                --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage="{{ .StorageSize }}" \
+                                --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.accessModes[0]="ReadWriteOnce" \
+                                --set prometheus.prometheusSpec.secrets[0]="etcd-client" \
+                                --set prometheus-k8s-exporter.PrometheusK8sExporter.metrics.serviceMonitor.enabled="true" \
+                                --set prometheus-k8s-exporter.PrometheusK8sExporter.metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \
+                                --set prometheus-node-exporter.PrometheusNodeExporter.metrics.serviceMonitor.enabled="true" \
+                                --set prometheus-node-exporter.PrometheusNodeExporter.metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \
+                                --set prometheus.ingress.enabled="true" \
+                                --set prometheus.ingress.paths[0]="/prometheus" \
+                                --set prometheus.ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin prometheus.ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
+                                || sfExit193
+                            sfExit
+
+---
