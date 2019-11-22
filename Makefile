@@ -139,6 +139,8 @@ clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd cli && $(MAKE) $(@))
 	@(cd lib && $(MAKE) $(@))
+
+mrproper: clean
 	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
 install:
