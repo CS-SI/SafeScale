@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1166,11 +1165,11 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 
 		// Docker Swarm is always installed, even if the cluster type is not SWARM (for now, may evolve in the future)
 		// So removing a Node implies removing also from Swarm
-		err = b.leaveNodeFromSwarm(task, pbHost, selectedMaster)
+		err = b.leaveNodeFromSwarm(task, pbHost, selectedMasterID)
 		if err != nil {
 			return err
 		}
-}
+	}
 
 	return nil
 }

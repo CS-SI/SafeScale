@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync/atomic"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	txttmpl "text/template"
 
@@ -206,20 +207,25 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 	return anon.(string), nil
 }
 
-func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.Host, selectedMaster string) error {
-	if selectedMaster == "" {
-		var err error
-		selectedMaster, err = b.Cluster().FindAvailableMaster(task)
+func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.Host, selectedMasterID string) error {
+	if selectedMasterID == "" {
+		selectedMaster, err := b.Cluster().FindAvailableMaster(task)
 		if err != nil {
 			return err
 		}
+		selectedMasterID = selectedMaster.ID
 	}
 
 	clientSSH := client.New().SSH
 
+	ctx, err := task.GetContext()
+	if err != nil {
+		return err
+	}
+
 	// Check worker belongs to k8s
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err := clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -231,7 +237,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl drain %s --delete-local-data --force --ignore-daemonsets", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -240,7 +246,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl delete node %s", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -250,7 +256,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 
 	// check node no longer belongs to k8s
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
