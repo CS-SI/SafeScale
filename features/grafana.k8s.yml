@@ -1,0 +1,124 @@
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+  suitableFor:
+    host: no
+    cluster: k8s,dcos
+
+    requirements:
+      features:
+        - kubernetes
+        - helm
+
+    parameters:
+      - Environnement=prod
+      - NameSpace=default
+      - ChartRepoName
+      - ChartRepoUrl
+      - HarborUsername
+      - HarborPassword
+      - DockerSecretName
+      - DockerServerUrl
+    
+    install:
+      bash:
+        check:
+          pace: list_helm
+          steps:
+            list_helm:
+              targets:
+                node: none
+                masters: any
+                  run: |
+                    sudo -u cladm -i helm search ...
+
+        add:
+          pace: prepare,install
+          steps:
+
+            prepare:
+              targets:
+                node: none
+                masters: any
+                  run: |
+                    mkdir -p ${SF_ETCDIR}/grafana
+
+                    cat > ${SF_ETCDIR}/grafana/helm.values.yaml <<EOF
+                    affinity:
+                      nodeAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                          nodeSelectorTerms:
+                          - matchExpressions:
+                            - key: "node-role.kubernetes.io/worker"
+                              operator: In
+                              values:
+                              - S1PDGS
+                      podAntiAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                        - labelSelector:
+                            matchExpressions:
+                            - key: release
+                              operator: In
+                              values:
+                              - grafana
+                          topologyKey: "kubernetes.io/hostname"
+                    EOF
+
+                    sfExit
+
+            install:
+              targets:
+                node: none
+                masters: any
+                  run: |
+                  
+                    if [ "{{ .Environnement }}" == "prod" ]; then
+                      CHART_VERSION="0.9.0"
+                      IMAGE_TAG="S1MIS-009"
+                    elif [ "{{ .Environnement }}" == "dev" ]; then  
+                      CHART_VERSION="0.0.1"
+                      IMAGE_TAG="develop"
+                    else
+                      sfFail 192
+                    fi
+
+                    GRAFANA_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+
+                    #Install PostgreSQL Helm chart for Harbor
+                    sudo -u cladm -i helm install \
+                    local_chart_monitoring/grafana \
+                    --version ${CHART_VERSION} \
+                    --name grafana \
+                    --namespace {{ .NameSpace }} \
+                    --tls \
+                    --set image.pullSecrets[0]="local-harbor" \
+                    --set image.tag="${IMAGE_TAG}" \
+                    --set sidecar.dashboards.enabled=true \
+                    --set sidecar.datasources.enabled=true \
+                    --set adminPassword=${GRAFANA_PASSWORD} \
+                    --set metrics.servicemonitor.enabled=true \
+                    --set ingress.enabled="true" \
+                    --set ingress.path="/grafana" \
+                    --set 'grafana\.ini'.server.root_url="%(protocol)s://{{ .EndPointIP }}/grafana" \
+                    --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
+                    --set 'grafana\.ini'.auth.disable_login_form="true" \
+                    --set 'grafana\.ini'.'auth\.anonymous'.enabled="true" \
+                    --set 'grafana\.ini'.'auth\.anonymous'.org_role="Admin" \
+                    --values values.yaml; || sfFail 193
+                    
+                    sfExit
+
+...
