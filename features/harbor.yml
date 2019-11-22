@@ -14,165 +14,112 @@
 
 ---
 feature:
-    suitableFor:
-        host: no
-        cluster: all
+  suitableFor:
+    host: no
+    cluster: k8s,dcos
 
     requirements:
-        features:
-            - docker
-
-        # "clusterSizing" not honored currently
-        clusterSizing:
-            dcos:
-                small:
-                    nodes: "count >= 2, cpu >= 2"   # 1 master, 1 node
-                normal:
-                    nodes: "count >= 4, cpu >= 2"   # 3 masters, 1 node
-                large:
-                    nodes: "count >= 6, cpu >= 2 "  # 3 masters, 3 nodes
-            boh:
-                small:
-                    masters: "count >= 1, cpu >= 2"
-                    nodes:   "count >= 1, cpu >= 2"
-                normal:
-                    masters: "count >= 3, cpu >= 2"
-                    nodes:   "count >= 1, cpu >= 2"
-                large:
-                    masters: "count >= 3, cpu >= 2"
-                    nodes:   "count >= 3, cpu >= 2"
-            k8s:
-                small:
-                    masters: "cpu >= 2"
-                    nodes:   "cpu >= 2"
-                normal:
-                    masters: "count >= 3, cpu >= 2"
-                    nodes:   "count >= 3, cpu >= 2"
-                large:
-                    masters: "count >= 5, cpu >= 2"
-                    nodes:   "count >= 8, cpu >= 2"
+      features:
+        - kubernetes
+        - helm
 
     parameters:
-        - AllowPodsOnMasters=false
-        - CNI=calico
-        - Dashboard=true
-        - Harden=true
-        - KubeVersion=1.14.1
-
+      - Environnement=prod
+    
     install:
-        dcos:
-            check:
-                pace: deploy
-                steps:
-                    deploy:
-                        targets:
-                            masters: one
-                        run: |
-                            sfDcos kubernetes &>/dev/null
+      bash:
+        check:
+          pace: helm_chart
+            steps:
+              helm_chart:
+                targets:
+                  node: none
+                  masters: one
+                    run: |
+                      sudo -u cladm -i helm search ...
 
-            add:
-                #pace: package,cli+config
-                pace: package,cli,config
-                steps:
-                    package:
-                        targets:
-                            masters: one
-                        options:
-                            small: |
-                                {
-                                    "kubernetes": {
-                                        "node_count": 1,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                            normal: |
-                                {
-                                    "kubernetes": {
-                                        "high_availability": true,
-                                        "node_count": 1,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                            large: |
-                                {
-                                    "kubernetes": {
-                                        "high_availability": true,
-                                        "node_count": 3,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                        run: |
-                            op=-1
-                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1) && op=$? || true
-                            [ $op -ne 0 ] && {
-                                echo $output
-                                echo $output | grep "already installed" &>/dev/null || sfFail $op
-                            }
-                            sfExit
+        add:
+          pace: prepare
+            steps:
+              prepare:
+                targets:
+                  node: none
+                  masters: one
+                    run: |
+                      mkdir -p ${SF_ETCDIR}/harbor
+                      cd ${SF_ETCDIR}/harbor
 
-                    cli:
-                        targets:
-                            masters: all
-                        run: |
-                            sfDcos package install --yes kubernetes --cli
-                            sfExit
-
-                    config:
-                        targets:
-                            masters: all
-                        run: |
-                            sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || sfFail 192
-                            sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
-                            sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
-                            sfExit
-
-            remove:
-                pace: package
-                steps:
-                    package:
-                        targets:
-                            masters: one
-                        run: |
-                            sfDcos package remove --yes kubernetes || sfFail 192
-                            sfExit
-
-        bash:
-            check:
-                pace: kubectl,nodes
-                steps:
-                    kubectl:
-                        targets:
-                            masters: all
-                        run: |
-                            [ -f /etc/kubernetes/.joined ] && [ $(sfKubectl get nodes | wc -l) -gt 1 ]
-
-                    nodes:
-                        targets:
-                            nodes: all
-                        run: |
-                            [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
-
-            add:
-                # pace: cp-dir,common-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
-                pace: sysconf,prepare-host,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,final
-                steps:
-                    sysconf:
-                        targets:
-                            masters: all
-                            nodes: all
-                        run: |
+                      cat << EOF > values.yaml
+master:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "node-role.kubernetes.io/worker"
+            operator: In
+            values:
+            - S1PDGS
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: role
+            operator: In
+            values:
+            - master
+          - key: release
+            operator: In
+            values:
+            - postgresql-infra
+        topologyKey: "kubernetes.io/hostname"
+slave:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "node-role.kubernetes.io/worker"
+            operator: In
+            values:
+            - S1PDGS
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: role
+            operator: In
+            values:
+            - slave
+          - key: release
+            operator: In
+            values:
+            - postgresql-infra
+        topologyKey: "kubernetes.io/hostname"
+pgpool:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "node-role.kubernetes.io/worker"
+            operator: In
+            values:
+            - S1PDGS
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: role
+            operator: In
+            values:
+            - pgpool
+          - key: release
+            operator: In
+            values:
+            - postgresql-infra
+        topologyKey: "kubernetes.io/hostname"
+EOF
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
                             case $LINUX_KIND in
@@ -424,16 +371,16 @@ feature:
                             cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 201
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
-                            mkdir -p ~{{.ClusterAdminUsername}}/.kube
-                            cp -f /etc/kubernetes/admin.conf ~{{.ClusterAdminUsername}}/.kube/config
-                            chown -R {{.ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}/.kube && \
-                            chmod -R go-rwx ~{{.ClusterAdminUsername}}/.kube
+                            mkdir -p ~{{.Username}}/.kube
+                            cp -f /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
+                            chmod -R go-rwx ~{{.Username}}/.kube
 
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/;
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/ca.crt;
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.key;
+                            sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/;
+                            sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/ca.crt;
+                            sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/server.key;
                             sudo chmod g+r /etc/kubernetes/pki/etcd/server.key;
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.crt;  
+                            sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/server.crt;  
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
@@ -620,81 +567,81 @@ feature:
 
                                     # Creates our patch file
                                     cat >/etc/kubernetes/kubeadm/calico.yaml.patch <<-'EOF'
-                            --- calico.yaml	2019-11-21 17:06:25.590230285 +0100
-                            +++ calico.yaml.new	2019-11-21 17:02:11.885017690 +0100
-                            @@ -24,7 +24,7 @@
-                                "plugins": [
-                                    {
-                                    "type": "calico",
-                            -          "log_level": "info",
-                            +          "log_level": "debug",
-                                    "datastore_type": "kubernetes",
-                                    "nodename": "__KUBERNETES_NODE_NAME__",
-                                    "mtu": __CNI_MTU__,
-                            @@ -516,7 +516,7 @@
-                                    # It can be deleted if this is a fresh installation, or if you have already
-                                    # upgraded to use calico-ipam.
-                                    - name: upgrade-ipam
-                            -          image: calico/cni:v3.10.1
-                            +          image: calico/cni:v3.10.0
-                                    command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
-                                    env:
-                                        - name: KUBERNETES_NODE_NAME
-                            @@ -536,7 +536,7 @@
-                                    # This container installs the CNI binaries
-                                    # and CNI network config file on each node.
-                                    - name: install-cni
-                            -          image: calico/cni:v3.10.1
-                            +          image: calico/cni:v3.10.0
-                                    command: ["/install-cni.sh"]
-                                    env:
-                                        # Name of the CNI config file to create.
-                            @@ -570,7 +570,7 @@
-                                    # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
-                                    # to communicate with Felix over the Policy Sync API.
-                                    - name: flexvol-driver
-                            -          image: calico/pod2daemon-flexvol:v3.10.1
-                            +          image: calico/pod2daemon-flexvol:v3.10.0
-                                    volumeMounts:
-                                    - name: flexvol-driver-host
-                                        mountPath: /host/driver
-                            @@ -579,7 +579,7 @@
-                                    # container programs network policy and routes on each
-                                    # host.
-                                    - name: calico-node
-                            -          image: calico/node:v3.10.1
-                            +          image: calico/node:v3.10.0
-                                    env:
-                                        # Use Kubernetes API as the backing datastore.
-                                        - name: DATASTORE_TYPE
-                            @@ -606,6 +606,8 @@
-                                        value: "autodetect"
-                                        # Enable IPIP
-                                        - name: CALICO_IPV4POOL_IPIP
-                            +              value: "Never"
-                            +            - name: CALICO_IPV4POOL_VXLAN
-                                        value: "Always"
-                                        # Set MTU for tunnel device used if ipip is enabled
-                                        - name: FELIX_IPINIPMTU
-                            @@ -617,7 +619,7 @@
-                                        # chosen from this range. Changing this value after installation will have
-                                        # no effect. This should fall within `--cluster-cidr`.
-                                        - name: CALICO_IPV4POOL_CIDR
-                            -              value: "192.168.0.0/16"
-                            +              value: "10.244.0.0/16"
-                                        # Disable file logging so `kubectl logs` works.
-                                        - name: CALICO_DISABLE_FILE_LOGGING
-                                        value: "true"
-                            @@ -753,7 +755,7 @@
-                                priorityClassName: system-cluster-critical
-                                containers:
-                                    - name: calico-kube-controllers
-                            -          image: calico/kube-controllers:v3.10.1
-                            +          image: calico/kube-controllers:v3.10.0
-                                    env:
-                                        # Choose which controllers to run.
-                                        - name: ENABLED_CONTROLLERS
-                            EOF
+--- calico.yaml	2019-11-21 17:06:25.590230285 +0100
++++ calico.yaml.new	2019-11-21 17:02:11.885017690 +0100
+@@ -24,7 +24,7 @@
+       "plugins": [
+         {
+           "type": "calico",
+-          "log_level": "info",
++          "log_level": "debug",
+           "datastore_type": "kubernetes",
+           "nodename": "__KUBERNETES_NODE_NAME__",
+           "mtu": __CNI_MTU__,
+@@ -516,7 +516,7 @@
+         # It can be deleted if this is a fresh installation, or if you have already
+         # upgraded to use calico-ipam.
+         - name: upgrade-ipam
+-          image: calico/cni:v3.10.1
++          image: calico/cni:v3.10.0
+           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
+           env:
+             - name: KUBERNETES_NODE_NAME
+@@ -536,7 +536,7 @@
+         # This container installs the CNI binaries
+         # and CNI network config file on each node.
+         - name: install-cni
+-          image: calico/cni:v3.10.1
++          image: calico/cni:v3.10.0
+           command: ["/install-cni.sh"]
+           env:
+             # Name of the CNI config file to create.
+@@ -570,7 +570,7 @@
+         # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
+         # to communicate with Felix over the Policy Sync API.
+         - name: flexvol-driver
+-          image: calico/pod2daemon-flexvol:v3.10.1
++          image: calico/pod2daemon-flexvol:v3.10.0
+           volumeMounts:
+           - name: flexvol-driver-host
+             mountPath: /host/driver
+@@ -579,7 +579,7 @@
+         # container programs network policy and routes on each
+         # host.
+         - name: calico-node
+-          image: calico/node:v3.10.1
++          image: calico/node:v3.10.0
+           env:
+             # Use Kubernetes API as the backing datastore.
+             - name: DATASTORE_TYPE
+@@ -606,6 +606,8 @@
+               value: "autodetect"
+             # Enable IPIP
+             - name: CALICO_IPV4POOL_IPIP
++              value: "Never"
++            - name: CALICO_IPV4POOL_VXLAN
+               value: "Always"
+             # Set MTU for tunnel device used if ipip is enabled
+             - name: FELIX_IPINIPMTU
+@@ -617,7 +619,7 @@
+             # chosen from this range. Changing this value after installation will have
+             # no effect. This should fall within `--cluster-cidr`.
+             - name: CALICO_IPV4POOL_CIDR
+-              value: "192.168.0.0/16"
++              value: "10.244.0.0/16"
+             # Disable file logging so `kubectl logs` works.
+             - name: CALICO_DISABLE_FILE_LOGGING
+               value: "true"
+@@ -753,7 +755,7 @@
+       priorityClassName: system-cluster-critical
+       containers:
+         - name: calico-kube-controllers
+-          image: calico/kube-controllers:v3.10.1
++          image: calico/kube-controllers:v3.10.0
+           env:
+             # Choose which controllers to run.
+             - name: ENABLED_CONTROLLERS
+EOF
 
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
