@@ -19,6 +19,7 @@ package k8s
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync/atomic"
 
 	txttmpl "text/template"
@@ -27,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
@@ -51,6 +53,7 @@ var (
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
 		ConfigureCluster:            configureCluster,
+		LeaveNodeFromCluster:        leaveNodeFromCluster,
 	}
 )
 
@@ -202,4 +205,62 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		anon = globalSystemRequirementsContent.Load()
 	}
 	return anon.(string), nil
+}
+
+func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.Host, selectedMaster string) error {
+	if selectedMaster == "" {
+		var err error
+		selectedMaster, err = b.Cluster().FindAvailableMaster(task)
+		if err != nil {
+			return err
+		}
+	}
+
+	clientSSH := client.New().SSH
+
+	// Check worker belongs to k8s
+	cmd := fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
+	retcode, retout, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("error listing k8s nodes %s: errorcode %d", pbHost.Name, retcode)
+	}
+	if !strings.Contains(retout, pbHost.Name) {
+		return nil // not there, nothing to do
+	}
+
+	cmd = fmt.Sprintf("sudo -u cladm -i kubectl drain %s --delete-local-data --force --ignore-daemonsets", pbHost.Name)
+	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("error draining k8s node %s: errorcode %d", pbHost.Name, retcode)
+	}
+
+	cmd = fmt.Sprintf("sudo -u cladm -i kubectl delete node %s", pbHost.Name)
+	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("error removing k8s node %s: errorcode %d", pbHost.Name, retcode)
+	}
+
+	// check node no longer belongs to k8s
+	cmd = fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
+	retcode, retout, _, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("error listing k8s nodes %s: errorcode %d", pbHost.Name, retcode)
+	}
+	if strings.Contains(retout, pbHost.Name) {
+		return fmt.Errorf("unable to remove k8s node '%s'", pbHost.Name)
+	}
+
+	return nil
 }
