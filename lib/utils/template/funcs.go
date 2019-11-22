@@ -59,13 +59,18 @@ func empty(param interface{}) bool {
 // If overwrite is true, will overwrite any existing entry
 func MergeFuncs(funcs map[string]interface{}, overwrite bool) map[string]interface{} {
 	if funcs != nil {
+		targetMap := make(map[string]interface{})
+		for k, v := range funcs {
+			targetMap[k] = v
+		}
+
 		for k, v := range FuncMap {
-			_, ok := funcs[k]
+			_, ok := targetMap[k]
 			if !ok || overwrite {
-				funcs[k] = v
+				targetMap[k] = v
 			}
 		}
-		return funcs
+		return targetMap
 	}
 	return FuncMap
 }
