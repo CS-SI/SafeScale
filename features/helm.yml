@@ -24,7 +24,7 @@ feature:
 
     parameters:
         - HelmVersion=2.14.1-linux-amd64
-        - NameSpace=default
+        - NameSpace=kube-system
 
     install:
         bash:
