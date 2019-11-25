@@ -150,9 +150,15 @@ feature:
 
         bash:
             check:
-                pace: kubectl,nodes
+                pace: gateways,masters,nodes
                 steps:
-                    kubectl:
+                    gateways:
+                        targets:
+                            gateway: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
+
+                    masters:
                         targets:
                             masters: all
                         run: |
@@ -165,11 +171,12 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
 
             add:
-                # pace: cp-dir,common-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
+                #pace: sysconf,prepare-host,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,no-schedule,final
                 pace: sysconf,prepare-host,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,final
                 steps:
                     sysconf:
                         targets:
+                            gateway: all
                             masters: all
                             nodes: all
                         run: |
@@ -231,6 +238,7 @@ feature:
 
                     prepare-host:
                         targets:
+                            gateway: all
                             masters: all
                             nodes: all
                         run: |
@@ -274,6 +282,7 @@ feature:
 
                     common-tools:
                         targets:
+                            gateway: all
                             masters: all
                             nodes: all
                         run: |
@@ -770,6 +779,7 @@ feature:
 
                     join:
                         targets:
+                            gateway: all
                             nodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && sfExit
@@ -786,6 +796,13 @@ feature:
                             [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 220
                             eval $NODE_JOIN_CMD || sfFail 221
                             touch /etc/kubernetes/.joined
+                            sfExit
+
+                    no-schedule:
+                        targets:
+                            gateway: all
+                        run: |
+                            sfKubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 222
                             sfExit
 
                     final:
