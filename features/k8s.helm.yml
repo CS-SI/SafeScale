@@ -24,7 +24,7 @@ feature:
 
     parameters:
         - Version=2.14.1
-        - NameSpace=kube-system
+        - Namespace=kube-system
 
     install:
         bash:
@@ -33,7 +33,6 @@ feature:
                 steps:
                     binaries:
                         targets:
-                            node: none
                             masters: all
                         run: |
                             ls /usr/local/bin/helm &>/dev/null
@@ -43,7 +42,7 @@ feature:
                 steps:
                     certificates:
                         targets:
-                            masters: all
+                            masters: one
                         run: |
                             mkdir -p ${SF_ETCDIR}/helm/pki ${SF_ETCDIR}/helm/ca
 
@@ -263,36 +262,37 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            ## Install Helm as cladm (the user that runs kubectl) client with TLS authentication with Tiller
-                            sudo -u cladm -i /usr/local/bin/helm init \
+                            ## Install Helm as {{ .ClusterAdminUsername }} (the user that runs kubectl) client with TLS authentication with Tiller
+                            sfHelm init \
                                 --tiller-tls \
+                                --tiller-tls-hostname {{ .Hostname }} \
                                 --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
                                 --tiller-tls-key ${SF_ETCDIR}/helm/pki/tiller.key.pem \
                                 --tiller-tls-verify \
                                 --tls-ca-cert ${SF_ETCDIR}/helm/ca/ca.cert.pem \
                                 --service-account tiller \
-                                --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' || sfFail 205
+                                --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' \
+                                || sfFail 205
 
                             mkdir -p /home/{{.ClusterAdminUsername}}/.helm
-                            cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem;
-                            cp ${SF_ETCDIR}/helm/pki/helm.cert.pem /home/{{.ClusterAdminUsername}}/.helm/cert.pem;
-                            cp ${SF_ETCDIR}/helm/pki/helm.key.pem /home/{{.ClusterAdminUsername}}/.helm/key.pem;
+                            cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
+                            cp ${SF_ETCDIR}/helm/pki/helm.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/cert.pem
+                            cp ${SF_ETCDIR}/helm/pki/helm.key.pem /home/{{ .ClusterAdminUsername }}/.helm/key.pem
 
-                            chown -R {{.ClusterAdminUsername}}:{{.ClusterAdminUsername}} /home/cladm/.helm/
+                            chown -R {{ .ClusterAdminUsername }}:{{ .ClusterAdminUsername }} /home/{{ .ClusterAdminUsername }}/.helm
+                            chmod -R 0770 /home/{{ .ClusterAdminUsername }}/.helm
 
                             # Push .helm configuration to all the other masters
                             # Creates an archive of the .helm directory
-                            cd /home/{{ .ClusterAdminUsername }}/ && \
+                            cd /home/{{ .ClusterAdminUsername }} && \
                             tar -zcvf ${SF_TMPDIR}/helm_config.tar.gz .helm || sfFail 206
 
                             # Push the archive in the dropzone and synchronize
                             sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 207
-                            for ip in {{range .MasterIPs}}{{.}} {{end}}; do
-                                [ "$ip" = "{{.HostIP}}" ] && continue
+                            for ip in {{ range .MasterIPs }}{{ . }} {{ end }}; do
                                 sfDropzoneSync $ip || sfFail 208
                             done
-                            rm ${SF_TMPDIR}/helm_config.tar.gz
-
+                            rm -f ${SF_TMPDIR}/helm_config.tar.gz
                             sfExit
 
                     synchro:
