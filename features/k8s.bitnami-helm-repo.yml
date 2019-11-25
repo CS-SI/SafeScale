@@ -21,16 +21,23 @@ feature:
 
     parameters:
         - Namespace=default
-        - Version=1.10.0
-        - HelmRepoName=stable
 
     requirements:
-        features:
-            - kubernetes
-            - k8s.helm
+        - kubernetes
+        - k8s.helm
 
     install:
         bash:
+            check:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm repo list | grep bitnami || sfFail 192
+                            sfExit
+
             add:
                 pace: helm
                 steps:
@@ -38,12 +45,17 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            helm install {{ .HelmRepoName }}/dashboards \
-                                --name dashboards \
-                                --namespace {{ .Namespace }} \
-                                --version {{ Version }} \
-                                --tls \
-                                || sfFail 192
+                            sfHelm repo add bitnami https://charts.bitnami.com/bitnami || sfFail 192
+                            sfExit
+
+            remove:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm repo delete bitnami || sfFail 192
                             sfExit
 
 ---

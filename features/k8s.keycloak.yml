@@ -20,12 +20,12 @@ feature:
     requirements:
         features:
             - kubernetes
-            - helm
+            - k8s.helm
             - k8s.postgres
 
     parameters:
-        - RootURL=/grafana
-        - ChartVersion=1.10.0
+        - ReleaseName=kong-ingress
+        - ChartVersion=0.9.0
         - NameSpace=default
         - KeycloakRealm=default
         - HelmRepoName=stable
@@ -33,13 +33,14 @@ feature:
     install:
         bash:
             check:
-                pace: list_helm
+                pace: helm
                 steps:
-                    list_helm:
+                    helm:
                         targets:
                             masters: any
                         run: |
-                            sudo -u cladm -i helm search ...
+                            sfHelm list {{ .HelmRepoName }}/keycloak || sfFail 192
+                            sfExit
 
         add:
             pace: db,install
@@ -48,9 +49,9 @@ feature:
                     targets:
                         masters: any
                     run: |
-                        mkdir -p ${SF_ETCDIR}/kong-ingress
+                        mkdir -p ${SF_ETCDIR}/keycloak
 
-                        POSTGRES_PASSWORD=$(sfKubectl get secret --namespace ${NAMESPACE} postgresql-infra -o jsonpath="{.data.postgresql-password}" | base64 --decode)
+                        POSTGRES_PASSWORD=$(sfKubectl get secret -n {{ .Namespace }} postgresql-infra -o jsonpath="{.data.postgresql-password}" | base64 --decode)
                         sfKubectl exec -it -n {{ .Namespace }} postgresql-infra-postgresql-master-0 -c postgresql-infra -- bash -c "export PGPASSWORD=${POSTGRES_PASSWORD}; psql -U postgres -c \"CREATE DATABASE kong\";"
 
                         sfExit
@@ -90,7 +91,7 @@ feature:
                         KEYCLOAK_ADMIN_PASSWORD=$(sfKubectl get secret -namespace {{ .Namespace }} keycloak-infra -o jsonpath="{.data.keycloak-admin-password}" | base64 --decode)
 
                         sfHelm install {{ .HelmRepoName }}/kong \
-                            --name kong-ingress \
+                            --name {{ .ReleaseName }} \
                             --namespace {{ .Namespace }} \
                             --version {{ .ChartVersion }} \
                             --tls \

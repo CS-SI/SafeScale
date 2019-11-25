@@ -240,9 +240,9 @@ func logstashFeature() *Feature {
 	}
 }
 
-// helmFeature ...
-func helmFeature() *Feature {
-	name := "helm"
+// k8shelmFeature ...
+func k8shelmFeature() *Feature {
+	name := "k8s.helm"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

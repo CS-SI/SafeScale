@@ -50,7 +50,7 @@ func init() {
 		metricbeatFeature(),
 		filebeatFeature(),
 		kibanaFeature(),
-		helmFeature(),
+		k8shelmFeature(),
 		sparkmaster4platformFeature(),
 		elassandraFeature(),
 		consul4platformFeature(),
