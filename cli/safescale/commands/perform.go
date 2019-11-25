@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"strings"
 
+	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
@@ -103,6 +104,17 @@ func createMonitoredK8S(complexity string) error {
 		return err
 	}
 
+	var err error
+	templateBox, err = rice.FindBox("../commands/scripts")
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to open embedded scripts folder: %s", err.Error())
+	}
+	tmplString, err := templateBox.String("monitored_k8s.sh")
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to read embedded feature speficication file '%s': %s", name, err.Error())
+	}
+
+	err := runCommand(tmplString)
 	// Install helm
 	cmdStr := fmt.Sprintf("safescale platform add-feature %s helm", SafescaleCmd, clusterName)
 
@@ -148,4 +160,12 @@ func runCommand(cmdStr string) error {
 		return cli.NewExitError(err.Error(), int(ExitCode.Run))
 	}
 	return nil
+}
+
+func getSafeScaleCommand() string {
+	ex, err := os.Executable()
+	if err != nil {
+		return "safescale"
+	}
+	return ex
 }
