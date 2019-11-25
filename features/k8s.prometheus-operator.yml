@@ -1,0 +1,163 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        cluster: K8S
+
+    parameters:
+        - Namespace=default
+        - StorageSize=10Gi
+        - ChartVersion=8.2.4
+        - HelmRepoName=stable
+        - DockerRegistryURL=hub.docker.com
+        #- DockerRegistryURL=harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools
+        - DockerRegistryUsername=
+        - DockerRegistryPassword
+
+    requirements:
+        - kubernetes
+        - k8s.helm
+        - k8s.kong-ingress
+
+    install:
+        bash:
+            check:
+                pace: helm
+                steps:
+                    helm:
+                        sfHelm list {{ .HelmRepoName }}/prometheus-operator || sfFail 192
+                        sfExit
+
+            add:
+                pace: secret,helm,post-conf
+                steps:
+                    secret:
+                        targets:
+                            masters: any
+                        run: |
+                            sfKubectl create secret generic etcd-client \
+                                --from-file=${SF_ETCDIR}/kubernetes/pki/etcd/ca.crt \
+                                --from-file=${SF_ETCDIR}/kubernetes/pki/etcd/server.key \
+                                --from-file=${SF_ETCDIR}/kubernetes/pki/etcd/server.crt \
+                                --namespace {{ .Namespace }} \
+                                || sfFail 192
+                            sfExit
+
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm install {{ .HelmRepoName }}/prometheus-operator \
+                                --name prometheus-operator \
+                                --namespace {{ .Namespace }} \
+                                --version {{ .ChartVersion }} \
+                                --tls \
+                                # --set global.imagePullSecrets[0].name="local-harbor" \
+                                # --set alertmanager.alertmanagerSpec.image.repository="{{ .DockerRegistryURL }}/prometheus-alertmanager" \
+                                # --set prometheusOperator.tlsProxy.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/ghostunnel" \
+                                # --set prometheusOperator.admissionWebhooks.patch.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/kube-webhook-certgen" \
+                                # --set prometheusOperator.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/prometheus-operator" \
+                                # --set prometheusOperator.configmapReloadImage.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/prometheus-operator-configmap-reload" \
+                                # --set prometheusOperator.prometheusConfigReloaderImage.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/prometheus-operator-config-reloader" \
+                                # --set prometheusOperator.hyperkubeImage.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/hyperkube" \
+                                # --set prometheusOperator.prometheusSpec.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/prometheus-operator/prometheus" \
+                                # --set prometheus-node-exporter.PrometheusNodeExporter.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/prometheus-exporter/prometheus-node-exporter" \
+                                # --set prometheus-k8s-exporter.PrometheusK8sExporter.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/prometheus-exporter/prometheus-k8s-exporter" \
+                                --set prometheus.prometheusSpec.externalUrl=https://{{ .EndpointIP }}/prometheus/ \
+                                --set alertmanager.alertmanagerSpec.externalUrl=https://{{ .EndpointIP }}/prometheus/ \
+                                --set kubeEtcd.serviceMonitor.scheme="https" \
+                                --set kubeEtcd.serviceMonitor.caFile="/etc/prometheus/secrets/etcd-client/ca.crt" \
+                                --set kubeEtcd.serviceMonitor.keyFile="/etc/prometheus/secrets/etcd-client/server.key" \
+                                --set kubeEtcd.serviceMonitor.certFile="/etc/prometheus/secrets/etcd-client/server.crt" \
+                                --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage="{{ .StorageSize }}" \
+                                --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.accessModes[0]="ReadWriteOnce" \
+                                --set prometheus.prometheusSpec.secrets[0]="etcd-client" \
+                                --set prometheus-k8s-exporter.PrometheusK8sExporter.metrics.serviceMonitor.enabled="true" \
+                                --set prometheus-k8s-exporter.PrometheusK8sExporter.metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \
+                                --set prometheus-node-exporter.PrometheusNodeExporter.metrics.serviceMonitor.enabled="true" \
+                                --set prometheus-node-exporter.PrometheusNodeExporter.metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \
+                                --set prometheus.ingress.enabled="true" \
+                                --set prometheus.ingress.paths[0]="/prometheus" \
+                                --set prometheus.ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
+                                || sfFail 193
+                            sfExit
+
+                    post-conf:
+                        targets:
+                            masters: any
+                        run: |
+                            cat <<EOF | sfKubectl apply -f - || sfFail 194
+                            apiVersion: v1
+                            kind: Service
+                            metadata:
+                              labels:
+                                app: docker-metrics
+                              name: docker-daemon-metrics
+                              namespace: {{ .Namespace }}
+                            spec:
+                              type: ClusterIP
+                              clusterIP: None
+                              ports:
+                              - name: metrics
+                                port: 9323
+                                protocol: TCP
+                            EOF
+
+                            cat <<EOF | sfKubectl apply -f - || sfFail 195
+                            apiVersion: monitoring.coreos.com/v1
+                            kind: ServiceMonitor
+                            metadata:
+                              labels:
+                                release: prometheus-operator
+                              name: docker-daemon-metrics
+                              namespace: {{ .Namespace }}
+                            spec:
+                              endpoints:
+                              - port: metrics
+                                interval: 10s
+                                scheme: http
+                              selector:
+                                matchLabels:
+                                  app: docker-metrics
+                              namespaceSelector:
+                                matchNames:
+                                - ${NAMESPACE}
+                            EOF
+                            sfExit
+
+            remove:
+                steps: cleanup
+                cleanup:
+                    targets:
+                        masters: any
+                    run: |
+                        sfKubectl delete endpoints -n {{ .Namespace }} docker-daemon-metrics || sfFail 192
+                        sfKubectl delete servicemonitor -n {{ .Namespace }} docker-daemon-metrics || sfFail 193
+                        sfKubectl delete service -n {{ .Namespace }} docker-daemon-metrics || sfFail 194
+
+                        sfHelm delete --purge --tls prometheus-operator || sfFail 195
+
+                        sfKubectl delete crd podmonitors.monitoring.coreos.com || sfFail 196
+                        sfKubectl delete crd prometheuses.monitoring.coreos.com || sfFail 197
+                        sfKubectl delete crd prometheusrules.monitoring.coreos.com || sfFail 198
+                        sfKubectl delete crd servicemonitors.monitoring.coreos.com || sfFail 199
+                        sfKubectl delete crd alertmanagers.monitoring.coreos.com || sfFail 200
+                        sfKubectl delete secret -n {{ .Namespace }} etcd-client || sfFail 201
+                        sfExit
+
+---

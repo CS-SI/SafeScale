@@ -160,8 +160,8 @@ func main() {
 	app.Commands = append(app.Commands, commands.ClusterCommand)
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
-	app.Commands = append(app.Commands, commands.PerformCommand)
-	sort.Sort(cli.CommandsByName(commands.PerformCommand.Subcommands))
+	// app.Commands = append(app.Commands, commands.PerformCommand)
+	// sort.Sort(cli.CommandsByName(commands.PerformCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 

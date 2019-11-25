@@ -104,24 +104,25 @@ func createMonitoredK8S(complexity string) error {
 		return err
 	}
 
-	var err error
-	templateBox, err = rice.FindBox("../commands/scripts")
+	templateBox, err := rice.FindBox("../commands/scripts")
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to open embedded scripts folder: %s", err.Error())
+		return fmt.Errorf("failed to open embedded scripts folder: %s", err.Error())
 	}
 	tmplString, err := templateBox.String("monitored_k8s.sh")
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to read embedded feature speficication file '%s': %s", name, err.Error())
+		return fmt.Errorf("failed to read embedded feature speficication file 'monitored_k8s.sh': %s", err.Error())
 	}
 
-	err := runCommand(tmplString)
+	var SafescaleCmd = "safescale"
+
+	err = runCommand(tmplString)
 	// Install helm
-	cmdStr := fmt.Sprintf("safescale platform add-feature %s helm", SafescaleCmd, clusterName)
+	cmdStr = fmt.Sprintf("%s platform add-feature %s helm", SafescaleCmd, clusterName)
 
 	// Adds harbour repo to Kubernetes
-	cmdStr := fmt.Sprintf("safescale ssh run %s su - cladm -i kubectl ...platform add-feature %s ")
+	cmdStr = fmt.Sprintf("%s ssh run %s su - cladm -i kubectl ...platform add-feature %s ", SafescaleCmd, clusterName, "k8s.harbour")
 
-	cmdStr := fmt.Sprintf("safescale platform add-feature %s monitored-k8s")
+	cmdStr = fmt.Sprintf("%s platform add-feature %s monitored-k8s", SafescaleCmd, clusterName)
 	// // Installs feature Spark
 	// cmdStr = fmt.Sprintf("safescale platform add-feature %s sparkmaster", clusterName)
 	// err = runCommand(cmdStr)

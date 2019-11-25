@@ -23,9 +23,9 @@ feature:
             - helm
 
     parameters:
-        - Version=1.10.0
+        - ChartVersion=1.4.0
         - PersistentVolumeSize="8Gi"
-        - NameSpace=default
+        - Namespace=default
         - HelmRepoName=stable
         #- DockerRegistryURL=90.84.245.22:30002/cs/monitoring
         - DockerRegistryURL=hub.docker.com
@@ -44,25 +44,11 @@ feature:
                             sudo -u cladm -i helm search ...
 
         add:
-            pace: secret,install
+            pace: config,install,ready
             steps:
-                secret:
+                config:
                     targets:
-                        masters: any
-                    run: |
-                        if [ ! -z "${DockerRegistryUsername}" ]; then
-                            sfKubectl create secret docker-registry my-docker-registry-credentials -n {{ .Namespace }} --docker-server={{ .DockerRegistryURL}} --docker-username={{ .DockerRegistryUsername }} --docker-password="{{ .DockerRegistryPassword }}
-                            if [ $? -ne 0 ]; then
-                                sfKubectl delete secret docker-registry my-docker-registry-credentials -n {{ .Namespace }}
-                                sfKubectl create secret docker-registry my-docker-registry-credentials -n {{ .Namespace }} --docker-server={{ .DockerRegistryURL}} --docker-username={{ .DockerRegistryUsername }} --docker-password="{{ .DockerRegistryPassword }}
-                            fi
-                            [ $? -ne 0 ] && sfFail 192
-                        fi
-                        sfExit
-
-                install:
-                    targets:
-                        masters: any
+                        masters: all
                     run: |
                         mkdir -p ${SF_ETCDIR}/k8s.postgres
 
@@ -137,33 +123,57 @@ feature:
                                     - postgresql-infra
                                 topologyKey: "kubernetes.io/hostname"
                         EOF
+                        sfExit
 
+                install:
+                    targets:
+                        masters: any
+                    run: |
                         #Install PostgreSQL Helm chart for Harbor
-                        helm install {{ .HelmRepoName }}/postgresql \
+                        sfHelm install {{ .HelmRepoName }}/stolon \
                             --name postgresql-infra \
+                            --clusterName postgresql-infra
                             --namespace {{ .Namespace }} \
-                            --version {{ .Version }} \
-                            --tls \
-                            --set imagePullSecrets="my-docker-registry-credentials" \
-                            --set image.registry="{{ .DockerRegistryURL }}" \
-                            --set image.tag=${IMAGE_TAG_POSTGRES} \
+                            --version {{ .ChartVersion }} \
+                            # --tls \
+                            # --set imagePullSecrets="my-docker-registry-credentials" \
+                            # --set image.registry="{{ .DockerRegistryURL }}" \
+                            # --set image.tag=${IMAGE_TAG_POSTGRES} \
                             --set persistence.enabled="true" \
                             --set persistence.size={{ .PersistentVolumeSize }} \
-                            --set postgresqlDatabase="registry" \
-                            --set volumePermissions.image.registry="{ .DockerRegistryURL }}/tools" \
+                            # --set postgresqlDatabase="registry" \
+                            # --set volumePermissions.image.registry="{ .DockerRegistryURL }}/tools" \
                             --set replication.enabled=true \
                             --set replication.synchronousCommit="on" \
                             --set replication.slaveReplicas=2 \
                             --set replication.numSynchronousReplicas=2 \
+                            --set store.backend="kubernetes" \
                             --set pgpool.replicas=2 \
                             --set pgpool.image.repository="{{ .DockerRegistryURL }}/tools/postgresql/pgpool" \
-                            --set metrics.image.registry="{{ .DockerRegistryURL }}/prometheus-exporter" \
+                            --set keeper.replicaCount=2 \
+                            --set proxy.replicaCount=3 \
+                            --set sentinel.replicaCount=2 \
+                            # --set metrics.image.registry="{{ .DockerRegistryURL }}/prometheus-exporter" \
                             --values ${SF_TMPDIR}/k8s.postgres.values.yaml \
                             || sfFail 192
 
                         rm -f ${SF_TMPDIR}/k8s.postgres.values.yaml
 
-                        echo "Waiting postgresql-infra pods"
-                        kubectl wait -n {{ .Namespace }} --timeout=-1s --for condition=ready pods -l release=postgresql-infra
+                ready:
+                    targets:
+                        masters: any
+                    run: |
+                        sfRetry 5m 5 sfKubectl wait -n {{ .Namespace }} --timeout=5s --for condition=ready pods -l release=postgresql-infra || sfFail 193
+                        sfExit
+
+        remove:
+            pace: helm
+            steps:
+                helm:
+                    targets:
+                        masters: any
+                    run: |
+                        sfHelm delete postgresql-infra || sfFail 192
+                        sfExit
 
 ...

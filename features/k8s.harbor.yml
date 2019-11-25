@@ -14,20 +14,20 @@
 
 ---
 feature:
-  suitableFor:
-    host: no
-    cluster: k8s,dcos
+    suitableFor:
+        host: no
+        cluster: k8s,dcos
 
     requirements:
-      features:
-        - kubernetes
-        - helm
+        features:
+            - kubernetes
+            - k8shelm
 
     parameters:
-      - Environnement=prod
-    
+        - Environnement=prod
+
     install:
-      bash:
+        bash:
         check:
           pace: helm_chart
             steps:
@@ -380,7 +380,7 @@ EOF
                             sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/ca.crt;
                             sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/server.key;
                             sudo chmod g+r /etc/kubernetes/pki/etcd/server.key;
-                            sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/server.crt;  
+                            sudo chown root:{{.Username}} /etc/kubernetes/pki/etcd/server.crt;
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
@@ -539,7 +539,7 @@ EOF
                                 sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 209
                                 sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 210
                             fi
-                            
+
                             sfExit
 
                     cni:
@@ -561,7 +561,7 @@ EOF
                                     # Applies RBAC Calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/rbac/rbac-kdd-calico.yaml -P /etc/kubernetes/kubeadm/
                                     sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 201
-                                    
+
                                     # Downloads default calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml -P /etc/kubernetes/kubeadm/
 
@@ -662,7 +662,7 @@ EOF
 
                                     # Applies patched file
                                     sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 205
-                                    
+
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
                                     sfFirewallReload || sfFail 206 "Firewall problem"
                                     ;;
