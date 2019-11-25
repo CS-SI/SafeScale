@@ -22,10 +22,12 @@ feature:
     parameters:
         - Namespace=default
         - Version=1.10.0
+        - HelmRepoName=stable
 
     requirements:
-        - kubernetes
-        - helm
+        features:
+            - kubernetes
+            - helm
 
     install:
         bash:
@@ -36,7 +38,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            helm install local_chart_monitoring/dashboards \
+                            helm install {{ .HelmRepoName }}/dashboards \
                                 --name dashboards \
                                 --namespace {{ .Namespace }} \
                                 --version {{ Version }} \

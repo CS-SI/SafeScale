@@ -22,10 +22,12 @@ feature:
     parameters:
         - Namespace=default
         - Version=0.9.0
+        - HelmRepoName=stable
 
     requirements:
-        - kubernetes
-        - helm
+        features:
+            - kubernetes
+            - helm
 
     install:
         bash:
@@ -36,7 +38,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            helm install local_chart_monitoring/kibana \
+                            helm install {{ .HelmRepoName }}/kibana \
                                 --name kibana-log \
                                 --namespace "{{ .Namespace }}" \
                                 --version {{ .VERSION }} \

@@ -1,0 +1,195 @@
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    suitableFor:
+        cluster: k8s
+
+    requirements:
+        features:
+            - kubernetes
+            - helm
+            - postgres.k8s
+
+    parameters:
+        - RootURL=/grafana
+        - Version=1.10.0
+        - NameSpace=default
+        - KeycloakRealm=default
+        - HelmRepoName=stable
+
+    install:
+        bash:
+            check:
+                pace: list_helm
+                steps:
+                    list_helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sudo -u cladm -i helm search ...
+
+        add:
+            pace: db,install
+            steps:
+                db:
+                    targets:
+                        masters: any
+                    run: |
+                        mkdir -p ${SF_ETCDIR}/kong-ingress
+
+                        POSTGRES_PASSWORD=$(sfKubectl get secret --namespace ${NAMESPACE} postgresql-infra -o jsonpath="{.data.postgresql-password}" | base64 --decode)
+                        sfKubectl exec -it -n {{ .Namespace }} postgresql-infra-postgresql-master-0 -c postgresql-infra -- bash -c "export PGPASSWORD=${POSTGRES_PASSWORD}; psql -U postgres -c \"CREATE DATABASE kong\";"
+
+                        sfExit
+
+                install:
+                    targets:
+                        masters: all
+                    run: |
+                        mkdir -p ${SF_ETCDIR}/kong-ingress
+
+                        cat >${SF_ETCDIR}/kong-ingress/k8s.values.yaml <<-EOF
+                        affinity:
+                          nodeAffinity:
+                            requiredDuringSchedulingIgnoredDuringExecution:
+                              nodeSelectorTerms:
+                              - matchExpressions:
+                                - key: "node-role.kubernetes.io/worker"
+                                  operator: In
+                                  values:
+                                  - infra
+                          podAntiAffinity:
+                            requiredDuringSchedulingIgnoredDuringExecution:
+                            - labelSelector:
+                                matchExpressions:
+                                - key: component
+                                  operator: In
+                                  values:
+                                  - app
+                              topologyKey: "kubernetes.io/hostname"
+                        EOF
+
+                install:
+                    targets:
+                        masters: any
+                    run: |
+                        SESSION_SECRET=$(sfGeneratePassword 32 '[[:alnum:]]')
+                        KEYCLOAK_ADMIN_PASSWORD=$(sfKubectl get secret -namespace {{ .Namespace }} keycloak-infra -o jsonpath="{.data.keycloak-admin-password}" | base64 --decode)
+
+                        helm install {{ .HelmRepoName }}/kong \
+                            --name kong-ingress \
+                            --namespace {{ .Namespace }} \
+                            --version ${CHART_VERSION_KONG} \
+                            --tls \
+                            --set image.pullSecrets[0]="local-harbor" \
+                            --set image.tag="${IMAGE_TAG_KONG}" \
+                            --set image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/kong" \
+                            --set waitImage.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/busybox" \
+                            --set ingressController.image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools/kong/kong-ingress-controller" \
+                            --set replicaCount=2 \
+                            --set ingressController.replicaCount=2 \
+                            --set ingressController.enabled=true \
+                            --set proxy.http.nodePort=32080 \
+                            --set proxy.tls.nodePort=32443 \
+                            --set postgresql.enabled=false \
+                            --set env.plugins="bundled\,oidc" \
+                            --set env.database="postgres" \
+                            --set env.pg_host="postgresql-infra-pgpool" \
+                            --set env.pg_database="kong" \
+                            --set env.pg_user="postgres" \
+                            --set env.pg_port=5432 \
+                            --set env.pg_password.valueFrom.secretKeyRef.key=postgresql-password \
+                            --set env.pg_password.valueFrom.secretKeyRef.name=postgresql-infra \
+                            --set env.log_level="debug" \
+                            --set admin.useTLS=false \
+                            --set readinessProbe.httpGet.scheme=HTTP \
+                            --set livenessProbe.httpGet.scheme=HTTP \
+                            --set metrics.enabled="true" \
+                            --set HealthCheck.enabled="true" \
+                            --values values.yaml \
+                            --set env.NGINX_PROXY_PROXY_BUFFER_SIZE="160k" \
+                            --set env.NGINX_PROXY_PROXY_BUFFERS="64 160k" \
+                            --set env.NGINX_PROXY_SET="\$\$session_secret ${SESSION_SECRET}" \
+                            || sfFail 193
+
+                        kubectl apply -f - <<EOF
+                        apiVersion: configuration.konghq.com/v1
+                        kind: KongPlugin
+                        metadata:
+                            name: prometheus
+                            namespace: {{ .Namespace }}
+                            labels:
+                            global: "true"
+                        plugin: prometheus
+                        EOF
+
+                        kubectl exec -n {{ .Namespace }} keycloak-0 -- bash -c "/opt/keycloak/keycloak/bin/kcadm.sh config credentials --server http://localhost:8085 --realm master --user {{ .KeycloakRealm }} --password $KEYCLOAK_ADMIN_PASSWORD;"
+
+                        #CREATE OIDC CLIENT
+                        kubectl exec -n {{ .Namespace }} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh create clients -r {{ .KeycloakRealm }} \
+                            -s 'clientId='$KEYCLOAK_OIDC_CLIENT'' \
+                            -s 'standardFlowEnabled="true"' \
+                            -s 'directAccessGrantsEnabled="true"' \
+                            -s 'serviceAccountsEnabled="true"' \
+                            -s 'authorizationServicesEnabled="true"' \
+                            -s 'redirectUris=["/*"]'
+
+                        CID=$(kubectl exec -n {{ .Namespace }} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh get clients -r {{ .KeycloakRealm }} -q clientId=$KEYCLOAK_OIDC_CLIENT --fields 'id' | jq -r .[0].id | tr -s '\n')
+
+                        #CREATE USERGROUPMAPPER
+                        kubectl exec -it -n {{ .Namespace }} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh create clients/"${CID/$'\r'/}"/protocol-mappers/models -r {{ .KeycloakRealm }} \
+                            -s 'name=userGroupMapper' \
+                            -s 'protocol=openid-connect' \
+                            -s 'protocolMapper=oidc-group-membership-mapper' \
+                            -s 'consentRequired=false' \
+                            -s 'config."claim.name"=user_groups' \
+                            -s 'config."full.path"=false' \
+                            -s 'config."id.token.claim"=true' \
+                            -s 'config."access.token.claim"=true' \
+                            -s 'config."userinfo.token.claim"=false'
+
+                        #SAVE OIDC CLIENT SECRET
+                        KEYCLOAK_CLIENT_SECRET=$(kubectl exec -n {{ .Namespace }} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh get clients/"${CID/$'\r'/}"/client-secret -r {{ .KeycloakRealm }} --fields value --format csv --noquotes)
+
+                        #CONFIGURE KONG OIDC PLUGIN
+                        kubectl apply -f - <<EOF
+                        apiVersion: configuration.konghq.com/v1
+                        kind: KongPlugin
+                        metadata:
+                            name: kong-oidc-plugin
+                            namespace: {{ .Namespace }}
+                            labels:
+                            global: "false"
+                        config:
+                            client_id: $KEYCLOAK_OIDC_CLIENT
+                            client_secret: $KEYCLOAK_CLIENT_SECRET
+                            discovery: https://{{ .EndpointIP }}/realms/{{ .KeycloakRealm }}/.well-known/openid-configuration
+                            session_secret: $SESSION_SECRET
+                            groups_authorized_paths:
+                            - group_name: allowed_users
+                            group_authorized_paths:
+                            - /
+                        plugin: oidc
+                        EOF
+
+                        # Add letsencrypt X3 certificates
+                        kubectl wait pods -n {{ .Namespace }} --timeout=-1s --for condition=ready -l app=kong -l release=kong-ingress -l component=controller --all
+                        kubectl wait pods -n {{ .Namespace }} --timeout=-1s --for condition=ready -l app=kong -l release=kong-ingress -l component=app --all
+                        curl -X PUT --url "http://kong-ingress-kong-admin.{{ .Namespace }}.svc.cluster.local:8444/certificates/{{ .EndpointIP }}" -F "cert=@${0%/*}/fullchain.pem" -F "key=@${0%/*}/privkey.pem"
+
+                        sfExit
+
+...

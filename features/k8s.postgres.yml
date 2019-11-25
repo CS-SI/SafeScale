@@ -1,0 +1,169 @@
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    suitableFor:
+        cluster: k8s
+
+    requirements:
+        features:
+            - kubernetes
+            - helm
+
+    parameters:
+        - Version=1.10.0
+        - PersistentVolumeSize="8Gi"
+        - NameSpace=default
+        - HelmRepoName=stable
+        #- DockerRegistryURL=90.84.245.22:30002/cs/monitoring
+        - DockerRegistryURL=hub.docker.com
+        - DockerRegistryUsername=
+        - DockerRegistryPassword=
+
+    install:
+        bash:
+            check:
+                pace: list_helm
+                steps:
+                    list_helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sudo -u cladm -i helm search ...
+
+        add:
+            pace: secret,install
+            steps:
+                secret:
+                    targets:
+                        masters: any
+                    run: |
+                        if [ ! -z "${DockerRegistryUsername}" ]; then
+                            sfKubectl create secret docker-registry my-docker-registry-credentials -n {{ .Namespace }} --docker-server={{ .DockerRegistryURL}} --docker-username={{ .DockerRegistryUsername }} --docker-password="{{ .DockerRegistryPassword }}
+                            if [ $? -ne 0 ]; then
+                                sfKubectl delete secret docker-registry my-docker-registry-credentials -n {{ .Namespace }}
+                                sfKubectl create secret docker-registry my-docker-registry-credentials -n {{ .Namespace }} --docker-server={{ .DockerRegistryURL}} --docker-username={{ .DockerRegistryUsername }} --docker-password="{{ .DockerRegistryPassword }}
+                            fi
+                            [ $? -ne 0 ] && sfFail 192
+                        fi
+                        sfExit
+
+                install:
+                    targets:
+                        masters: any
+                    run: |
+                        mkdir -p ${SF_ETCDIR}/k8s.postgres
+
+                        cat >${SF_TMPDIR}/k8s.postgres.values.yaml <<-EOF
+                        master:
+                          affinity:
+                            nodeAffinity:
+                              requiredDuringSchedulingIgnoredDuringExecution:
+                                nodeSelectorTerms:
+                                - matchExpressions:
+                                  - key: "node-role.kubernetes.io/worker"
+                                    operator: In
+                                    values:
+                                    - infra
+                            podAntiAffinity:
+                              requiredDuringSchedulingIgnoredDuringExecution:
+                              - labelSelector:
+                                  matchExpressions:
+                                  - key: role
+                                    operator: In
+                                    values:
+                                    - master
+                                  - key: release
+                                    operator: In
+                                    values:
+                                    - postgresql-infra
+                                topologyKey: "kubernetes.io/hostname"
+                        slave:
+                          affinity:
+                            nodeAffinity:
+                              requiredDuringSchedulingIgnoredDuringExecution:
+                                nodeSelectorTerms:
+                                - matchExpressions:
+                                  - key: "node-role.kubernetes.io/worker"
+                                    operator: In
+                                    values:
+                                    - infra
+                            podAntiAffinity:
+                              requiredDuringSchedulingIgnoredDuringExecution:
+                              - labelSelector:
+                                  matchExpressions:
+                                  - key: role
+                                    operator: In
+                                    values:
+                                    - slave
+                                  - key: release
+                                    operator: In
+                                    values:
+                                    - postgresql-infra
+                                topologyKey: "kubernetes.io/hostname"
+                        pgpool:
+                          affinity:
+                            nodeAffinity:
+                              requiredDuringSchedulingIgnoredDuringExecution:
+                                nodeSelectorTerms:
+                                - matchExpressions:
+                                  - key: "node-role.kubernetes.io/worker"
+                                    operator: In
+                                    values:
+                                    - infra
+                            podAntiAffinity:
+                              requiredDuringSchedulingIgnoredDuringExecution:
+                              - labelSelector:
+                                  matchExpressions:
+                                  - key: role
+                                    operator: In
+                                    values:
+                                    - pgpool
+                                  - key: release
+                                    operator: In
+                                    values:
+                                    - postgresql-infra
+                                topologyKey: "kubernetes.io/hostname"
+                        EOF
+
+                        #Install PostgreSQL Helm chart for Harbor
+                        helm install {{ .HelmRepoName }}/postgresql \
+                            --name postgresql-infra \
+                            --namespace {{ .Namespace }} \
+                            --version {{ .Version }} \
+                            --tls \
+                            --set imagePullSecrets="my-docker-registry-credentials" \
+                            --set image.registry="{{ .DockerRegistryURL }}" \
+                            --set image.tag=${IMAGE_TAG_POSTGRES} \
+                            --set persistence.enabled="true" \
+                            --set persistence.size={{ .PersistentVolumeSize }} \
+                            --set postgresqlDatabase="registry" \
+                            --set volumePermissions.image.registry="{ .DockerRegistryURL }}/tools" \
+                            --set replication.enabled=true \
+                            --set replication.synchronousCommit="on" \
+                            --set replication.slaveReplicas=2 \
+                            --set replication.numSynchronousReplicas=2 \
+                            --set pgpool.replicas=2 \
+                            --set pgpool.image.repository="{{ .DockerRegistryURL }}/tools/postgresql/pgpool" \
+                            --set metrics.image.registry="{{ .DockerRegistryURL }}/prometheus-exporter" \
+                            --values ${SF_TMPDIR}/k8s.postgres.values.yaml \
+                            || sfFail 192
+
+                        rm -f ${SF_TMPDIR}/k8s.postgres.values.yaml
+
+                        echo "Waiting postgresql-infra pods"
+                        kubectl wait -n {{ .Namespace }} --timeout=-1s --for condition=ready pods -l release=postgresql-infra
+
+...
