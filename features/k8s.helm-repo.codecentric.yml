@@ -20,18 +20,24 @@ feature:
         cluster: K8S
 
     parameters:
-        - ReleaseName=keycloak
         - Namespace=default
-        - ChartVersion=6.0.3
-        - HelmRepoName=codecentric
 
     requirements:
-        features:
-            - kubernetes
-            - helm
+        - kubernetes
+        - k8s.helm
 
     install:
         bash:
+            check:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm repo list | grep codecentric || sfFail 192
+                            sfExit
+
             add:
                 pace: helm
                 steps:
@@ -39,18 +45,8 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            helm install {{ .HelmRepoName }}/keycloak \
-                                --name {{ .ReleaseName }}}} \
-                                --namespace "{{ .Namespace }}" \
-                                --version {{ .ChartVersion }} \
-                                --tls \
-                                --set metrics.serviceMonitor.enabled=true \
-                                --set metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \
-                                --set keycloak.ingress.enabled="true" \
-                                --set keycloak.ingress.path="/auth" \
-                                --set ingress.controller="kong" \
-                                --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
-                                || sfFail 192
+                            sfHelm repo add codecentric https://codecentric.github.io/helm-charts || sfFail 192
+                            sfExit
 
             remove:
                 pace: helm
@@ -59,5 +55,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            sfHelm delete {{ .ReleaseName }}
+                            sfHelm repo delete codecentric || sfFail 192
+                            sfExit
+
 ---
