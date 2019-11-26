@@ -70,7 +70,7 @@ feature:
                                   topologyKey: "kubernetes.io/hostname"
                             EOF
 
-                            REPLICAS="{{ range .ClusterMasterIPs }}{{ . }} {{ end }}"
+                            REPLICAS="{{ range .ClusterMasterNames }}{{ . }} {{ end }}"
                             REPLICA_COUNT=$(echo -n $REPLICAS | wc -w)
 
                             sfHelm install {{ .HelmRepoName }}/zookeeper \

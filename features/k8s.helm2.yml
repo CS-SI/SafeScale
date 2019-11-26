@@ -16,7 +16,7 @@
 feature:
     suitableFor:
         host: no
-        cluster: k8s,dcos
+        cluster: K8S,DCOS
 
     requirements:
         features:
@@ -35,7 +35,8 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            ls /usr/local/bin/helm &>/dev/null
+                            ls /usr/local/bin/helm &>/dev/null || sfFail 192
+                            sfExit
 
             add:
                 pace: certificates,binaries,namespace,policies,init,synchro
@@ -109,6 +110,10 @@ feature:
                             mv helm.cert.pem helm.key.pem ${SF_ETCDIR}/helm/pki
                             mv tiller.cert.pem tiller.key.pem ${SF_ETCDIR}/helm/pki
 
+                            chown -R root:{{ .ClusterAdminUsername }} ${SF_ETCDIR}/helm
+                            chmod -R u+rwx,g+r-wx,o-rwx ${SF_ETCDIR}/helm
+                            find ${SF_ETCDIR}/helm -exec chmod ug+x {} \;
+
                             ## Clean directory
                             rm ca.srl csr.conf helm.csr.pem tiller.csr.pem
                             sfExit
@@ -149,99 +154,99 @@ feature:
                             apiVersion: rbac.authorization.k8s.io/v1
                             kind: ClusterRoleBinding
                             metadata:
-                              name: tiller-clusterrolebinding-admin
+                                name: tiller-clusterrolebinding-admin
                             roleRef:
-                              apiGroup: rbac.authorization.k8s.io
-                              kind: ClusterRole
-                              name: cluster-admin
+                                apiGroup: rbac.authorization.k8s.io
+                                kind: ClusterRole
+                                name: cluster-admin
                             subjects:
-                            - kind: ServiceAccount
-                              name: tiller
-                              namespace: kube-system
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
                             EOF
 
-                            cat > ${SF_ETCDIR}/helm/tiller-role.yaml <<EOF
+                            cat > ${SF_ETCDIR}/helm/tiller-role-{{.Namespace}}.yaml <<EOF
                             kind: Role
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                              name: tiller-role
-                              namespace: {{.NameSpace}}
+                                name: tiller-role
+                                namespace: {{.Namespace}}
                             rules:
-                            - apiGroups: ["", "batch", "extensions", "apps"]
-                              resources: ["*"]
-                              verbs: ["*"]
+                                - apiGroups: ["", "batch", "extensions", "apps"]
+                                  resources: ["*"]
+                                  verbs: ["*"]
                             EOF
 
-                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding.yaml <<EOF
+                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding-{{.Namespace}}.yaml <<EOF
                             kind: RoleBinding
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                              name: tiller-rolebinding
-                              namespace: {{.NameSpace}}
+                                name: tiller-rolebinding
+                                namespace: {{.Namespace}}
                             subjects:
-                            - kind: ServiceAccount
-                              name: tiller
-                              namespace: kube-system
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
                             roleRef:
-                              kind: Role
-                              name: tiller-role
-                              apiGroup: rbac.authorization.k8s.io
+                                kind: Role
+                                name: tiller-role-{{.Namespace}}
+                                apiGroup: rbac.authorization.k8s.io
                             EOF
 
                             cat > ${SF_ETCDIR}/helm/tiller-role-system.yaml <<EOF
                             kind: Role
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                              namespace: kube-system
-                              name: tiller-role-system
+                                namespace: kube-system
+                                name: tiller-role-system
                             rules:
-                            - apiGroups: ["", "extensions", "apps"]
-                              resources: ["configmaps"]
-                              verbs: ["*"]
+                                - apiGroups: ["", "extensions", "apps"]
+                                  resources: ["configmaps"]
+                                  verbs: ["*"]
                             EOF
 
                             cat > ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml <<EOF
                             kind: RoleBinding
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                              name: tiller-rolebinding-system
-                              namespace: kube-system
+                                name: tiller-rolebinding-system
+                                namespace: kube-system
                             subjects:
-                            - kind: ServiceAccount
-                              name: tiller
-                              namespace: kube-system
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
                             roleRef:
-                              kind: Role
-                              name: tiller-role-system
-                              apiGroup: rbac.authorization.k8s.io
+                                kind: Role
+                                name: tiller-role-system
+                                apiGroup: rbac.authorization.k8s.io
                             EOF
 
                             cat > ${SF_ETCDIR}/helm/tiller-role-secret.yaml <<EOF
                             kind: Role
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                              namespace: kube-system
-                              name: tiller-role-secret
+                                namespace: kube-system
+                                name: tiller-role-secret
                             rules:
-                            - apiGroups: [""]
-                              resources: ["secrets"]
-                              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+                                - apiGroups: [""]
+                                  resources: ["secrets"]
+                                  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
                             EOF
 
                             cat > ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml <<EOF
                             kind: RoleBinding
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                              name: tiller-rolebinding-secret
-                              namespace: kube-system
+                                name: tiller-rolebinding-secret
+                                namespace: kube-system
                             subjects:
-                            - kind: ServiceAccount
-                              name: tiller
-                              namespace: kube-system
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
                             roleRef:
-                              kind: Role
-                              name: tiller-role-secret
-                              apiGroup: rbac.authorization.k8s.io
+                                kind: Role
+                                name: tiller-role-secret
+                                apiGroup: rbac.authorization.k8s.io
                             EOF
 
                     apply-policies:
@@ -250,8 +255,8 @@ feature:
                         run: |
                             ## Apply RBAC policy
                             sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 198
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role.yaml || sfFail 199
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding.yaml || sfFail 200
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-{{.Namespace}}.yaml || sfFail 199
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-{{.Namespace}}.yaml || sfFail 200
                             sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-system.yaml || sfFail 201
                             sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml || sfFail 202
                             sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-secret.yaml || sfFail 203
@@ -314,17 +319,33 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            sfKubectl delete serviceaccount tiller --namespace {{ .Namespace }} || sfFail 195
+                            ## Delete deployment
+                            if sfKubectl -n kube-system get deployment tiller-deploy; then
+                                sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
+                            fi
+                            ## Delete account
+                            if sfKubectl get serviceaccount tiller -n {{ .Namespace }} 2>/dev/null; then
+                                sfKubectl delete serviceaccount tiller -n {{ .Namespace }} || sfFail 193
+                            fi
+                            ## Delete RBAC policy
+                            if sfKubectl get role tiller-rolebinding-secret; then
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 194
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-{{ .Namespace }}.yaml || sfFail 195
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-{{.Namespace}}.yaml || sfFail 196
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-system.yaml || sfFail 197
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml || sfFail 198
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-secret.yaml || sfFail 199
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml || sfFail 200
+                            fi
                             sfExit
 
                     cleanup:
                         targets:
                             masters: all
                         run: |
-                            rm -f /usr/local/bin/helm || sfFail 193
-                            rm -f /usr/local/bin/tiller || sfFail 194
-                            rm -drf ${SF_ETCDIR}/helm || sfFail 196
-                            rm -drf /home/{{ .ClusterAdminUsername }}/.helm || sfFail 197
+                            rm -f /usr/local/bin/helm || sfFail 201
+                            rm -f /usr/local/bin/tiller || sfFail 202
+                            rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm || sfFail 203
                             sfExit
 
 ...

@@ -56,7 +56,7 @@ feature:
         - AllowPodsOnMasters=false
         - CNI=calico
         - Dashboard=true
-        - Harden=true
+        - Hardening=true
         - KubeVersion=1.14.1
 
     install:
@@ -69,6 +69,7 @@ feature:
                             masters: one
                         run: |
                             sfDcos kubernetes &>/dev/null
+                            sfExit
 
             add:
                 #pace: package,cli+config
@@ -171,8 +172,7 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
 
             add:
-                #pace: sysconf,prepare-host,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,no-schedule,final
-                pace: sysconf,prepare-host,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,final
+                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,final
                 steps:
                     sysconf:
                         targets:
@@ -211,7 +211,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution '$LINUX_KIND'"
-                                    sfFail 196
+                                    sfFail 192
                                     ;;
                             esac
 
@@ -236,37 +236,37 @@ feature:
                             fi
                             sfExit
 
-                    prepare-host:
+                    syshardening:
                         targets:
                             gateway: all
                             masters: all
                             nodes: all
                         run: |
-                            if [ "{{.Harden}}" == "true" ]; then
+                            {{ if eq .Hardening "true" }}
+                            case $(sfGetFact "linux_kind") in
+                                debian|ubuntu)
+                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 193
+                                    ;;
 
-                                case $(sfGetFact "linux_kind") in
-                                    debian|ubuntu)
-                                        sfApt update && sfApt install -y audit audit-libs quota || sfFail 192
-                                        ;;
+                                centos|redhat)
+                                    yum -y install audit audit-libs quota || sfFail 193
+                                    ;;
 
-                                    centos|redhat)
-                                        yum -y install audit audit-libs quota || sfFail 192
-                                        ;;
+                                *) echo "unsupported linux distribution ''"
+                                   sfFail 193
+                                   ;;
+                            esac
 
-                                    *) echo "unsupported linux distribution ''"
-                                    sfFail 193
-                                esac
-
-                                ## Configures ulimit
-                                cat >> /etc/security/limits.conf <<EOF
+                            ## Configures ulimit
+                            cat >> /etc/security/limits.conf <<EOF
                             *      soft      nproc      100
                             *      hard      nproc      200
                             *      soft      nofile      1024
                             *      hard      nofile      2048
                             EOF
 
-                                ## Configures audit rules
-                                cat > /etc/audit/rules.d/docker.rules <<EOF
+                            ## Configures audit rules
+                            cat > /etc/audit/rules.d/docker.rules <<EOF
                             -w /usr/bin/docker -p awx -k docker_binary
                             -w /var/lib/docker -p aw -k docker_data
                             -w /etc/docker -p aw -k docker_configuration
@@ -275,9 +275,8 @@ feature:
                             -w /usr/bin/containerd -p awx -k docker_containerd
                             -w /usr/bin/runc -p awx -k docker_runc
                             EOF
-                                sfService restart auditd
-
-                            fi
+                            sfService restart auditd
+                            {{ end }}
                             sfExit
 
                     common-tools:
@@ -294,7 +293,11 @@ feature:
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
+                            {{ if .KubeVersion }}
+                                    sfApt update && sfApt install -y kubelet={{.KubeVersion}}-00 kubeadm={{.KubeVersion}}-00 kubectl={{.KubeVersion}}-00 || sfFail 192
+                            {{ else }}
                                     sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 192
+                            {{ end }}
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
 
@@ -309,12 +312,15 @@ feature:
                             gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
                             exclude=kube*
                             EOF
-
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 192
+                            {{ if .KubeVersion }}
+                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 194
+                            {{ else }}
+                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 194
+                            {{ end }}
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
-                                   sfFail 193
+                                   sfFail 195
                             esac
                             sfService enable kubelet && sfService start kubelet
                             sfExit
@@ -328,7 +334,7 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
-                            [ -z "${TARGET_DIR+x}" ] && sfFail 197
+                            [ -z "${TARGET_DIR+x}" ] && sfFail 196
 
                             cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
                             upstream kubernetes-api-cluster {
@@ -352,18 +358,23 @@ feature:
 
                             mkdir -p /etc/kubernetes/kubeadm
 
-                            cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-'EOF'
+                            {{ if .KubeVersion }}
+                            KUBE_VERSION=v{{ .KubeVersion }}
+                            {{ else }}
+                            KUBE_VERSION=stable
+                            {{ end }}
+
+                            cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
                             apiVersion: kubeadm.k8s.io/v1beta1
                             kind: ClusterConfiguration
-                            kubernetesVersion: stable
                             controlPlaneEndpoint: "{{.DefaultRouteIP}}:6443"
-                            kubernetesVersion: v{{.KubeVersion}}
+                            kubernetesVersion: ${KUBE_VERSION}
                             etcd:
-                              local:
-                                dataDir: /var/lib/etcd
+                                local:
+                                    dataDir: /var/lib/etcd
                             networking:
-                              podSubnet: 10.244.0.0/16
+                                podSubnet: 10.244.0.0/16
                             EOF
 
                             # apiVersion: kubeadm.k8s.io/v1beta1
@@ -427,10 +438,10 @@ feature:
                             # EOF
                             # fi
 
-                            sfRetry 5m 5 kubeadm config images pull || sfFail 198
-                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 199
-                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 200
-                            cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 201
+                            sfRetry 5m 5 kubeadm config images pull || sfFail 197
+                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 198
+                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 199
+                            cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 200
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
                             mkdir -p ~{{.ClusterAdminUsername}}/.kube
@@ -442,35 +453,32 @@ feature:
                             sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/ca.crt;
                             sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.key;
                             sudo chmod g+r /etc/kubernetes/pki/etcd/server.key;
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.crt;  
+                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.crt;
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 202
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 201
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
                             echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
                             cat ${SF_TMPDIR}/cp_join_cmd.sh
-                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 203
-                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 204
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 202
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 203
                             for ip in {{range .MasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
-                                sfDropzoneSync $ip || sfFail 205
+                                sfDropzoneSync $ip || sfFail 204
                             done
                             rm ${SF_TMPDIR}/cp_join_cmd.sh ${SF_TMPDIR}/init_cluster_admin_kube.sh
                             sfDropzoneClean
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 206
-                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 207
-                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 208
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 205
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 206
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 207
 
-                            touch /etc/kubernetes/.joined
-                            echo "cp1 init done"
-
-                            if [ "{{.Harden}}" == "true" ]; then
+                            {{ if eq .Hardening "true" }}
                                 cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
                             ---
                             apiVersion: extensions/v1beta1
@@ -598,10 +606,13 @@ feature:
                             EOF
 
                                 # Apply policies
-                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 209
-                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 210
-                            fi
-                            
+                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 208
+                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 209
+                            {{ end }}
+
+                            touch /etc/kubernetes/.joined
+                            echo "cp1 init done"
+
                             sfExit
 
                     cni:
@@ -610,11 +621,11 @@ feature:
                         run: |
                             case {{.CNI}} in
                                 flannel) # To be removed
-                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 209
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 210
 
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    sfFirewallReload || sfFail 211 "Firewall problem"
                                     ;;
                                 calico)
                                     # Should already exist...
@@ -622,8 +633,8 @@ feature:
 
                                     # Applies RBAC Calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/rbac/rbac-kdd-calico.yaml -P /etc/kubernetes/kubeadm/
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 201
-                                    
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 212
+
                                     # Downloads default calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml -P /etc/kubernetes/kubeadm/
 
@@ -708,30 +719,26 @@ feature:
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
                                         debian|ubuntu)
-                                            sfApt update && sfApt install -y patch || sfFail 202
+                                            sfApt update && sfApt install -y patch || sfFail 213
                                             ;;
 
                                         centos|redhat)
-                                            yum -y install patch || sfFail 203
+                                            yum -y install patch || sfFail 213
                                             ;;
 
                                         *) echo "unsupported linux distribution ''"
-                                        sfFail 204
+                                           sfFail 213
+                                           ;;
                                     esac
 
                                     # Patches calico file
                                     patch -l /etc/kubernetes/kubeadm/calico.yaml /etc/kubernetes/kubeadm/calico.yaml.patch
 
                                     # Applies patched file
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 205
-                                    
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 214
+
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 206 "Firewall problem"
-                                    ;;
-                                canal) # To be removed
-                                    sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || sfFail 211
-                                    sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    sfFirewallReload || sfFail 215 "Firewall problem"
                                     ;;
                             esac
                             sfExit 0
@@ -743,19 +750,19 @@ feature:
                             # Don't try to init a kubernetes cluster already running
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 212
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 216
                             sfDropzoneClean
 
-                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 213
-                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 214
-                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 215
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 216
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 217
+                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 218
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 219
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 220
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 217
-                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 218
-                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 219
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 221
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 222
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 223
 
                             touch /etc/kubernetes/.joined
                             echo "cpx init done"
@@ -765,14 +772,11 @@ feature:
                                 flannel)
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    sfFirewallReload || sfFail 224 "Firewall problem"
                                     ;;
                                 calico)
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 204 "Firewall problem"
-                                canal)
-                                    sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    sfFirewallReload || sfFail 225 "Firewall problem"
                                     ;;
                             esac
                             sfExit
@@ -793,8 +797,8 @@ feature:
                                 MASTERIP=$m
                                 break
                             done
-                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 220
-                            eval $NODE_JOIN_CMD || sfFail 221
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 226
+                            eval $NODE_JOIN_CMD || sfFail 227
                             touch /etc/kubernetes/.joined
                             sfExit
 
@@ -802,7 +806,7 @@ feature:
                         targets:
                             gateway: all
                         run: |
-                            sfKubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 222
+                            sfKubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 228
                             sfExit
 
                     final:
@@ -814,10 +818,10 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 229 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 230 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi
@@ -853,6 +857,7 @@ feature:
                         run: |
                             sfKubectl drain {{.Hostname}} --delete-local-data --force --ignore-daemonsets
                             sfKubectl delete node {{.Hostname}}
+                            sfExit
 
                     reverseproxy:
                         targets:
@@ -860,29 +865,34 @@ feature:
                         run: |
                             rm -f /etc/kong4gateway/includes/kubernetes.conf
                             sfReverseProxyReload
+                            sfExit
 
                     reset:
                         targets:
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
                             kubeadm reset -f
+                            sfExit
 
                     clean:
                         targets:
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
+
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 223 "exiture purging kubernetes"
+                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
                                     ;;
                                 redhat|centos)
-                                    yum remove -y kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 224 "exiture purging kubernetes"
+                                    yum remove -y kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
                                     ;;
                             esac
-                            sfFirewallReload || sfFail 204 "Firewall problem"
-                            rm -f /etc/kubernetes/.joined
+                            sfFirewallReload || sfFail 193 "Firewall problem"
+                            rm -rf /etc/kubernetes/.joined /home/{{ .ClusterAdminUsername }}/.kube
                             sfExit
 
 ...
