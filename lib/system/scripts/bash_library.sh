@@ -377,6 +377,11 @@ sfKubectl() {
 }
 export -f sfKubectl
 
+sfHelm() {
+    sudo -u cladm -i helm "$@" --tls
+}
+export -f sfHelm
+
 sfDcos() {
     sudo -u cladm -i dcos "$@"
 }
