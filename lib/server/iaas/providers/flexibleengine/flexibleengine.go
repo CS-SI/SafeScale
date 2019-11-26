@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com"
+	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com/v3"
 )
 
 type gpuCfg struct {
