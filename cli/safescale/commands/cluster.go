@@ -896,11 +896,7 @@ var clusterDcosCommand = cli.Command{
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		err = executeCommand(cmdStr)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		return clitools.SuccessResponse(nil)
+		return executeCommand(cmdStr)
 	},
 }
 
@@ -927,11 +923,7 @@ var clusterKubectlCommand = cli.Command{
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i kubectl " + strings.Join(args, " ")
-		err = executeCommand(cmdStr)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		return clitools.SuccessResponse(nil)
+		return executeCommand(cmdStr)
 	},
 }
 
@@ -957,12 +949,17 @@ var clusterHelmCommand = cli.Command{
 		}
 
 		args := c.Args().Tail()
-		cmdStr := "sudo -u cladm -i helm " + strings.Join(args, " ")
-		err = executeCommand(cmdStr)
-		if err != nil {
-			return clitools.FailureResponse(err)
+		useTLS := "--tls"
+		for _, arg := range args {
+			switch arg {
+			case "init":
+				return cli.NewExitError("helm init is forbidden", int(ExitCode.InvalidArgument))
+			case "search":
+				useTLS = ""
+			}
 		}
-		return clitools.SuccessResponse(nil)
+		cmdStr := "sudo -u cladm -i helm " + strings.Join(args, " ") + useTLS
+		return executeCommand(cmdStr)
 	},
 }
 
