@@ -28,7 +28,7 @@ import (
 	"syscall"
 
 	"github.com/dlespiau/covertool/pkg/exit"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -55,10 +55,10 @@ func work() {
 		exit.Exit(1)
 	}()
 
-	log.Infoln("Checking configuration")
+	logrus.Infoln("Checking configuration")
 	_, err := iaas.GetTenantNames()
 	if err != nil {
-		log.Fatalf(err.Error())
+		logrus.Fatalf(err.Error())
 	}
 
 	safescaledPort := 50051
@@ -80,19 +80,19 @@ func work() {
 	envVars := os.Environ()
 	for _, envVar := range envVars {
 		if strings.HasPrefix(envVar, "SAFESCALE") {
-			log.Infof("Using %s", envVar)
+			logrus.Infof("Using %s", envVar)
 		}
 	}
 
-	log.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", safescaledPort, suffix)
+	logrus.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", safescaledPort, suffix)
 
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(safescaledPort))
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		logrus.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
 
-	log.Infoln("Registering services")
+	logrus.Infoln("Registering services")
 	pb.RegisterBucketServiceServer(s, &listeners.BucketListener{})
 	pb.RegisterDataServiceServer(s, &listeners.DataListener{})
 	pb.RegisterHostServiceServer(s, &listeners.HostListener{})
@@ -105,7 +105,7 @@ func work() {
 	pb.RegisterTenantServiceServer(s, &listeners.TenantListener{})
 	pb.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
 
-	// log.Println("Initializing service factory")
+	// logrus.Println("Initializing service factory")
 	// commands.InitServiceFactory()
 
 	// Register reflection service on gRPC server.
@@ -114,7 +114,7 @@ func work() {
 	version := VERSION + ", build " + REV + " (" + BUILD_DATE + ")"
 	fmt.Printf("Safescaled version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		logrus.Fatalf("Failed to serve: %v", err)
 	}
 }
 
@@ -155,21 +155,21 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			log.SetLevel(log.TraceLevel)
+			logrus.SetLevel(logrus.TraceLevel)
 			utils.Verbose = true
 		} else {
-			log.SetLevel(log.WarnLevel)
+			logrus.SetLevel(logrus.WarnLevel)
 		}
 
 		if c.GlobalBool("verbose") {
-			log.SetLevel(log.InfoLevel)
+			logrus.SetLevel(logrus.InfoLevel)
 			utils.Verbose = true
 		}
 		if c.GlobalBool("debug") {
 			if c.GlobalBool("verbose") {
-				log.SetLevel(log.TraceLevel)
+				logrus.SetLevel(logrus.TraceLevel)
 			} else {
-				log.SetLevel(log.DebugLevel)
+				logrus.SetLevel(logrus.DebugLevel)
 			}
 			utils.Debug = true
 		}
@@ -183,6 +183,6 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }
