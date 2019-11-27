@@ -815,6 +815,10 @@ feature:
                         run: |
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
                             [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
+                            # Adds namespace safescale
+                            sfKubectl create namespace safescale
+                            # FIXME: add label to namespace (in prevision of network policies)
+                            # sfKubectl set label
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
