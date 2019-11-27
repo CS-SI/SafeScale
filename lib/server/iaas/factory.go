@@ -83,6 +83,7 @@ func UseStorages(tenantNames []string) (*StorageServices, error) {
 // If necessary, this function try to load service from configuration file
 func UseService(tenantName string) (newService Service, err error) {
 	defer scerr.OnExitLogError("", &err)()
+	defer scerr.OnPanic(&err)
 
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
@@ -502,9 +503,14 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 
 	// FIXME Remove google custom code
 	if config.Type == "google" {
-		if config.ProjectID, ok = identity["project_id"].(string); !ok {
-			return config, fmt.Errorf("problem parsing project_id")
+		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
+		for _, key := range keys {
+			if _, ok = identity[key].(string); !ok {
+				return config, fmt.Errorf("problem parsing %s", key)
+			}
 		}
+
+		config.ProjectID = identity["project_id"].(string)
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
@@ -650,9 +656,14 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 
 	// FIXME Remove google custom code
 	if config.Type == "google" {
-		if config.ProjectID, ok = identity["project_id"].(string); !ok {
-			return config, fmt.Errorf("problem parsing project_id")
+		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
+		for _, key := range keys {
+			if _, ok = identity[key].(string); !ok {
+				return config, fmt.Errorf("problem parsing %s", key)
+			}
 		}
+
+		config.ProjectID = identity["project_id"].(string)
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
