@@ -83,7 +83,7 @@ getdevdeps: begin
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u  $(ERRCHECK) || true); \
 	fi
-	@which convey > /dev/null; if [ $$? -ne 0 ]; then \
+	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u  $(CONVEY) || true); \
 	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
@@ -139,7 +139,9 @@ clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd cli && $(MAKE) $(@))
 	@(cd lib && $(MAKE) $(@))
-	# @(git clean -xdf -e .idea -e vendor -e .vscode || true)
+
+mrproper: clean
+	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
