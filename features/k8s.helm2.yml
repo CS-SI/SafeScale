@@ -35,7 +35,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            ls /usr/local/bin/helm &>/dev/null || sfFail 192
+                            ls /usr/local/sbin/helm &>/dev/null || sfFail 192
                             sfExit
 
             add:
@@ -130,8 +130,8 @@ feature:
                             chmod a+rx ${SF_TMPDIR}/linux-amd64/helm \
                               && chmod a+rx ${SF_TMPDIR}/linux-amd64/tiller || sfFail 194
 
-                            mv ${SF_TMPDIR}/linux-amd64/helm /usr/local/bin \
-                              && mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/bin || sfFail 195
+                            mv ${SF_TMPDIR}/linux-amd64/helm /usr/local/sbin \
+                              && mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/sbin || sfFail 195
 
                             rm -drf ${SF_TMPDIR}/linux-amd64 \
                               && rm -rf ${SF_TMPDIR}/helm-v{{.Version}}-linux-amd64.tar.gz || sfFail 196
@@ -343,8 +343,8 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            rm -f /usr/local/bin/helm || sfFail 201
-                            rm -f /usr/local/bin/tiller || sfFail 202
+                            rm -f /usr/local/sbin/helm || sfFail 201
+                            rm -f /usr/local/sbin/tiller || sfFail 202
                             rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm || sfFail 203
                             sfExit
 
