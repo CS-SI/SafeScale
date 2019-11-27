@@ -24,7 +24,7 @@ feature:
 
     parameters:
         - Version=2.14.1
-        - Namespace=kube-system
+        - Namespace=default
 
     install:
         bash:
@@ -39,9 +39,9 @@ feature:
                             sfExit
 
             add:
-                pace: certificates,binaries,namespace,policies,init,synchro
+                pace: certs,binaries,account,rbac-files,apply-rbac,init,synchro
                 steps:
-                    certificates:
+                    certs:
                         targets:
                             masters: one
                         run: |
@@ -138,15 +138,15 @@ feature:
 
                             sfExit
 
-                    namespace:
+                    account:
                         targets:
                             masters: one
                         run: |
                             ## Create serviceaccount
-                            sfKubectl create serviceaccount tiller --namespace kube-system || sfFail 197
+                            sfKubectl create serviceaccount tiller -n kube-system || sfFail 197
                             sfExit
 
-                    policies:
+                    rbac-files:
                         targets:
                             masters: all
                         run: |
@@ -169,8 +169,8 @@ feature:
                             kind: Role
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                                name: tiller-role
-                                namespace: {{.Namespace}}
+                                name: tiller-role-{{ .Namespace }}
+                                namespace: {{ .Namespace }}
                             rules:
                                 - apiGroups: ["", "batch", "extensions", "apps"]
                                   resources: ["*"]
@@ -197,8 +197,8 @@ feature:
                             kind: Role
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                                namespace: kube-system
                                 name: tiller-role-system
+                                namespace: kube-system
                             rules:
                                 - apiGroups: ["", "extensions", "apps"]
                                   resources: ["configmaps"]
@@ -225,8 +225,8 @@ feature:
                             kind: Role
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
-                                namespace: kube-system
                                 name: tiller-role-secret
+                                namespace: kube-system
                             rules:
                                 - apiGroups: [""]
                                   resources: ["secrets"]
@@ -249,7 +249,7 @@ feature:
                                 apiGroup: rbac.authorization.k8s.io
                             EOF
 
-                    apply-policies:
+                    apply-rbac:
                         targets:
                             masters: one
                         run: |
@@ -268,7 +268,7 @@ feature:
                             masters: one
                         run: |
                             ## Install Helm as {{ .ClusterAdminUsername }} (the user that runs kubectl) client with TLS authentication with Tiller
-                            sfHelm init \
+                            sudo -u cladm -i helm init \
                                 --tiller-tls \
                                 --tiller-tls-hostname {{ .Hostname }} \
                                 --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
@@ -320,15 +320,15 @@ feature:
                             masters: one
                         run: |
                             ## Delete deployment
-                            if sfKubectl -n kube-system get deployment tiller-deploy; then
+                            if sfKubectl -n kube-system get deployment tiller-deploy &>/dev/null; then
                                 sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
                             fi
                             ## Delete account
-                            if sfKubectl get serviceaccount tiller -n {{ .Namespace }} 2>/dev/null; then
-                                sfKubectl delete serviceaccount tiller -n {{ .Namespace }} || sfFail 193
+                            if sfKubectl get serviceaccount tiller -n kube-system &>/dev/null; then
+                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 193
                             fi
                             ## Delete RBAC policy
-                            if sfKubectl get role tiller-rolebinding-secret; then
+                            if sfKubectl get role tiller-rolebinding-secret -n kube-system &>/dev/null; then
                                 sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 194
                                 sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-{{ .Namespace }}.yaml || sfFail 195
                                 sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-{{.Namespace}}.yaml || sfFail 196
