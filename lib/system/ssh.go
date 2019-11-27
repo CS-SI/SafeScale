@@ -195,7 +195,12 @@ func getFreePort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	port := listener.Addr().(*net.TCPAddr).Port
+	tcp, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		return 0, fmt.Errorf("Invalid listener.Addr()")
+	}
+
+	port := tcp.Port
 	return port, nil
 }
 
