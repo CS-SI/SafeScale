@@ -383,6 +383,7 @@ sfHelm() {
     for p in $@; do
         case $p in
             search) ;;
+            repo) ;;
             init) echo "sfHelm init is forbidden" && return 1
                   ;;
             *) use_tls=--tls
