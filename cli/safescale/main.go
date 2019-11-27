@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
@@ -105,21 +105,21 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			log.SetLevel(log.TraceLevel)
+			logrus.SetLevel(logrus.TraceLevel)
 			utils.Verbose = true
 		} else {
-			log.SetLevel(log.WarnLevel)
+			logrus.SetLevel(logrus.WarnLevel)
 		}
 
 		if c.GlobalBool("verbose") {
-			log.SetLevel(log.InfoLevel)
+			logrus.SetLevel(logrus.InfoLevel)
 			utils.Verbose = true
 		}
 		if c.GlobalBool("debug") {
 			if c.GlobalBool("verbose") {
-				log.SetLevel(log.TraceLevel)
+				logrus.SetLevel(logrus.TraceLevel)
 			} else {
-				log.SetLevel(log.DebugLevel)
+				logrus.SetLevel(logrus.DebugLevel)
 			}
 			utils.Debug = true
 		}

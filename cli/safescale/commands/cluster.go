@@ -930,16 +930,8 @@ var clusterKubectlCommand = cli.Command{
 var clusterHelmCommand = cli.Command{
 	Name:      "helm",
 	Category:  "Administrative commands",
-	Usage:     "helm CLUSTERNAME [COMMAND ...]",
+	Usage:     "helm CLUSTERNAME COMMAND [PARAMS ...]",
 	ArgsUsage: "CLUSTERNAME",
-
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> kubectl [-- <arg>...]`,
-	// 		Description: `
-	// Executes kubectl cli on the cluster.
-	// Is meaningful only for a cluster where Kubernetes service is installed and running.`,
-	// 	},
 
 	Action: func(c *cli.Context) error {
 		log.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
@@ -949,16 +941,23 @@ var clusterHelmCommand = cli.Command{
 		}
 
 		args := c.Args().Tail()
-		useTLS := "--tls"
+		useTLS := " --tls"
+		filteredArgs := []string{}
 		for _, arg := range args {
+			remove := false
 			switch arg {
 			case "init":
 				return cli.NewExitError("helm init is forbidden", int(ExitCode.InvalidArgument))
-			case "search":
+			case "search", "repo":
 				useTLS = ""
+			case "--":
+				remove = true
+			}
+			if !remove {
+				filteredArgs = append(filteredArgs, arg)
 			}
 		}
-		cmdStr := "sudo -u cladm -i helm " + strings.Join(args, " ") + useTLS
+		cmdStr := "sudo -u cladm -i helm " + strings.Join(filteredArgs, " ") + useTLS
 		return executeCommand(cmdStr)
 	},
 }
