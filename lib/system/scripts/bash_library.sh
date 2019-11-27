@@ -378,7 +378,19 @@ sfKubectl() {
 export -f sfKubectl
 
 sfHelm() {
-    sudo -u cladm -i helm "$@" --tls
+    # analyzes parameters...
+    local use_tls=
+    for p in $@; do
+        case $p in
+            search) ;;
+            init) echo "sfHelm init is forbidden" && return 1
+                  ;;
+            *) use_tls=--tls
+               ;;
+        esac
+    done
+
+    sudo -u cladm -i helm "$@" $use_tls
 }
 export -f sfHelm
 
