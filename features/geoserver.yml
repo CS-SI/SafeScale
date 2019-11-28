@@ -239,7 +239,7 @@ feature:
                             </web-app>
                             EOF
 
-                            cat >${SF_ETCDIR}/geoserver/build/my-docker-entrypoint.sh <<-EOF
+                            cat >${SF_ETCDIR}/geoserver/build/my-docker-entrypoint.sh <<-'EOF'
                             #!/bin/bash
 
                             if [ ! -z "$GEOSERVER_ADMIN_PASSWORD__file"]; then
