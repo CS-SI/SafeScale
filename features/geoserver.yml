@@ -296,8 +296,7 @@ feature:
                                           target: 8080
                                           mode: host
                                     deploy:
-                                        mode: replicated
-                                        replicas: 1
+                                        mode: global
                                         placement:
                                             constraints:
                                                 - node.role == manager
@@ -350,7 +349,7 @@ feature:
             - name: geoserver_backends
               type: upstream
               targets:
-                  masters: one
+                  masters: all
               content: |
                   {
                       "algorithm": "consistent-hashing",
@@ -362,7 +361,7 @@ feature:
             - name: geoserver_svc
               type: service
               targets:
-                  masters: one
+                  masters: all
               content: |
                   {
                       "host": "geoserver_backends",
@@ -373,7 +372,7 @@ feature:
             - name: geoserver_route
               type: route
               targets:
-                  masters: one
+                  masters: all
               content: |
                   {
                       "paths": ["{{ .RootURL }}"],
