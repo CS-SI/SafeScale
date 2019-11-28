@@ -239,17 +239,30 @@ feature:
                             </web-app>
                             EOF
 
+                            cat >${SF_ETCDIR}/geoserver/build/my-docker-entrypoint.sh <<-EOF
+                            #!/bin/bash
+
+                            if [ ! -z "$GEOSERVER_ADMIN_PASSWORD__file"]; then
+                                export GEOSERVER_ADMIN_PASSWORD="$(cat $GEOSERVER_ADMIN_PASSWORD__file)"
+                            fi
+                            exec /usr/local/tomcat/tmp/entrypoint.sh
+                            EOF
+
                             cat >${SF_ETCDIR}/geoserver/build/Dockerfile <<-EOF
                             FROM kartoza/geoserver:2.15.2
 
                             # Overrides existing web.xml with our own configuration
                             COPY web.xml /usr/local/tomcat/webapps/geoserver/WEB-INF/
+                            COPY my-docker-entrypoint.sh /
+                            RUN chmod u+rx /my-docker-entrypoint.sh
 
                             # Fixes a bug with new version of GeoServer
                             # Caused by: java.lang.IllegalStateException: Unable to complete the scan for annotations for web application [/geoserver] due to
                             # a StackOverflowError. Possible root causes include a too low setting for -Xss and illegal cyclic inheritance dependencies. The
                             # class hierarchy being processed was [org.sqlite.SQLiteConnection->org.sqlite.jdbc4.JDBC4Connection->org.sqlite.jdbc3.JDBC3Connection->org.sqlite.SQLiteConnection]
                             RUN rm /usr/local/tomcat/webapps/geoserver/WEB-INF/lib/sqlite-jdbc-*.jar
+
+                            CMD ["/my-docker-entrypoint.sh"]
                             EOF
 
                             docker build --network host -t safescale/geoserver:latest ${SF_ETCDIR}/geoserver/build || sfFail 193
@@ -285,6 +298,8 @@ feature:
                             services:
                                 geoserver:
                                     image: safescale/geoserver:latest
+                                    environment:
+                                        - GEOSERVER_ADMIN_PASSWORD__file=/var/run/secrets/admin.password
                                     volumes:
                                         - /shared/data:/shared/data
                                     networks:
