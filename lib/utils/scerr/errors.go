@@ -559,7 +559,7 @@ func decorateWithCallTrace(prefix, what, why string) string {
 		msg = missingPrefixMessage
 	}
 
-	if pc, file, line, ok := runtime.Caller(1); ok {
+	if pc, file, line, ok := runtime.Caller(2); ok {
 		if f := runtime.FuncForPC(pc); f != nil {
 			filename := strings.Replace(file, getPartToRemove(), "", 1)
 			msg += fmt.Sprintf(" in %s", filepath.Base(f.Name()))

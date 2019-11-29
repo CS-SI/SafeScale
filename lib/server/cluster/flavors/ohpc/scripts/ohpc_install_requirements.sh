@@ -24,9 +24,11 @@ install_common_requirements() {
     sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
 
     # Upgrade to last CentOS revision
-    yum upgrade --assumeyes --tolerant && \
-    yum update --assumeyes
-    [ $? -ne 0 ] && exit 192
+    if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+        yum upgrade --assumeyes --tolerant && \
+        yum update --assumeyes
+        [ $? -ne 0 ] && sfFail 192
+    fi
 
     # Create group nogroup
     groupadd nogroup &>/dev/null

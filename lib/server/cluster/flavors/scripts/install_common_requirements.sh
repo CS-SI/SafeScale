@@ -23,11 +23,19 @@ install_common_requirements() {
     setenforce 0 &>/dev/null
     sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config &>/dev/null
 
+    # VPL: shall we update systematically at install ?
+    # # Upgrade to last CentOS revision
+    # if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+    #     yum upgrade --assumeyes --tolerant && \
+    #     yum update --assumeyes
+    #     [ $? -ne 0 ] && sfFail 192
+    # fi
+
     # Creates user {{.ClusterAdminUsername}}
     useradd -s /bin/bash -m -d /home/{{.ClusterAdminUsername}} {{.ClusterAdminUsername}}
     groupadd -r -f docker &>/dev/null
     usermod -aG docker {{.ClusterAdminUsername}}
-    echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
+    echo -e "{{.ClusterAdminPassword}}\n{{.ClusterAdminPassword}}" | passwd {{.ClusterAdminUsername}}
     mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
     echo "{{ .SSHPublicKey }}" >~{{.CluterAdminUsername}}/.ssh/authorized_keys
     echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
