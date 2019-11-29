@@ -88,7 +88,7 @@ pathremove() {
 		local PATHVARIABLE=${2:-PATH}
 		for DIR in ${!PATHVARIABLE} ; do
 				if [ "$DIR" != "$1" ] ; then
-				  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+					NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
 				fi
 		done
 		export $PATHVARIABLE="$NEWPATH"

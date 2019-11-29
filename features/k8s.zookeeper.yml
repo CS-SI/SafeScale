@@ -23,7 +23,7 @@ feature:
         - ReleaseName=zookeeper
         - Namespace=default
         - ChartVersion=0.7.0
-        - HelmRepoName=binami
+        - HelmRepoName=bitnami
 
     requirements:
         - kubernetes
