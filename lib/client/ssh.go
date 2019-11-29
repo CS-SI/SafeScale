@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -69,6 +70,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 	}
 	defer cancel()
 
+	var breakErr error
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// Create the command
@@ -78,10 +80,13 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 				return err
 			}
 
-			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(nil, executionTimeout)
+			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(nil, false, executionTimeout)
 
-			// If an error occurred, stop the loop and propagates this error
-			if err != nil {
+			// If an error occurred and is not a timeout one, stop the loop and propagates this error
+			if breakErr != nil {
+				if _, ok := breakErr.(*scerr.ErrTimeout); ok {
+					return breakErr
+				}
 				retcode = -1
 				return nil
 			}
@@ -99,12 +104,12 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		},
 	)
 	if retryErr != nil {
-		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return -1, "", "", retryErr
-		}
 		return -1, "", "", retryErr
 	}
-	return retcode, stdout, stderr, err
+	if breakErr != nil {
+		return -1, "", "", breakErr
+	}
+	return retcode, stdout, stderr, nil
 }
 
 func (s *ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, error) {

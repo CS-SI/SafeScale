@@ -208,15 +208,15 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 	return retCode, stdOut, stdErr, err
 }
 
-// run executes command on the host
-func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
-	// Create the command
-	sshCmd, err := ssh.Command(cmd)
-	if err != nil {
-		return 0, "", "", err
-	}
-	return sshCmd.Run(nil) // FIXME It CAN lock, use RunWithTimeout instead
-}
+// // run executes command on the host
+// func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
+// 	// Create the command
+// 	sshCmd, err := ssh.Command(cmd)
+// 	if err != nil {
+// 		return 0, "", "", err
+// 	}
+// 	return sshCmd.Run(nil, false) // FIXME It CAN lock, use RunWithTimeout instead
+// }
 
 // run executes command on the host
 func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (int, string, string, error) {
@@ -225,7 +225,7 @@ func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.RunWithTimeout(nil, duration)
+	return sshCmd.RunWithTimeout(nil, false, duration)
 }
 
 func extracthostName(in string) (string, error) {
