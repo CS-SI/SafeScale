@@ -19,10 +19,11 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -40,6 +41,8 @@ const (
 	DONE
 	// ABORTED the task has been aborted
 	ABORTED
+	// TIMEOUT the task ran out of time
+	TIMEOUT
 )
 
 // TaskParameters ...
@@ -71,6 +74,7 @@ type Task interface {
 	// GetResult() TaskResult
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
+	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, error)
 	// StoreResult(TaskParameters)
 	TryWait() (bool, TaskResult, error)
 	Wait() (TaskResult, error)
@@ -134,7 +138,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 	)
 
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil!, use context.TODO() instead!")
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil, use context.TODO() instead")
 	}
 
 	if parentTask == nil {
@@ -206,7 +210,7 @@ func (t *task) ForceID(id string) (Task, error) {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty!")
 	}
 	if id == "0" {
-		return nil, scerr.InvalidParameterError("id", "cannot be '0', reserved for root task!")
+		return nil, scerr.InvalidParameterError("id", "cannot be '0', reserved for root task")
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -217,14 +221,22 @@ func (t *task) ForceID(id string) (Task, error) {
 
 // Start runs in goroutine the function with parameters
 func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
+	return t.StartWithTimeout(action, params, 0)
+}
+
+// StartWithTimeout runs in goroutine the TasAction with TaskParameters, and stops after timeout (if > 0)
+// If timeout happens, error returned will be ErrTimeout
+// This function is useful when you know at the time you use it there will be a timeout to apply.
+func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, error) {
 	tid, _ := t.GetID() // FIXME Later
+
+	if t.GetStatus() != READY {
+		return nil, fmt.Errorf("cannot start task '%s': not ready", tid)
+	}
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if t.status != READY {
-		return nil, fmt.Errorf("Can't start task '%s': not ready!", tid)
-	}
 	if action == nil {
 		t.status = DONE
 	} else {
@@ -232,39 +244,71 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 		t.doneCh = make(chan bool, 1)
 		t.abortCh = make(chan bool, 1)
 		t.finishCh = make(chan struct{}, 1)
-		go t.controller(action, params)
+		go t.controller(action, params, timeout)
 	}
 	return t, nil
 }
 
 // controller controls the start, termination and possibly aboprtion of the action
-func (t *task) controller(action TaskAction, params TaskParameters) {
+func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
 	go t.run(action, params)
 
 	// tracer := NewTracer(true, t, "")
 	finish := false
-	for !finish {
-		select {
-		case <-t.ctx.Done():
-			// Context cancel signal received, propagating using abort signal
-			// tracer.Trace("receiving signal from context, aborting task...")
-			t.abortCh <- true
-		case <-t.doneCh:
-			// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
-			// tracer.Trace("receiving done signal from go routine")
-			t.lock.Lock()
-			t.status = DONE
-			t.lock.Unlock()
-			finish = true
-			break
-		case <-t.abortCh:
-			// Abort signal received
-			// tracer.Trace("receiving abort signal")
-			t.lock.Lock()
-			t.status = ABORTED
-			t.err = scerr.AbortedError()
-			t.lock.Unlock()
-			finish = true
+
+	if timeout > 0 {
+		for !finish {
+			select {
+			case <-t.ctx.Done():
+				// Context cancel signal received, propagating using abort signal
+				// tracer.Trace("receiving signal from context, aborting task...")
+				t.abortCh <- true
+			case <-t.doneCh:
+				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
+				// tracer.Trace("receiving done signal from go routine")
+				t.lock.Lock()
+				t.status = DONE
+				t.lock.Unlock()
+				finish = true
+			case <-t.abortCh:
+				// Abort signal received
+				// tracer.Trace("receiving abort signal")
+				t.lock.Lock()
+				t.status = ABORTED
+				t.err = scerr.AbortedError()
+				t.lock.Unlock()
+				finish = true
+			case <-time.After(timeout):
+				t.lock.Lock()
+				t.status = TIMEOUT
+				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+				t.lock.Unlock()
+				finish = true
+			}
+		}
+	} else {
+		for !finish {
+			select {
+			case <-t.ctx.Done():
+				// Context cancel signal received, propagating using abort signal
+				// tracer.Trace("receiving signal from context, aborting task...")
+				t.abortCh <- true
+			case <-t.doneCh:
+				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
+				// tracer.Trace("receiving done signal from go routine")
+				t.lock.Lock()
+				t.status = DONE
+				t.lock.Unlock()
+				finish = true
+			case <-t.abortCh:
+				// Abort signal received
+				// tracer.Trace("receiving abort signal")
+				t.lock.Lock()
+				t.status = ABORTED
+				t.err = scerr.AbortedError()
+				t.lock.Unlock()
+				finish = true
+			}
 		}
 	}
 
@@ -342,10 +386,11 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 	return false, nil, nil
 }
 
-// WaitFor waits for the task to end, for 'duration' duration
+// WaitFor waits for the task to end, for 'duration' duration.
+// Note: if timeout occured, the task is not aborted. You have to abort it yourself if needed.
 // If task done, returns (true, <error from the task>)
-// If task aborted, returns (true, utils.ErrAborted)
-// If duration elapsed (meaning the task is still running after duration), returns (false, utils.ErrTimeout)
+// If task aborted, returns (true, scerr.ErrAborted)
+// If duration elapsed (meaning the task is still running after duration), returns (false, scerr.ErrTimeout)
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	tid, _ := t.GetID() // FIXME Later
 
@@ -381,7 +426,7 @@ func (t *task) Reset() (Task, error) {
 
 	status := t.GetStatus()
 	if status == RUNNING {
-		return nil, fmt.Errorf("Can't reset task '%s': task running!", tid)
+		return nil, fmt.Errorf("cannot reset task '%s': task running", tid)
 	}
 
 	t.lock.Lock()
@@ -415,9 +460,10 @@ func (t *task) Abort() {
 		defer t.lock.Unlock()
 
 		// Tell controller to stop go routine
-		t.abortCh <- true
+		//		t.abortCh <- true
 
 		// Tell context to cancel
+		// VPL: normally this should trigger abort in controller...
 		t.cancel()
 
 		t.status = ABORTED
@@ -426,7 +472,7 @@ func (t *task) Abort() {
 
 // Aborted tells if task has been aborted
 func (t *task) Aborted() bool {
-	return t.status == ABORTED
+	return t.GetStatus() == ABORTED
 }
 
 // StoreResult stores the result of the run
