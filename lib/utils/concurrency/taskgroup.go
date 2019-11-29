@@ -191,7 +191,9 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 	tg.task.lock.Lock()
 	defer tg.task.lock.Unlock()
 	tg.task.result = results
-	tg.task.err = fmt.Errorf(strings.Join(errors, "\n"))
+	if len(errors) > 0 {
+		tg.task.err = fmt.Errorf(strings.Join(errors, "\n"))
+	}
 	tg.task.status = DONE
 	tg.result = results
 	return results, tg.task.err
