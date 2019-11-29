@@ -586,7 +586,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, collectOutputs bool,
 	if err != nil {
 		return -1, "", "", err
 	}
-	_, err = subtask.StartWithTimeout(sc.asyncExecute, data.Map{
+	_, err = subtask.StartWithTimeout(sc.taskExecute, data.Map{
 		"stdout":          stdoutPipe,
 		"stderr":          stderrPipe,
 		"collect_outputs": false,
@@ -605,7 +605,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, collectOutputs bool,
 	return -1, "", "", scerr.InconsistentError("'result' should have been of type 'data.Map'")
 }
 
-func (sc *SSHCommand) asyncExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -691,7 +691,10 @@ func (sc *SSHCommand) asyncExecute(task concurrency.Task, p concurrency.TaskPara
 	_ = stdoutPipe.Close()
 	_ = stderrPipe.Close()
 
-	if err != nil {
+	if err == nil {
+		result["retcode"] = 0
+	} else {
+		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
 		if _, ok := err.(*exec.ExitError); !ok {
 			if !collectOutputs {
 				derr := pipeBridgeCtrl.Stop()
@@ -701,27 +704,25 @@ func (sc *SSHCommand) asyncExecute(task concurrency.Task, p concurrency.TaskPara
 			}
 			return result, err
 		}
+
+		// Make sure all outputs have been processed
 		if !collectOutputs {
 			pbcErr = pipeBridgeCtrl.Wait()
 		}
-	}
 
-	result["retcode"] = 0
-	if collectOutputs {
-		result["stdout"] = string(msgOut[:])
-		if err != nil {
-			msgError, retCode, erro := ExtractRetCode(err)
-			if erro != nil {
-				return result, err
-			}
-			result["retcode"] = retCode
-			result["stderr"] = fmt.Sprint(string(msgErr[:]), msgError)
-			return result, nil
+		// Extract execution information
+		msgError, retCode, erro := ExtractRetCode(err)
+		if erro != nil {
+			return result, err
 		}
-		result["stderr"] = string(msgErr[:])
-		return result, nil
+		result["retcode"] = retCode
+		if collectOutputs {
+			result["stdout"] = string(msgOut[:])
+			result["stderr"] = fmt.Sprint(string(msgErr[:]), msgError)
+		} else {
+			result["stderr"] = msgError
+		}
 	}
-
 	// Error happening on PipeBridgeController, when command succeeded, deserves to be logged
 	if !collectOutputs && pbcErr != nil {
 		logrus.Debug(pbcErr)
