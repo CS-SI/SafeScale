@@ -125,12 +125,11 @@ func (w *worker) ConcernsCluster() bool {
 func (w *worker) CanProceed(s Settings) error {
 	switch w.target.Type() {
 	case "cluster":
-		// err := w.validateContextForCluster()
-		// if err == nil && !s.SkipSizingRequirements {
-		// 	err = w.validateClusterSizing()
-		// }
-		// return err
-		return nil
+		err := w.validateContextForCluster()
+		if err == nil && !s.SkipSizingRequirements {
+			err = w.validateClusterSizing()
+		}
+		return err
 	case "node":
 		return nil
 	case "host":
@@ -692,7 +691,7 @@ func (w *worker) validateContextForCluster() error {
 			}
 		}
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of cluster", w.feature.DisplayName(), clusterFlavor.String())
+	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.DisplayName(), clusterFlavor.String())
 	return fmt.Errorf(msg)
 }
 
