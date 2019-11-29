@@ -242,10 +242,11 @@ feature:
                             cat >${SF_ETCDIR}/geoserver/build/my-docker-entrypoint.sh <<-'EOF'
                             #!/bin/bash
 
-                            if [ ! -z "$GEOSERVER_ADMIN_PASSWORD__file"]; then
+                            if [ ! -z "$GEOSERVER_ADMIN_PASSWORD__file" ]; then
                                 export GEOSERVER_ADMIN_PASSWORD="$(cat $GEOSERVER_ADMIN_PASSWORD__file)"
                             fi
-                            exec /usr/local/tomcat/tmp/entrypoint.sh
+                            
+                            exec /scripts/entrypoint.sh
                             EOF
 
                             cat >${SF_ETCDIR}/geoserver/build/Dockerfile <<-EOF
