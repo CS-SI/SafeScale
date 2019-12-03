@@ -39,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	_ "github.com/CS-SI/SafeScale/lib/server" // Imported to initialise tenants
@@ -431,7 +432,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				log.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
-			_, cout, _, err := c.RunWithTimeout(nil, true, 8*time.Minute) // FIXME Hardcoded timeout
+			_, cout, _, err := c.RunWithTimeout(nil, Outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
 			if err != nil {
 				log.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
 				return err

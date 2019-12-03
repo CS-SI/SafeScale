@@ -42,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -993,7 +994,7 @@ func executeCommand(command string) error {
 	}
 	safescalessh := client.New().SSH
 	for i, m := range masters {
-		retcode, stdout, stderr, err := safescalessh.Run(m, command, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		retcode, stdout, stderr, err := safescalessh.Run(m, command, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
