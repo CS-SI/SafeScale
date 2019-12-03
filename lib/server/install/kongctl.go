@@ -23,6 +23,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
@@ -358,7 +359,7 @@ func (k *KongController) buildSourceControlContent(rules map[string]interface{})
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := safescale.New().SSH.Run(k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, _, err := safescale.New().SSH.Run(k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -376,7 +377,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 // post creates a rule
 func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -400,7 +401,7 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 // put updates or creates a rule
 func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -424,7 +425,7 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 // patch updates an existing rule
 func (k *KongController) patch(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}

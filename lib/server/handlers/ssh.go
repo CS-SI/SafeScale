@@ -30,6 +30,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
@@ -225,7 +226,7 @@ func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.RunWithTimeout(nil, false, duration)
+	return sshCmd.RunWithTimeout(nil, Outputs.DISPLAY, duration)
 }
 
 func extracthostName(in string) (string, error) {

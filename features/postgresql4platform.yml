@@ -18,7 +18,7 @@
 feature:
     suitableFor:
         host: no
-        cluster: yes
+        cluster: swarm
 
     parameters:
         - PurgeOnRemoval=no

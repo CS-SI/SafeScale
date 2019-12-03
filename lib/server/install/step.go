@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -412,7 +413,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	command = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
 
 	// Executes the script on the remote host
-	retcode, _, _, err := client.New().SSH.Run(host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, _, _, err := client.New().SSH.Run(host.Name, command, Outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{err: err}, nil
 	}

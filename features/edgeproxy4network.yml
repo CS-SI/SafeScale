@@ -17,7 +17,9 @@
 ---
 feature:
     suitableFor:
+        host: no
         cluster: all
+
     requirements:
         features:
             - postgres4gateway

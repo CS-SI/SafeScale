@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -186,7 +187,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", localpath), temporal.GetBigDelay(), temporal.GetExecutionTimeout())
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", remotepath), Outputs.COLLECT, temporal.GetBigDelay(), temporal.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -236,7 +237,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = sshClt.Run(host.Name, cmd, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
+			retcode, _, _, err = sshClt.Run(host.Name, cmd, Outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}

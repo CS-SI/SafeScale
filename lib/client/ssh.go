@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -42,8 +43,8 @@ type ssh struct {
 	session *Session
 }
 
-// Run ...
-func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+// Run executes the command
+func (s *ssh) Run(hostName, command string, outputs Outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	var (
 		retcode        int
 		stdout, stderr string
@@ -80,7 +81,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 				return err
 			}
 
-			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(nil, false, executionTimeout)
+			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(nil, outputs, executionTimeout)
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if breakErr != nil {
