@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"text/template"
 
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
@@ -124,7 +125,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr := sshconfig.Command("which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(nil, true, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(nil, Outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -135,7 +136,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr = sshconfig.SudoCommand("which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(nil, true, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(nil, Outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {

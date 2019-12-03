@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -362,7 +363,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	if err != nil {
 		return ClusterState.Error, err
 	}
-	retcode, _, stderr, err = safescaleClt.SSH.Run(masterID, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, stderr, err = safescaleClt.SSH.Run(masterID, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		logrus.Errorf("failed to run remote command to get cluster state: %v\n%s", err, stderr)
 		return ClusterState.Error, err

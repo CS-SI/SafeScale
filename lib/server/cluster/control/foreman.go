@@ -47,6 +47,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -151,7 +152,7 @@ func (b *foreman) ExecuteScript(
 	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
 	cmd := fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
 
-	return client.New().SSH.Run(hostID, cmd, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+	return client.New().SSH.Run(hostID, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 }
 
 // construct ...
@@ -814,11 +815,11 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		}
 		if joinCmd == "" {
 			retcode, _, _, err := clientSSH.Run(hostID, "docker swarm init && docker node update "+host.Name+" --label-add safescale.host.role=master",
-				client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+				Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 			if err != nil || retcode != 0 {
 				return fmt.Errorf("failed to init docker swarm")
 			}
-			retcode, token, stderr, err := clientSSH.Run(hostID, "docker swarm join-token manager -q", client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			retcode, token, stderr, err := clientSSH.Run(hostID, "docker swarm join-token manager -q", Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 			if err != nil || retcode != 0 {
 				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
 			}
@@ -826,7 +827,7 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, host.PrivateIp)
 		} else {
 			masterJoinCmd := joinCmd + " && docker node update " + host.Name + " --label-add safescale.host.role=master"
-			retcode, _, stderr, err := clientSSH.Run(hostID, masterJoinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			retcode, _, stderr, err := clientSSH.Run(hostID, masterJoinCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 			if err != nil || retcode != 0 {
 				return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
 			}
@@ -854,35 +855,35 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
 		}
-		retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
 		}
 		labelCmd := "docker node update " + host.Name + " --label-add safescale.host.role=node"
-		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to label swarm worker '%s' as node: %s", host.Name, stderr)
 		}
 	}
 
 	// Join gateways in Docker Swarm as workers
-	retcode, _, stderr, err := clientSSH.Run(primaryGateway.ID, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, stderr, err := clientSSH.Run(primaryGateway.ID, joinCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
 	}
 	labelCmd := "docker node update " + primaryGateway.Name + " --label-add safescale.host.role=gateway"
-	retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.Name, stderr)
 	}
 
 	if secondaryGateway != nil {
-		retcode, _, stderr, err := clientSSH.Run(secondaryGateway.ID, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		retcode, _, stderr, err := clientSSH.Run(secondaryGateway.ID, joinCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
 		}
 		labelCmd := "docker node update " + secondaryGateway.Name + " --label-add safescale.host.role=gateway"
-		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.Name, stderr)
 		}
@@ -901,7 +902,7 @@ func (b *foreman) getSwarmJoinCommand(task concurrency.Task, selectedMaster *pb.
 		memberType = "manager"
 	}
 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-	retcode, token, stderr, err := clientInstance.SSH.Run(selectedMaster.Id, tokenCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, token, stderr, err := clientInstance.SSH.Run(selectedMaster.Id, tokenCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
 	}
@@ -1032,12 +1033,12 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 			return err
 		}
 
-		retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
 		}
 		nodeLabel := "docker node update " + pbHost.Name + " --label-add safescale.host.role=node"
-		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, nodeLabel, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+		retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, nodeLabel, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to add label to docker Swarm worker '%s': %s", pbHost.Name, stderr)
 		}
@@ -1132,7 +1133,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 
 	// Check worker is member of the Swarm
 	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
-	retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -1142,7 +1143,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	}
 	// node is a worker in the Swarm: 1st ask worker to leave Swarm
 	cmd = "docker swarm leave"
-	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -1154,7 +1155,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+			retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -1176,7 +1177,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 
 	// 3rd, ask master to remove node from Swarm
 	cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
-	retcode, _, stderr, err = clientSSH.Run(selectedMaster, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, stderr, err = clientSSH.Run(selectedMaster, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -1249,6 +1250,10 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		// Uploads safescale binary
 		if binaryDir != "" {
 			path = binaryDir + "/safescale"
+			_, err := os.Stat(path)
+			if err != nil {
+				path = ""
+			}
 		}
 		if path == "" {
 			path, err = exec.LookPath("safescale")
@@ -1268,6 +1273,14 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		path = ""
 		if binaryDir != "" {
 			path = binaryDir + "/safescaled"
+			_, err := os.Stat(path)
+			if err != nil {
+				path = binaryDir + "../safescaled/safescaled"
+				_, err := os.Stat(path)
+				if err != nil {
+					path = ""
+				}
+			}
 		}
 		if path == "" {
 			path, err = exec.LookPath("safescaled")
@@ -1288,7 +1301,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		if suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-			retcode, stdout, stderr, err := client.New().SSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, 2*temporal.GetLongOperationTimeout())
+			retcode, stdout, stderr, err := client.New().SSH.Run(pbHost.Id, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, 2*temporal.GetLongOperationTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error())
 				logrus.Errorf(utils.Capitalize(msg))

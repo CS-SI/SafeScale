@@ -43,6 +43,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -424,88 +425,16 @@ func (sc *SSHCommand) Display() string {
 //
 // If the command starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
-func (sc *SSHCommand) Run(t concurrency.Task, collectOutputs bool) (int, string, string, error) {
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%v)", collectOutputs), true).WithStopwatch().GoingIn()
-	tracer.Trace("command=\n%s\n", sc.Display())
+func (sc *SSHCommand) Run(t concurrency.Task, outputs Outputs.Enum) (int, string, string, error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outputs.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	// Set up the outputs (std and err)
-	stdoutPipe, err := sc.StdoutPipe()
-	if err != nil {
-		return -1, "", "", err
-	}
-
-	stderrPipe, err := sc.StderrPipe()
-	if err != nil {
-		return -1, "", "", err
-	}
-
-	var (
-		stdoutBridge, stderrBridge cli.PipeBridge
-		pipeBridgeCtrl             *cli.PipeBridgeController
-		msgOut, msgErr             []byte
-	)
-	if !collectOutputs {
-		stdoutBridge, err = cli.NewStdoutBridge(stdoutPipe)
-		if err != nil {
-			return -1, "", "", err
-		}
-		stderrBridge, err = cli.NewStderrBridge(stderrPipe)
-		if err != nil {
-			return -1, "", "", err
-		}
-		pipeBridgeCtrl, err = cli.NewPipeBridgeController(stdoutBridge, stderrBridge)
-		if err != nil {
-			return -1, "", "", err
-		}
-	}
-
-	// Launch the command and wait for its execution
-	if err = sc.Start(); err != nil {
-		return -1, "", "", err
-	}
-
-	if collectOutputs {
-		msgOut, err = ioutil.ReadAll(stdoutPipe)
-		if err != nil {
-			return -1, "", "", err
-		}
-
-		msgErr, err = ioutil.ReadAll(stderrPipe)
-		if err != nil {
-			return -1, "", "", err
-		}
-	}
-
-	err = sc.Wait()
-	if collectOutputs {
-		if err != nil {
-			msgError, retCode, erro := ExtractRetCode(err)
-			if erro != nil {
-				return -1, "", "", err
-			}
-			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
-		}
-		return 0, string(msgOut[:]), string(msgErr[:]), nil
-	}
-
-	derr := pipeBridgeCtrl.Stop()
-	if err != nil {
-		msgError, retCode, erro := ExtractRetCode(err)
-		if erro != nil {
-			return -1, "", "", err
-		}
-		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
-	}
-	if derr != nil {
-		return -1, "", "", derr
-	}
-	return 0, "", "", nil
+	return sc.RunWithTimeout(t, outputs, 0)
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, collectOutputs bool, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs Outputs.Enum, timeout time.Duration) (int, string, string, error) {
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outputs.String(), timeout), true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 
@@ -589,7 +518,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, collectOutputs bool,
 	_, err = subtask.StartWithTimeout(sc.taskExecute, data.Map{
 		"stdout":          stdoutPipe,
 		"stderr":          stderrPipe,
-		"collect_outputs": false,
+		"collect_outputs": outputs != Outputs.DISPLAY,
 	}, timeout)
 	if err != nil {
 		return -1, "", "", err
@@ -606,6 +535,9 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, collectOutputs bool,
 }
 
 func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	if sc == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -693,6 +625,10 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 
 	if err == nil {
 		result["retcode"] = 0
+		if collectOutputs {
+			result["stdout"] = string(msgOut[:])
+			result["stderr"] = string(msgErr[:])
+		}
 	} else {
 		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
 		if _, ok := err.(*exec.ExitError); !ok {
@@ -882,7 +818,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				return err
 			}
 
-			retcode, stdout, stderr, err = cmd.RunWithTimeout(nil, true, timeout)
+			retcode, stdout, stderr, err = cmd.RunWithTimeout(nil, Outputs.COLLECT, timeout)
 			if err != nil {
 				return err
 			}
@@ -952,7 +888,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		keyFile: identityfile,
 	}
 
-	return sshCommand.Run(nil, true) // FIXME It CAN lock, use .RunWithTimeout instead
+	return sshCommand.Run(nil, Outputs.COLLECT) // FIXME It CAN lock, use .RunWithTimeout instead
 }
 
 // Exec executes the cmd using ssh
