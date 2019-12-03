@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -78,7 +79,7 @@ var sshRun = cli.Command{
 			timeout = temporal.GetHostTimeout()
 
 		}
-		retcode, stdout, stderr, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), temporal.GetConnectionTimeout(), timeout)
+		retcode, stdout, stderr, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), Outputs.COLLECT, temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
 		}
