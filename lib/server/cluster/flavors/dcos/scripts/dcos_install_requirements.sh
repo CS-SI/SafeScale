@@ -35,20 +35,20 @@ install_common_requirements() {
     # Create group nogroup
     groupadd nogroup &>/dev/null
 
-    # Creates user cladm
-    useradd -s /bin/bash -m -d /home/cladm cladm
+    # Creates user {{.ClusterAdminUsername}}
+    useradd -s /bin/bash -m -d /home/{{.ClusterAdminUsername}} {{.ClusterAdminUsername}}
     groupadd -r -f docker &>/dev/null
-    usermod -aG docker cladm
-    echo -e "{{ .CladmPassword }}\n{{ .CladmPassword }}" | passwd cladm
-    mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
-    echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
-    echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
-    chmod 0400 ~cladm/.ssh/*
-    echo "cladm ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
+    usermod -aG docker {{.ClusterAdminUsername}}
+    echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
+    mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
+    echo "{{ .SSHPublicKey }}" >~{{.ClusterAdminUsername}}/.ssh/authorized_keys
+    echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
+    chmod 0400 ~{{.ClusterAdminUsername}}/.ssh/*
+    echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
     chmod o-rwx /etc/sudoers.d/10-admins
 
-    mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
-    cat >>~cladm/.bashrc <<-'EOF'
+    mkdir -p ~{{.ClusterAdminUsername}}/.local/bin && find ~{{.ClusterAdminUsername}}/.local -exec chmod 0770 {} \;
+    cat >>~{{.ClusterAdminUsername}}/.bashrc <<-'EOF'
         pathremove() {
             local IFS=':'
             local NEWPATH
@@ -72,11 +72,11 @@ install_common_requirements() {
         pathprepend $HOME/.local/bin
         pathappend /opt/mesosphere/bin
 EOF
-    chown -R cladm:cladm ~cladm
+    chown -R {{.ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
 
-    for i in ~cladm/.hushlogin ~cladm/.cloud-warnings.skip; do
+    for i in ~{{.ClusterAdminUsername}}/.hushlogin ~{{.ClusterAdminUsername}}/.cloud-warnings.skip; do
         touch $i
-        chown root:cladm $i
+        chown root:{{.ClusterAdminUsername}} $i
         chmod ug+r-wx,o-rwx $i
     done
 
