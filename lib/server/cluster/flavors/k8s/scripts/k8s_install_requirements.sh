@@ -29,7 +29,7 @@ install_common_requirements() {
     usermod -aG docker {{.ClusterAdminUsername}}
     echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
     mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
-    echo "{{ .SSHPublicKey }}" >~{{.CluterAdminUsername}}/.ssh/authorized_keys
+    echo "{{ .SSHPublicKey }}" >~{{.ClusterAdminUsername}}/.ssh/authorized_keys
     echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
     chmod 0400 ~{{.ClusterAdminUsername}}/.ssh/*
     echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
