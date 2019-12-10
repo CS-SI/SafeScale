@@ -192,11 +192,11 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		dataBuffer := bytes.NewBufferString("")
 		identity := cluster.GetIdentity(task)
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          netCfg.CIDR,
-			"Username":      "cladm",
-			"CladmPassword": identity.AdminPassword,
-			"SSHPublicKey":  identity.Keypair.PublicKey,
-			"SSHPrivateKey": identity.Keypair.PrivateKey,
+			"CIDR":                 netCfg.CIDR,
+			"ClusterAdminUsername": "cladm",
+			"ClusterAdminPassword": identity.AdminPassword,
+			"SSHPublicKey":         identity.Keypair.PublicKey,
+			"SSHPrivateKey":        identity.Keypair.PrivateKey,
 		})
 		if err != nil {
 			return "", fmt.Errorf("error realizing script template: %s", err.Error())
