@@ -676,7 +676,7 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	filepath := srvutils.TempFolder + "/user_data.phase2.sh"
+	filepath := utils.TempFolder + "/user_data.phase2.sh"
 	err = install.UploadStringToRemoteFile(string(userDataPhase2), srvutils.ToPBHost(host), filepath, "", "", "")
 	if err != nil {
 		return nil, err
@@ -741,7 +741,7 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 		return []string{}, []string{}
 	}
 
-	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat /opt/safescale/var/log/user_data.phase2.log; exit $?"))
+	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat %s/user_data.phase2.log; exit $?", utils.LogFolder))
 	warnings := []string{}
 	errs := []string{}
 
@@ -767,8 +767,8 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/opt/safescale/var/tmp/user_data.phase2.sh", dumpName+"sh")
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/opt/safescale/var/log/user_data.phase2.log", dumpName+"log")
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase2.sh", dumpName+"sh")
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase2.log", dumpName+"log")
 	}
 }
 
