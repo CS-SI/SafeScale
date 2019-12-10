@@ -89,7 +89,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 // RemoveRemote deletes the remote file from host
 func (rfc RemoteFileItem) RemoveRemote(hostname string) error {
 	SSHClient := client.New().SSH
-	cmd := "rm -f " + rfc.Remote
+	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, err := SSHClient.Run(hostname, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to remove file '%s:%s'", hostname, rfc.Remote)
