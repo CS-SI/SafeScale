@@ -26,15 +26,15 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
-	log "github.com/sirupsen/logrus"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate rice embed-go
@@ -116,7 +116,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if err != nil {
 		return 255, "", "", fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
-	filename := "/opt/safescale/var/tmp/" + name
+	filename := utils.TempFolder + "/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			retcode, stdout, stderr, err := sshconfig.Copy(ctx, filename, f.Name(), true)
@@ -140,7 +140,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
-				log.Warn("SSH problem ?")
+				logrus.Warn("SSH problem ?")
 			}
 		}
 	}
@@ -151,14 +151,14 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
-				log.Warn("SUDO problem ?")
+				logrus.Warn("SUDO problem ?")
 			}
 		}
 	}
 
 	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
-		log.Warnf("Error deleting file: %v", nerr)
+		logrus.Warnf("Error deleting file: %v", nerr)
 	}
 
 	// Execute script on remote host with retries if needed
@@ -214,11 +214,11 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	/*
 		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
 		if uperr != nil {
-			log.Warn("Network problem...")
+			logrus.Warn("Network problem...")
 		} else {
 			_, uptext, _, kerr := k.Run()
 			if kerr == nil {
-				log.Warnf("Network working !!: %s", uptext)
+				logrus.Warnf("Network working !!: %s", uptext)
 			}
 		}
 	*/

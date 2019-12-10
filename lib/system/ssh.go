@@ -36,7 +36,7 @@ import (
 	"text/template"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -156,14 +156,14 @@ func (tunnel *SSHTunnel) Close() error {
 	defer func() {
 		lazyErr := utils.LazyRemove(tunnel.keyFile.Name())
 		if lazyErr != nil {
-			log.Error(lazyErr)
+			logrus.Error(lazyErr)
 		}
 	}()
 
 	// Kills the process of the tunnel
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
-		log.Errorf("tunnel.cmd.Process.Kill() failed: %s", reflect.TypeOf(err).String())
+		logrus.Errorf("tunnel.cmd.Process.Kill() failed: %s\n", reflect.TypeOf(err).String())
 		return fmt.Errorf("unable to close tunnel :%s", err.Error())
 	}
 	// Kills remaining processes if there are some
@@ -174,7 +174,7 @@ func (tunnel *SSHTunnel) Close() error {
 		if err == nil {
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
-				log.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
+				logrus.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
 				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 		}
@@ -188,7 +188,7 @@ func getFreePort() (int, error) {
 	defer func() {
 		clErr := listener.Close()
 		if clErr != nil {
-			log.Error(clErr)
+			logrus.Error(clErr)
 		}
 	}()
 	if err != nil {
@@ -216,20 +216,17 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, e
 	}
 	_, err = f.WriteString(content)
 	if err != nil {
-		log.Warnf("Error writing string: %v", err)
-		return nil, err
+		logrus.Warnf("Error writing string: %v", err)
 	}
 
 	err = f.Chmod(filemode)
 	if err != nil {
-		log.Warnf("Error changing directory: %v", err)
-		return nil, err
+		logrus.Warnf("Error changing directory: %v", err)
 	}
 
 	err = f.Close()
 	if err != nil {
-		log.Warnf("Error closing file: %v", err)
-		return nil, err
+		logrus.Warnf("Error closing file: %v", err)
 	}
 
 	return f, nil
@@ -243,8 +240,7 @@ func isTunnelReady(port int) bool {
 	}
 	err = server.Close()
 	if err != nil {
-		log.Warnf("Error closing server: %v", err)
-		return false
+		logrus.Warnf("Error closing server: %v", err)
 	}
 	return false
 
@@ -310,8 +306,7 @@ func (sc *SSHCommand) closeTunneling() error {
 
 	// Tunnels are imbricated only last error is significant
 	if err != nil {
-		log.Errorf("closeTunneling: %s", reflect.TypeOf(err).String())
-		return err
+		logrus.Errorf("closeTunneling: %s\n", reflect.TypeOf(err).String())
 	}
 
 	return err
@@ -330,7 +325,7 @@ func (sc *SSHCommand) Wait() error {
 		return err
 	}
 	if nerr != nil {
-		log.Warnf("Error waiting for command cleanup: %v", nerr)
+		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
 	}
 	return nerr
 }
@@ -371,7 +366,7 @@ func (sc *SSHCommand) Output() ([]byte, error) {
 		return content, err
 	}
 	if nerr != nil {
-		log.Warnf("Error waiting for command cleanup: %v", nerr)
+		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
 	}
 	return content, err
 }
@@ -385,7 +380,7 @@ func (sc *SSHCommand) CombinedOutput() ([]byte, error) {
 		return content, err
 	}
 	if nerr != nil {
-		log.Warnf("Error waiting for command cleanup: %v", nerr)
+		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
 	}
 	return content, err
 }
@@ -414,135 +409,239 @@ func (sc *SSHCommand) Display() string {
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
 func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
-	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
-	tracer.Trace("command=\n%s\n", sc.Display())
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outputs.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	// Set up the outputs (std and err)
-	stdOut, err := sc.StdoutPipe()
-	if err != nil {
-		return -1, "", "", err
-	}
-	stderr, err := sc.StderrPipe()
-	if err != nil {
-		return -1, "", "", err
-	}
-
-	// Launch the command and wait for its execution
-	if err = sc.Start(); err != nil {
-		return -1, "", "", err
-	}
-
-	msgOut, err := ioutil.ReadAll(stdOut)
-	if err != nil {
-		return -1, "", "", err
-	}
-
-	msgErr, err := ioutil.ReadAll(stderr)
-	if err != nil {
-		return -1, "", "", err
-	}
-
-	err = sc.Wait()
-	if err != nil {
-		msgError, retCode, erro := ExtractRetCode(err)
-		if erro != nil {
-			return -1, "", "", err
-		}
-		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
-	}
-
-	return 0, string(msgOut[:]), string(msgErr[:]), nil
+	return sc.RunWithTimeout(t, outputs, 0)
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(ctx context.Context, t concurrency.Task, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs Outputs.Enum, timeout time.Duration) (int, string, string, error) {
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outputs.String(), timeout), true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
-
 	// Set up the outputs (std and err)
-	stdOut, err := sc.StdoutPipe()
+	stdoutPipe, err := sc.StdoutPipe()
 	if err != nil {
 		return 0, "", "", err
 	}
-	stderr, err := sc.StderrPipe()
+	stderrPipe, err := sc.StderrPipe()
 	if err != nil {
 		return 0, "", "", err
+	}
+
+	// doneCh := make(chan bool)
+
+	// var msgOut []byte
+	// var msgErr []byte
+
+	// go func() {
+	// 	defer close(doneCh)
+
+	// 	clean := true
+	// 	var closeErr error
+
+	// 	msgOut, closeErr = ioutil.ReadAll(stdOut)
+	// 	if closeErr != nil {
+	// 		logrus.Debugf("error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
+	// 		clean = false
+	// 	}
+
+	// 	msgErr, closeErr = ioutil.ReadAll(stderr)
+	// 	if closeErr != nil {
+	// 		logrus.Debugf("error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
+	// 		clean = false
+	// 	}
+
+	// 	err = sc.Wait()
+	// 	if err != nil {
+	// 		logrus.Debugf("error waiting for command [%s]: %v", sc.Display(), err)
+	// 		clean = false
+	// 	}
+
+	// 	doneCh <- clean
+	// }()
+
+	// select {
+	// case issues := <-doneCh:
+	// 	if err != nil {
+	// 		msgError, retCode, erro := ExtractRetCode(err)
+	// 		if erro != nil {
+	// 			return 0, "", "", err
+	// 		}
+	// 		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
+	// 	}
+	// 	if !issues {
+	// 		logrus.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display())
+	// 	}
+	// case <-time.After(timeout):
+	// 	errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
+	// 	logrus.Warnf(errMsg)
+	// 	return 0, "", "", fmt.Errorf(errMsg)
+	// }
+
+	subtask, err := concurrency.NewTask(task)
+	if err != nil {
+		return -1, "", "", err
+	}
+
+	_, err = subtask.StartWithTimeout(sc.taskExecute, data.Map{
+		"stdout":          stdoutPipe,
+		"stderr":          stderrPipe,
+		"collect_outputs": outputs != Outputs.DISPLAY,
+	}, timeout)
+	if err != nil {
+		return -1, "", "", err
+	}
+
+	r, err := subtask.Wait()
+	if err != nil {
+		return -1, "", "", err
+	}
+	if result, ok := r.(data.Map); ok {
+		return result["retcode"].(int), result["stdout"].(string), result["stderr"].(string), nil
+	}
+	return -1, "", "", scerr.InconsistentError("'result' should have been of type 'data.Map'")
+}
+
+func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	if sc == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	params, ok := p.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("p", "must be of type data.Map")
+	}
+	var (
+		stdoutPipe, stderrPipe io.ReadCloser
+		collectOutputs         bool
+	)
+	stdoutPipe, ok = params["stdout"].(io.ReadCloser)
+	if !ok {
+		return nil, scerr.InvalidParameterError("p[stdout]", "is missing or is not of type io.ReadCloser")
+	}
+	if stdoutPipe == nil {
+		return nil, scerr.InvalidParameterError("p[stdout]", "cannot be nil")
+	}
+	stderrPipe, ok = params["stderr"].(io.ReadCloser)
+	if !ok {
+		return nil, scerr.InvalidParameterError("p[stderr]", "is missing or is not of type io.ReadCloser")
+	}
+	if stderrPipe == nil {
+		return nil, scerr.InvalidParameterError("p[stderr]", "cannot be nil")
+	}
+	if collectOutputs, ok = params["collect_outputs"].(bool); !ok {
+		return nil, scerr.InvalidParameterError("p[collect_outputs]", "is missing or is not of type bool")
+	}
+
+	var (
+		stdoutBridge, stderrBridge cli.PipeBridge
+		pipeBridgeCtrl             *cli.PipeBridgeController
+		msgOut, msgErr             []byte
+		err                        error
+	)
+
+	result := data.Map{
+		"retcode": -1,
+		"stdout":  "",
+		"stderr":  "",
+	}
+
+	if !collectOutputs {
+		stdoutBridge, err = cli.NewStdoutBridge(stdoutPipe)
+		if err != nil {
+			return result, err
+		}
+		stderrBridge, err = cli.NewStderrBridge(stderrPipe)
+		if err != nil {
+			return result, err
+		}
+		pipeBridgeCtrl, err = cli.NewPipeBridgeController(stdoutBridge, stderrBridge)
+		if err != nil {
+			return result, err
+		}
 	}
 
 	// Launch the command and wait for its execution
-	if err = sc.Start(); err != nil {
-		return 0, "", "", err
+	if err := sc.Start(); err != nil {
+		return result, err
 	}
 
-	doneCh := make(chan bool)
-
-	var msgOut []byte
-	var msgErr []byte
-
-	go func() {
-		defer close(doneCh)
-
-		clean := true
-		var closeErr error
-
-		msgOut, closeErr = ioutil.ReadAll(stdOut)
-		if closeErr != nil {
-			log.Debugf("error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
-			clean = false
-		}
-
-		msgErr, closeErr = ioutil.ReadAll(stderr)
-		if closeErr != nil {
-			log.Debugf("error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
-			clean = false
-		}
-
-		err = sc.Wait()
+	if collectOutputs {
+		msgOut, err = ioutil.ReadAll(stdoutPipe)
 		if err != nil {
-			log.Debugf("error waiting for command [%s]: %v", sc.Display(), err)
-			clean = false
+			return result, err
 		}
 
-		doneCh <- clean
-	}()
-
-	select {
-	case cleanlyDone := <-doneCh:
+		msgErr, err = ioutil.ReadAll(stderrPipe)
 		if err != nil {
-			msgError, retCode, erro := ExtractRetCode(err)
-			if erro != nil {
-				return 0, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), err
-			}
-			if !cleanlyDone && retCode != 0 {
-				if strings.Contains(sc.Display(), ".check_") {
-					if retCode != 1 {
-						log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
-					}
-				} else {
-					log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
+			return result, err
+		}
+	} else {
+		err = pipeBridgeCtrl.Start(task)
+		if err != nil {
+			return result, err
+		}
+	}
+
+	var pbcErr error
+	err = sc.Wait()
+	_ = stdoutPipe.Close()
+	_ = stderrPipe.Close()
+
+	if err == nil {
+		result["retcode"] = 0
+		if collectOutputs {
+			result["stdout"] = string(msgOut[:])
+			result["stderr"] = string(msgErr[:])
+		}
+	} else {
+		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
+		if _, ok := err.(*exec.ExitError); !ok {
+			if !collectOutputs {
+				derr := pipeBridgeCtrl.Stop()
+				if derr != nil {
+					err = scerr.AddConsequence(err, derr)
 				}
 			}
-
-			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
+			return result, err
 		}
-	case <-time.After(timeout):
-		errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
-		log.Warnf(errMsg)
-		return 0, string(msgOut[:]), string(msgErr[:]), fmt.Errorf(errMsg)
-	case <-ctx.Done():
-		return 0, string(msgOut[:]), string(msgErr[:]), retry.AbortedError("operation aborted by user", nil)
-	}
 
-	return 0, string(msgOut[:]), string(msgErr[:]), nil
+		// Make sure all outputs have been processed
+		if !collectOutputs {
+			pbcErr = pipeBridgeCtrl.Wait()
+		}
+
+		// Extract execution information
+		msgError, retCode, erro := ExtractRetCode(err)
+		if erro != nil {
+			return result, err
+		}
+		result["retcode"] = retCode
+		if collectOutputs {
+			result["stdout"] = string(msgOut[:])
+			result["stderr"] = fmt.Sprint(string(msgErr[:]), msgError)
+		} else {
+			result["stderr"] = msgError
+		}
+	}
+	// Error happening on PipeBridgeController, when command succeeded, deserves to be logged
+	if !collectOutputs && pbcErr != nil {
+		logrus.Debug(pbcErr)
+	}
+	return result, nil
 }
 
 func (sc *SSHCommand) cleanup() error {
 	err1 := sc.closeTunneling()
 	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
-		return fmt.Errorf("unable to close SSH tunnels: %s: %s", fmt.Sprintf("closeTunneling() failed: %s", reflect.TypeOf(err1).String()), err1.Error())
+		logrus.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
+		return fmt.Errorf("unable to close SSH tunnels: %s", err1.Error())
 	}
 	if err2 != nil {
 		return fmt.Errorf("unable to close SSH tunnels: %s", err2.Error())
@@ -683,38 +782,28 @@ func (ssh *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout
 		stdout, stderr string
 	)
 
-	desist := false
 	begins := time.Now()
-
-	go func() {
-		defer close(echan)
-		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-			func() error {
-				if desist {
-					return retry.AbortedError("operation aborted by user", nil)
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			cmd, err := ssh.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
+			if err != nil {
+				return err
+			}
+            
+            retcode, stdout, stderr, err = cmd.RunWithTimeout(nil, Outputs.COLLECT, timeout)
+			if err != nil {
+				return err
+			}
+			if retcode != 0 {
+				if retcode == 255 {
+					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 				}
-
-				cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
-				if err != nil {
-					return err
-				}
-
-				retcode, stdout, stderr, err = cmd.RunWithTimeout(ctx, nil, timeout)
-				if err != nil {
-					return err
-				}
-				if retcode != 0 {
-					if retcode == 255 {
-						return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
-					}
-					return fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
-				}
-				return nil
-			},
-			timeout,
-		)
-		echan <- retryErr
-	}()
+				return fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
+			}
+			return nil
+		},
+		timeout,
+	)
 
 	select {
 	case retryErr := <-echan:
@@ -725,8 +814,7 @@ func (ssh *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout
 		desist = true
 		return stdout, retry.AbortedError("operation aborted by user", nil)
 	}
-
-	log.Debugf("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
+	logrus.Debugf("host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 
@@ -778,20 +866,7 @@ func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, is
 		tunnels: tunnels,
 		keyFile: identityfile,
 	}
-
-	echan := make(chan error)
-	go func() {
-		defer close(echan)
-		errc, stdout, stderr, err = sshCommand.Run(nil)
-		echan <- err
-	}()
-
-	select {
-	case <-ctx.Done():
-		return 0, stdout, stderr, retry.AbortedError("operation cancelled by user", nil)
-	case err := <-echan:
-		return errc, stdout, stderr, err
-	}
+	return sshCommand.Run(nil, Outputs.COLLECT) // FIXME It CAN lock, use .RunWithTimeout instead
 }
 
 // Enter Enter to interactive shell
@@ -801,7 +876,7 @@ func (ssh *SSHConfig) Enter() error {
 		for _, t := range tunnels {
 			nerr := t.Close()
 			if nerr != nil {
-				log.Warnf("Error closing ssh tunnel: %v", nerr)
+				logrus.Warnf("Error closing ssh tunnel: %v", nerr)
 			}
 		}
 		return fmt.Errorf("unable to create command : %s", err.Error())
@@ -812,13 +887,13 @@ func (ssh *SSHConfig) Enter() error {
 		for _, t := range tunnels {
 			nerr := t.Close()
 			if nerr != nil {
-				log.Warnf("Error closing ssh tunnel: %v", nerr)
+				logrus.Warnf("Error closing ssh tunnel: %v", nerr)
 			}
 		}
 		if keyFile != nil {
 			nerr := utils.LazyRemove(keyFile.Name())
 			if nerr != nil {
-				log.Warnf("Error removing file %v", nerr)
+				logrus.Warnf("Error removing file %v", nerr)
 			}
 		}
 		return fmt.Errorf("unable to create command : %s", err.Error())
@@ -829,13 +904,13 @@ func (ssh *SSHConfig) Enter() error {
 		for _, t := range tunnels {
 			nerr := t.Close()
 			if nerr != nil {
-				log.Warnf("Error closing ssh tunnel: %v", nerr)
+				logrus.Warnf("Error closing ssh tunnel: %v", nerr)
 			}
 		}
 		if keyFile != nil {
 			nerr := utils.LazyRemove(keyFile.Name())
 			if nerr != nil {
-				log.Warnf("Error removing file %v", nerr)
+				logrus.Warnf("Error removing file %v", nerr)
 			}
 		}
 		return fmt.Errorf("unable to create command : %s", err.Error())
@@ -848,7 +923,7 @@ func (ssh *SSHConfig) Enter() error {
 	err = proc.Run()
 	nerr := utils.LazyRemove(keyFile.Name())
 	if nerr != nil {
-		log.Warnf("Error removing file %v", nerr)
+		logrus.Warnf("Error removing file %v", nerr)
 	}
 	return err
 }

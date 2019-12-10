@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -600,7 +600,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 		if ok {
 			optionsFileContent = content.(string)
-			vars["options"] = fmt.Sprintf("--options=%s/options.json", srvutils.TempFolder)
+			vars["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
 		}
 	} else {
 		vars["options"] = ""
