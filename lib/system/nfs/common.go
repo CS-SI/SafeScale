@@ -25,16 +25,15 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
-	log "github.com/sirupsen/logrus"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate rice embed-go
@@ -105,7 +104,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	if err != nil {
 		return 255, "", "", fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
-	filename := "/opt/safescale/var/tmp/" + name
+	filename := utils.TempFolder + "/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
@@ -129,7 +128,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
-				log.Warn("SSH problem ?")
+				logrus.Warn("SSH problem ?")
 			}
 		}
 	}
@@ -140,14 +139,14 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
-				log.Warn("SUDO problem ?")
+				logrus.Warn("SUDO problem ?")
 			}
 		}
 	}
 
 	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
-		log.Warnf("Error deleting file: %v", nerr)
+		logrus.Warnf("Error deleting file: %v", nerr)
 	}
 
 	// Execute script on remote host with retries if needed
@@ -190,7 +189,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			log.Errorf("Timeout running remote script '%s'", name)
+			logrus.Errorf("Timeout running remote script '%s'", name)
 			return 255, stdout, stderr, retryErr
 		default:
 			return 255, stdout, stderr, retryErr
@@ -200,11 +199,11 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	/*
 		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
 		if uperr != nil {
-			log.Warn("Network problem...")
+			logrus.Warn("Network problem...")
 		} else {
 			_, uptext, _, kerr := k.Run()
 			if kerr == nil {
-				log.Warnf("Network working !!: %s", uptext)
+				logrus.Warnf("Network working !!: %s", uptext)
 			}
 		}
 	*/
@@ -214,8 +213,8 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
 	if err != nil {
-		log.Debugf("Standard output: [%s]", stdout)
-		log.Debugf("Standard error: [%s]", stderr)
+		logrus.Debugf("Standard output: [%s]", stdout)
+		logrus.Debugf("Standard error: [%s]", stderr)
 
 		// TODO Simplification of error message
 		collected := ""

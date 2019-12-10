@@ -938,7 +938,7 @@ func uploadTemplateToFile(
 		return "", fmt.Errorf("failed to realize template: %s", err.Error())
 	}
 	cmd := dataBuffer.String()
-	remotePath := srvutils.TempFolder + "/" + fileName
+	remotePath := utils.TempFolder + "/" + fileName
 
 	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
 	if err != nil {
@@ -1263,7 +1263,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 				return fmt.Errorf(msg)
 			}
 		}
-		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescale", "root", "root", "0755")
+		err = install.UploadFile(path, pbHost, utils.BinFolder+"/safescale", "root", "root", "0755")
 		if err != nil {
 			logrus.Errorf("failed to upload 'safescale' binary")
 			return fmt.Errorf("failed to upload 'safescale' binary': %s", err.Error())

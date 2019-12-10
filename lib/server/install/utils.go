@@ -31,7 +31,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -311,7 +310,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 		}
 
 		// parse then execute the template
-		tmpl := fmt.Sprintf(tmplContent, srvutils.LogFolder, srvutils.LogFolder)
+		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
 		result, err := template.New("normalize_script").Parse(tmpl)
 		if err != nil {
 			return "", fmt.Errorf("error parsing bash template: %s", err.Error())

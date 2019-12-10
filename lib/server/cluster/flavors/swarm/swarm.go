@@ -38,10 +38,6 @@ import (
 
 //go:generate rice embed-go
 
-const (
-// tempFolder = "/opt/safescale/var/tmp/"
-)
-
 var (
 	templateBox atomic.Value
 
