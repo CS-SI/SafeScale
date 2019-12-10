@@ -26,7 +26,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -396,14 +395,14 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
-		err := UploadStringToRemoteFile(is.OptionsFileContent, host, srvutils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
+		err := UploadStringToRemoteFile(is.OptionsFileContent, host, utils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
 		if err != nil {
 			return stepResult{err: err}, nil
 		}
 	}
 
 	// Uploads then executes command
-	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
+	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
 		return stepResult{err: err}, nil

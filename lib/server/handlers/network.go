@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -656,11 +655,11 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	if err != nil {
 		return nil, err
 	}
-	err = install.UploadStringToRemoteFile(string(content), safescaleutils.ToPBHost(gw), srvutils.TempFolder+"/user_data.phase2.sh", "", "", "")
+	err = install.UploadStringToRemoteFile(string(content), safescaleutils.ToPBHost(gw), utils.TempFolder+"/user_data.phase2.sh", "", "", "")
 	if err != nil {
 		return nil, err
 	}
-	command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
+	command := fmt.Sprintf("sudo bash %s/%s; exit $?", utils.TempFolder, "user_data.phase2.sh")
 	sshHandler := NewSSHHandler(handler.service)
 
 	// logrus.Debugf("Configuring gateway '%s', phase 2", gw.Name)
