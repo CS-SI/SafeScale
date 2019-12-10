@@ -34,13 +34,13 @@ install_common_requirements() {
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
     groupadd -r -f docker &>/dev/null
-    usermod -aG docker cladm
-    echo -e "{{ .CladmPassword }}\n{{ .CladmPassword }}" | passwd cladm
-    mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
-    echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
-    echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
-    chmod 0400 ~cladm/.ssh/*
-    echo "cladm ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
+    usermod -aG docker {{.ClusterAdminUsername}}
+    echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
+    mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
+    echo "{{ .SSHPublicKey }}" >~{{.ClusterAdminUsername}}/.ssh/authorized_keys
+    echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
+    chmod 0400 ~{{.ClusterAdminUsername}}/.ssh/*
+    echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
     chmod o-rwx /etc/sudoers.d/10-admins
 
     mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;

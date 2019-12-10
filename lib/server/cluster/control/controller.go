@@ -133,14 +133,14 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
-	defer scerr.OnPanic(&err)()
-
-	if f == nil {
-		return scerr.InvalidParameterError("f", "cannot be nil")
-	}
 	if task == nil {
 		task = concurrency.RootTask()
 	}
+	if f == nil {
+		return scerr.InvalidParameterError("f", "cannot be nil")
+	}
+
+    defer scerr.OnPanic(&err)()
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
