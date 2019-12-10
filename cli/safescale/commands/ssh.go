@@ -80,16 +80,14 @@ var sshRun = cli.Command{
 			timeout = temporal.GetHostTimeout()
 
 		}
-		retcode, stdout, stderr, err := client.New().SSH.Run(context.TODO(), c.Args().Get(0), c.String("c"), temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), Outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
-			fmt.Print(stderr)
-			return cli.NewExitError(stderr, retcode)
+			return cli.NewExitError("", retcode)
 		}
-		fmt.Print(stdout)
 		return nil
 	},
 }
