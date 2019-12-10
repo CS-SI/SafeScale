@@ -900,7 +900,7 @@ var clusterDcosCommand = cli.Command{
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		return executeCommand(cmdStr, RemoteFilesHandler{})
+		return executeCommand(cmdStr, nil)
 	},
 }
 
@@ -925,10 +925,11 @@ var clusterKubectlCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
+		clientID := GenerateClientIdentity()
 		args := c.Args().Tail()
 		filteredArgs := []string{}
 		ignoreNext := false
-		valuesOnRemote := RemoteFilesHandler{}
+		valuesOnRemote := &RemoteFilesHandler{}
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
 		for idx, arg := range args {
 			if ignoreNext {
@@ -951,32 +952,32 @@ var clusterKubectlCommand = cli.Command{
 							ignoreNext = true
 							continue
 						}
+
+						// Check for file
 						st, err := os.Stat(localFile)
 						if err != nil {
-							return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+							return cli.NewExitError(err.Error(), 1)
 						}
-
 						// If it's a link, get the target of it
 						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 							link, err := filepath.EvalSymlinks(localFile)
 							if err != nil {
-								return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+								return cli.NewExitError(err.Error(), 1)
 							}
 							st, err = os.Stat(link)
 							if err != nil {
-								return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+								return cli.NewExitError(err.Error(), 1)
 							}
 						}
 
 						if localFile != "-" {
-							id := GenerateClientIdentity()
-							rfc := RemoteFileItem{
+							rfi := RemoteFileItem{
 								Local:  localFile,
-								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, id, time.Now().UnixNano()),
+								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
 							}
-							valuesOnRemote.Add(rfc)
+							valuesOnRemote.Add(&rfi)
 							filteredArgs = append(filteredArgs, "-f")
-							filteredArgs = append(filteredArgs, rfc.Remote)
+							filteredArgs = append(filteredArgs, rfi.Remote)
 						} else {
 							// data comes from the standard input
 							return clitools.FailureResponse(fmt.Errorf("'-f -' is not yet supported"))
@@ -1011,12 +1012,13 @@ var clusterHelmCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
+		clientID := GenerateClientIdentity()
 		useTLS := " --tls"
 		filteredArgs := []string{}
 		args := c.Args().Tail()
 		ignoreNext := false
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
-		valuesOnRemote := RemoteFilesHandler{}
+		valuesOnRemote := &RemoteFilesHandler{}
 		for idx, arg := range args {
 			if ignoreNext {
 				ignoreNext = false
@@ -1046,34 +1048,35 @@ var clusterHelmCommand = cli.Command{
 							ignoreNext = true
 							continue
 						}
+
+						// Check for file
 						st, err := os.Stat(localFile)
 						if err != nil {
-							return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+							return cli.NewExitError(err.Error(), 1)
 						}
 						// If it's a link, get the target of it
 						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 							link, err := filepath.EvalSymlinks(localFile)
 							if err != nil {
-								return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+								return cli.NewExitError(err.Error(), 1)
 							}
 							st, err = os.Stat(link)
 							if err != nil {
-								return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+								return cli.NewExitError(err.Error(), 1)
 							}
 						}
 
 						if localFile != "-" {
-							id := GenerateClientIdentity()
 							rfc := RemoteFileItem{
 								Local:  localFile,
-								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, id, time.Now().UnixNano()),
+								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
 							}
-							valuesOnRemote.Add(rfc)
+							valuesOnRemote.Add(&rfc)
 							filteredArgs = append(filteredArgs, "-f")
 							filteredArgs = append(filteredArgs, rfc.Remote)
 						} else {
 							// data comes from the standard input
-							return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "'-f -' is not yet supported"))
+							return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "'-f -' is not yet supported")
 						}
 						ignoreNext = true
 					}
@@ -1112,19 +1115,21 @@ var clusterRunCommand = cli.Command{
 	},
 }
 
-func executeCommand(command string, files RemoteFilesHandler) error {
+func executeCommand(command string, files *RemoteFilesHandler) error {
 	logrus.Debugf("command=[%s]", command)
 	master, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 	if err != nil {
 		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.GetIdentity(concurrency.RootTask()).Name, err.Error())
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg))
+		return clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg)
 	}
 
-	if files.Count() > 0 {
-		defer files.Cleanup(master)
+	if files != nil && files.Count() > 0 {
+		if !Debug {
+			defer files.Cleanup(master)
+		}
 		err = files.Upload(master)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.RPC, err.Error()))
+			return clitools.ExitOnErrorWithMessage(ExitCode.RPC, err.Error())
 		}
 	}
 
@@ -1132,7 +1137,7 @@ func executeCommand(command string, files RemoteFilesHandler) error {
 	retcode, _, _, err := safescalessh.Run(master, command, Outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master, err.Error())
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg))
+		return clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg)
 	}
 	if retcode != 0 {
 		return cli.NewExitError("", retcode)

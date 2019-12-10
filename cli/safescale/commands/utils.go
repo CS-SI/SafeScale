@@ -99,21 +99,21 @@ func (rfc RemoteFileItem) RemoveRemote(hostname string) error {
 
 // RemoteFilesHandler handles the copy of files and cleanup
 type RemoteFilesHandler struct {
-	items []RemoteFileItem
+	items []*RemoteFileItem
 }
 
 // Add adds a RemoteFileItem in the handler
-func (rfh RemoteFilesHandler) Add(file RemoteFileItem) {
+func (rfh *RemoteFilesHandler) Add(file *RemoteFileItem) {
 	rfh.items = append(rfh.items, file)
 }
 
 // Count returns the number of files in the handler
-func (rfh RemoteFilesHandler) Count() uint {
+func (rfh *RemoteFilesHandler) Count() uint {
 	return uint(len(rfh.items))
 }
 
 // Upload executes the copy of files
-func (rfh RemoteFilesHandler) Upload(hostname string) error {
+func (rfh *RemoteFilesHandler) Upload(hostname string) error {
 	for _, v := range rfh.items {
 		err := v.Upload(hostname)
 		if err != nil {
@@ -125,7 +125,7 @@ func (rfh RemoteFilesHandler) Upload(hostname string) error {
 
 // Cleanup executes the removal of remote files.
 // Note: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
-func (rfh RemoteFilesHandler) Cleanup(hostname string) {
+func (rfh *RemoteFilesHandler) Cleanup(hostname string) {
 	for _, v := range rfh.items {
 		err := v.RemoveRemote(hostname)
 		if err != nil {
