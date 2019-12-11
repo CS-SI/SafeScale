@@ -58,6 +58,8 @@ feature:
         - Dashboard=true
         - Hardening=true
         - KubeVersion=1.14.1
+        - HelmVersion=2.14.1
+        - HelmDefaultNamespace=default
 
     install:
         dcos:
@@ -151,28 +153,32 @@ feature:
 
         bash:
             check:
-                pace: gateways,masters,nodes
+                pace: masters,others
                 steps:
-                    gateways:
+                    others:
                         targets:
                             gateway: all
+                            nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
+                            if [ -f /etc/kubernetes/.joined ]; then
+                                pidof kubelet &>/dev/null || sfFail 192
+                                sfExit
+                            fi
+                            sfFail 193
 
                     masters:
                         targets:
                             masters: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && [ $(sfKubectl get nodes | wc -l) -gt 1 ]
-
-                    nodes:
-                        targets:
-                            nodes: all
-                        run: |
-                            [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
+                            if [ -f /etc/kubernetes/.joined ]; then
+                                [ $(sfKubectl get nodes | wc -l) -gt 1 ] || sfFail 194
+                                [ -f /usr/local/bin/helm || sfFail 195
+                                sfExit
+                            fi
+                            sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,final
+                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
                 steps:
                     sysconf:
                         targets:
@@ -266,7 +272,7 @@ feature:
                             EOF
 
                             ## Configures audit rules
-                            cat > /etc/audit/rules.d/docker.rules <<EOF
+                            cat >/etc/audit/rules.d/docker.rules <<EOF
                             -w /usr/bin/docker -p awx -k docker_binary
                             -w /var/lib/docker -p aw -k docker_data
                             -w /etc/docker -p aw -k docker_configuration
@@ -323,6 +329,7 @@ feature:
                                    sfFail 195
                             esac
                             sfService enable kubelet && sfService start kubelet
+
                             sfExit
 
                     reverseproxy:
@@ -377,67 +384,6 @@ feature:
                                 podSubnet: 10.244.0.0/16
                             EOF
 
-                            # apiVersion: kubeadm.k8s.io/v1beta1
-                            # bootstrapTokens:
-                            # - groups:
-                            #   - system:bootstrappers:kubeadm:default-node-token
-                            #   ttl: 24h0m0s
-                            #   usages:
-                            #   - signing
-                            #   - authentication
-                            # kind: InitConfiguration
-                            # localAPIEndpoint:
-                            #   advertiseAddress: {{ .HostIP }}
-                            #   bindPort: 6443
-                            # nodeRegistration:
-                            #   criSocket: /var/run/dockershim.sock
-                            #   name: {{ .Hostname }}
-                            #   taints:
-                            #   - effect: NoSchedule
-                            #     key: node-role.kubernetes.io/master
-                            # ---
-                            # apiServer:
-                            #   timeoutForControlPlane: 4m0s
-                            #   extraArgs:
-                            #     authorization-mode: RBAC,Node
-                            #     audit-log-path: /var/log/k8s_audit.log
-                            #     audit-log-maxage: "30"
-                            #     audit-log-maxbackup: "10"
-                            #     audit-log-maxsize: "100"
-                            #     service-account-lookup: "true"
-                            #     profiling: "false"
-                            # apiVersion: kubeadm.k8s.io/v1beta1
-                            # certificatesDir: /etc/kubernetes/pki
-                            # clusterName: kubernetes
-                            # controlPlaneEndpoint: "{{ .DefaultRouteIP }}"
-                            # controllerManager:
-                            #   extraArgs:
-                            #     bind-address: "{{ .HostIP }}"
-                            #     terminated-pod-gc-threshold: "12500"
-                            #     profiling: "false"
-                            #     use-service-account-credentials: "true"
-                            #     feature-gates: RotateKubeletServerCertificate=true
-                            # dns:
-                            #   type: CoreDNS
-                            # etcd:
-                            #   local:
-                            #     dataDir: /var/lib/etcd
-                            # imageRepository: k8s.gcr.io
-                            # kind: ClusterConfiguration
-                            # kubernetesVersion: v{{.KubeVersion}}
-                            # networking:
-                            #   dnsDomain: cluster.local
-                            #   podSubnet: 10.244.0.0/16
-                            #   serviceSubnet: 10.96.0.0/12
-                            # scheduler: {}
-                            # EOF
-
-                            # if [ "$(sfGetFact "redhat_like")" == "1" ]; then
-                            #     cat >/etc/sysconfig/kubelet <<-EOF
-                            # KUBELET_EXTRA_ARGS="--hostname-override {{ .HostIP }}
-                            # EOF
-                            # fi
-
                             sfRetry 5m 5 kubeadm config images pull || sfFail 197
                             kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 198
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 199
@@ -449,11 +395,11 @@ feature:
                             chown -R {{.ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}/.kube && \
                             chmod -R go-rwx ~{{.ClusterAdminUsername}}/.kube
 
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/;
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/ca.crt;
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.key;
-                            sudo chmod g+r /etc/kubernetes/pki/etcd/server.key;
-                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.crt;
+                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/
+                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/ca.crt
+                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.key
+                            sudo chmod g+r /etc/kubernetes/pki/etcd/server.key
+                            sudo chown root:{{.ClusterAdminUsername}} /etc/kubernetes/pki/etcd/server.crt
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
@@ -764,9 +710,6 @@ feature:
                             sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 222
                             sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 223
 
-                            touch /etc/kubernetes/.joined
-                            echo "cpx init done"
-
                             # Configure firewall
                             case {{.CNI}} in
                                 flannel)
@@ -779,6 +722,9 @@ feature:
                                     sfFirewallReload || sfFail 225 "Firewall problem"
                                     ;;
                             esac
+
+                            touch /etc/kubernetes/.joined
+                            echo "cpx init done"
                             sfExit
 
                     join:
@@ -804,9 +750,283 @@ feature:
 
                     no-schedule:
                         targets:
-                            gateway: all
+                            gateways: all
                         run: |
                             sfKubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 228
+                            sfExit
+
+                    helm-certs:
+                        targets:
+                            masters: one
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/helm/pki ${SF_ETCDIR}/helm/ca
+                            cd ${SF_TMPDIR}
+
+                            ## Generate Certificate Authority
+                            openssl genrsa -out ca.key.pem 4096
+                            openssl req -key ca.key.pem -new -x509 \
+                                -days 10000 -sha256 -out ca.cert.pem \
+                                -extensions v3_ca -subj "/C=FR/ST=Toulouse/L=Toulouse/O=CSSI/OU=Space/CN={{ .Hostname }}"
+
+                            ## Generate keys
+                            openssl genrsa -out tiller.key.pem 4096
+                            openssl genrsa -out helm.key.pem 4096
+
+                            ## Create a config file for generating a Certificate Signing Request (CSR)
+                            cat >csr.conf <<-EOF
+                            [ req ]
+                            default_bits = 2048
+                            prompt = no
+                            default_md = sha256
+                            req_extensions = req_ext
+                            distinguished_name = dn
+
+                            [ dn ]
+                            C=FR
+                            ST=FR
+                            L=Toulouse
+                            O=CSSI
+                            OU=Space
+                            CN={{ .Hostname }}
+
+                            [ req_ext ]
+                            subjectAltName = @alt_names
+
+                            [ alt_names ]
+                            DNS.1 = helm
+                            DNS.2 = helm.{{ .HelmDefaultNamespace }}
+                            DNS.3 = helm.{{ .HelmDefaultNamespace }}.svc
+                            DNS.4 = helm.{{ .HelmDefaultNamespace }}.svc.cluster
+                            DNS.5 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local
+                            DNS.6 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local.com
+                            IP = {{ .HostIP }}
+
+                            [ v3_ext ]
+                            authorityKeyIdentifier=keyid,issuer:always
+                            basicConstraints=CA:FALSE
+                            keyUsage=keyEncipherment,dataEncipherment
+                            extendedKeyUsage=serverAuth,clientAuth
+                            subjectAltName=@alt_names
+                            EOF
+
+                            ## Generate the certificates signing request based on the config file
+                            openssl req -new -key tiller.key.pem -out tiller.csr.pem -config csr.conf
+                            openssl req -new -key helm.key.pem -out helm.csr.pem -config csr.conf
+
+                            ## Generate certificates using the ca.key.pem, ca.crt.pem and xxxx.csr.pem
+                            openssl x509 -req -CA ca.cert.pem -CAkey ca.key.pem -CAcreateserial -in tiller.csr.pem -out tiller.cert.pem -days 365 -extfile csr.conf
+
+                            #openssl x509 -req -in helm.csr.pem -CA ca.cert.pem -CAkey ca.key.pem \
+                            openssl x509 -req -CA ca.cert.pem -CAkey ca.key.pem -CAcreateserial -in helm.csr.pem -out helm.cert.pem  -days 365 -extfile csr.conf
+
+                            ## Backup certificate and private key
+                            mkdir -p ${SF_ETCDIR}/helm/pki
+                            mv ca.cert.pem ca.key.pem ${SF_ETCDIR}/helm/ca
+                            mv helm.cert.pem helm.key.pem ${SF_ETCDIR}/helm/pki
+                            mv tiller.cert.pem tiller.key.pem ${SF_ETCDIR}/helm/pki
+
+                            chown -R root:{{ .ClusterAdminUsername }} ${SF_ETCDIR}/helm
+                            chmod -R u+rwx,g+r-wx,o-rwx ${SF_ETCDIR}/helm
+                            find ${SF_ETCDIR}/helm -exec chmod ug+x {} \;
+
+                            ## Clean directory
+                            rm ca.srl csr.conf helm.csr.pem tiller.csr.pem
+                            sfExit
+
+                    helm-binary:
+                        target:
+                            masters: all
+                        run: |
+                            # Install Helm
+                            cd ${SF_TMPDIR}
+                            wget https://get.helm.sh/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 192
+
+                            tar -zxvf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz -C ${SF_TMPDIR} || sfFail 193
+
+                            chmod a+rx ${SF_TMPDIR}/linux-amd64/helm \
+                              && chmod a+rx ${SF_TMPDIR}/linux-amd64/tiller || sfFail 194
+
+                            mv ${SF_TMPDIR}/linux-amd64/helm /usr/local/sbin \
+                              && mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/sbin || sfFail 195
+
+                            rm -drf ${SF_TMPDIR}/linux-amd64 \
+                              && rm -rf ${SF_TMPDIR}/helm-v{{.Version}}-linux-amd64.tar.gz || sfFail 196
+                            sfExit
+
+                    helm-account:
+                        targets:
+                            masters: one
+                        run: |
+                            ## Create serviceaccount
+                            sfKubectl create serviceaccount tiller -n kube-system || sfFail 197
+                            sfExit
+
+                    helm-rbac-files:
+                        targets:
+                            masters: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/helm
+
+                            cat > ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml <<EOF
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            kind: ClusterRoleBinding
+                            metadata:
+                                name: tiller-clusterrolebinding-admin
+                            roleRef:
+                                apiGroup: rbac.authorization.k8s.io
+                                kind: ClusterRole
+                                name: cluster-admin
+                            subjects:
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
+                            EOF
+
+                            cat > ${SF_ETCDIR}/helm/tiller-role-{{.HelmDefaultNamespace}}.yaml <<EOF
+                            kind: Role
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            metadata:
+                                name: tiller-role-{{ .HelmDefaultNamespace }}
+                                namespace: {{ .HelmDefaultNamespace }}
+                            rules:
+                                - apiGroups: ["", "batch", "extensions", "apps"]
+                                  resources: ["*"]
+                                  verbs: ["*"]
+                            EOF
+
+                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding-{{.HelmDefaultNamespace}}.yaml <<EOF
+                            kind: RoleBinding
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            metadata:
+                                name: tiller-rolebinding
+                                namespace: {{.HelmDefaultNamespace}}
+                            subjects:
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
+                            roleRef:
+                                kind: Role
+                                name: tiller-role-{{.HelmDefaultNamespace}}
+                                apiGroup: rbac.authorization.k8s.io
+                            EOF
+
+                            cat > ${SF_ETCDIR}/helm/tiller-role-system.yaml <<EOF
+                            kind: Role
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            metadata:
+                                name: tiller-role-system
+                                namespace: kube-system
+                            rules:
+                                - apiGroups: ["", "extensions", "apps"]
+                                  resources: ["configmaps"]
+                                  verbs: ["*"]
+                            EOF
+
+                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml <<EOF
+                            kind: RoleBinding
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            metadata:
+                                name: tiller-rolebinding-system
+                                namespace: kube-system
+                            subjects:
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
+                            roleRef:
+                                kind: Role
+                                name: tiller-role-system
+                                apiGroup: rbac.authorization.k8s.io
+                            EOF
+
+                            cat > ${SF_ETCDIR}/helm/tiller-role-secret.yaml <<EOF
+                            kind: Role
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            metadata:
+                                name: tiller-role-secret
+                                namespace: kube-system
+                            rules:
+                                - apiGroups: [""]
+                                  resources: ["secrets"]
+                                  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+                            EOF
+
+                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml <<EOF
+                            kind: RoleBinding
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            metadata:
+                                name: tiller-rolebinding-secret
+                                namespace: kube-system
+                            subjects:
+                                - kind: ServiceAccount
+                                  name: tiller
+                                  namespace: kube-system
+                            roleRef:
+                                kind: Role
+                                name: tiller-role-secret
+                                apiGroup: rbac.authorization.k8s.io
+                            EOF
+
+                    helm-rbac-apply:
+                        targets:
+                            masters: one
+                        run: |
+                            ## Apply RBAC policy
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 198
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-{{.HelmDefaultNamespace}}.yaml || sfFail 199
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-{{.HelmDefaultNamespace}}.yaml || sfFail 200
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-system.yaml || sfFail 201
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml || sfFail 202
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-secret.yaml || sfFail 203
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml || sfFail 204
+                            sfExit
+
+                    helm-init:
+                        targets:
+                            masters: one
+                        run: |
+                            ## Install Helm as {{ .ClusterAdminUsername }} (the user that runs kubectl) client with TLS authentication with Tiller
+                            sudo -u {{ .ClusterAdminUsername }} -i helm init \
+                                --tiller-tls \
+                                --tiller-tls-hostname {{ .Hostname }} \
+                                --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
+                                --tiller-tls-key ${SF_ETCDIR}/helm/pki/tiller.key.pem \
+                                --tiller-tls-verify \
+                                --tls-ca-cert ${SF_ETCDIR}/helm/ca/ca.cert.pem \
+                                --service-account tiller \
+                                --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' \
+                                || sfFail 205
+
+                            mkdir -p /home/{{.ClusterAdminUsername}}/.helm
+                            cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
+                            cp ${SF_ETCDIR}/helm/pki/helm.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/cert.pem
+                            cp ${SF_ETCDIR}/helm/pki/helm.key.pem /home/{{ .ClusterAdminUsername }}/.helm/key.pem
+
+                            chown -R {{ .ClusterAdminUsername }}:{{ .ClusterAdminUsername }} /home/{{ .ClusterAdminUsername }}/.helm
+                            chmod -R 0770 /home/{{ .ClusterAdminUsername }}/.helm
+
+                            # Push .helm configuration to all the other masters
+                            # Creates an archive of the .helm directory
+                            cd /home/{{ .ClusterAdminUsername }} && \
+                            tar -zcvf ${SF_TMPDIR}/helm_config.tar.gz .helm || sfFail 206
+
+                            # Push the archive in the dropzone and synchronize
+                            sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 207
+                            for ip in {{ range .MasterIPs }}{{ . }} {{ end }}; do
+                                sfDropzoneSync $ip || sfFail 208
+                            done
+                            rm -f ${SF_TMPDIR}/helm_config.tar.gz
+                            sfExit
+
+                    helm-sync:
+                        targets:
+                            masters: all
+                        run: |
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 192
+                            sfDropzoneClean
+
+                            [ -f ${SF_TMPDIR}/helm_config.tar.gz ] || sfFail 193
+                            tar -zxvf ${SF_TMPDIR}/helm_config.tar.gz -C /home/{{ .ClusterAdminUsername }} || sfFail 194
+                            rm -f ${SF_TMPDIR}/helm_config.tar.gz
                             sfExit
 
                     final:
@@ -830,31 +1050,44 @@ feature:
                                 fi
                             fi
 
-                            # cat <<EOF | kubectl apply -f -
-                            # apiVersion: v1
-                            # kind: ServiceAccount
-                            # metadata:
-                            #   name: cladm
-                            #   namespace: kube-system
-                            # ---
-                            # apiVersion: rbac.authorization.k8s.io/v1
-                            # kind: ClusterRoleBinding
-                            # metadata:
-                            #   name: cladm
-                            # roleRef:
-                            #   apiGroup: rbac.authorization.k8s.io
-                            #   kind: ClusterRole
-                            #   name: cluster-admin
-                            # subjects:
-                            #   - kind: ServiceAccount
-                            #     name: cladm
-                            #     namespace: kube-system
-                            # EOF
                             sfExit
 
             remove:
-                pace: node,reset,reverseproxy,clean
+                pace: helm-namespace,helm-cleanup,node,reset,reverseproxy,clean
                 steps:
+                    helm-namespace:
+                        targets:
+                            masters: one
+                        run: |
+                            ## Delete deployment
+                            if sfKubectl -n kube-system get deployment tiller-deploy &>/dev/null; then
+                                sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
+                            fi
+                            ## Delete account
+                            if sfKubectl get serviceaccount tiller -n kube-system &>/dev/null; then
+                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 193
+                            fi
+                            ## Delete RBAC policy
+                            if sfKubectl get role tiller-rolebinding-secret -n kube-system &>/dev/null; then
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 194
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-{{ .HelmDefaultNamespace }}.yaml || sfFail 195
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-{{.HelmDefaultNamespace}}.yaml || sfFail 196
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-system.yaml || sfFail 197
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml || sfFail 198
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-secret.yaml || sfFail 199
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml || sfFail 200
+                            fi
+                            sfExit
+
+                    helm-cleanup:
+                        targets:
+                            masters: all
+                        run: |
+                            rm -f /usr/local/sbin/helm || sfFail 201
+                            rm -f /usr/local/sbin/tiller || sfFail 202
+                            rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm || sfFail 203
+                            sfExit
+
                     node:
                         targets:
                             masters: one
@@ -889,13 +1122,13 @@ feature:
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
+                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 204 "failure purging kubernetes"
                                     ;;
                                 redhat|centos)
-                                    yum remove -y kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
+                                    yum remove -y kubectl kubeadm kubelet || sfFail 204 "failure purging kubernetes"
                                     ;;
                             esac
-                            sfFirewallReload || sfFail 193 "Firewall problem"
+                            sfFirewallReload || sfFail 205 "Firewall problem"
                             rm -rf /etc/kubernetes/.joined /home/{{ .ClusterAdminUsername }}/.kube
                             sfExit
 
