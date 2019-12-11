@@ -19,17 +19,15 @@ package listeners
 import (
 	"context"
 	"fmt"
+
 	"github.com/asaskevich/govalidator"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -45,12 +43,18 @@ import (
 type BucketListener struct{}
 
 // List available buckets
-func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *pb.BucketList, err error) {
+func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (bl *pb.BucketList, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot list buckets").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -60,33 +64,34 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "bucket list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket List"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no tenant set")
-	}
-
-	handler := handlers.NewBucketHandler(tenant.Service)
-	buckets, err := handler.List(ctx)
+	handler := BucketHandler(job)
+	buckets, err := handler.List()
 	if err != nil {
-		tbr := scerr.Wrap(err, "can't list buckets")
-		return nil, tbr.ToGRPCStatus()
+		return nil, err
 	}
 
 	return conv.ToPBBucketList(buckets), nil
 }
 
 // Create a new bucket
-func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot create bucket").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -104,33 +109,35 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 		}
 	}
 
+	job, err := PrepareJob(ctx, "", "bucket create")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
 	bucketName := in.GetName()
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Create : "+bucketName); err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, "cannot create bucket: no tenant set")
-	}
-
-	handler := handlers.NewBucketHandler(tenant.Service)
-	err = handler.Create(ctx, bucketName)
+	handler := BucketHandler(job)
+	err = handler.Create(bucketName)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot create bucket").ToGRPCStatus()
+		return empty, err
 	}
 
 	return empty, nil
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot delete bucket").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -148,25 +155,21 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 		}
 	}
 
+	job, err := PrepareJob(ctx, "", "bucket list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
 	bucketName := in.GetName()
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Delete : "+bucketName); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot delete bucket: no tenant set")
-	}
-
-	handler := handlers.NewBucketHandler(tenant.Service)
-	err = handler.Delete(ctx, bucketName)
+	handler := BucketHandler(job)
+	err = handler.Delete(bucketName)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot delete bucket").ToGRPCStatus()
+		return empty, err
 	}
 
 	return empty, nil
@@ -174,14 +177,20 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 
 // Inspect a bucket
 func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.BucketMountingPoint, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot inspect bucket").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -191,36 +200,38 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 		}
 	}
 
+	job, err := PrepareJob(ctx, "", "bucket inspect")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
 	bucketName := in.GetName()
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect bucket: no tenant set")
-	}
-
-	handler := handlers.NewBucketHandler(tenant.Service)
-	resp, err := handler.Inspect(ctx, bucketName)
+	handler := BucketHandler(job)
+	resp, err := handler.Inspect(bucketName)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot inspect bucket").ToGRPCStatus()
+		return nil, err
 	}
-	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
+	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if resp == nil {
-		return nil, status.Errorf(codes.NotFound, "cannot inspect bucket '%s': not found", in.GetName())
+		return nil, scerr.NotFoundError(fmt.Sprintf("bucket '%s' not found", bucketName))
 	}
 	return conv.ToPBBucketMountPoint(resp), nil
 }
 
 // Mount a bucket on the filesystem of the host
-func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot mount bucket").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -238,41 +249,43 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 		}
 	}
 
+	job, err := PrepareJob(ctx, "", "bucket mount")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().GetName()
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Mount : "+bucketName+" on "+hostName); err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, "cannot mount bucket: no tenant set")
-	}
-
-	handler := handlers.NewBucketHandler(tenant.Service)
-	err = handler.Mount(ctx, bucketName, hostName, in.GetPath())
+	handler := BucketHandler(job)
+	err = handler.Mount(bucketName, hostName, in.GetPath())
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot mount bucket").ToGRPCStatus()
+		return empty, err
 	}
 	return empty, nil
 }
 
 // Unmount a bucket from the filesystem of the host
-func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot unmount bucket").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -282,26 +295,22 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 		}
 	}
 
+	job, err := PrepareJob(ctx, "", "bucket unmount")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().GetName()
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Unmount : "+bucketName+" off "+hostName); err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, "cannot unmount bucket: no tenant set")
-	}
-
-	handler := handlers.NewBucketHandler(tenant.Service)
-	err = handler.Unmount(ctx, bucketName, hostName)
+	handler := BucketHandler(job)
+	err = handler.Unmount(bucketName, hostName)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot unmount bucket").ToGRPCStatus()
+		return empty, err
 	}
 	return empty, nil
 }

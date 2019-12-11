@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -61,32 +60,32 @@ func JobRegister(ctx context.Context, cancelFunc func(), command string) error {
 	return nil
 }
 
-// JobCancelUUID ...
-func JobCancelUUID(uuid string) {
-	mutexJobManager.Lock()
-	defer mutexJobManager.Unlock()
-	if info, found := jobMap[uuid]; found {
-		info.cancelFunc()
-	}
-}
+// // JobCancelUUID ...
+// func JobCancelUUID(uuid string) {
+//	mutexJobManager.Lock()
+//	defer mutexJobManager.Unlock()
+//	if info, found := jobMap[uuid]; found {
+//		info.cancelFunc()
+//	}
+// }
 
-// JobDeregisterUUID ...
-func JobDeregisterUUID(uuid string) {
-	mutexJobManager.Lock()
-	defer mutexJobManager.Unlock()
+// // JobDeregisterUUID ...
+// func JobDeregisterUUID(uuid string) {
+// 	mutexJobManager.Lock()
+// 	defer mutexJobManager.Unlock()
 
-	delete(jobMap, uuid)
-}
+// 	delete(jobMap, uuid)
+// }
 
-// JobDeregister ...
-func JobDeregister(ctx context.Context) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		logrus.Errorf("Trying to deregister a job without uuid!")
-	} else {
-		JobDeregisterUUID(md.Get("uuid")[0])
-	}
-}
+// // JobDeregister ...
+// func JobDeregister(ctx context.Context) {
+// 	md, ok := metadata.FromIncomingContext(ctx)
+// 	if !ok {
+// 		logrus.Errorf("Trying to deregister a job without uuid!")
+// 	} else {
+// 		JobDeregisterUUID(md.Get("uuid")[0])
+// 	}
+// }
 
 // JobList ...
 func JobList() map[string]string {
