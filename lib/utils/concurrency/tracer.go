@@ -40,7 +40,7 @@ type Tracer struct {
 	sw           temporal.Stopwatch
 }
 
-// IsLogActive ... FIXME
+// IsLogActive ...
 func IsLogActive(key string) bool {
 	if logs := os.Getenv("SAFESCALE_OPTIONAL_LOGS"); logs != "" {
 		return strings.Contains(logs, key)
