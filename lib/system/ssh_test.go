@@ -17,15 +17,17 @@
 package system_test
 
 import (
-	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os/user"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
@@ -51,7 +53,10 @@ func Test_Command(t *testing.T) {
 		Port:       22,
 		PrivateKey: string(content),
 	}
-	cmd, err := sshConf.Command("whoami")
+	task, err := concurrency.NewTask()
+	require.NotNil(t, task)
+
+	cmd, err := sshConf.Command(task, "whoami")
 	require.Nil(t, err)
 	out, err := cmd.Output()
 	require.Nil(t, err)
@@ -60,7 +65,7 @@ func Test_Command(t *testing.T) {
 
 	if !utils.IsEmpty(gateway) {
 		sshConf.GatewayConfig = &gateway
-		cmd, err := sshConf.Command("bash -c whoami")
+		cmd, err := sshConf.Command(task, "bash -c whoami")
 		require.Nil(t, err)
 		out, err := cmd.Output()
 		require.Nil(t, err)
@@ -82,10 +87,11 @@ func Test_Command(t *testing.T) {
 
 	if !utils.IsEmpty(gateway) {
 		sshConf.GatewayConfig = &gateway
-		cmd, err := sshConf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
+		cmd, err := sshConf.Command(task, "BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
 		require.Nil(t, err)
-		errc, vibra, _, err := cmd.RunWithTimeout(context.TODO(), nil, 2*time.Minute)
+		task, err := concurrency.NewTask()
 		require.Nil(t, err)
+		errc, vibra, _, err := cmd.RunWithTimeout(task, outputs.COLLECT, 2*time.Minute)
 		if errc != 0 {
 			fmt.Println(string(vibra))
 		}

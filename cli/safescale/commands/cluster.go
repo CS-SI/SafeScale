@@ -17,14 +17,18 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
@@ -42,6 +46,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -75,6 +80,7 @@ var ClusterCommand = cli.Command{
 		clusterShrinkCommand,
 		clusterDcosCommand,
 		clusterKubectlCommand,
+		clusterHelmCommand,
 		clusterListFeaturesCommand,
 		clusterCheckFeatureCommand,
 		clusterAddFeatureCommand,
@@ -840,11 +846,7 @@ var clusterDcosCommand = cli.Command{
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		err = executeCommand(cmdStr)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		return clitools.SuccessResponse(nil)
+		return executeCommand(cmdStr, nil)
 	},
 }
 
@@ -861,13 +863,170 @@ var clusterKubectlCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
+		clientID := GenerateClientIdentity()
 		args := c.Args().Tail()
-		cmdStr := "sudo -u cladm -i kubectl " + strings.Join(args, " ")
-		err = executeCommand(cmdStr)
+		filteredArgs := []string{}
+		ignoreNext := false
+		valuesOnRemote := &RemoteFilesHandler{}
+		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
+		for idx, arg := range args {
+			if ignoreNext {
+				ignoreNext = false
+				continue
+			}
+			ignore := false
+			switch arg {
+			case "--":
+				ignore = true
+			case "-f":
+				if idx+1 < len(args) {
+					localFile := args[idx+1]
+					if localFile != "" {
+						// If it's an URL, propagate as-is
+						if urlRegex.MatchString(localFile) {
+							filteredArgs = append(filteredArgs, "-f")
+							filteredArgs = append(filteredArgs, localFile)
+							ignore = true
+							ignoreNext = true
+							continue
+						}
+
+						// Check for file
+						st, err := os.Stat(localFile)
+						if err != nil {
+							return cli.NewExitError(err.Error(), 1)
+						}
+						// If it's a link, get the target of it
+						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
+							link, err := filepath.EvalSymlinks(localFile)
+							if err != nil {
+								return cli.NewExitError(err.Error(), 1)
+							}
+							st, err = os.Stat(link)
+							if err != nil {
+								return cli.NewExitError(err.Error(), 1)
+							}
+						}
+
+						if localFile != "-" {
+							rfi := RemoteFileItem{
+								Local:  localFile,
+								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
+							}
+							valuesOnRemote.Add(&rfi)
+							filteredArgs = append(filteredArgs, "-f")
+							filteredArgs = append(filteredArgs, rfi.Remote)
+						} else {
+							// data comes from the standard input
+							return clitools.FailureResponse(fmt.Errorf("'-f -' is not yet supported"))
+						}
+						ignoreNext = true
+					}
+				}
+				ignore = true
+			}
+			if !ignore {
+				filteredArgs = append(filteredArgs, arg)
+			}
+		}
+		cmdStr := `sudo -u cladm -i kubectl`
+		if len(filteredArgs) > 0 {
+			cmdStr += ` ` + strings.Join(filteredArgs, " ")
+		}
+		return executeCommand(cmdStr, valuesOnRemote)
+	},
+}
+
+var clusterHelmCommand = cli.Command{
+	Name:      "helm",
+	Category:  "Administrative commands",
+	Usage:     "helm CLUSTERNAME COMMAND [[--][PARAMS ...]]",
+	ArgsUsage: "CLUSTERNAME",
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
+		err := extractClusterArgument(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		return clitools.SuccessResponse(nil)
+
+		clientID := GenerateClientIdentity()
+		useTLS := " --tls"
+		filteredArgs := []string{}
+		args := c.Args().Tail()
+		ignoreNext := false
+		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
+		valuesOnRemote := &RemoteFilesHandler{}
+		for idx, arg := range args {
+			if ignoreNext {
+				ignoreNext = false
+				continue
+			}
+			ignore := false
+			switch arg {
+			case "init":
+				if idx == 0 {
+					return cli.NewExitError("helm init is forbidden", int(ExitCode.InvalidArgument))
+				}
+			case "search", "repo":
+				if idx == 0 {
+					useTLS = ""
+				}
+			case "--":
+				ignore = true
+			case "-f", "--values":
+				if idx+1 < len(args) {
+					localFile := args[idx+1]
+					if localFile != "" {
+						// If it's an URL, filter as-is
+						if urlRegex.MatchString(localFile) {
+							filteredArgs = append(filteredArgs, "-f")
+							filteredArgs = append(filteredArgs, localFile)
+							ignore = true
+							ignoreNext = true
+							continue
+						}
+
+						// Check for file
+						st, err := os.Stat(localFile)
+						if err != nil {
+							return cli.NewExitError(err.Error(), 1)
+						}
+						// If it's a link, get the target of it
+						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
+							link, err := filepath.EvalSymlinks(localFile)
+							if err != nil {
+								return cli.NewExitError(err.Error(), 1)
+							}
+							st, err = os.Stat(link)
+							if err != nil {
+								return cli.NewExitError(err.Error(), 1)
+							}
+						}
+
+						if localFile != "-" {
+							rfc := RemoteFileItem{
+								Local:  localFile,
+								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
+							}
+							valuesOnRemote.Add(&rfc)
+							filteredArgs = append(filteredArgs, "-f")
+							filteredArgs = append(filteredArgs, rfc.Remote)
+						} else {
+							// data comes from the standard input
+							return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "'-f -' is not yet supported")
+						}
+						ignoreNext = true
+					}
+				}
+				ignore = true
+			}
+			if !ignore {
+				filteredArgs = append(filteredArgs, arg)
+			}
+		}
+		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
+		return executeCommand(cmdStr, valuesOnRemote)
 	},
 }
 
@@ -888,42 +1047,38 @@ var clusterRunCommand = cli.Command{
 	},
 }
 
-func executeCommand(command string) error {
-	masters, err := clusterInstance.ListMasterIDs(concurrency.RootTask())
+func executeCommand(command string, files *RemoteFilesHandler) error {
+	task, err := concurrency.NewTask()
 	if err != nil {
 		return err
 	}
-	cMasters := len(masters)
-	if cMasters == 0 {
-		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity(concurrency.RootTask()).Name)
-		return clitools.ExitOnErrorWithMessage(exitcode.Run, msg)
-	}
-	safescalessh := client.New().SSH
-	i := 0
-	for _, m := range masters {
-		i++
-		retcode, stdout, stderr, err := safescalessh.Run(context.TODO(), m, command, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "failed to execute command on master #%d: %s", i, err.Error())
-			if i < cMasters {
-				_, _ = fmt.Fprintln(os.Stderr, "Trying another master...")
-				continue
-			}
-		}
-		if retcode != 0 {
-			output := stdout
-			if output != "" {
-				output += "\n"
-			}
-			output += stderr
-			// _, _ = fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
-			return clitools.ExitOnRPC(output)
-		}
-		fmt.Println(stdout)
-		return nil
+
+	master, err := clusterInstance.FindAvailableMaster(task)
+	if err != nil {
+		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.GetIdentity(concurrency.RootTask()).Name, err.Error())
+		return clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg)
 	}
 
-	return clitools.ExitOnRPC("failed to find an available master server to execute the command.")
+	if files != nil && files.Count() > 0 {
+		if !Debug {
+			defer files.Cleanup(task, master.Name)
+		}
+		err = files.Upload(task, master.Name)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.RPC, err.Error())
+		}
+	}
+
+	safescalessh := client.New().SSH
+	retcode, _, _, err := safescalessh.Run(task, master.Name, command, Outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if err != nil {
+		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master, err.Error())
+		return clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg)
+	}
+	if retcode != 0 {
+		return cli.NewExitError("", retcode)
+	}
+	return nil
 }
 
 // clusterCheckFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
