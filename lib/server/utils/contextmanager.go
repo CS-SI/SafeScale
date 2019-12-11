@@ -58,7 +58,7 @@ func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (contex
 	return ctx, cancel, nil
 }
 
-//GetUUID ...
+// GetUUID ...
 func GetUUID() string {
 	mutexContextManager.Lock()
 	defer mutexContextManager.Unlock()

@@ -19,35 +19,62 @@ package listeners
 import (
 	"context"
 	"fmt"
+
 	"github.com/asaskevich/govalidator"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
+
+// PrepareJob creates a new job
+func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (server.Job, error) {
+	var tenant *Tenant
+	if tenantName != "" {
+		service, err := iaas.UseService(tenantName)
+		if err != nil {
+			return nil, err
+		}
+		tenant = &Tenant{name: tenantName, Service: service}
+	} else {
+		tenant = GetCurrentTenant()
+		if tenant == nil {
+			return nil, fmt.Errorf("no tenant set")
+		}
+	}
+	newctx, cancel := context.WithCancel(ctx)
+
+	job, err := server.NewJob(newctx, cancel, tenant.Service, jobDescription)
+	if err != nil {
+		return nil, err
+	}
+	return job, nil
+}
 
 // JobManagerListener service server gRPC
 type JobManagerListener struct{}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot stop job").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -62,40 +89,54 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 		return empty, scerr.InvalidRequestError("cannot stop job: job id not set")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", uuid), true).GoingIn()
+	// ctx, cancelFunc := context.WithCancel(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer task.Close()
+
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", uuid), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	tracer.Trace("Receiving stop order for job '%s'...", uuid)
+	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop job "+uuid); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
+	// ctx, cancelFunc := context.WithCancel(ctx)
+	// // LATER: handle jobregister error
+	// if err := srvutils.JobRegister(ctx, cancelFunc, "Stop job "+uuid); err == nil {
+	// 	defer srvutils.JobDeregister(ctx)
+	// } /* else {
+	// 	return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	// }*/
 
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot stop process: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
+	// tenant := GetCurrentTenant()
+	// if tenant == nil {
+	// 	msg := "cannot stop process: no tenant set"
+	// 	tracer.Trace(utils.Capitalize(msg))
+	// 	return empty, status.Errorf(codes.FailedPrecondition, msg)
+	// }
 
-	handler := handlers.NewJobHandler(tenant.Service)
-	handler.Stop(ctx, in.Uuid)
+	// handler := JobManagerHandler(tenant.Service)
+	// handler.Stop(ctx, in.Uuid)
+	// srvutils.JobCancelUUID(uuid)
 
-	return empty, nil
+	return empty, server.AbortJobByID(uuid)
 }
 
 // List running process
-func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *pb.JobList, err error) {
+func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *pb.JobList, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot list jobs").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -105,33 +146,38 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer task.Close()
+
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "List Processes"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
+	// ctx, cancelFunc := context.WithCancel(ctx)
+	// // LATER: handle jobregister error
+	// if err := srvutils.JobRegister(ctx, cancelFunc, "List Processes"); err == nil {
+	// 	defer srvutils.JobDeregister(ctx)
+	// } /* else {
+	// 	return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	// }*/
 
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot list process: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
+	// tenant := GetCurrentTenant()
+	// if tenant == nil {
+	// 	msg := "cannot list process: no tenant set"
+	// 	tracer.Trace(utils.Capitalize(msg))
+	// 	return nil, status.Errorf(codes.FailedPrecondition, msg)
+	// }
 
-	handler := handlers.NewJobHandler(tenant.Service)
-	processMap, err := handler.List(ctx)
-	if err != nil {
-		return nil, scerr.Wrap(err, "cannot list jobs").ToGRPCStatus()
-	}
-
+	// handler := JobManagerHandler(tenant.Service)
+	jobMap := server.ListJobs()
 	var pbProcessList []*pb.JobDefinition
-	for uuid, info := range processMap {
+	for uuid, info := range jobMap {
+		if task.Aborted() {
+			return nil, scerr.AbortedError("aborted", nil)
+		}
 		pbProcessList = append(pbProcessList, &pb.JobDefinition{Uuid: uuid, Info: info})
 	}
 	return &pb.JobList{List: pbProcessList}, nil
