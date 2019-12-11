@@ -424,6 +424,8 @@ func (sc *SSHCommand) Display() string {
 //
 // If the command starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
+//
+// WARNING : This function CAN lock, use .RunWithTimeout instead
 func (sc *SSHCommand) Run(t concurrency.Task, outputs Outputs.Enum) (int, string, string, error) {
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outputs.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
