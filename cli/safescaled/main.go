@@ -94,7 +94,7 @@ func work() {
 
 	log.Infoln("Registering services")
 	pb.RegisterBucketServiceServer(s, &listeners.BucketListener{})
-	pb.RegisterDataServiceServer(s, &listeners.DataListener{})
+	// pb.RegisterDataServiceServer(s, &listeners.DataListener{})
 	pb.RegisterHostServiceServer(s, &listeners.HostListener{})
 	pb.RegisterImageServiceServer(s, &listeners.ImageListener{})
 	pb.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
