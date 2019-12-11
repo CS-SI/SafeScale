@@ -1005,7 +1005,7 @@ var clusterHelmCommand = cli.Command{
 							if err != nil {
 								return cli.NewExitError(err.Error(), 1)
 							}
-							_, err = os.Stat(link)
+							st, err = os.Stat(link)
 							if err != nil {
 								return cli.NewExitError(err.Error(), 1)
 							}
