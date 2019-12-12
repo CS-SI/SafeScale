@@ -33,9 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// ImageHandler ...
-var ImageHandler = handlers.NewImageHandler
-
 // safescale image list --all=false
 
 //ImageListener image service server grpc
@@ -78,6 +75,8 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *p
 		tracer.Trace(utils.Capitalize(msg))
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
+
+	var ImageHandler = handlers.NewImageHandler
 
 	handler := ImageHandler(currentTenant.Service)
 	images, err := handler.List(ctx, in.GetAll())

@@ -34,9 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// JobManagerHandler ...
-var JobManagerHandler = handlers.NewJobHandler
-
 // JobManagerListener service server gRPC
 type JobManagerListener struct{}
 
@@ -86,7 +83,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := JobManagerHandler(tenant.Service)
+	handler := handlers.NewJobHandler(tenant.Service)
 	handler.Stop(ctx, in.Uuid)
 
 	return empty, nil
@@ -127,7 +124,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := JobManagerHandler(tenant.Service)
+	handler := handlers.NewJobHandler(tenant.Service)
 	processMap, err := handler.List(ctx)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list jobs").ToGRPCStatus()

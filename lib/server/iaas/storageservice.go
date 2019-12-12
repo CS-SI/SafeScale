@@ -34,7 +34,7 @@ func NewStorageService() StorageServices {
 
 //RegisterStorage ...
 func (sts *StorageServices) RegisterStorage(tenantName string) error {
-	tenants, err := getTenantsFromCfg()
+	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return err
 	}

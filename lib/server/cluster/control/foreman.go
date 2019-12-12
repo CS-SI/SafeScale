@@ -1650,11 +1650,10 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	}
 	if _, ok := p["timeout"]; !ok {
 		timeout = 0
-	} else {
-		if timeout = p["timeout"].(time.Duration); !ok {
-			return nil, scerr.InvalidParameterError("params[timeout]", "is not a time.Duration")
-		}
+	} else if timeout = p["timeout"].(time.Duration); !ok {
+		return nil, scerr.InvalidParameterError("params[timeout]", "is not a time.Duration")
 	}
+
 	if nokeep, ok = p["nokeep"].(bool); !ok {
 		nokeep = true
 	}

@@ -41,31 +41,6 @@ type gpuCfg struct {
 	GPUType   string
 }
 
-var gpuMap = map[string]gpuCfg{
-	"g2-15": gpuCfg{
-		GPUNumber: 1,
-		GPUType:   "NVIDIA 1070",
-	},
-	"g2-30": gpuCfg{
-		GPUNumber: 1,
-		GPUType:   "NVIDIA 1070",
-	},
-	"g3-120": gpuCfg{
-		GPUNumber: 3,
-		GPUType:   "NVIDIA 1080 TI",
-	},
-	"g3-30": gpuCfg{
-		GPUNumber: 1,
-		GPUType:   "NVIDIA 1080 TI",
-	},
-}
-
-var (
-	identityEndpoint = "https://auth.cloud.ovh.net/v2.0"
-	externalNetwork  = "Ext-Net"
-	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
-)
-
 // OVH api credentials
 var (
 	alternateAPIApplicationKey    string
@@ -123,7 +98,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	}
 
 	authOptions := stacks.AuthenticationOptions{
-		IdentityEndpoint: identityEndpoint,
+		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
 		Username:         openstackID,
 		Password:         openstackPassword,
 		TenantID:         applicationKey,
@@ -149,11 +124,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		ProviderNetwork:           externalNetwork,
+		ProviderNetwork:           "Ext-Net",
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
 		AutoHostNetworkInterfaces: false,
-		DNSList:                   dnsServers,
+		DNSList:                   []string{"213.186.33.99", "1.1.1.1"},
 		VolumeSpeeds: map[string]VolumeSpeed.Enum{
 			"classic":    VolumeSpeed.COLD,
 			"high-speed": VolumeSpeed.HDD,
@@ -262,6 +237,25 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 }
 
 func addGPUCfg(tpl *resources.HostTemplate) {
+	var gpuMap = map[string]gpuCfg{
+		"g2-15": gpuCfg{
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1070",
+		},
+		"g2-30": gpuCfg{
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1070",
+		},
+		"g3-120": gpuCfg{
+			GPUNumber: 3,
+			GPUType:   "NVIDIA 1080 TI",
+		},
+		"g3-30": gpuCfg{
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1080 TI",
+		},
+	}
+
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType

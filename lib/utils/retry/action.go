@@ -22,6 +22,7 @@ package retry
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 	"time"
 
@@ -319,7 +320,7 @@ func (a action) loop() error {
 		start   = time.Now()
 	)
 	if arbiter == nil {
-		arbiter = DefaultArbiter
+		arbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
 	}
 
 	if a.First != nil {
@@ -385,7 +386,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 		start   = time.Now()
 	)
 	if arbiter == nil {
-		arbiter = DefaultArbiter
+		arbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
 	}
 
 	if a.First != nil {

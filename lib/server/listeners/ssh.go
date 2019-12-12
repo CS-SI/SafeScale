@@ -34,9 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// SSHHandler exists to ease integration tests
-var SSHHandler = handlers.NewSSHHandler
-
 // safescale ssh connect host2
 // safescale ssh run host2 -c "uname -a"
 // safescale ssh copy /file/test.txt host1://tmp
@@ -87,7 +84,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := SSHHandler(tenant.Service)
+	handler := handlers.NewSSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Run(ctx, host, command)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot run by ssh").ToGRPCStatus()
@@ -138,7 +135,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := SSHHandler(tenant.Service)
+	handler := handlers.NewSSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Copy(ctx, source, dest)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot copy by ssh").ToGRPCStatus()

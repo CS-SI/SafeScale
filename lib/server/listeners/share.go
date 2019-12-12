@@ -36,9 +36,6 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// ShareHandler ...
-var ShareHandler = handlers.NewShareHandler
-
 // safescale nas|share create share1 host1 --path="/shared/data"
 // safescale nas|share delete share1
 // safescale nas|share mount share1 host2 --path="/data"
@@ -92,7 +89,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := ShareHandler(tenant.Service)
+	handler := handlers.NewShareHandler(tenant.Service)
 	share, err := handler.Create(ctx, shareName, hostRef, sharePath, in.GetSecurityModes(), in.GetOptions().GetReadOnly(), in.GetOptions().GetRootSquash(), in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(), in.GetOptions().GetCrossMount(), in.GetOptions().GetSubtreeCheck())
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot create share").ToGRPCStatus()
@@ -141,7 +138,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := ShareHandler(tenant.Service)
+	handler := handlers.NewShareHandler(tenant.Service)
 	_, _, _, err = handler.Inspect(ctx, shareName)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot delete share").ToGRPCStatus()
@@ -189,7 +186,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ 
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := ShareHandler(tenant.Service)
+	handler := handlers.NewShareHandler(tenant.Service)
 	shares, err := handler.List(ctx)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list Shares").ToGRPCStatus()
@@ -248,7 +245,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := ShareHandler(tenant.Service)
+	handler := handlers.NewShareHandler(tenant.Service)
 	mount, err := handler.Mount(ctx, shareRef, hostRef, hostPath, in.GetWithCache())
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot mount share").ToGRPCStatus()
@@ -300,7 +297,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := ShareHandler(tenant.Service)
+	handler := handlers.NewShareHandler(tenant.Service)
 	err = handler.Unmount(ctx, shareRef, hostRef)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot unmount share").ToGRPCStatus()
@@ -348,7 +345,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := ShareHandler(tenant.Service)
+	handler := handlers.NewShareHandler(tenant.Service)
 	host, share, mounts, err := handler.Inspect(ctx, shareRef)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot inspect share").ToGRPCStatus()

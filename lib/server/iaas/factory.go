@@ -58,7 +58,7 @@ func GetTenantNames() (map[string]string, error) {
 
 // GetTenants returns all known tenants
 func GetTenants() ([]interface{}, error) {
-	tenants, err := getTenantsFromCfg()
+	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func UseService(tenantName string) (newService Service, err error) {
 	defer scerr.OnExitLogError("", &err)()
 	defer scerr.OnPanic(&err)
 
-	tenants, err := getTenantsFromCfg()
+	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func UseService(tenantName string) (newService Service, err error) {
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocation objectstorage.Location, fakeMetaLocation objectstorage.Location) (Service, error) {
-	tenants, err := getTenantsFromCfg()
+	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +690,7 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 }
 
 func loadConfig() error {
-	tenantsCfg, err := getTenantsFromCfg()
+	tenantsCfg, v, err := getTenantsFromCfg()
 	if err != nil {
 		return err
 	}
@@ -709,9 +709,8 @@ func loadConfig() error {
 	return nil
 }
 
-var v *viper.Viper
-
-func getTenantsFromCfg() ([]interface{}, error) {
+func getTenantsFromCfg() ([]interface{}, *viper.Viper, error) {
+	var v *viper.Viper
 	v = viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
@@ -722,9 +721,9 @@ func getTenantsFromCfg() ([]interface{}, error) {
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
 		log.Errorf(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, v, fmt.Errorf(msg)
 	}
 	settings := v.AllSettings()
 	tenantsCfg, _ := settings["tenants"].([]interface{})
-	return tenantsCfg, nil
+	return tenantsCfg, v, nil
 }

@@ -139,15 +139,13 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
 	if fws != nil && err == nil {
 		buildNewRule = false
-	} else {
-		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok {
-				if gerr.Code != 404 {
-					return nil, err
-				}
-			} else {
+	} else if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok {
+			if gerr.Code != 404 {
 				return nil, err
 			}
+		} else {
+			return nil, err
 		}
 	}
 
@@ -189,15 +187,13 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	rfs, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
 	if rfs != nil && err == nil {
 		buildNewNATRule = false
-	} else {
-		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok {
-				if gerr.Code != 404 {
-					return nil, err
-				}
-			} else {
+	} else if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok {
+			if gerr.Code != 404 {
 				return nil, err
 			}
+		} else {
+			return nil, err
 		}
 	}
 
