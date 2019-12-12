@@ -15,8 +15,8 @@ type HostInfo struct {
 	CPU        int
 	RAM        int
 	Disk       int
-	PUBLIC_IP  string
-	PRIVATE_IP string
+	PublicIp   string
+	PrivateIp  string
 	State      int
 	PrivateKey string
 }

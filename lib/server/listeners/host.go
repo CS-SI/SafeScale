@@ -36,9 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// HostHandler ...
-var HostHandler = handlers.NewHostHandler
-
 // HostListener host service server grpc
 type HostListener struct{}
 
@@ -102,7 +99,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	err = handler.Start(ctx, ref)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot start host").ToGRPCStatus()
@@ -155,7 +152,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	err = handler.Stop(ctx, ref)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot stop host").ToGRPCStatus()
@@ -205,7 +202,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	err = handler.Reboot(ctx, ref)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot reboot host").ToGRPCStatus()
@@ -252,7 +249,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	hosts, err := handler.List(ctx, all)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list hosts").ToGRPCStatus()
@@ -323,7 +320,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		sizing = &s
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	host, err := handler.Create(ctx,
 		name,
 		in.GetNetwork(),
@@ -379,7 +376,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	host, err := handler.Resize(ctx,
 		name,
 		int(in.GetCpuCount()),
@@ -438,7 +435,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot get host status").ToGRPCStatus()
@@ -489,7 +486,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot inspect host").ToGRPCStatus()
@@ -541,7 +538,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(tenant.Service)
+	handler := handlers.NewHostHandler(tenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot delete host").ToGRPCStatus()
@@ -593,7 +590,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := HostHandler(currentTenant.Service)
+	handler := handlers.NewHostHandler(currentTenant.Service)
 	sshConfig, err := handler.SSH(ctx, ref)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot ssh host").ToGRPCStatus()

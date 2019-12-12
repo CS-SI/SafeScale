@@ -34,9 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// BucketHandler ...
-var BucketHandler = handlers.NewBucketHandler
-
 // safescale bucket create c1
 // safescale bucket mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /buckets/c1)
 // safescale bucket umount c1 host1
@@ -77,7 +74,7 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (b
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no tenant set")
 	}
 
-	handler := BucketHandler(tenant.Service)
+	handler := handlers.NewBucketHandler(tenant.Service)
 	buckets, err := handler.List(ctx)
 	if err != nil {
 		tbr := scerr.Wrap(err, "can't list buckets")
@@ -122,7 +119,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot create bucket: no tenant set")
 	}
 
-	handler := BucketHandler(tenant.Service)
+	handler := handlers.NewBucketHandler(tenant.Service)
 	err = handler.Create(ctx, bucketName)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot create bucket").ToGRPCStatus()
@@ -166,7 +163,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot delete bucket: no tenant set")
 	}
 
-	handler := BucketHandler(tenant.Service)
+	handler := handlers.NewBucketHandler(tenant.Service)
 	err = handler.Delete(ctx, bucketName)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot delete bucket").ToGRPCStatus()
@@ -209,7 +206,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect bucket: no tenant set")
 	}
 
-	handler := BucketHandler(tenant.Service)
+	handler := handlers.NewBucketHandler(tenant.Service)
 	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot inspect bucket").ToGRPCStatus()
@@ -257,7 +254,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot mount bucket: no tenant set")
 	}
 
-	handler := BucketHandler(tenant.Service)
+	handler := handlers.NewBucketHandler(tenant.Service)
 	err = handler.Mount(ctx, bucketName, hostName, in.GetPath())
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot mount bucket").ToGRPCStatus()
@@ -301,7 +298,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot unmount bucket: no tenant set")
 	}
 
-	handler := BucketHandler(tenant.Service)
+	handler := handlers.NewBucketHandler(tenant.Service)
 	err = handler.Unmount(ctx, bucketName, hostName)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot unmount bucket").ToGRPCStatus()

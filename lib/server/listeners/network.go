@@ -37,9 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// NetworkHandler ...
-var NetworkHandler = handlers.NewNetworkHandler
-
 // safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
 // safescale network list
 // safescale network delete net1
@@ -115,7 +112,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		gwName = in.GetGateway().GetName()
 	}
 
-	handler := NetworkHandler(tenant.Service)
+	handler := handlers.NewNetworkHandler(tenant.Service)
 	network, err := handler.Create(ctx,
 		networkName,
 		in.GetCidr(),
@@ -172,7 +169,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := NetworkHandler(tenant.Service)
+	handler := handlers.NewNetworkHandler(tenant.Service)
 	networks, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list networks").ToGRPCStatus()
@@ -230,7 +227,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := NetworkHandler(currentTenant.Service)
+	handler := handlers.NewNetworkHandler(currentTenant.Service)
 	network, err := handler.Inspect(ctx, ref)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot inspect network").ToGRPCStatus()
@@ -287,7 +284,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := NetworkHandler(currentTenant.Service)
+	handler := handlers.NewNetworkHandler(currentTenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot delete network").ToGRPCStatus()

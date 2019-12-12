@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
@@ -25,16 +26,12 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
-
-// TemplateHandler exists to ease integration tests
-var TemplateHandler = handlers.NewTemplateHandler
 
 // safescale template list --all=false
 
@@ -78,7 +75,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := TemplateHandler(tenant.Service)
+	handler := handlers.NewTemplateHandler(tenant.Service)
 	templates, err := handler.List(ctx, all)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list templates").ToGRPCStatus()

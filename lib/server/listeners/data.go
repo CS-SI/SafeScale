@@ -34,9 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// DataHandler ...
-var DataHandler = handlers.NewDataHandler
-
 // DataListener is the data service grpc server
 type DataListener struct{}
 
@@ -71,7 +68,7 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
-	handler := DataHandler(tenants.StorageServices)
+	handler := handlers.NewDataHandler(tenants.StorageServices)
 	fileNames, uploadDates, fileSizes, fileBuckets, err := handler.List(ctx)
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list buckets").ToGRPCStatus()
@@ -116,7 +113,7 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
-	handler := DataHandler(tenants.StorageServices)
+	handler := handlers.NewDataHandler(tenants.StorageServices)
 	err = handler.Push(ctx, in.GetLocalPath(), objectName)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot push data").ToGRPCStatus()
@@ -161,7 +158,7 @@ func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *google_pro
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot pull data: no storage tenants set")
 	}
 
-	handler := DataHandler(tenants.StorageServices)
+	handler := handlers.NewDataHandler(tenants.StorageServices)
 	err = handler.Get(ctx, in.GetLocalPath(), objectName)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot pull data").ToGRPCStatus()
@@ -205,7 +202,7 @@ func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_p
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot list buckets: no storage tenants set")
 	}
 
-	handler := DataHandler(tenants.StorageServices)
+	handler := handlers.NewDataHandler(tenants.StorageServices)
 	err = handler.Delete(ctx, objectName)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot delete data").ToGRPCStatus()

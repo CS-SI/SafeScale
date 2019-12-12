@@ -46,9 +46,6 @@ import (
 // FIXME Think about this
 // //go:generate mockgen -destination=../mocks/mock_volumeserviceserver.go -package=mocks github.com/CS-SI/SafeScale/lib VolumeServiceServer
 
-// VolumeHandler ...
-var VolumeHandler = handlers.NewVolumeHandler
-
 // VolumeListener is the volume service grpc server
 type VolumeListener struct{}
 
@@ -92,7 +89,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := VolumeHandler(tenant.Service)
+	handler := handlers.NewVolumeHandler(tenant.Service)
 	volumes, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list volumes").ToGRPCStatus()
@@ -147,7 +144,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := VolumeHandler(tenant.Service)
+	handler := handlers.NewVolumeHandler(tenant.Service)
 	vol, err := handler.Create(ctx, name, int(size), VolumeSpeed.Enum(speed))
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot create volume").ToGRPCStatus()
@@ -215,7 +212,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := VolumeHandler(tenant.Service)
+	handler := handlers.NewVolumeHandler(tenant.Service)
 	err = handler.Attach(ctx, volumeRef, hostRef, mountPath, filesystem, doNotFormat)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot attach volume").ToGRPCStatus()
@@ -272,7 +269,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := VolumeHandler(tenant.Service)
+	handler := handlers.NewVolumeHandler(tenant.Service)
 	err = handler.Detach(ctx, volumeRef, hostRef)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot detach volume").ToGRPCStatus()
@@ -326,7 +323,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 		return empty, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := VolumeHandler(tenant.Service)
+	handler := handlers.NewVolumeHandler(tenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot delete volume").ToGRPCStatus()
@@ -381,7 +378,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	handler := VolumeHandler(tenant.Service)
+	handler := handlers.NewVolumeHandler(tenant.Service)
 	volume, mounts, err := handler.Inspect(ctx, ref)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
