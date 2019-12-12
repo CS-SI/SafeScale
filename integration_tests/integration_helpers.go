@@ -70,7 +70,7 @@ func GetOutput(command string) (string, error) {
 
 //RunOnlyInIntegrationTest ...
 func RunOnlyInIntegrationTest(key string) error {
-	if tenant_override := os.Getenv(key); tenant_override == "" {
+	if tenantOverride := os.Getenv(key); tenantOverride == "" {
 		return fmt.Errorf("this only runs as an integration test")
 	}
 	return nil

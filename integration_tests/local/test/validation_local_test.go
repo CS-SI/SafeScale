@@ -12,7 +12,7 @@ func Test_Basic(t *testing.T) {
 }
 
 func Test_ReadyToSsh(t *testing.T) {
-	integration_tests.ReadyToSsh(t, Providers.LOCAL)
+	integration_tests.ReadyToSSH(t, Providers.LOCAL)
 }
 
 func Test_ShareError(t *testing.T) {

@@ -1122,7 +1122,7 @@ func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 		hostSize.Cores, _ = flavor["vcpus"].(int)
 		hostSize.DiskSize, _ = flavor["disk"].(int)
 		hostSize.RAMSize, _ = flavor["ram"].(float32)
-		hostSize.RAMSize = hostSize.RAMSize / 1000.0
+		hostSize.RAMSize /= 1000.0
 	}
 	return hostSize
 }

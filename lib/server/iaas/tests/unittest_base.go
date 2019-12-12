@@ -655,6 +655,7 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 	err = tester.Service.DeleteBucket("testC2")
 	assert.Nil(t, err)
 	cl, err = tester.Service.ListBuckets("")
+	assert.Nil(t, err)
 	assert.NotContains(t, cl, "testC", "testC2")
 }
 

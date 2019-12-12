@@ -191,13 +191,13 @@ func (h *Host) GetAccessIP() string {
 }
 
 // GetPublicIP computes public IP of the host
-func (h *Host) GetPublicIP() (pubIp string) {
+func (h *Host) GetPublicIP() (pubIP string) {
 	var ip string
 
 	defer func() {
 		if x := recover(); x != nil {
 			logrus.Warnf("runtime panic occurred: %+v", x)
-			pubIp = ""
+			pubIP = ""
 		}
 	}()
 
@@ -216,13 +216,13 @@ func (h *Host) GetPublicIP() (pubIp string) {
 }
 
 // GetPrivateIP ...
-func (h *Host) GetPrivateIP() (privateIp string) {
+func (h *Host) GetPrivateIP() (privateIP string) {
 	var ip string
 
 	defer func() {
 		if x := recover(); x != nil {
 			logrus.Warnf("runtime panic occurred: %+v", x)
-			privateIp = ""
+			privateIP = ""
 		}
 	}()
 

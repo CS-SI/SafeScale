@@ -959,35 +959,35 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 		if err != nil {
 			logrus.Error(err)
 			return err
-		} else {
-			if network.VIP != nil {
-				mhm, merr := mh.Get()
-				if merr != nil {
-					return merr
-				}
+		}
 
-				err = handler.service.UnbindHostFromVIP(network.VIP, mhm)
-				if err != nil {
-					logrus.Errorf("failed to unbind secondary gateway from VIP: %v", err)
-				}
+		if network.VIP != nil {
+			mhm, merr := mh.Get()
+			if merr != nil {
+				return merr
 			}
 
-			err = handler.service.DeleteGateway(network.SecondaryGatewayID) // allow no gateway, but log it
+			err = handler.service.UnbindHostFromVIP(network.VIP, mhm)
 			if err != nil {
-				switch err.(type) {
-				case *scerr.ErrNotFound:
-					logrus.Errorf("failed to delete secondary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
-				case *scerr.ErrTimeout:
-					logrus.Errorf("failed to delete secondary gateway, timeout: %s", openstack.ProviderErrorToString(err))
-				default:
-					logrus.Errorf("failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
-				}
+				logrus.Errorf("failed to unbind secondary gateway from VIP: %v", err)
 			}
+		}
 
-			err = mh.Delete()
-			if err != nil {
-				return err
+		err = handler.service.DeleteGateway(network.SecondaryGatewayID) // allow no gateway, but log it
+		if err != nil {
+			switch err.(type) {
+			case *scerr.ErrNotFound:
+				logrus.Errorf("failed to delete secondary gateway, resource not found: %s", openstack.ProviderErrorToString(err))
+			case *scerr.ErrTimeout:
+				logrus.Errorf("failed to delete secondary gateway, timeout: %s", openstack.ProviderErrorToString(err))
+			default:
+				logrus.Errorf("failed to delete secondary gateway: %s", openstack.ProviderErrorToString(err))
 			}
+		}
+
+		err = mh.Delete()
+		if err != nil {
+			return err
 		}
 	}
 

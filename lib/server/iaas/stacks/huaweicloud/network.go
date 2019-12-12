@@ -384,11 +384,11 @@ type subnetDeleteResult struct {
 }
 
 // convertIPv4ToNumber converts a net.IP to a uint32 representation
-func convertIPv4ToNumber(IP net.IP) (uint32, error) {
-	if IP.To4() == nil {
+func convertIPv4ToNumber(ip net.IP) (uint32, error) {
+	if ip.To4() == nil {
 		return 0, fmt.Errorf("not an IPv4")
 	}
-	n := uint32(IP[0])*0x1000000 + uint32(IP[1])*0x10000 + uint32(IP[2])*0x100 + uint32(IP[3])
+	n := uint32(ip[0])*0x1000000 + uint32(ip[1])*0x10000 + uint32(ip[2])*0x100 + uint32(ip[3])
 	return n, nil
 }
 

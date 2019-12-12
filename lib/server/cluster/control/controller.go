@@ -1273,19 +1273,19 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	}
 
 	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		hostId, ok := params.(string)
+		hostID, ok := params.(string)
 		if !ok {
 			return nil, scerr.InvalidParameterError("params", "is not a string")
 		}
-		funcErr := c.DeleteSpecificNode(t, hostId, "")
+		funcErr := c.DeleteSpecificNode(t, hostID, "")
 		return nil, funcErr
 	}
 	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		hostId, ok := params.(string)
+		hostID, ok := params.(string)
 		if !ok {
 			return nil, scerr.InvalidParameterError("params", "is not a string")
 		}
-		funcErr := c.deleteMaster(t, hostId)
+		funcErr := c.deleteMaster(t, hostID)
 		return nil, funcErr
 	}
 

@@ -319,19 +319,19 @@ func humanReadableSize(bytes int64) string {
 	switch {
 	case bytes >= cPETABYTE:
 		unit = "P"
-		value = value / cPETABYTE
+		value /= cPETABYTE
 	case bytes >= cTERABYTE:
 		unit = "T"
-		value = value / cTERABYTE
+		value /= cTERABYTE
 	case bytes >= cGIGABYTE:
 		unit = "G"
-		value = value / cGIGABYTE
+		value /= cGIGABYTE
 	case bytes >= cMEGABYTE:
 		unit = "M"
-		value = value / cMEGABYTE
+		value /= cMEGABYTE
 	case bytes >= cKILOBYTE:
 		unit = "K"
-		value = value / cKILOBYTE
+		value /= cKILOBYTE
 	case bytes >= cBYTE:
 		unit = "B"
 	case bytes == 0:
