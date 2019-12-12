@@ -471,6 +471,15 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (_ *resources.Host, 
 		}
 	}
 
+	defer func() {
+		if err != nil {
+			derr := s.DeleteHost(host.ID)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	// Updates Host Property propsv1.HostSizing
 	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
