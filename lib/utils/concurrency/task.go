@@ -526,10 +526,8 @@ func (t *task) Abort() (err error) {
 		t.cancel()
 
 		t.status = ABORTED
-	} else {
-		if t.status != DONE {
-			t.status = ABORTED
-		}
+	} else if t.status != DONE {
+		t.status = ABORTED
 	}
 
 	return nil

@@ -262,7 +262,7 @@ func upgradePropertyNodesIfNeeded(t concurrency.Task, c *control.Controller) err
 					}
 					nodesV2.MasterLastIndex = nodesV1.MasterLastIndex
 					nodesV2.PrivateLastIndex = nodesV1.PrivateLastIndex
-					nodesV1 = &clusterpropsv1.Nodes{}
+
 					return nil
 				})
 			})

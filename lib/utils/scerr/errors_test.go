@@ -123,7 +123,7 @@ func getNotFoundErrorWithFields() error {
 
 func getNotFoundErrorWithFieldsAndConsequences() error {
 	nfe := NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
-	return AddConsequence(nfe, fmt.Errorf("someting else..."))
+	return AddConsequence(nfe, fmt.Errorf("something else ... "))
 }
 
 func TestEnrichedError(t *testing.T) {

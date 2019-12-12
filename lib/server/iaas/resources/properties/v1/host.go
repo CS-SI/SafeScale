@@ -447,15 +447,15 @@ func (hm *HostMounts) Replace(p serialize.Property) serialize.Property {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostShare struct {
-	ID            string            `json:"id"`                         // ID ...
-	Name          string            `json:"name"`                       // the name of the share
-	Path          string            `json:"path"`                       // the path on the host filesystem that is shared
-	PathAcls      string            `json:"path_acls,omitempty"`        // filesystem acls to set on the exported folder
-	Type          string            `json:"type,omitempty"`             // export type is lowercase (ie. nfs, glusterfs, ...)
-	ShareAcls     string            `json:"share_acls,omitempty"`       // the acls to set on the share
-	ShareOptions  string            `json:"share_options,omitempty"`    // the options (other than acls) to set on the share
-	ClientsByID   map[string]string `json:"clients_by_id,omit_empty"`   // contains the name of the hosts mounting the export, indexed by ID
-	ClientsByName map[string]string `json:"clients_by_name,omit_empty"` // contains the ID of the hosts mounting the export, indexed by Name
+	ID            string            `json:"id"`                        // ID ...
+	Name          string            `json:"name"`                      // the name of the share
+	Path          string            `json:"path"`                      // the path on the host filesystem that is shared
+	PathAcls      string            `json:"path_acls,omitempty"`       // filesystem acls to set on the exported folder
+	Type          string            `json:"type,omitempty"`            // export type is lowercase (ie. nfs, glusterfs, ...)
+	ShareAcls     string            `json:"share_acls,omitempty"`      // the acls to set on the share
+	ShareOptions  string            `json:"share_options,omitempty"`   // the options (other than acls) to set on the share
+	ClientsByID   map[string]string `json:"clients_by_id,omitempty"`   // contains the name of the hosts mounting the export, indexed by ID
+	ClientsByName map[string]string `json:"clients_by_name,omitempty"` // contains the ID of the hosts mounting the export, indexed by Name
 }
 
 // NewHostShare ...

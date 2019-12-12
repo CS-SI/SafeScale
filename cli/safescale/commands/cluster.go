@@ -106,10 +106,8 @@ func extractClusterArgument(c *cli.Context) error {
 				msg := fmt.Sprintf("failed to query for cluster '%s': %s", clusterName, err.Error())
 				return clitools.ExitOnRPC(msg)
 			}
-		} else {
-			if c.Command.HasName("create") {
-				return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.", clusterName))
-			}
+		} else if c.Command.HasName("create") {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.", clusterName))
 		}
 	}
 

@@ -38,25 +38,25 @@ import (
 func ProviderErrorToString(err error) string {
 	switch e := err.(type) {
 	case gophercloud.ErrDefault400:
-		return fmt.Sprintf("code: 400, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 400, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault400:
-		return fmt.Sprintf("code: 400, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 400, reason: %s", string(e.Body))
 	case gophercloud.ErrDefault401:
-		return fmt.Sprintf("code: 401, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 401, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault401:
-		return fmt.Sprintf("code: 401, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 401, reason: %s", string(e.Body))
 	case gophercloud.ErrDefault404:
-		return fmt.Sprintf("code: 404, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 404, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault404:
-		return fmt.Sprintf("code: 404, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 404, reason: %s", string(e.Body))
 	case gophercloud.ErrDefault500:
-		return fmt.Sprintf("code: 500, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 500, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault500:
-		return fmt.Sprintf("code: 500, reason: %s", string(e.Body[:]))
+		return fmt.Sprintf("code: 500, reason: %s", string(e.Body))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
+		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
+		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
 	default:
 		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)", reflect.TypeOf(err).String(), err)
 
@@ -68,33 +68,33 @@ func ProviderErrorToString(err error) string {
 func TranslateProviderError(err error) error {
 	switch e := err.(type) {
 	case gophercloud.ErrDefault400:
-		return scerr.InvalidRequestError(string(e.Body[:]))
+		return scerr.InvalidRequestError(string(e.Body))
 	case *gophercloud.ErrDefault400:
-		return scerr.InvalidRequestError(string(e.Body[:]))
+		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrDefault401:
-		return scerr.NotAuthenticatedError(string(e.Body[:]))
+		return scerr.NotAuthenticatedError(string(e.Body))
 	case *gophercloud.ErrDefault401:
-		return scerr.NotAuthenticatedError(string(e.Body[:]))
+		return scerr.NotAuthenticatedError(string(e.Body))
 	case gophercloud.ErrDefault403:
-		return scerr.ForbiddenError(string(e.Body[:]))
+		return scerr.ForbiddenError(string(e.Body))
 	case *gophercloud.ErrDefault403:
-		return scerr.ForbiddenError(string(e.Body[:]))
+		return scerr.ForbiddenError(string(e.Body))
 	case gophercloud.ErrDefault404:
-		return scerr.NotFoundError(string(e.Body[:]))
+		return scerr.NotFoundError(string(e.Body))
 	case *gophercloud.ErrDefault404:
-		return scerr.NotFoundError(string(e.Body[:]))
+		return scerr.NotFoundError(string(e.Body))
 	case gophercloud.ErrDefault429:
-		return scerr.OverloadError(string(e.Body[:]))
+		return scerr.OverloadError(string(e.Body))
 	case *gophercloud.ErrDefault429:
-		return scerr.OverloadError(string(e.Body[:]))
+		return scerr.OverloadError(string(e.Body))
 	case gophercloud.ErrDefault500:
-		return scerr.InvalidRequestError(string(e.Body[:]))
+		return scerr.InvalidRequestError(string(e.Body))
 	case *gophercloud.ErrDefault500:
-		return scerr.InvalidRequestError(string(e.Body[:]))
+		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body[:])), nil, nil)
+		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), nil, nil)
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body[:])), nil, nil)
+		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), nil, nil)
 	}
 
 	logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())

@@ -470,7 +470,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	)
 	p := params.(data.Map)
 
-	if anon, ok = p["stepName"]; !ok {
+	if _, ok = p["stepName"]; !ok {
 		return nil, scerr.InvalidParameterError("params[stepName]", "is missing")
 	}
 	if stepName, ok = anon.(string); !ok {
@@ -479,7 +479,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if stepName == "" {
 		return nil, scerr.InvalidParameterError("param[stepName]", "cannot be an empty string")
 	}
-	if anon, ok = p["stepKey"]; !ok {
+	if _, ok = p["stepKey"]; !ok {
 		return nil, scerr.InvalidParameterError("params[stepKey]", "is missing")
 	}
 	if stepKey, ok = anon.(string); !ok {
@@ -488,13 +488,13 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if stepKey == "" {
 		return nil, scerr.InvalidParameterError("param[stepKey]", "cannot be an empty string")
 	}
-	if anon, ok = p["stepMap"]; !ok {
+	if _, ok = p["stepMap"]; !ok {
 		return nil, scerr.InvalidParameterError("params[stepMap]", "is missing")
 	}
 	if stepMap, ok = anon.(map[string]interface{}); !ok {
 		return nil, scerr.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
 	}
-	if anon, ok = p["variables"]; !ok {
+	if _, ok = p["variables"]; !ok {
 		return nil, scerr.InvalidParameterError("params[variables]", "is missing")
 	}
 	if vars, ok = p["variables"].(Variables); !ok {

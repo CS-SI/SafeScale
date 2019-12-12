@@ -1,6 +1,6 @@
 package utils
 
-var (
+const (
 	// BaseFolder is the path of the base folder containing safescale data
 	BaseFolder = "/opt/safescale"
 	// VarFolder ...

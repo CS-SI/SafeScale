@@ -196,7 +196,7 @@ func getFreePort() (int, error) {
 	}
 	tcp, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
-		return 0, fmt.Errorf("Invalid listener.Addr()")
+		return 0, fmt.Errorf("invalid listener.Addr()")
 	}
 
 	port := tcp.Port
@@ -400,7 +400,7 @@ func (sc *SSHCommand) Start() error {
 
 // Display ...
 func (sc *SSHCommand) Display() string {
-	return strings.Join(sc.cmd.Args[:], " ")
+	return strings.Join(sc.cmd.Args, " ")
 }
 
 // Run starts the specified command and waits for it to complete.
@@ -449,10 +449,10 @@ func (sc *SSHCommand) Run(t concurrency.Task) (int, string, string, error) {
 		if erro != nil {
 			return -1, "", "", err
 		}
-		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
+		return retCode, string(msgOut), fmt.Sprint(string(msgErr), msgError), nil
 	}
 
-	return 0, string(msgOut[:]), string(msgErr[:]), nil
+	return 0, string(msgOut), string(msgErr), nil
 }
 
 // RunWithTimeout ...
@@ -513,29 +513,29 @@ func (sc *SSHCommand) RunWithTimeout(ctx context.Context, t concurrency.Task, ti
 		if err != nil {
 			msgError, retCode, erro := ExtractRetCode(err)
 			if erro != nil {
-				return 0, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), err
+				return 0, string(msgOut), fmt.Sprint(string(msgErr), msgError), err
 			}
 			if !cleanlyDone && retCode != 0 {
 				if strings.Contains(sc.Display(), ".check_") {
 					if retCode != 1 {
-						log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
+						log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut), fmt.Sprint(string(msgErr), msgError))
 					}
 				} else {
-					log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError))
+					log.Tracef("there have been issues running this command [%s], stdout: [%s], stderr: [%s]", sc.Display(), string(msgOut), fmt.Sprint(string(msgErr), msgError))
 				}
 			}
 
-			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
+			return retCode, string(msgOut), fmt.Sprint(string(msgErr), msgError), nil
 		}
 	case <-time.After(timeout):
 		errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
 		log.Warnf(errMsg)
-		return 0, string(msgOut[:]), string(msgErr[:]), fmt.Errorf(errMsg)
+		return 0, string(msgOut), string(msgErr), fmt.Errorf(errMsg)
 	case <-ctx.Done():
-		return 0, string(msgOut[:]), string(msgErr[:]), retry.AbortedError("operation aborted by user", nil)
+		return 0, string(msgOut), string(msgErr), retry.AbortedError("operation aborted by user", nil)
 	}
 
-	return 0, string(msgOut[:]), string(msgErr[:]), nil
+	return 0, string(msgOut), string(msgErr), nil
 }
 
 func (sc *SSHCommand) cleanup() error {
@@ -617,7 +617,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 	}
 
 	if cmdString != "" {
-		sshCmdString = sshCmdString + fmt.Sprintf("%s bash <<'ENDSSH'\n%s\nENDSSH", sudoOpt, cmdString)
+		sshCmdString += fmt.Sprintf("%s bash <<'ENDSSH'\n%s\nENDSSH", sudoOpt, cmdString)
 	}
 	return sshCmdString, f, nil
 

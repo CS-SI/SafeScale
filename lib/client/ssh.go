@@ -277,9 +277,7 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 		return err
 	}
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
-		func() error {
-			return sshCfg.Enter()
-		},
+		sshCfg.Enter,
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {

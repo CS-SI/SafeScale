@@ -136,7 +136,7 @@ func volumeStateConvert(gcpDriveStatus string) (VolumeState.Enum, error) {
 	case "RESTORING":
 		return VolumeState.CREATING, nil
 	default:
-		return -1, fmt.Errorf("Unexpected volume status: [%s]", gcpDriveStatus)
+		return -1, fmt.Errorf("unexpected volume status: [%s]", gcpDriveStatus)
 	}
 }
 

@@ -117,7 +117,7 @@ func (tm *taskedLock) RUnlock(task Task) error {
 
 	if _, ok := tm.readLocks[tid]; !ok {
 		tracer.Trace("Can't RUnlock, not RLocked")
-		return fmt.Errorf("Can't RUnlock task %s: not RLocked", tid)
+		return fmt.Errorf("can't RUnlock task %s: not RLocked", tid)
 	}
 	tm.readLocks[tid]--
 	if tm.readLocks[tid] == 0 {
@@ -203,11 +203,11 @@ func (tm *taskedLock) Unlock(task Task) error {
 	// but RUnlocks must have been done before Unlock.
 	if _, ok := tm.readLocks[tid]; ok {
 		tracer.Trace(fmt.Sprintf("Can't Unlock, %d remaining RLock inside", tm.readLocks[tid]))
-		return fmt.Errorf("Can't Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid])
+		return fmt.Errorf("can't Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid])
 	}
 	if _, ok := tm.writeLocks[tid]; !ok {
 		tracer.Trace("Can't Unlock, not Locked")
-		return fmt.Errorf("Can't Unlock task '%s': not Locked", tid)
+		return fmt.Errorf("can't Unlock task '%s': not Locked", tid)
 	}
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {

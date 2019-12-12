@@ -231,17 +231,16 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
 		}
 		return fmt.Errorf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
-	} else {
-		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
-		}
-
-		if retcode != 0 {
-			return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
-		}
-
-		return nil
 	}
+	if err != nil {
+		return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
+	}
+
+	if retcode != 0 {
+		return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+	}
+
+	return nil
 }
 
 func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {

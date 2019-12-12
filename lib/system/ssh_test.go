@@ -45,31 +45,32 @@ func Test_Command(t *testing.T) {
 
 	require.Nil(t, err)
 
-	ssh_conf := system.SSHConfig{
+	sshConf := system.SSHConfig{
 		User:       "oscar",
 		Host:       "127.0.0.1",
 		Port:       22,
 		PrivateKey: string(content),
 	}
-	cmd, err := ssh_conf.Command("whoami")
+	cmd, err := sshConf.Command("whoami")
 	require.Nil(t, err)
 	out, err := cmd.Output()
 	require.Nil(t, err)
 	require.Equal(t, "oscar", strings.Trim(string(out), "\n"))
-	gateway := ssh_conf
+	gateway := sshConf
 
 	if !utils.IsEmpty(gateway) {
-		ssh_conf.GatewayConfig = &gateway
-		cmd, err := ssh_conf.Command("bash -c whoami")
+		sshConf.GatewayConfig = &gateway
+		cmd, err := sshConf.Command("bash -c whoami")
 		require.Nil(t, err)
 		out, err := cmd.Output()
+		require.Nil(t, err)
 		require.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
 	}
 
 	/*
 		if !utils.IsEmpty(gateway) {
-			ssh_conf.GatewayConfig = &gateway
-			cmd, err := ssh_conf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
+			sshConf.GatewayConfig = &gateway
+			cmd, err := sshConf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
 			require.Nil(t, err)
 			vibra, err := cmd.Output()
 			require.NotNil(t, err)
@@ -80,10 +81,11 @@ func Test_Command(t *testing.T) {
 	*/
 
 	if !utils.IsEmpty(gateway) {
-		ssh_conf.GatewayConfig = &gateway
-		cmd, err := ssh_conf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
+		sshConf.GatewayConfig = &gateway
+		cmd, err := sshConf.Command("BASH_XTRACEFD=7 ./fuchsia.sh 7> /tmp/captured 2>&7;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured;exit `cat /tmp/errc`")
 		require.Nil(t, err)
 		errc, vibra, _, err := cmd.RunWithTimeout(context.TODO(), nil, 2*time.Minute)
+		require.Nil(t, err)
 		if errc != 0 {
 			fmt.Println(string(vibra))
 		}

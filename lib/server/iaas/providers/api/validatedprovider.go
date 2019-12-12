@@ -96,8 +96,8 @@ func (w ValidatedProvider) GetName() string {
 // Stack specific functions
 
 // NewValidatedProvider ...
-func NewValidatedProvider(InnerProvider Provider, name string) *ValidatedProvider {
-	return &ValidatedProvider{InnerProvider: InnerProvider, Name: name}
+func NewValidatedProvider(innerProvider Provider, name string) *ValidatedProvider {
+	return &ValidatedProvider{InnerProvider: innerProvider, Name: name}
 }
 
 // ListAvailabilityZones ...

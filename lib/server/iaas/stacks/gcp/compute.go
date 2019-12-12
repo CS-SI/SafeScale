@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -285,17 +284,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	if defaultGateway == nil && !hostMustHavePublicIP {
 		return nil, userData, fmt.Errorf("the host %s must have a gateway or be public", resourceName)
-	}
-
-	var nets []servers.Network
-
-	// FIXME add provider network to host networks ?
-
-	// Add private networks
-	for _, n := range request.Networks {
-		nets = append(nets, servers.Network{
-			UUID: n.ID,
-		})
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -799,7 +787,7 @@ func stateConvert(gcpHostStatus string) (HostState.Enum, error) {
 	case "TERMINATED":
 		return HostState.STOPPED, nil
 	default:
-		return -1, fmt.Errorf("Unexpected host status: [%s]", gcpHostStatus)
+		return -1, fmt.Errorf("unexpected host status: [%s]", gcpHostStatus)
 	}
 }
 

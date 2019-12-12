@@ -183,6 +183,10 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 		tasks = append(tasks, rt)
 	}
 
+	if len(tasks) == 0 {
+		t.Fatal("Unexpected error")
+	}
+
 	var res TaskResult
 
 	c := make(chan struct{})
@@ -237,6 +241,9 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 
 	begin := time.Now()
 	waited, _, err := overlord.WaitFor(time.Duration(10) * 10 * time.Millisecond)
+	if err != nil {
+		t.Errorf("Unexpected: %s", err)
+	}
 	end := time.Since(begin)
 
 	if end >= (time.Millisecond * 10 * 12) {

@@ -55,15 +55,13 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
 	if recnet != nil && err == nil {
 		recreateSafescaleNetwork = false
-	} else {
-		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok {
-				if gerr.Code != 404 {
-					return nil, err
-				}
-			} else {
+	} else if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok {
+			if gerr.Code != 404 {
 				return nil, err
 			}
+		} else {
+			return nil, err
 		}
 	}
 

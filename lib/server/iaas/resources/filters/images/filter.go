@@ -46,7 +46,7 @@ func (f *Filter) Not() *Filter {
 func (f *Filter) And(other *Filter) *Filter {
 	oldFilter := f.filter
 	f.filter = func(in resources.Image) bool {
-		return oldFilter(in) && (*other).filter(in)
+		return oldFilter(in) && other.filter(in)
 	}
 	return f
 }
@@ -55,7 +55,7 @@ func (f *Filter) And(other *Filter) *Filter {
 func (f *Filter) Or(other *Filter) *Filter {
 	oldFilter := f.filter
 	f.filter = func(in resources.Image) bool {
-		return oldFilter(in) || (*other).filter(in)
+		return oldFilter(in) || other.filter(in)
 	}
 	return f
 }

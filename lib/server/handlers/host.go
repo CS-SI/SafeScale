@@ -709,7 +709,7 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	log.Infof("Waiting for reboot... of host '%s'", host.Name)
+	log.Infof("Waiting for reboot... of host '%s', stderr=[%s]", host.Name, stderr)
 	// Wait like 5 min for the machine to reboot
 	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetHostTimeout())
 	if err != nil {
@@ -1059,7 +1059,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 
 	if deleteMetadataOnly {
-		return fmt.Errorf("Unable to find the host even if it is described by metadatas\nIncoherent metadatas have been supressed")
+		return fmt.Errorf("unable to find the host even if it is described by metadatas\nIncoherent metadatas have been supressed")
 	}
 
 	select { // FIXME Unorthodox usage of context

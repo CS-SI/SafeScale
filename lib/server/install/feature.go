@@ -189,16 +189,15 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 		default:
 			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
-	} else {
-		if v.IsSet("feature") {
-			feat = Feature{
-				fileName:    name + ".yml",
-				displayName: name,
-				specs:       v,
-				task:        task,
-			}
+	} else if v.IsSet("feature") {
+		feat = Feature{
+			fileName:    name + ".yml",
+			displayName: name,
+			specs:       v,
+			task:        task,
 		}
 	}
+
 	return &feat, err
 }
 

@@ -34,16 +34,16 @@ var provider providerapi.Provider
 
 func getTester() (*tests.ServiceTester, error) {
 	if tester == nil {
-		the_service, err := getClient()
+		theService, err := getClient()
 		if err != nil {
 			return nil, err
 		}
-		// the_service, err := flexibleengine.Build(stacks.AuthenticationOptions{}, stacks.ConfigurationOptions{})
+		// theService, err := flexibleengine.Build(stacks.AuthenticationOptions{}, stacks.ConfigurationOptions{})
 		// if err != nil {
 		// 	return nil, err
 		// }
 		tester = &tests.ServiceTester{
-			Service: the_service,
+			Service: theService,
 		}
 	}
 	return tester, nil
@@ -51,14 +51,14 @@ func getTester() (*tests.ServiceTester, error) {
 
 func getClient() (iaas.Service, error) {
 	if service == nil {
-		tenant_name := ""
-		if tenant_override := os.Getenv("TEST_FLEXIBLE"); tenant_override != "" {
-			tenant_name = tenant_override
+		tenantName := ""
+		if tenantOverride := os.Getenv("TEST_FLEXIBLE"); tenantOverride != "" {
+			tenantName = tenantOverride
 		}
 		var err error
-		service, err = iaas.UseService(tenant_name)
+		service, err = iaas.UseService(tenantName)
 		if err != nil || service == nil {
-			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name)
+			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
 		}
 	}
 	return service, nil

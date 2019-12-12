@@ -11,7 +11,7 @@ func Test_Basic(t *testing.T) {
 	integration_tests.Basic(t, Providers.CLOUDFERRO)
 }
 func Test_ReadyToSsh(t *testing.T) {
-	integration_tests.ReadyToSsh(t, Providers.CLOUDFERRO)
+	integration_tests.ReadyToSSH(t, Providers.CLOUDFERRO)
 }
 
 func Test_ShareError(t *testing.T) {
