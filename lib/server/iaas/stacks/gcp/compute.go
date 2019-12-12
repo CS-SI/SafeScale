@@ -391,7 +391,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
+			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
 			if err != nil {
 				if server != nil {
 					// try deleting server
@@ -549,7 +549,7 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 }
 
 // buildGcpMachine ...
-func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate) (*resources.Host, error) {
+func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate) (*resources.Host, error) {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
 	imageURL := imageID
@@ -583,7 +583,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 			{
 				AccessConfigs: publicAccess(isPublic),
 				Network:       prefix + "/global/networks/" + network,
-				Subnetwork:    prefix + "/regions/europe-west1/subnetworks/" + subnetwork,
+				Subnetwork:    prefix + "/regions/" + region + "/subnetworks/" + subnetwork,
 			},
 		},
 		ServiceAccounts: []*compute.ServiceAccount{
