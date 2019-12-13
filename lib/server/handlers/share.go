@@ -17,15 +17,14 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
@@ -41,27 +40,25 @@ import (
 
 // ShareAPI defines API to manipulate Shares
 type ShareAPI interface {
-	Create(context.Context, string, string, string, []string, bool, bool, bool, bool, bool, bool, bool) (*propsv1.HostShare, error)
-	ForceInspect(context.Context, string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	Inspect(context.Context, string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	Delete(context.Context, string) error
-	List(context.Context) (map[string]map[string]*propsv1.HostShare, error)
-	Mount(context.Context, string, string, string, bool) (*propsv1.HostRemoteMount, error)
-	Unmount(context.Context, string, string) error
+	Create(string, string, string, []string, bool, bool, bool, bool, bool, bool, bool) (*propsv1.HostShare, error)
+	ForceInspect(string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
+	Inspect(string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
+	Delete(string) error
+	List() (map[string]map[string]*propsv1.HostShare, error)
+	Mount(string, string, string, bool) (*propsv1.HostRemoteMount, error)
+	Unmount(string, string) error
 }
 
 // FIXME ROBUSTNESS All functions MUST propagate context
 
 // ShareHandler nas service
 type ShareHandler struct {
-	service iaas.Service
+	job server.Job
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(svc iaas.Service) ShareAPI {
-	return &ShareHandler{
-		service: svc,
-	}
+func NewShareHandler(job server.Job) ShareAPI {
+	return &ShareHandler{job: job}
 }
 
 func sanitize(in string) (string, error) {
@@ -74,31 +71,29 @@ func sanitize(in string) (string, error) {
 
 // Create a share on host
 func (handler *ShareHandler) Create(
-	ctx context.Context,
 	shareName, hostName, path string, securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
 ) (share *propsv1.HostShare, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-
 	if shareName == "" {
-		return nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("shareName", "cannot be empty")
 	}
 	if hostName == "" {
-		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("hostName", "cannot be empty")
 	}
 	if path == "" {
-		return nil, scerr.InvalidParameterError("path", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("path", "cannot be empty")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	// Check if a share already exists with the same name
-	server, _, _, err := handler.Inspect(ctx, shareName)
+	server, _, _, err := handler.Inspect(shareName)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			return nil, err
@@ -114,8 +109,8 @@ func (handler *ShareHandler) Create(
 		return nil, err
 	}
 
-	hostHandler := NewHostHandler(handler.service)
-	server, err = hostHandler.Inspect(ctx, hostName)
+	hostHandler := NewHostHandler(handler.job)
+	server, err = hostHandler.Inspect(hostName)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +134,8 @@ func (handler *ShareHandler) Create(
 	}
 
 	// Installs NFS Server software if needed
-	sshHandler := NewSSHHandler(handler.service)
-	sshConfig, err := sshHandler.GetConfig(ctx, server)
+	sshHandler := NewSSHHandler(handler.job)
+	sshConfig, err := sshHandler.GetConfig(server)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +148,7 @@ func (handler *ShareHandler) Create(
 		serverSharesV1 := v.(*propsv1.HostShares)
 		if len(serverSharesV1.ByID) == 0 {
 			// Host doesn't have shares yet, so install NFS
-			err = nfsServer.Install(ctx)
+			err = nfsServer.Install(handler.job.Task())
 			if err != nil {
 				return err
 			}
@@ -163,15 +158,15 @@ func (handler *ShareHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	err = nfsServer.AddShare(ctx, sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
+	err = nfsServer.AddShare(handler.job.Task(), sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			err2 := nfsServer.RemoveShare(ctx, sharePath)
+			err2 := nfsServer.RemoveShare(handler.job.Task(), sharePath)
 			if err2 != nil {
-				log.Warn("failed to RemoveShare")
+				logrus.Warn("failed to RemoveShare")
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
@@ -200,11 +195,16 @@ func (handler *ShareHandler) Create(
 		return nil, err
 	}
 
-	mh, err := metadata.SaveHost(handler.service, server)
+	if handler.job.Aborted() {
+		return nil, scerr.AbortedError("aborted", nil)
+	}
+
+	mh, err := metadata.SaveHost(handler.job.Service(), server)
 	if err != nil {
 		return nil, err
 	}
 	newShare := share
+
 	defer func() {
 		if err != nil {
 			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
@@ -214,17 +214,17 @@ func (handler *ShareHandler) Create(
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("failed to set shares metadata of host %s", hostName)
+				logrus.Warnf("failed to set shares metadata of host %s", hostName)
 				err = scerr.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
-				log.Warnf("failed to save metadata of host %s", hostName)
+				logrus.Warnf("failed to save metadata of host %s", hostName)
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
 	}()
-	ms, err := metadata.SaveShare(handler.service, server.ID, server.Name, share.ID, share.Name)
+	ms, err := metadata.SaveShare(handler.job.Service(), server.ID, server.Name, share.ID, share.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -232,40 +232,42 @@ func (handler *ShareHandler) Create(
 		if err != nil {
 			derr := ms.Delete()
 			if derr != nil {
-				log.Warnf("failed to delete metadata of share '%s'", newShare.Name)
+				logrus.Warnf("failed to delete metadata of share '%s'", newShare.Name)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
 
-	select {
-	case <-ctx.Done():
-		log.Warnf("Share creation cancelled by user")
-		err = fmt.Errorf("share creation cancelled by user")
-		return nil, err
-	default:
-	}
+	// select {
+	// case <-ctx.Done():
+	// 	logrus.Warnf("Share creation cancelled by user")
+	// 	err = fmt.Errorf("share creation cancelled by user")
+	// 	return nil, err
+	// default:
+	// }
 
 	return share, nil
 }
 
 // Delete a share from host
-func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) {
+func (handler *ShareHandler) Delete(name string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-
+	if handler.job == nil {
+		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
 	if name == "" {
 		return scerr.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	// Retrieve info about the share
-	server, share, _, err := handler.ForceInspect(ctx, name)
+	server, share, _, err := handler.ForceInspect(name)
 	if err != nil {
 		return err
 	}
@@ -286,8 +288,8 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 			return fmt.Errorf("still used by: %s", strings.Join(list, ","))
 		}
 
-		sshHandler := NewSSHHandler(handler.service)
-		sshConfig, err := sshHandler.GetConfig(ctx, server.ID)
+		sshHandler := NewSSHHandler(handler.job)
+		sshConfig, err := sshHandler.GetConfig(server.ID)
 		if err != nil {
 			return err
 		}
@@ -296,7 +298,7 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 		if err != nil {
 			return err
 		}
-		err = nfsServer.RemoveShare(ctx, share.Path)
+		err = nfsServer.RemoveShare(handler.job.Task(), share.Path)
 		if err != nil {
 			return err
 		}
@@ -309,39 +311,36 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 		return err
 	}
 
+	// check if job has been aborted; if yes stop here
+	if handler.job.Aborted() {
+		return scerr.AbortedError("aborted", nil)
+	}
+
 	// Save server metadata
-	_, err = metadata.SaveHost(handler.service, server)
+	_, err = metadata.SaveHost(handler.job.Service(), server)
 	if err != nil {
 		return err
 	}
 
 	// Remove share metadata
-	err = metadata.RemoveShare(handler.service, server.ID, server.Name, share.ID, share.Name)
+	err = metadata.RemoveShare(handler.job.Service(), server.ID, server.Name, share.ID, share.Name)
 	if err != nil {
 		return err
-	}
-
-	select { // FIXME Unorthodox usage of context
-	case <-ctx.Done():
-		log.Warnf("Share deletion cancelled by user")
-		_, err = handler.Create(context.Background(), share.Name, server.Name, share.Path, []string{}, false, false, false, false, false, false, false)
-		if err != nil {
-			return fmt.Errorf("failed to stop share deletion")
-		}
-		return fmt.Errorf("share deletion cancelled by user")
-	default:
 	}
 
 	return nil
 }
 
 // List return the list of all shares from all servers
-func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[string]*propsv1.HostShare, err error) { // FIXME Make sure ctx is propagated
+func (handler *ShareHandler) List() (props map[string]map[string]*propsv1.HostShare, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+	if handler.job == nil {
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -349,11 +348,14 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	shares := map[string]map[string]*propsv1.HostShare{}
 
 	var servers []string
-	ms, err := metadata.NewShare(handler.service)
+	ms, err := metadata.NewShare(handler.job.Service())
 	if err != nil {
 		return nil, err
 	}
 	err = ms.Browse(func(hostName string, shareID string) error {
+		if handler.job.Aborted() {
+			return scerr.AbortedError("aborted", nil)
+		}
 		servers = append(servers, hostName)
 		return nil
 	})
@@ -366,9 +368,13 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 		return shares, nil
 	}
 
-	hostSvc := NewHostHandler(handler.service)
+	hostSvc := NewHostHandler(handler.job)
 	for _, serverID := range servers {
-		host, err := hostSvc.Inspect(ctx, serverID)
+		if handler.job.Aborted() {
+			return nil, scerr.AbortedError("aborted", nil)
+		}
+
+		host, err := hostSvc.Inspect(serverID)
 		if err != nil {
 			return nil, err
 		}
@@ -386,12 +392,7 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 }
 
 // Mount a share on a local directory of an host
-func (handler *ShareHandler) Mount(
-	ctx context.Context,
-	shareName, hostName, path string,
-	withCache bool,
-) (mount *propsv1.HostRemoteMount, err error) {
-	defer scerr.OnPanic(&err)()
+func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache bool) (mount *propsv1.HostRemoteMount, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -408,12 +409,13 @@ func (handler *ShareHandler) Mount(
 		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	// Retrieve info about the share
-	server, share, _, err := handler.Inspect(ctx, shareName)
+	server, share, _, err := handler.Inspect(shareName)
 	if err != nil {
 		return nil, err
 	}
@@ -434,8 +436,8 @@ func (handler *ShareHandler) Mount(
 	if server.Name == hostName || server.ID == hostName {
 		target = server
 	} else {
-		hostSvc := NewHostHandler(handler.service)
-		target, err = hostSvc.Inspect(ctx, hostName)
+		hostSvc := NewHostHandler(handler.job)
+		target, err = hostSvc.Inspect(hostName)
 		if err != nil {
 			return nil, err
 		}
@@ -480,8 +482,8 @@ func (handler *ShareHandler) Mount(
 		return nil, err
 	}
 
-	sshHandler := NewSSHHandler(handler.service)
-	sshConfig, err := sshHandler.GetConfig(ctx, target)
+	sshHandler := NewSSHHandler(handler.job)
+	sshConfig, err := sshHandler.GetConfig(target)
 	if err != nil {
 		return nil, err
 	}
@@ -499,12 +501,12 @@ func (handler *ShareHandler) Mount(
 		if err != nil {
 			return err
 		}
-		err = nfsClient.Install(ctx)
+		err = nfsClient.Install(handler.job.Task())
 		if err != nil {
 			return err
 		}
 
-		err = nfsClient.Mount(ctx, export, mountPath, withCache)
+		err = nfsClient.Mount(handler.job.Task(), export, mountPath, withCache)
 		if err != nil {
 			return err
 		}
@@ -518,28 +520,28 @@ func (handler *ShareHandler) Mount(
 	}
 	defer func() {
 		if err != nil {
-			sshHandler := NewSSHHandler(handler.service)
-			sshConfig, derr := sshHandler.GetConfig(ctx, target)
+			sshHandler := NewSSHHandler(handler.job)
+			sshConfig, derr := sshHandler.GetConfig(target)
 			if derr != nil {
-				log.Warn(derr)
+				logrus.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 
 			nfsClient, derr := nfs.NewNFSClient(sshConfig)
 			if derr != nil {
-				log.Warn(derr)
+				logrus.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 
-			derr = nfsClient.Install(ctx)
+			derr = nfsClient.Install(handler.job.Task())
 			if derr != nil {
-				log.Warn(derr)
+				logrus.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 
-			derr = nfsClient.Unmount(ctx, export)
+			derr = nfsClient.Unmount(handler.job.Task(), export)
 			if derr != nil {
-				log.Warn(derr)
+				logrus.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
@@ -565,7 +567,7 @@ func (handler *ShareHandler) Mount(
 		return nil, err
 	}
 
-	mh, err := metadata.SaveHost(handler.service, server)
+	mh, err := metadata.SaveHost(handler.job.Service(), server)
 	if err != nil {
 		return nil, err
 	}
@@ -578,19 +580,19 @@ func (handler *ShareHandler) Mount(
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
+				logrus.Warnf("failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
 				err = scerr.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
-				log.Warnf("failed to save host %s metadatas : %s", server.Name, err2.Error())
+				logrus.Warnf("failed to save host %s metadatas : %s", server.Name, err2.Error())
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
 	}()
 
 	if target != server {
-		_, err = metadata.SaveHost(handler.service, target)
+		_, err = metadata.SaveHost(handler.job.Service(), target)
 		if err != nil {
 			return nil, err
 		}
@@ -607,48 +609,46 @@ func (handler *ShareHandler) Mount(
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
+				logrus.Warnf("failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
 				err = scerr.AddConsequence(err, err2)
 			}
-			_, err2 = metadata.SaveHost(handler.service, target)
+			_, err2 = metadata.SaveHost(handler.job.Service(), target)
 			if err2 != nil {
-				log.Warnf("failed to save host '%s' metadata : %s", hostName, err2.Error())
+				logrus.Warnf("failed to save host '%s' metadata : %s", hostName, err2.Error())
 				err = scerr.AddConsequence(err, err2)
 			}
 		}
 	}()
 
-	select {
-	case <-ctx.Done():
-		log.Warnf("Share mount cancelled by user")
-		err = fmt.Errorf("share mount cancelled by user")
-		return nil, err
-	default:
-	}
+	// select {
+	// case <-ctx.Done():
+	// 	logrus.Warnf("Share mount cancelled by user")
+	// 	err = fmt.Errorf("share mount cancelled by user")
+	// 	return nil, err
+	// default:
+	// }
 
 	return mount, nil
 }
 
 // Unmount a share from local directory of an host
-func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) {
+func (handler *ShareHandler) Unmount(shareName, hostName string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-
 	if shareName == "" {
 		return scerr.InvalidParameterError("shareName", "cannot be empty!")
 	}
-
 	if hostName == "" {
 		return scerr.InvalidParameterError("hostName", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	server, share, _, err := handler.ForceInspect(ctx, shareName)
+	server, share, _, err := handler.ForceInspect(shareName)
 	if err != nil {
 		return err
 	}
@@ -673,8 +673,8 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	if server.Name == hostName || server.ID == hostName {
 		target = server
 	} else {
-		hostSvc := NewHostHandler(handler.service)
-		target, err = hostSvc.ForceInspect(ctx, hostName)
+		hostSvc := NewHostHandler(handler.job)
+		target, err = hostSvc.ForceInspect(hostName)
 		if err != nil {
 			return err
 		}
@@ -689,8 +689,8 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 		}
 
 		// Unmount share from client
-		sshHandler := NewSSHHandler(handler.service)
-		sshConfig, err := sshHandler.GetConfig(ctx, target.ID)
+		sshHandler := NewSSHHandler(handler.job)
+		sshConfig, err := sshHandler.GetConfig(target.ID)
 		if err != nil {
 			return err
 		}
@@ -698,7 +698,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 		if err != nil {
 			return err
 		}
-		err = nfsClient.Unmount(ctx, server.GetAccessIP()+":"+share.Path)
+		err = nfsClient.Unmount(handler.job.Task(), server.GetAccessIP()+":"+share.Path)
 		if err != nil {
 			return err
 		}
@@ -725,50 +725,45 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	}
 
 	// Saves metadata
-	_, err = metadata.SaveHost(handler.service, server)
+	_, err = metadata.SaveHost(handler.job.Service(), server)
 	if err != nil {
 		return err
 	}
 	if server != target {
-		_, err = metadata.SaveHost(handler.service, target)
+		_, err = metadata.SaveHost(handler.job.Service(), target)
 		if err != nil {
 			return err
 		}
 	}
 
-	select { // FIXME Unorthodox usage of context
-	case <-ctx.Done():
-		log.Warnf("Share unmount cancelled by user")
-		_, err = handler.Mount(context.Background(), shareName, hostName, mountPath, false)
-		if err != nil {
-			return fmt.Errorf("failed to stop share unmount")
-		}
-		return fmt.Errorf("share unmounting cancelled by user")
-	default:
-	}
+	// select { // FIXME Unorthodox usage of context; use instead job.Aborted() in strategic places to react accordingly
+	// case <-ctx.Done():
+	// 	logrus.Warnf("Share unmount cancelled by user")
+	// 	_, err = handler.Mount(context.Background(), shareName, hostName, mountPath, false)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to stop share unmount")
+	// 	}
+	// 	return fmt.Errorf("share unmounting cancelled by user")
+	// default:
+	// }
 
 	return nil
 }
 
 // ForceInspect returns the host and share corresponding to 'shareName'
-func (handler *ShareHandler) ForceInspect(
-	ctx context.Context,
-	shareName string,
-) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
-
+func (handler *ShareHandler) ForceInspect(shareName string) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
 	if handler == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
-
 	if shareName == "" {
 		return nil, nil, nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	host, share, mounts, err := handler.Inspect(ctx, shareName)
+	host, share, mounts, err := handler.Inspect(shareName)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -780,24 +775,20 @@ func (handler *ShareHandler) ForceInspect(
 
 // Inspect returns the host and share corresponding to 'shareName'
 // If share isn't found, return (nil, nil, nil, utils.ErrNotFound)
-func (handler *ShareHandler) Inspect(
-	ctx context.Context,
-	shareName string,
-) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
+func (handler *ShareHandler) Inspect(shareName string) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
 	if handler == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
-
 	if shareName == "" {
 		return nil, nil, nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	hostName, err := metadata.LoadShare(handler.service, shareName)
+	hostName, err := metadata.LoadShare(handler.job.Service(), shareName)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, nil, nil, resources.ResourceNotFoundError("share", shareName)
@@ -808,8 +799,8 @@ func (handler *ShareHandler) Inspect(
 		return nil, nil, nil, fmt.Errorf("failed to find host sharing '%s'", shareName)
 	}
 
-	hostSvc := NewHostHandler(handler.service)
-	server, err := hostSvc.ForceInspect(ctx, hostName)
+	hostSvc := NewHostHandler(handler.job)
+	server, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -839,9 +830,9 @@ func (handler *ShareHandler) Inspect(
 
 	mounts := map[string]*propsv1.HostRemoteMount{}
 	for k := range share.ClientsByName {
-		client, err := hostSvc.Inspect(ctx, k)
+		client, err := hostSvc.Inspect(k)
 		if err != nil {
-			log.Errorf("%+v", err)
+			logrus.Errorf("%+v", err)
 			errors = append(errors, err)
 			continue
 		}
@@ -859,7 +850,7 @@ func (handler *ShareHandler) Inspect(
 			return nil
 		})
 		if err != nil {
-			log.Error(err)
+			logrus.Error(err)
 			errors = append(errors, err)
 			continue
 		}
@@ -873,7 +864,7 @@ func (handler *ShareHandler) Inspect(
 }
 
 func (handler *ShareHandler) findShare(shareName string) (string, error) {
-	hostName, err := metadata.LoadShare(handler.service, shareName)
+	hostName, err := metadata.LoadShare(handler.job.Service(), shareName)
 	if err != nil {
 		return "", err
 	}

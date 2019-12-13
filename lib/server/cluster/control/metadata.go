@@ -142,7 +142,6 @@ func (m *Metadata) Write() error {
 	return m.item.Write(m.name)
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
 // Reload reloads the metadata from ObjectStorage
 // It's a good idea to do that just after an Acquire() to be sure to have the latest data
 func (m *Metadata) Reload(task concurrency.Task) error {
@@ -150,7 +149,10 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	// If the metadata object has never been written yet, succeed doing nothing

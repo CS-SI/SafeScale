@@ -34,8 +34,8 @@ import (
 
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
-	Bucket     *bucket
-	Data       *data
+	Bucket *bucket
+	// Data       *data
 	Host       *host
 	Image      *image
 	JobManager *jobManager
@@ -79,7 +79,7 @@ func New() Client {
 	}
 
 	s.Bucket = &bucket{session: s}
-	s.Data = &data{session: s}
+	// s.Data = &data{session: s}
 	s.Host = &host{session: s}
 	s.Image = &image{session: s}
 	s.Network = &network{session: s}

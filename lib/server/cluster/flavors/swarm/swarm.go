@@ -38,10 +38,6 @@ import (
 
 //go:generate rice embed-go
 
-const (
-// tempFolder = "/opt/safescale/var/tmp/"
-)
-
 var (
 	templateBox atomic.Value
 
@@ -167,10 +163,11 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		dataBuffer := bytes.NewBufferString("")
 		identity := cluster.GetIdentity(task)
 		data := map[string]interface{}{
-			"CIDR":          netCfg.CIDR,
-			"CladmPassword": identity.AdminPassword,
-			"SSHPublicKey":  identity.Keypair.PublicKey,
-			"SSHPrivateKey": identity.Keypair.PrivateKey,
+			"CIDR":                 netCfg.CIDR,
+			"ClusterAdminUsername": "cladm",
+			"ClusterAdminPassword": identity.AdminPassword,
+			"SSHPublicKey":         identity.Keypair.PublicKey,
+			"SSHPrivateKey":        identity.Keypair.PrivateKey,
 		}
 		err = tmplPrepared.Execute(dataBuffer, data)
 		if err != nil {

@@ -19,10 +19,11 @@ package dcos
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strings"
 	"sync/atomic"
 	txttmpl "text/template"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -31,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/errorcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
@@ -147,18 +149,13 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index uint,
 		return err
 	}
 
-	ctx, err := task.GetContext()
-	if err != nil {
-		return err
-	}
-
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, host.Name)
 
 	netCfg, err := foreman.Cluster().GetNetworkConfig(task)
 	if err != nil {
 		return err
 	}
-	retcode, stdout, stderr, err := foreman.ExecuteScript(ctx, box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
+	retcode, stdout, stderr, err := foreman.ExecuteScript(task, box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
 		"BootstrapIP":   netCfg.GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
@@ -174,11 +171,6 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index uint,
 func configureNode(task concurrency.Task, foreman control.Foreman, index uint, host *pb.Host) error {
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, host.Name)
 
-	ctx, err := task.GetContext()
-	if err != nil {
-		return err
-	}
-
 	box, err := getTemplateBox()
 	if err != nil {
 		return err
@@ -187,7 +179,7 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index uint, h
 	if err != nil {
 		return err
 	}
-	retcode, stdout, stderr, err := foreman.ExecuteScript(ctx, box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
+	retcode, stdout, stderr, err := foreman.ExecuteScript(task, box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
 		"BootstrapIP":   netCfg.GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
@@ -266,11 +258,6 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 		return err
 	}
 
-	ctx, err := task.GetContext()
-	if err != nil {
-		return err
-	}
-
 	var dnsServers []string
 	cluster := foreman.Cluster()
 	cfg, err := cluster.GetService(task).GetConfigurationOptions()
@@ -302,7 +289,7 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 		"SSHPrivateKey":  identity.Keypair.PrivateKey,
 		"SSHPublicKey":   identity.Keypair.PublicKey,
 	}
-	retcode, stdout, stderr, err := foreman.ExecuteScript(ctx, box, funcMap, "dcos_prepare_bootstrap.sh", gwData, netCfg.GatewayID)
+	retcode, stdout, stderr, err := foreman.ExecuteScript(task, box, funcMap, "dcos_prepare_bootstrap.sh", gwData, netCfg.GatewayID)
 	if err != nil {
 		return err
 	}
@@ -359,11 +346,11 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		dataBuffer := bytes.NewBufferString("")
 		identity := cluster.GetIdentity(task)
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          netCfg.CIDR,
-			"Username":      "cladm",
-			"CladmPassword": identity.AdminPassword,
-			"SSHPublicKey":  identity.Keypair.PublicKey,
-			"SSHPrivateKey": identity.Keypair.PrivateKey,
+			"CIDR":                 netCfg.CIDR,
+			"ClusterAdminUsername": "cladm",
+			"ClusterAdminPassword": identity.AdminPassword,
+			"SSHPublicKey":         identity.Keypair.PublicKey,
+			"SSHPrivateKey":        identity.Keypair.PrivateKey,
 		})
 		if err != nil {
 			return "", fmt.Errorf("error realizing script template: %s", err.Error())
@@ -396,16 +383,15 @@ func getState(task concurrency.Task, foreman control.Foreman) (clusterstate.Enum
 
 	}
 
-	ctx, err := task.GetContext()
+	_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetContextTimeout())
 	if err != nil {
 		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to get valid context : %s", err.Error()))
 	}
-
-	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetContextTimeout())
+	retcode, _, stderr, err = safescaleClt.SSH.Run(task, master.ID, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
-		return clusterstate.Error, err
+		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to run remote command to get cluster state: %v\n%s", err, stderr))
 	}
-	retcode, _, stderr, err = safescaleClt.SSH.Run(ctx, master.ID, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, stderr, err = safescaleClt.SSH.Run(task, master.ID, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to run remote command to get cluster state: %v\n%s", err, stderr))
 	}

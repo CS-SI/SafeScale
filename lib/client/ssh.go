@@ -17,7 +17,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os/exec"
@@ -32,8 +31,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -43,9 +45,8 @@ type ssh struct {
 	session *Session
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
 // Run ...
-func (s *ssh) Run(ctx context.Context, hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) { // CRITICAL FIXME Use context here
+func (s *ssh) Run(task concurrency.Task, hostName, command string, outputs Outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	var (
 		retcode        int
 		stdout, stderr string
@@ -66,23 +67,17 @@ func (s *ssh) Run(ctx context.Context, hostName, command string, connectionTimeo
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	runctx, cancel, err := utils.GetTimeoutContext(ctx, executionTimeout)
-	if err != nil {
-		return -1, "", "", err
-	}
-	defer cancel()
-
 	var breakErr error
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// Create the command
 			var sshCmd *system.SSHCommand
-			sshCmd, err := sshCfg.Command(command)
+			sshCmd, err := sshCfg.Command(task, command)
 			if err != nil {
 				return err
 			}
 
-			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(runctx, nil, executionTimeout)
+			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(task, outputs, executionTimeout)
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if breakErr != nil {
@@ -160,7 +155,7 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy ...
-func (s *ssh) Copy(ctx context.Context, from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) { // FIXME CRITICAL Use context
+func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) { // FIXME CRITICAL Use context
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -218,19 +213,13 @@ func (s *ssh) Copy(ctx context.Context, from, to string, connectionTimeout, exec
 		connectionTimeout = executionTimeout
 	}
 
-	ctx, cancel, err := utils.GetTimeoutContext(ctx, executionTimeout)
-	if err != nil {
-		return -1, "", "", err
-	}
-	defer cancel()
-
 	var (
 		retcode        int
 		stdout, stderr string
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err = sshCfg.Copy(ctx, remotePath, localPath, upload)
+			retcode, stdout, stderr, err = sshCfg.Copy(task, remotePath, localPath, upload)
 			// If an error occurred, stop the loop and propagates this error
 			if err != nil {
 				retcode = -1
@@ -277,13 +266,15 @@ func (s *ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHCon
 
 // FIXME ROBUSTNESS All functions MUST propagate context
 // Connect ...
-func (s *ssh) Connect(name string, timeout time.Duration) error {
-	sshCfg, err := s.getSSHConfigFromName(name, timeout)
+func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) error {
+	sshCfg, err := s.getSSHConfigFromName(hostname, timeout)
 	if err != nil {
 		return err
 	}
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
-		sshCfg.Enter,
+		func() error {
+			return sshCfg.Enter(username, shell)
+		},
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
@@ -375,7 +366,7 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 }
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
-func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
+func (s *ssh) WaitReady(task concurrency.Task, hostName string, timeout time.Duration) error {
 	if timeout < temporal.GetHostTimeout() {
 		timeout = temporal.GetHostTimeout()
 	}
@@ -384,6 +375,6 @@ func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
 		return err
 	}
 
-	_, err = sshCfg.WaitServerReady(context.TODO(), "ready", timeout) // FIXME Remove context.TODO()
+	_, err = sshCfg.WaitServerReady(task, "ready", timeout) // FIXME Remove context.TODO()
 	return err
 }

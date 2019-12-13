@@ -18,7 +18,8 @@
 feature:
     suitableFor:
         host: no
-        cluster: yes
+        cluster: all
+
     requirements:
         features:
             - docker

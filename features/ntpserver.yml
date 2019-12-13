@@ -19,6 +19,10 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+
+    parameters:
+        PEERS=
+
     install:
         bash:
             check:
@@ -26,10 +30,10 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -50,9 +54,9 @@ feature:
                 steps:
                     ntp-server:
                         targets:
-                            hosts: no
+                            hosts: yes
                             gateways: all
-                            masters: all
+                            masters: no
                             nodes: all
                         run: |
                             case $LINUX_KIND in
@@ -73,10 +77,10 @@ feature:
 
                     firewall:
                         targets:
-                            gateways: all
-                            hosts: no
+                            gateways: no
+                            hosts: yes
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             # Makes sure firewalld is running, starting first its dependency dbus...
                             sfService start dbus
@@ -87,10 +91,10 @@ feature:
 
                     ready:
                         targets:
-                            gateways: all
-                            hosts: no
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -119,10 +123,10 @@ feature:
                 steps:
                     ntp-server:
                         targets:
-                            gateways: all
-                            hosts: no
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)

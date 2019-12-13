@@ -18,7 +18,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -33,12 +32,14 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	_ "github.com/CS-SI/SafeScale/lib/server" // Imported to initialise tenants
@@ -303,6 +304,10 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 		return err
 	}
 
+	job, err := server.NewJob(nil, nil, serviceProvider, "")
+	if err != nil {
+		return err
+	}
 	err = dumpImages(serviceProvider, theTenant)
 	if err != nil {
 		return err
@@ -398,9 +403,9 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			hostHandler := handlers.NewHostHandler(serviceProvider)
+			hostHandler := handlers.NewHostHandler(job)
 
-			host, err := hostHandler.Create(context.Background(), hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
+			host, err := hostHandler.Create(hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
@@ -408,29 +413,29 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 			defer func() {
 				log.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.ID)
-				delerr := hostHandler.Delete(context.Background(), host.ID)
+				delerr := hostHandler.Delete(host.ID)
 				if delerr != nil {
 					log.Warnf("Error deleting host '%s'", host.ID)
 				}
 			}()
 
-			sshSvc := handlers.NewSSHHandler(serviceProvider)
-			ssh, err := sshSvc.GetConfig(context.Background(), host.ID) // FIXME Remove context.Background()
+			sshSvc := handlers.NewSSHHandler(job)
+			ssh, err := sshSvc.GetConfig(host.ID) // FIXME Remove context.Background()
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			_, nerr := ssh.WaitServerReady(context.Background(), "ready", time.Duration(6+concurrency-1)*time.Minute)
+			_, nerr := ssh.WaitServerReady(job.Task(), "ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
 				log.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
 			}
-			c, err := ssh.Command(cmd)
+			c, err := ssh.Command(job.Task(), cmd)
 			if err != nil {
 				log.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
-			_, cout, _, err := c.RunWithTimeout(context.TODO(), nil, 8*time.Minute) // FIXME Hardcoded timeout
+			_, cout, _, err := c.RunWithTimeout(nil, Outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
 			if err != nil {
 				log.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
 				return err

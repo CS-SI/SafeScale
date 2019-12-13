@@ -18,7 +18,6 @@ package utils
 
 import (
 	"github.com/sirupsen/logrus"
-	"math"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -293,15 +292,16 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 	}
 }
 
-// ToPBFileList convert a list of file names from api to protocolbuffer FileList format
-func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, fileBuckets [][]string) *pb.FileList {
-	var files []*pb.File
-	nbFiles := int(math.Min(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))), float64(len(fileBuckets))))
-	for i := 0; i < nbFiles; i++ {
-		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
-	}
-	return &pb.FileList{Files: files}
-}
+// VPL: data stuff disabled
+// // ToPBFileList convert a list of file names from api to protocolbuffer FileList format
+// func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, fileBuckets [][]string) *pb.FileList {
+// 	files := []*pb.File{}
+// 	nbFiles := int(math.Min(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))), float64(len(fileBuckets))))
+// 	for i := 0; i < nbFiles; i++ {
+// 		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
+// 	}
+// 	return &pb.FileList{Files: files}
+// }
 
 // ToPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
 func ToPBHostSizing(src resources.SizingRequirements) pb.HostSizing {

@@ -123,8 +123,10 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 
 // getTemplateBox
 func getTemplateBox() (*rice.Box, error) {
-	var b *rice.Box
-	var err error
+	var (
+		b   *rice.Box
+		err error
+	)
 	anon := templateBox.Load()
 	if anon == nil {
 		// Note: path MUST be literal for rice to work
@@ -170,10 +172,11 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		dataBuffer := bytes.NewBufferString("")
 		identity := cluster.GetIdentity(task)
 		data := map[string]interface{}{
-			"CIDR":          netCfg.CIDR,
-			"CladmPassword": identity.AdminPassword,
-			"SSHPublicKey":  identity.Keypair.PublicKey,
-			"SSHPrivateKey": identity.Keypair.PrivateKey,
+			"CIDR":                 netCfg.CIDR,
+			"ClusterAdminUsername": "cladm",
+			"ClusterAdminPassword": identity.AdminPassword,
+			"SSHPublicKey":         identity.Keypair.PublicKey,
+			"SSHPrivateKey":        identity.Keypair.PrivateKey,
 		}
 		err = tmplPrepared.Execute(dataBuffer, data)
 		if err != nil {

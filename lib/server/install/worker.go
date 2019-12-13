@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -125,12 +125,11 @@ func (w *worker) ConcernsCluster() bool {
 func (w *worker) CanProceed(s Settings) error {
 	switch w.target.Type() {
 	case "cluster":
-		// err := w.validateContextForCluster()
-		// if err == nil && !s.SkipSizingRequirements {
-		// 	err = w.validateClusterSizing()
-		// }
-		// return err
-		return nil
+		err := w.validateContextForCluster()
+		if err == nil && !s.SkipSizingRequirements {
+			err = w.validateClusterSizing()
+		}
+		return err
 	case "node":
 		return nil
 	case "host":
@@ -600,7 +599,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 		if ok {
 			optionsFileContent = content.(string)
-			vars["options"] = fmt.Sprintf("--options=%s/options.json", srvutils.TempFolder)
+			vars["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
 		}
 	} else {
 		vars["options"] = ""
@@ -695,7 +694,7 @@ func (w *worker) validateContextForCluster() error {
 			}
 		}
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of cluster", w.feature.DisplayName(), clusterFlavor.String())
+	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.DisplayName(), clusterFlavor.String())
 	return fmt.Errorf(msg)
 }
 

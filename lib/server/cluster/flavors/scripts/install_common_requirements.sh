@@ -1,6 +1,4 @@
-#!/usr/bin/env bash -x
-#
-# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,34 +20,24 @@ install_common_requirements() {
     export LANG=C
 
     # Disable SELinux
-    if [[ -n $(command -v getenforce) ]]; then
-        act=0
-        getenforce | grep "Disabled" || act=1
-        if [ $act -eq 1 ]; then
-            if [[ -n $(command -v setenforce) ]]; then
-                setenforce 0 || fail 201 "Error setting selinux in Disabled mode"
-                sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
-            fi
-        fi
-    fi
+    setenforce 0 &>/dev/null
+    sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config &>/dev/null
 
-    # Upgrade to last CentOS revision
-    rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info && \
-    yum install -y python-backports-ssl_match_hostname && \
-    yum upgrade --assumeyes --tolerant && \
-    yum update --assumeyes
-    [ $? -ne 0 ] && exit 192
-
-    # Create group nogroup
-    groupadd nogroup &>/dev/null
+    # VPL: shall we update systematically at install ?
+    # # Upgrade to last CentOS revision
+    # if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+    #     yum upgrade --assumeyes --tolerant && \
+    #     yum update --assumeyes
+    #     [ $? -ne 0 ] && sfFail 192
+    # fi
 
     # Creates user {{.ClusterAdminUsername}}
     useradd -s /bin/bash -m -d /home/{{.ClusterAdminUsername}} {{.ClusterAdminUsername}}
     groupadd -r -f docker &>/dev/null
     usermod -aG docker {{.ClusterAdminUsername}}
-    echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
+    echo -e "{{.ClusterAdminPassword}}\n{{.ClusterAdminPassword}}" | passwd {{.ClusterAdminUsername}}
     mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
-    echo "{{ .SSHPublicKey }}" >~{{.ClusterAdminUsername}}/.ssh/authorized_keys
+    echo "{{ .SSHPublicKey }}" >~{{.CluterAdminUsername}}/.ssh/authorized_keys
     echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
     chmod 0400 ~{{.ClusterAdminUsername}}/.ssh/*
     echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
@@ -78,9 +66,9 @@ install_common_requirements() {
             export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
         }
         pathprepend $HOME/.local/bin
-        pathappend /opt/mesosphere/bin
+        pathprepend /usr/local/bin
 EOF
-    chown -R {{.ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
+    chown -R {{ .ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
 
     for i in ~{{.ClusterAdminUsername}}/.hushlogin ~{{.ClusterAdminUsername}}/.cloud-warnings.skip; do
         touch $i
@@ -88,42 +76,40 @@ EOF
         chmod ug+r-wx,o-rwx $i
     done
 
-    # Disables installation of docker-python from yum and adds some requirements
-    yum remove -y python-docker-py &>/dev/null
-    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq rclone && \
-    yum versionlock exclude python-docker-py || exit 193
-
-    # Installs PIP
-    yum install -y epel-release && \
-    yum makecache fast && \
-    yum install -y python-pip || yum install -y python2-pip || exit 194
-
-    # Installs docker-python with pip
-    pip install -q docker-py==1.10.6 || exit 195
-
     # Enable overlay module
     echo overlay >/etc/modules-load.d/10-overlay.conf
 
     # Loads overlay module
     modprobe overlay
 
-    # Mesos needs a subversion release > 1.8
-    cat >/etc/yum.repos.d/wandisco-svn.repo <<-'EOF'
-[WANdiscoSVN]
-name=WANdisco SVN Repo 1.9
-enabled=1
-baseurl=http://opensource.wandisco.com/centos/7/svn-1.9/RPMS/$basearch/
-gpgcheck=1
-gpgkey=http://opensource.wandisco.com/RPM-GPG-KEY-WANdisco
-EOF
-    yum install -y subversion
-
     echo "Common requirements successfully installed."
 }
 export -f install_common_requirements
 
-yum makecache fast
-yum install -y time
+case $(sfGetFact "linux_kind") in
+    debian|ubuntu)
+        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip"
+        curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
+        unzip rclone-current-linux-amd64.zip && \
+        cp rclone-*-linux-amd64/rclone /usr/local/bin && \
+        mkdir -p /usr/local/share/man/man1 && \
+        cp rclone-*-linux-amd64/rclone.1 /usr/local/share/man/man1/ && \
+        rm -rf rclone-* && \
+        chown root:root /usr/local/bin/rclone && \
+        chmod 755 /usr/local/bin/rclone && \
+        mandb
+        ;;
+    redhat|centos)
+        yum makecache fast
+        yum install -y wget curl time rclone jq unzip
+        ;;
+    fedora)
+        dnf install wget curl time rclone jq unzip
+        ;;
+    *)
+        echo "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
+        exit 1
+        ;;
+esac
 
-# /usr/bin/time -p bash -c -x install_common_requirements
-install_common_requirements || sfFail $? "Problem installing common requirements"
+/usr/bin/time -p bash -c -x install_common_requirements
