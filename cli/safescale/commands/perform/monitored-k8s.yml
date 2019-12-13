@@ -1,0 +1,165 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        cluster: K8S
+
+    parameters:
+        - Namespace
+
+    requirements:
+        - kubernetes
+        - helm
+
+    install:
+        bash:
+            add:
+                pace: config-all,config-masters,config-k8s
+                steps:
+                    config-all:
+                        targets:
+                            masters: all
+                            nodes: all
+                            #gateways: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/kubernetes/scripts
+                            mkdir -p ${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/scripts
+                            mkdir -p ${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/yaml
+                            mkdir -p ${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/helm
+                            mkdir -p ${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/mandatory_cots
+                            mkdir -p ${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/cots
+
+                            cat >${SF_ETCDIR}/kubernetes/scripts/dns_config.sh <<'EOF'
+                            #!/bin/bash
+
+                            counter=1
+                            coredns_ip="10.96.0.10"
+                            ifcfg_path="/etc/sysconfig/network-scripts/ifcfg-eth0"
+                            resolv_path="/etc/resolv.conf"
+
+                            ifcfg_file() {
+                                sed -i "/^DNS[0-9]=$coredns_ip/d" $ifcfg_path;
+                                for i in $(sed -n -e 's/^DNS[0-9]=//p' $ifcfg_path); do
+                                    for j in $counter; do
+                                        ((counter++))
+                                    done
+                                    echo DNS$counter=$i
+                                done
+                                echo "DOMAIN=${namespace}.svc.cluster.local svc.cluster.local cluster.local"
+                            }
+
+                            resolv_file() {
+                                for i in $(sed -n -e 's/^DNS[0-9]=//p' $ifcfg_path); do
+                                    echo nameserver $i
+                                done
+                                echo "search ${namespace}.svc.cluster.local svc.cluster.local cluster.local"
+                            }
+
+                            ifcfg=`ifcfg_file`;
+                            sed -i '/^DNS/d' $ifcfg_path;
+                            sed -i '/^DOMAIN/d' $ifcfg_path;
+                            echo "DNS1=$coredns_ip" >> $ifcfg_path;
+                            echo "$ifcfg" >> $ifcfg_path;
+
+                            resolv=`resolv_file`;
+                            echo "$resolv" > $resolv_path;
+                            EOF
+
+                            bash -c ${SF_TMPDIR}/kubernetes/dns_config.sh || sfFail 192 "Failed to configure DNS to use CoreDNS"
+                            rm -f ${SF_TMPDIR}/kubernetes/dns_config.sh
+                            sfExit
+
+                    config-masters:
+                        targets:
+                            masters: all
+                        run: |
+                            cat >${SF_ETCDIR}/kubernetes/scripts/expose_metrics.sh <<-'EOF'
+                            #!/bin/bash
+                            if $(sudo -u cladm -i kubectl get configmap -n kube-system kube-proxy -o yaml | grep -Fxq '    metricsBindAddress: 127.0.0.1:10249'); then
+                                sudo -u cladm -i kubectl get configmap -n kube-system kube-proxy -o yaml | sed 's/metricsBindAddress: 127.0.0.1:10249/metricsBindAddress: 0.0.0.0:10249/g' | sudo -u cladm -i kubectl apply -f -
+                            fi
+                            EOF
+
+                            cat >${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/yaml/pds-privileged-serviceaccounts.yaml <<EOF
+                            apiVersion: rbac.authorization.k8s.io/v1
+                            kind: ClusterRoleBinding
+                            metadata:
+                                name: privileged-psp-cloud-expo-serviceaccounts
+                                roleRef:
+                                    kind: ClusterRole
+                                    name: privileged-psp
+                            apiGroup: rbac.authorization.k8s.io
+                            subjects:
+                            - kind: Group
+                            name: system:serviceaccounts
+                            apiGroup: rbac.authorization.k8s.io
+                            namespace: ${name_space}
+                            EOF
+
+                            # VPL: moved in requirements
+                            # task_start "----" "Safescale add-feature helm"
+                            # task_info "Executing command '{{ .SafescaleCmd }} --debug platform add-feature ${cluster_name} helm -p NameSpace=${name_space}'"
+                            # {{ .SafescaleCmd }} --debug platform add-feature ${cluster_name} helm -p NameSpace=${name_space}
+                            # task_done "----" "Safescale add-feature helm" $?
+
+                            # VPL: to move in monitored_k8s() function in perform.go
+                            # task_start "----" "Install repo chart CS"
+                            # sfHelm repo add cloudexpo http://90.84.245.22:30002/chartrepo/cs \
+                            #     --username=${harbor_username} \
+                            #     --password=${harbor_password} \
+                            # sfKubectl create secret docker-registry harbor-cs \
+                            #     -n "{{ .Namespace }}" \
+                            #     --docker-server=http://90.84.245.22:30002/ \
+                            #     --docker-username=${harbor_username} \
+                            #     --docker-password=${harbor_password}" | {{ .SafescaleCmd }} ssh connect ${HOST}
+                            # task_done "----" "Install repo chart CS" $?
+                            sfExit
+
+                    config-k8s:
+                        targets:
+                            masters: one
+                        run: |
+                            bash ${SF_ETCDIR}/kubernetes/scripts/expose-metrics.sh || sfFail 193 "Failed to configure kube-proxy to expose metrics"
+                            sfKubectl create namespace {{ .Namespace }} || sfFail 194
+                            sfKubectl apply -f ${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/yaml/pds-privileged-serviceaccounts.yaml
+
+                    config-helms:
+                        targets:
+                            masters: all
+                        run: |
+                            cat >${SF_ETCDIR}/kubernetes/namespaces/{{ .Namespace }}/helm/grafana-values.yaml <<-EOF
+                            affinity:
+                              nodeAffinity:
+                                requiredDuringSchedulingIgnoredDuringExecution:
+                                  nodeSelectorTerms:
+                                  - matchExpressions:
+                                    - key: "node-role.kubernetes.io/worker"
+                                      operator: In
+                                      values:
+                                      - infra
+                              podAntiAffinity:
+                                requiredDuringSchedulingIgnoredDuringExecution:
+                                - labelSelector:
+                                    matchExpressions:
+                                    - key: release
+                                      operator: In
+                                      values:
+                                      - fluentd
+                                  topologyKey: "kubernetes.io/hostname"
+                            EOF
+                            sfExit

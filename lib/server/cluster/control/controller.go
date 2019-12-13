@@ -109,6 +109,12 @@ func (c *Controller) Restore(task concurrency.Task, f Foreman) (err error) {
 	if f == nil {
 		return scerr.InvalidParameterError("f", "cannot be nil")
 	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if f == nil {
+		return scerr.InvalidParameterError("f", "cannot be nil")
+	}
 
 	err = c.Lock(task)
 	if err != nil {
@@ -133,13 +139,14 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
-	defer scerr.OnPanic(&err)()
-
 	if f == nil {
 		return scerr.InvalidParameterError("f", "cannot be nil")
 	}
 	if task == nil {
-		task = concurrency.RootTask()
+		task, err = concurrency.NewTask()
+		if err != nil {
+			return err
+		}
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
@@ -149,6 +156,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
 	)()
 	defer scerr.OnExitLogError(tracer.TraceMessage("creation of infrastructure of cluster:"), &err)()
+	defer scerr.OnPanic(&err)()
 
 	err = c.Lock(task)
 	if err != nil {
@@ -593,15 +601,9 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (_ *clusterprops
 			continue
 		}
 
-		ctx, err := task.GetContext()
+		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
-			log.Errorf("failed to get context: %s", err.Error())
-			continue
-		}
-
-		_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetConnectSSHTimeout())
-		if err != nil {
-			if _, ok := err.(retry.ErrTimeout); ok {
+			if _, ok := err.(*retry.ErrTimeout); ok {
 				lastError = err
 				continue
 			}
@@ -643,15 +645,9 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2
 			continue
 		}
 
-		ctx, err := task.GetContext()
+		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
-			log.Errorf("failed to get context: %s", err.Error())
-			continue
-		}
-
-		_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetConnectSSHTimeout())
-		if err != nil {
-			if _, ok := err.(retry.ErrTimeout); ok {
+			if _, ok := err.(*retry.ErrTimeout); ok {
 				continue
 			}
 			return nil, err
@@ -1245,21 +1241,19 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv2.Node
 	return nil
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
 // Delete destroys everything related to the infrastructure built for the Cluster
 func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
-	defer scerr.OnPanic(&err)()
-
 	if task == nil {
-		task = concurrency.RootTask()
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	// Updates metadata
 	err = c.UpdateMetadata(task, func() error {

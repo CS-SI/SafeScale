@@ -21,7 +21,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
 
@@ -97,14 +97,19 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 
 	var errors []error
 
+	task, err := concurrency.NewTask()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, path := range paths {
 		files, err := ioutil.ReadDir(path)
 		if err == nil {
 			for _, f := range files {
 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile {
-					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					feature, err := NewFeature(task, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if err != nil {
-						log.Error(err)
+						logrus.Error(err)
 						errors = append(errors, err)
 						continue
 					}
@@ -312,7 +317,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 		return nil, fmt.Errorf("failed to find a way to check '%s'", f.DisplayName())
 	}
 
-	log.Debugf("Checking if feature '%s' is installed on %s '%s'...", f.DisplayName(), t.Type(), t.Name())
+	logrus.Debugf("Checking if feature '%s' is installed on %s '%s'...", f.DisplayName(), t.Type(), t.Name())
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -395,7 +400,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 			return nil, fmt.Errorf("failed to check feature '%s': %s", f.DisplayName(), err.Error())
 		}
 		if results.Successful() {
-			log.Infof("Feature '%s' is already installed.", f.DisplayName())
+			logrus.Infof("Feature '%s' is already installed.", f.DisplayName())
 			return results, nil
 		}
 	}
@@ -484,7 +489,7 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 			if clusterInstance != nil {
 				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetIdentity(f.task).Name)
 			}
-			log.Debugf("%s %s...", msgHead, msgTail)
+			logrus.Debugf("%s %s...\n", msgHead, msgTail)
 		}
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
 			needed, err := NewFeature(f.task, requirement)

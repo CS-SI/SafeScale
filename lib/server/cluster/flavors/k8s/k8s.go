@@ -35,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/server/install"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -192,11 +193,11 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		dataBuffer := bytes.NewBufferString("")
 		identity := cluster.GetIdentity(task)
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          netCfg.CIDR,
-			"Username":      "cladm",
-			"CladmPassword": identity.AdminPassword,
-			"SSHPublicKey":  identity.Keypair.PublicKey,
-			"SSHPrivateKey": identity.Keypair.PrivateKey,
+			"CIDR":                 netCfg.CIDR,
+			"ClusterAdminUsername": "cladm",
+			"ClusterAdminPassword": identity.AdminPassword,
+			"SSHPublicKey":         identity.Keypair.PublicKey,
+			"SSHPrivateKey":        identity.Keypair.PrivateKey,
 		})
 		if err != nil {
 			return "", fmt.Errorf("error realizing script template: %s", err.Error())
@@ -218,14 +219,9 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 
 	clientSSH := client.New().SSH
 
-	ctx, err := task.GetContext()
-	if err != nil {
-		return err
-	}
-
 	// Check worker belongs to k8s
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err := clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err := clientSSH.Run(task, selectedMasterID, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -237,7 +233,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl drain %s --delete-local-data --force --ignore-daemonsets", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(task, selectedMasterID, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -246,7 +242,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl delete node %s", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(task, selectedMasterID, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -256,7 +252,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 
 	// check node no longer belongs to k8s
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err = clientSSH.Run(task, selectedMasterID, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}

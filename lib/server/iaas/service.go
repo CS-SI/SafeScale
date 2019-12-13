@@ -30,7 +30,7 @@ import (
 
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/xrash/smetrics"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -301,7 +301,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 		if err != nil {
 			if force {
-				log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+				logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 			} else {
 				var noHostError string
 				if sizing.MinFreq <= 0 {
@@ -309,7 +309,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				} else {
 					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 				}
-				log.Error(noHostError)
+				logrus.Error(noHostError)
 				return nil, fmt.Errorf(noHostError)
 			}
 		} else {
@@ -326,7 +326,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			imageList, err := db.ReadAll(folder)
 			if err != nil {
 				if force {
-					log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+					logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 				} else {
 					var noHostError string
 					if sizing.MinFreq <= 0 {
@@ -334,7 +334,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					} else {
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 					}
-					log.Error(noHostError)
+					logrus.Error(noHostError)
 					return nil, fmt.Errorf(noHostError)
 				}
 			} else {
@@ -342,7 +342,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				for _, f := range imageList {
 					imageFound := resources.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-						log.Error(fmt.Sprintf("error unmarsalling image %s : %v", f, err))
+						logrus.Error(fmt.Sprintf("error unmarsalling image %s : %v", f, err))
 					}
 
 					// if the user asked explicitly no gpu
@@ -368,7 +368,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					} else {
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinFreq)
 					}
-					log.Error(noHostError)
+					logrus.Error(noHostError)
 					return nil, fmt.Errorf(noHostError)
 				}
 
@@ -380,7 +380,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	}
 
 	if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
-		log.Debugf("Looking for a host template as small as possible")
+		logrus.Debugf("Looking for a host template as small as possible")
 	} else {
 		coreMsg := ""
 		if sizing.MinCores > 0 {
@@ -407,30 +407,30 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			diskMsg = fmt.Sprintf(" and at least %d GB of disk", sizing.MinDiskSize)
 		}
 
-		log.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
+		logrus.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
 	}
 
 	for _, t := range allTpls {
 		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
-			log.Debugf(msg, "not enough cores")
+			logrus.Debugf(msg, "not enough cores")
 			continue
 		}
 		if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
-			log.Debugf(msg, "too many cores")
+			logrus.Debugf(msg, "too many cores")
 			continue
 		}
 		if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
-			log.Debugf(msg, "not enough RAM")
+			logrus.Debugf(msg, "not enough RAM")
 			continue
 		}
 		if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
-			log.Debugf(msg, "too many RAM")
+			logrus.Debugf(msg, "too many RAM")
 			continue
 		}
 		if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
-			log.Debugf(msg, "not enough disk")
+			logrus.Debugf(msg, "not enough disk")
 			continue
 		}
 
@@ -567,7 +567,7 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 		return nil, fmt.Errorf("unable to find an image matching %s", osname)
 	}
 
-	log.Infof("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
+	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
 	return &imgs[maxi], nil
 }
 

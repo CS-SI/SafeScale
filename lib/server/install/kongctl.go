@@ -18,16 +18,16 @@ package install
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"text/template"
 
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	safescale "github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -71,7 +71,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 
 	// Check if reverseproxy feature is installed on host
 
-	voidtask, err := concurrency.VoidTask()
+	voidtask, err := concurrency.NewTask()
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		if err != nil {
 			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
-		log.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
+		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":
@@ -233,7 +233,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		if err != nil {
 			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
-		log.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
+		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "upstream":
@@ -271,7 +271,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		if err != nil {
 			return ruleName, fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
-		log.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
+		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, nil
 
 	default:
@@ -348,7 +348,7 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 	}
 	if err != nil {
 		msg := fmt.Sprintf("failed to apply setting 'source-control' of proxy rule '%s': %s", ruleName, err.Error())
-		log.Debugf(utils.Capitalize(msg))
+		logrus.Debugf(utils.Capitalize(msg))
 		return fmt.Errorf(msg)
 	}
 	return nil
@@ -365,7 +365,11 @@ func (k *KongController) buildSourceControlContent(rules map[string]interface{})
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := safescale.New().SSH.Run(context.TODO(), k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	task, err := concurrency.NewTask()
+	if err != nil {
+		return nil, "", err
+	}
+	retcode, stdout, _, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -382,13 +386,17 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 
 // post creates a rule
 func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+	task, err := concurrency.NewTask()
+	if err != nil {
+		return nil, "", err
+	}
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(context.TODO(), k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
 	if retcode != 0 {
-		log.Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fmt.Errorf("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 	response, httpcode, err := k.parseResult(stdout)
@@ -406,13 +414,17 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 
 // put updates or creates a rule
 func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+	task, err := concurrency.NewTask()
+	if err != nil {
+		return nil, "", err
+	}
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(context.TODO(), k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
 	if retcode != 0 {
-		log.Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fmt.Errorf("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
@@ -430,13 +442,17 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 
 // patch updates an existing rule
 func (k *KongController) patch(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+	task, err := concurrency.NewTask()
+	if err != nil {
+		return nil, "", err
+	}
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(context.TODO(), k.gateway.Name, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
 	if retcode != 0 {
-		log.Debugf("update of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.Debugf("update of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fmt.Errorf("update of rule '%s' failed: retcode=%d", name, retcode)
 	}
 

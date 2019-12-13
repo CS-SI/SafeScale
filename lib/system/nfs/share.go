@@ -17,13 +17,13 @@
 package nfs
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // ExportOptions ...
@@ -80,7 +80,7 @@ func (s *Share) AddACL(acl ExportACL) {
 }
 
 //Add configures and exports the share
-func (s *Share) Add(ctx context.Context) error {
+func (s *Share) Add(task concurrency.Task) error {
 	var acls string
 	for _, a := range s.ACLs {
 		acl := a.Host + "("
@@ -142,6 +142,6 @@ func (s *Share) Add(ctx context.Context) error {
 		"AccessRights": strings.TrimSpace(acls),
 	}
 
-	retcode, stdout, stderr, err := executeScript(ctx, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
+	retcode, stdout, stderr, err := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }

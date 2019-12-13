@@ -466,7 +466,7 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
 		return scerr.InvalidParameterError("net", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, "+net.Name+")", true).GoingIn()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(<%s>, %s)", svc.GetName(), net.Name), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -495,7 +495,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+ref+"')", true).GoingIn()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(<%s>, %s)", svc.GetName(), ref), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

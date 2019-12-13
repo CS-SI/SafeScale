@@ -17,14 +17,13 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumeproperty"
@@ -43,12 +42,12 @@ import (
 
 // VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
-	Delete(ctx context.Context, ref string) error
-	List(ctx context.Context, all bool) ([]resources.Volume, error)
-	Inspect(ctx context.Context, ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error)
-	Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (*resources.Volume, error)
-	Attach(ctx context.Context, volume string, host string, path string, format string, doNotFormat bool) error
-	Detach(ctx context.Context, volume string, host string) error
+	Delete(ref string) error
+	List(all bool) ([]resources.Volume, error)
+	Inspect(ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error)
+	Create(name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error)
+	Attach(volume string, host string, path string, format string, doNotFormat bool) error
+	Detach(volume string, host string) error
 }
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
@@ -57,63 +56,52 @@ type VolumeAPI interface {
 
 // VolumeHandler volume service
 type VolumeHandler struct {
-	service iaas.Service
+	job server.Job
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(svc iaas.Service) VolumeAPI {
-	return &VolumeHandler{
-		service: svc,
-	}
+func NewVolumeHandler(job server.Job) VolumeAPI {
+	return &VolumeHandler{job: job}
 }
 
 // List returns the network list
-func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) {
+func (handler *VolumeHandler) List(all bool) (volumes []resources.Volume, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	echan := make(chan error)
-	go func() {
-		defer close(echan)
-		if all {
-			listedVolumes, err := handler.service.ListVolumes()
-			volumes = listedVolumes
-
-			echan <- err
-			return
-		}
-
-		mv, err := metadata.NewVolume(handler.service)
-		if err != nil {
-			echan <- err
-			return
-		}
-		err = mv.Browse(func(volume *resources.Volume) error {
-			volumes = append(volumes, *volume)
-			return nil
-		})
-		echan <- err
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, scerr.AbortedError("operation aborted by user", nil)
-	case err := <-echan:
+	if all {
+		listedVolumes, err := handler.job.Service().ListVolumes()
 		if err != nil {
 			return nil, err
 		}
+		volumes = listedVolumes
+	} else {
+		mv, err := metadata.NewVolume(handler.job.Service())
+		if err != nil {
+			return nil, err
+		}
+		err = mv.Browse(func(volume *resources.Volume) error {
+			if handler.job.Aborted() {
+				return retry.AbortedError("aborted", nil)
+			}
+			volumes = append(volumes, *volume)
+			return nil
+		})
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	return volumes, nil
 }
 
 // Delete deletes volume referenced by ref
-func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) {
+func (handler *VolumeHandler) Delete(ref string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -122,12 +110,12 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 		return scerr.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	mv, err := metadata.LoadVolume(handler.service, ref)
+	mv, err := metadata.LoadVolume(handler.job.Service(), ref)
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrNotFound:
@@ -158,7 +146,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 		return err
 	}
 
-	err = handler.service.DeleteVolume(volume.ID)
+	err = handler.job.Service().DeleteVolume(volume.ID)
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrNotFound:
@@ -174,44 +162,42 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 		return err
 	}
 
-	select { // FIXME Unorthodox usage of context
-	case <-ctx.Done():
-		logrus.Warnf("Volume deletion cancelled by user")
-		volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
-		if err != nil {
-			return fmt.Errorf("failed to stop volume deletion")
-		}
-		buf, err := volumeBis.Serialize()
-		if err != nil {
-			return fmt.Errorf("failed to recreate deleted volume")
-		}
-		return fmt.Errorf("deleted volume recreated by safescale : %s", buf)
-	default:
-	}
+	// select { // FIXME Unorthodox usage of context
+	// case <-ctx.Done():
+	// 	logrus.Warnf("Volume deletion cancelled by user")
+	// 	volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to stop volume deletion")
+	// 	}
+	// 	buf, err := volumeBis.Serialize()
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to recreate deleted volume")
+	// 	}
+	// 	return fmt.Errorf("deleted volume recreated by safescale : %s", buf)
+	// default:
+	// }
 
 	return nil
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
 func (handler *VolumeHandler) Inspect(
-	ctx context.Context,
 	ref string,
 ) (volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount, err error) {
 
 	if handler == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
-
 	if ref == "" {
 		return nil, nil, scerr.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), "('"+ref+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	mv, err := metadata.LoadVolume(handler.service, ref)
+	mv, err := metadata.LoadVolume(handler.job.Service(), ref)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, nil, resources.ResourceNotFoundError("volume", ref)
@@ -224,13 +210,13 @@ func (handler *VolumeHandler) Inspect(
 	}
 
 	mounts = map[string]*propsv1.HostLocalMount{}
-	hostSvc := NewHostHandler(handler.service)
+	hostSvc := NewHostHandler(handler.job)
 
 	err = volume.Properties.LockForRead(volumeproperty.AttachedV1).ThenUse(func(v interface{}) error {
 		volumeAttachedV1 := v.(*propsv1.VolumeAttachments)
 		if len(volumeAttachedV1.Hosts) > 0 {
 			for id := range volumeAttachedV1.Hosts {
-				host, err := hostSvc.Inspect(ctx, id)
+				host, err := hostSvc.Inspect(id)
 				if err != nil {
 					continue
 				}
@@ -266,20 +252,19 @@ func (handler *VolumeHandler) Inspect(
 }
 
 // Create a volume
-func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (volume *resources.Volume, err error) { // FIXME Make sure ctx is propagated
+func (handler *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) (volume *resources.Volume, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	volume, err = handler.service.CreateVolume(resources.VolumeRequest{
+	volume, err = handler.job.Service().CreateVolume(resources.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -297,7 +282,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	newVolume := volume
 	defer func() {
 		if err != nil {
-			derr := handler.service.DeleteVolume(newVolume.ID)
+			derr := handler.job.Service().DeleteVolume(newVolume.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case *scerr.ErrNotFound:
@@ -312,7 +297,11 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 		}
 	}()
 
-	md, err := metadata.SaveVolume(handler.service, volume)
+	if handler.job.Aborted() {
+		return nil, scerr.AbortedError("aborted", nil)
+	}
+
+	md, err := metadata.SaveVolume(handler.job.Service(), volume)
 	if err != nil {
 		logrus.Debugf("Error creating volume: saving volume metadata: %+v", err)
 		return nil, err
@@ -329,23 +318,14 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 		}
 	}()
 
-	select {
-	case <-ctx.Done():
-		logrus.Warnf("Volume creation cancelled by user")
-		err = fmt.Errorf("volume creation cancelled by user")
-		return nil, err
-	default:
-	}
-
 	return volume, nil
 }
 
 // Attach a volume to an host
-func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) {
+func (handler *VolumeHandler) Attach(volumeName, hostName, path, format string, doNotFormat bool) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-
 	if volumeName == "" {
 		return scerr.InvalidParameterError("volumeName", "cannot be empty!")
 	}
@@ -362,13 +342,13 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		return scerr.InvalidParameterError("format", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
 	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	// Get volume data
-	volume, _, err := handler.Inspect(ctx, volumeName)
+	volume, _, err := handler.Inspect(volumeName)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return err
@@ -377,8 +357,8 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	}
 
 	// Get Host data
-	hostSvc := NewHostHandler(handler.service)
-	host, err := hostSvc.ForceInspect(ctx, hostName)
+	hostSvc := NewHostHandler(handler.job)
+	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
 		return err
 	}
@@ -441,11 +421,11 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Note: most providers are not able to tell the real device name the volume
 				//       will have on the host, so we have to use a way that can work everywhere
 				// Get list of disks before attachment
-				oldDiskSet, err := handler.listAttachedDevices(ctx, host)
+				oldDiskSet, err := handler.listAttachedDevices(host)
 				if err != nil {
 					return err
 				}
-				vaID, err := handler.service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
+				vaID, err := handler.job.Service().CreateVolumeAttachment(resources.VolumeAttachmentRequest{
 					Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 					HostID:   host.ID,
 					VolumeID: volume.ID,
@@ -461,7 +441,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Starting from here, remove volume attachment if exit with error
 				defer func() {
 					if err != nil {
-						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)
+						derr := handler.job.Service().DeleteVolumeAttachment(host.ID, vaID)
 						if derr != nil {
 							switch derr.(type) {
 							case *scerr.ErrNotFound:
@@ -484,7 +464,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				retryErr := retry.WhileUnsuccessfulDelay1Second(
 					func() error {
 						// Get new of disk after attachment
-						newDiskSet, err := handler.listAttachedDevices(ctx, host)
+						newDiskSet, err := handler.listAttachedDevices(host)
 						if err != nil {
 							return err
 						}
@@ -505,8 +485,8 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
 
 				// Create mount point
-				sshHandler := NewSSHHandler(handler.service)
-				sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
+				sshHandler := NewSSHHandler(handler.job)
+				sshConfig, err := sshHandler.GetConfig(host.ID)
 				if err != nil {
 					return err
 				}
@@ -515,7 +495,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				if err != nil {
 					return err
 				}
-				volumeUUID, err = server.MountBlockDevice(ctx, deviceName, mountPoint, format, doNotFormat)
+				volumeUUID, err = server.MountBlockDevice(handler.job.Task(), deviceName, mountPoint, format, doNotFormat)
 				if err != nil {
 					return err
 				}
@@ -532,7 +512,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				// Starting from here, unmount block device if exiting with error
 				defer func() {
 					if err != nil {
-						derr := server.UnmountBlockDevice(ctx, volumeUUID)
+						derr := server.UnmountBlockDevice(handler.job.Task(), volumeUUID)
 						if derr != nil {
 							logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 							err = scerr.AddConsequence(err, derr)
@@ -558,12 +538,12 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 
 	defer func() {
 		if err != nil {
-			derr := server.UnmountBlockDevice(ctx, volumeUUID)
+			derr := server.UnmountBlockDevice(handler.job.Task(), volumeUUID)
 			if derr != nil {
 				logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 				err = scerr.AddConsequence(err, derr)
 			}
-			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
+			derr = handler.job.Service().DeleteVolumeAttachment(host.ID, vaID)
 			if derr != nil {
 				switch derr.(type) {
 				case *scerr.ErrNotFound:
@@ -578,7 +558,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		}
 	}()
 
-	_, err = metadata.SaveVolume(handler.service, volume)
+	_, err = metadata.SaveVolume(handler.job.Service(), volume)
 	if err != nil {
 		return err
 	}
@@ -594,7 +574,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				logrus.Warnf("failed to set volume %s metadatas", volumeName)
 				err = scerr.AddConsequence(err, err2)
 			}
-			_, err2 = metadata.SaveVolume(handler.service, volume)
+			_, err2 = metadata.SaveVolume(handler.job.Service(), volume)
 			if err2 != nil {
 				logrus.Warnf("failed to save volume %s metadatas", volumeName)
 				err = scerr.AddConsequence(err, err2)
@@ -602,7 +582,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		}
 	}()
 
-	mh, err := metadata.SaveHost(handler.service, host)
+	mh, err := metadata.SaveHost(handler.job.Service(), host)
 	if err != nil {
 		return err
 	}
@@ -640,19 +620,19 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		}
 	}()
 
-	select { // FIXME Unorthodox usage of context
-	case <-ctx.Done():
-		logrus.Warnf("Volume attachment cancelled by user")
-		err = fmt.Errorf("volume attachment cancelled by user")
-		return err
-	default:
-	}
+	// select { // FIXME Unorthodox usage of context
+	// case <-ctx.Done():
+	// 	logrus.Warnf("Volume attachment cancelled by user")
+	// 	err = fmt.Errorf("volume attachment cancelled by user")
+	// 	return err
+	// default:
+	// }
 
 	logrus.Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volume.Name, host.Name, volumeUUID)
 	return nil
 }
 
-func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (set mapset.Set, err error) { // FIXME Make sure ctx is propagated
+func (handler *VolumeHandler) listAttachedDevices(host *resources.Host) (set mapset.Set, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -661,17 +641,17 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 		return nil, scerr.InvalidParameterError("host", "cannot be nil!")
 	}
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(handler.job.Task(), "", true).TraceMessage(""), &err)()
 
 	var (
 		retcode        int
 		stdout, stderr string
 	)
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
-	sshHandler := NewSSHHandler(handler.service)
+	sshHandler := NewSSHHandler(handler.job)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			retcode, stdout, stderr, err = sshHandler.Run(ctx, host.ID, cmd)
+			retcode, stdout, stderr, err = sshHandler.Run(host.ID, cmd)
 			if err != nil {
 				return err
 			}
@@ -697,7 +677,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) (err error) {
+func (handler *VolumeHandler) Detach(volumeName, hostName string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -716,7 +696,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	defer scerr.OnPanic(&err)()
 
 	// Load volume data
-	volume, _, err := handler.Inspect(ctx, volumeName)
+	volume, _, err := handler.Inspect(volumeName)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			return err
@@ -726,8 +706,8 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	mountPath := ""
 
 	// Load host data
-	hostSvc := NewHostHandler(handler.service)
-	host, err := hostSvc.ForceInspect(ctx, hostName)
+	hostSvc := NewHostHandler(handler.job)
+	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
 		return err
 	}
@@ -781,8 +761,8 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				}
 
 				// Unmount the Block Device ...
-				sshHandler := NewSSHHandler(handler.service)
-				sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
+				sshHandler := NewSSHHandler(handler.job)
+				sshConfig, err := sshHandler.GetConfig(host.ID)
 				if err != nil {
 					return err
 				}
@@ -790,7 +770,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				if err != nil {
 					return err
 				}
-				err = nfsServer.UnmountBlockDevice(ctx, attachment.Device)
+				err = nfsServer.UnmountBlockDevice(handler.job.Task(), attachment.Device)
 				if err != nil {
 					// FIXME Think about this
 					logrus.Error(err)
@@ -798,7 +778,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				}
 
 				// ... then detach volume
-				err = handler.service.DeleteVolumeAttachment(host.ID, attachment.AttachID)
+				err = handler.job.Service().DeleteVolumeAttachment(host.ID, attachment.AttachID)
 				if err != nil {
 					switch err.(type) {
 					case *scerr.ErrNotFound, *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
@@ -832,26 +812,26 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	}
 
 	// Updates metadata
-	_, err = metadata.SaveHost(handler.service, host)
+	_, err = metadata.SaveHost(handler.job.Service(), host)
 	if err != nil {
 		return err
 	}
-	_, err = metadata.SaveVolume(handler.service, volume)
+	_, err = metadata.SaveVolume(handler.job.Service(), volume)
 	if err != nil {
 		return err
 	}
 
-	select { // FIXME Unorthodox usage of context
-	case <-ctx.Done():
-		logrus.Warnf("Volume detachment cancelled by user")
-		// Currently format is not registered anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
-		err = handler.Attach(context.Background(), volumeName, hostName, mountPath, "ext4", true)
-		if err != nil {
-			return fmt.Errorf("failed to stop volume detachment")
-		}
-		return fmt.Errorf("volume detachment cancelled by user")
-	default:
-	}
+	// select { // FIXME Unorthodox usage of context
+	// case <-ctx.Done():
+	// 	logrus.Warnf("Volume detachment cancelled by user")
+	// 	// Currently format is not registered anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
+	// 	err = handler.Attach(context.Background(), volumeName, hostName, mountPath, "ext4", true)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to stop volume detachment")
+	// 	}
+	// 	return fmt.Errorf("volume detachment cancelled by user")
+	// default:
+	// }
 
 	return nil
 }

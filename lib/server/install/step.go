@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -276,10 +277,6 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	)()
 
 	if is.Serial || s.Serialize {
-		subtask, err := concurrency.NewTask(is.Worker.feature.task)
-		if err != nil {
-			return nil, err
-		}
 
 		for _, h := range hosts {
 			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
@@ -292,16 +289,17 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			if err != nil {
 				return nil, err
 			}
+			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
+			if err != nil {
+				return nil, err
+			}
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
 			results[h.Name] = result.(stepResult)
-			taskCtx, err := subtask.GetContext()
-			if err != nil {
-				return nil, err
-			}
-			_, err = concurrency.NewTaskWithContext(taskCtx, subtask)
-			if err != nil {
-				return nil, err
-			}
+			subtask.Close()
+			// err = subtask.Reset()
+			// if err != nil {
+			// 	return nil, err
+			// }
 
 			if !results[h.Name].Successful() {
 				if is.Worker.action == action.Check { // Checks can fail and it's ok
@@ -332,7 +330,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			if err != nil {
 				return nil, err
 			}
-			subtask, err := concurrency.NewTask(is.Worker.feature.task)
+			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
 			if err != nil {
 				return nil, err
 			}
@@ -379,7 +377,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
-func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		p  = data.Map{}
 		ok bool
@@ -400,11 +398,6 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'variables' of type 'Variables'")
 	}
 
-	ctx, err := t.GetContext()
-	if err != nil {
-		return nil, err
-	}
-
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
@@ -413,7 +406,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
-		err := UploadStringToRemoteFile(is.OptionsFileContent, host, srvutils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
+		err := UploadStringToRemoteFile(is.OptionsFileContent, host, utils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
 		if err != nil {
 			return stepResult{err: err}, nil
 		}
@@ -428,7 +421,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	// Uploads then executes command
-	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
+	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
 		return stepResult{err: err}, nil
@@ -441,7 +434,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	// Executes the script on the remote host
-	retcode, outrun, _, err := client.New().SSH.Run(ctx, host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, err := client.New().SSH.Run(task, host.Name, command, Outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{err: err, output: outrun}, nil
 	}

@@ -425,7 +425,11 @@ var hostAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
+		task, err := concurrency.NewTask()
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+		}
+		feature, err := install.NewFeature(task, featureName)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -446,7 +450,7 @@ var hostAddFeatureCommand = cli.Command{
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		// Wait for SSH service on remote host first
-		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
+		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
@@ -525,7 +529,11 @@ var hostCheckFeatureCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
+		task, err := concurrency.NewTask()
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+		}
+		feature, err := install.NewFeature(task, featureName)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
@@ -545,7 +553,7 @@ var hostCheckFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
+		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
@@ -599,6 +607,10 @@ var hostDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
+		task, err := concurrency.NewTask()
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+		}
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
@@ -619,7 +631,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
+		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))

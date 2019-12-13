@@ -17,10 +17,9 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -32,40 +31,38 @@ import (
 
 // ImageAPI defines API to manipulate images
 type ImageAPI interface {
-	List(ctx context.Context, all bool) ([]resources.Image, error)
-	Select(ctx context.Context, osfilter string) (*resources.Image, error)
-	Filter(ctx context.Context, osfilter string) ([]resources.Image, error)
+	List(all bool) ([]resources.Image, error)
+	Select(osfilter string) (*resources.Image, error)
+	Filter(osfilter string) ([]resources.Image, error)
 }
 
 // FIXME ROBUSTNESS All functions MUST propagate context
 
 // ImageHandler image service
 type ImageHandler struct {
-	service iaas.Service
+	job server.Job
 }
 
 // NewImageHandler creates an host service
-func NewImageHandler(svc iaas.Service) ImageAPI {
-	return &ImageHandler{
-		service: svc,
-	}
+func NewImageHandler(job server.Job) ImageAPI {
+	return &ImageHandler{job: job}
 }
 
 // List returns the image list
-func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) { // FIXME Unused ctx
+func (handler *ImageHandler) List(all bool) (images []resources.Image, err error) { // FIXME Unused ctx
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	return handler.service.ListImages(all)
+	return handler.job.Service().ListImages(all)
 }
 
 // Select selects the image that best fits osname
-func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *resources.Image, err error) { // FIXME Unused ctx
+func (handler *ImageHandler) Select(osname string) (image *resources.Image, err error) { // FIXME Unused ctx
 	return nil, nil
 }
 
 // Filter filters the images that do not fit osname
-func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []resources.Image, err error) { // FIXME Unused ctx
+func (handler *ImageHandler) Filter(osname string) (image []resources.Image, err error) { // FIXME Unused ctx
 	return nil, nil
 }
