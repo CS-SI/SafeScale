@@ -427,6 +427,10 @@ var hostAddFeatureCommand = cli.Command{
 
 		task, err := concurrency.NewTask()
 		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+		}
+		feature, err := install.NewFeature(task, featureName)
+		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		feature, err := install.NewFeature(task, featureName)

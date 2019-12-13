@@ -404,9 +404,9 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			logrus.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			hostHandler := handlers.NewHostHandler(serviceProvider)
+			hostHandler := handlers.NewHostHandler(job)
 
-			host, err := hostHandler.Create(context.Background(), hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
+			host, err := hostHandler.Create(hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
 			if err != nil {
 				logrus.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
@@ -420,23 +420,23 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				}
 			}()
 
-			sshSvc := handlers.NewSSHHandler(serviceProvider)
-			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
+			sshSvc := handlers.NewSSHHandler(job)
+			ssh, err := sshSvc.GetConfig(host.ID) // FIXME Remove context.Background()
 			if err != nil {
 				logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			_, nerr := ssh.WaitServerReady("ready", time.Duration(6+concurrency-1)*time.Minute)
+			_, nerr := ssh.WaitServerReady(job.Task(), "ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
 				logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
 			}
-			c, err := ssh.Command(cmd)
+			c, err := ssh.Command(job.Task(), cmd)
 			if err != nil {
 				logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
-			_, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
+			_, cout, _, err := c.RunWithTimeout(nil, Outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
 			if err != nil {
 				logrus.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
 				return err
