@@ -274,19 +274,19 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 }
 
 // Connect ...
-func (s *ssh) Connect(name string, timeout time.Duration) error {
-	sshCfg, err := s.getSSHConfigFromName(name, timeout)
+func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) error {
+	sshCfg, err := s.getSSHConfigFromName(hostname, timeout)
 	if err != nil {
 		return err
 	}
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
-			return sshCfg.Enter()
+			return sshCfg.Enter(username, shell)
 		},
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
-				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostname)
 			}
 		},
 	)

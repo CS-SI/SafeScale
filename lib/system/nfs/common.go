@@ -133,7 +133,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		}
 	}
 
-	k, uperr = sshconfig.SudoCommand("which scp")
+	k, uperr = sshconfig.SudoCommand("which scp", false)
 	if uperr != nil && k != nil {
 		_, uptext, _, kerr := k.RunWithTimeout(nil, Outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
@@ -164,7 +164,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			stderr = ""
 			retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(cmd)
+			sshCmd, err := sshconfig.SudoCommand(cmd, false)
 			if err != nil {
 				return err
 			}

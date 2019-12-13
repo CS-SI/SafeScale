@@ -19,8 +19,9 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"text/template"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
@@ -70,7 +71,7 @@ func exec(ctx context.Context, script string, data interface{}, hostid string, s
 		return err
 	}
 
-	cmd, err := ssh.SudoCommand(scriptCmd)
+	cmd, err := ssh.SudoCommand(scriptCmd, false)
 	if err != nil {
 		return err
 	}

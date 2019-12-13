@@ -136,13 +136,34 @@ var sshConnect = cli.Command{
 	Name:      "connect",
 	Usage:     "Connect to the host with interactive shell",
 	ArgsUsage: "<Host_name|Host_ID>",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "u,username",
+			Value: "",
+			Usage: "Username to connect to",
+		},
+		cli.StringFlag{
+			Name:  "s,shell",
+			Value: "bash",
+			Usage: "Shell to use (default: bash)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("missing mandatory argument <Host_name>")
 		}
-		err := client.New().SSH.Connect(c.Args().Get(0), 0)
+		var (
+			username, shell string
+		)
+		if c.IsSet("username") {
+			username = c.String("username")
+		}
+		if c.IsSet("shell") {
+			shell = c.String("shell")
+		}
+		err := client.New().SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh connect", false).Error()))
 		}

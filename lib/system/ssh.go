@@ -724,7 +724,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 	return tunnels, &sshConfig, nil
 }
 
-func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string, *os.File, error) {
+func createSSHCmd(sshConfig *SSHConfig, cmdString, username, shell string, withTty, withSudo bool) (string, *os.File, error) {
 	f, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to create temporary key file: %s", err.Error())
@@ -740,14 +740,32 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		sshConfig.Host,
 	)
 
-	sudoOpt := ""
-	if withSudo {
+	if shell == "" {
+		shell = "bash"
+	}
+	cmd := ""
+	if username != "" {
+		cmd = "sudo -u " + username + " -i "
+	}
+
+	if withTty {
 		// tty option is required for some command like ls
-		sudoOpt = " -t sudo"
+		sshCmdString += " -t"
+	}
+
+	if withSudo {
+		if cmd == "" {
+			// tty option is required for some command like ls
+			cmd = "sudo"
+		}
+	}
+
+	if cmd != "" {
+		sshCmdString = sshCmdString + " " + cmd + " " + shell
 	}
 
 	if cmdString != "" {
-		sshCmdString = sshCmdString + fmt.Sprintf("%s bash <<'ENDSSH'\n%s\nENDSSH", sudoOpt, cmdString)
+		sshCmdString = sshCmdString + fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
 	return sshCmdString, f, nil
 
@@ -755,21 +773,21 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 
 // Command returns the cmd struct to execute cmdString remotely
 func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
-	return ssh.command(cmdString, false)
+	return ssh.command(cmdString, false, false)
 }
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
+func (ssh *SSHConfig) SudoCommand(cmdString string, withSudo bool) (*SSHCommand, error) {
 	// FIXME Add traces
-	return ssh.command(cmdString, true)
+	return ssh.command(cmdString, false, true)
 }
 
-func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
+func (ssh *SSHConfig) command(cmdString string, withTty, withSudo bool) (*SSHCommand, error) {
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, withSudo)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, "", "", withTty, withSudo)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
@@ -904,7 +922,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		}
 		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, "", "", false, false)
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -951,7 +969,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 }
 
 // Enter Enter to interactive shell
-func (ssh *SSHConfig) Enter() error {
+func (ssh *SSHConfig) Enter(username, shell string) error {
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		for _, t := range tunnels {
@@ -963,7 +981,7 @@ func (ssh *SSHConfig) Enter() error {
 		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
 
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", false)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", username, shell, true, false)
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -1019,7 +1037,7 @@ func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SS
 	if err != nil {
 		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, "", "", false, false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
