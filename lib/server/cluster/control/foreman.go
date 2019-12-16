@@ -82,22 +82,22 @@ type Makers struct {
 	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition // default sizing of node(s)
 	DefaultImage                func(task concurrency.Task, b Foreman) string            // default image of server(s)
 	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType NodeType.Enum) (string, map[string]interface{})
-	GetGlobalSystemRequirements func(task concurrency.Task, b Foreman) (string, error)
+	GetGlobalSystemRequirements func(task concurrency.Task, f Foreman) (string, error)
 	GetTemplateBox              func() (*rice.Box, error)
-	ConfigureGateway            func(task concurrency.Task, b Foreman) error
-	CreateMaster                func(task concurrency.Task, b Foreman, index int) error
-	ConfigureMaster             func(task concurrency.Task, b Foreman, index int, pbHost *pb.Host) error
-	UnconfigureMaster           func(task concurrency.Task, b Foreman, pbHost *pb.Host) error
-	CreateNode                  func(task concurrency.Task, b Foreman, index int, pbHost *pb.Host) error
-	ConfigureNode               func(task concurrency.Task, b Foreman, index int, pbHost *pb.Host) error
-	UnconfigureNode             func(task concurrency.Task, b Foreman, pbHost *pb.Host, selectedMasterID string) error
-	ConfigureCluster            func(task concurrency.Task, b Foreman) error
-	UnconfigureCluster          func(task concurrency.Task, b Foreman) error
-	JoinMasterToCluster         func(task concurrency.Task, b Foreman, pbHost *pb.Host) error
-	JoinNodeToCluster           func(task concurrency.Task, b Foreman, pbHost *pb.Host) error
-	LeaveMasterFromCluster      func(task concurrency.Task, b Foreman, pbHost *pb.Host) error
-	LeaveNodeFromCluster        func(task concurrency.Task, b Foreman, pbHost *pb.Host, selectedMaster string) error
-	GetState                    func(task concurrency.Task, b Foreman) (ClusterState.Enum, error)
+	ConfigureGateway            func(task concurrency.Task, f Foreman) error
+	CreateMaster                func(task concurrency.Task, f Foreman, index int) error
+	ConfigureMaster             func(task concurrency.Task, f Foreman, index int, pbHost *pb.Host) error
+	UnconfigureMaster           func(task concurrency.Task, f Foreman, pbHost *pb.Host) error
+	CreateNode                  func(task concurrency.Task, f Foreman, index int, pbHost *pb.Host) error
+	ConfigureNode               func(task concurrency.Task, f Foreman, index int, pbHost *pb.Host) error
+	UnconfigureNode             func(task concurrency.Task, f Foreman, pbHost *pb.Host, selectedMasterID string) error
+	ConfigureCluster            func(task concurrency.Task, f Foreman, req Request) error
+	UnconfigureCluster          func(task concurrency.Task, f Foreman) error
+	JoinMasterToCluster         func(task concurrency.Task, f Foreman, pbHost *pb.Host) error
+	JoinNodeToCluster           func(task concurrency.Task, f Foreman, pbHost *pb.Host) error
+	LeaveMasterFromCluster      func(task concurrency.Task, f Foreman, pbHost *pb.Host) error
+	LeaveNodeFromCluster        func(task concurrency.Task, f Foreman, pbHost *pb.Host, selectedMaster string) error
+	GetState                    func(task concurrency.Task, f Foreman) (ClusterState.Enum, error)
 }
 
 //go:generate mockgen -destination=../mocks/mock_foreman.go -package=mocks github.com/CS-SI/SafeScale/lib/server/cluster/control Foreman
@@ -612,6 +612,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// At the end, configure cluster as a whole
 	err = b.configureCluster(task, data.Map{
+		"Request":          req,
 		"PrimaryGateway":   primaryGateway,
 		"SecondaryGateway": secondaryGateway,
 	})
@@ -741,7 +742,34 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 		}
 	}()
 
+	var (
+		p   data.Map
+		ok  bool
+		req Request
+	)
+
+	p, ok = params.(data.Map)
+	if !ok {
+		return scerr.InvalidParameterError("params", "must be of type 'data.Map'")
+	}
+	req, ok = p["Request"].(Request)
+	if !ok {
+		return scerr.InvalidParameterError("params[Request]", "missing or not of type 'Request'")
+	}
+
 	err = b.createSwarm(task, params)
+	if err != nil {
+		return err
+	}
+
+	// Installs ntp server feature on cluster (masters)
+	err = b.installTimeServer(task)
+	if err != nil {
+		return err
+	}
+
+	// Installs ntp client feature on cluster (anything but masters)
+	err = b.installTimeClient(task)
 	if err != nil {
 		return err
 	}
@@ -753,14 +781,17 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	}
 
 	// Installs remotedesktop feature on cluster (all masters)
-	err = b.installRemoteDesktop(task)
-	if err != nil {
-		return err
+	_, ok = req.DisabledDefaultFeatures["remotedesktop"]
+	if !ok {
+		err = b.installRemoteDesktop(task)
+		if err != nil {
+			return err
+		}
 	}
 
 	// configure what has to be done cluster-wide
 	if b.makers.ConfigureCluster != nil {
-		return b.makers.ConfigureCluster(task, b)
+		return b.makers.ConfigureCluster(task, b, req)
 	}
 
 	// Not finding a callback isn't an error, so return nil in this case
@@ -1002,7 +1033,9 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 	if b.makers.JoinNodeToCluster == nil {
 		// configure what has to be done cluster-wide
 		if b.makers.ConfigureCluster != nil {
-			return b.makers.ConfigureCluster(task, b)
+			// FIXME: fill req.DisabledDefaultFeatures with information from (currently non-existent) cluster features metadata
+			req := Request{}
+			return b.makers.ConfigureCluster(task, b, req)
 		}
 	}
 
@@ -1426,6 +1459,8 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	logrus.Debugf("[%s] starting configuration...", gw.Name)
+
+	// First install ntp client
 
 	if b.makers.ConfigureGateway != nil {
 		err := b.makers.ConfigureGateway(t, b)
@@ -1996,6 +2031,70 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
 
 	logrus.Debugf("[%s] configuration successful.", hostLabel)
 	return nil, nil
+}
+
+// Installs Time Server (NTP)
+func (b *foreman) installTimeServer(task concurrency.Task) (err error) {
+	identity := b.cluster.GetIdentity(task)
+	clusterName := identity.Name
+
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	logrus.Debugf("[cluster %s] adding feature 'ntpserver'", clusterName)
+	feat, err := install.NewEmbeddedFeature(task, "ntpserver")
+	if err != nil {
+		return err
+	}
+	target, err := install.NewClusterTarget(task, b.cluster)
+	if err != nil {
+		return err
+	}
+	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	if err != nil {
+		return err
+	}
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
+		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+	}
+	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
+	return nil
+}
+
+// Installs Time Client (NTP)
+func (b *foreman) installTimeClient(task concurrency.Task) (err error) {
+	identity := b.cluster.GetIdentity(task)
+	clusterName := identity.Name
+
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	logrus.Debugf("[cluster %s] adding feature 'ntpclient'", clusterName)
+	feat, err := install.NewEmbeddedFeature(task, "ntpclient")
+	if err != nil {
+		return err
+	}
+	target, err := install.NewClusterTarget(task, b.cluster)
+	if err != nil {
+		return err
+	}
+	peers := []string{}
+	for _, i := range b.Cluster().ListMasterIPs(task) {
+		peers = append(peers, i)
+	}
+	results, err := feat.Add(target, install.Variables{"Peers": peers}, install.Settings{})
+	if err != nil {
+		return err
+	}
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
+		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+	}
+	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
+	return nil
 }
 
 // Installs reverseproxy
