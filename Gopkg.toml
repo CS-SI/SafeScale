@@ -138,6 +138,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[override]]
   name = "github.com/denisbrodbeck/machineid"
+  version = "=v1.0.1"
 
 [prune]
   go-tests = true
