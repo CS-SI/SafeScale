@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 //go:generate rice embed-go
@@ -110,7 +111,7 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return "Ubuntu 18.04"
 }
 
-func configureCluster(task concurrency.Task, foreman control.Foreman) error {
+func configureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
 	clusterName := foreman.Cluster().GetIdentity(task).Name
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
@@ -122,6 +123,15 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error())
 	}
+
+	// Initializes variables
+	v := data.Map{}
+
+	// If hardening is disabled, set the appropriate variable for the kubernetes feature
+	_, ok := req.DisabledDefaultFeatures["hardening"]
+	v["Hardening"] = !ok
+
+	// Installs kubernetes feature
 	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		return scerr.Wrap(err, fmt.Sprintf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error()))
