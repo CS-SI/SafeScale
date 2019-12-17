@@ -3,7 +3,6 @@ package gcp
 import (
 	"fmt"
 	"net/url"
-	"reflect"
 	"strings"
 	"time"
 
@@ -31,7 +30,7 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 	res = Result{}
 
 	if oco.Operation != nil {
-		if oco.Operation.Zone != "" {
+		if oco.Operation.Zone != "" { // nolint
 			zoneURL, _ := url.Parse(oco.Operation.Zone)
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
@@ -118,9 +117,9 @@ func getRegionFromSelfLink(link SelfLink) (string, error) {
 	return "", fmt.Errorf("not a region link")
 }
 
-func assertEq(exp, got interface{}) error {
-	if !reflect.DeepEqual(exp, got) {
-		return fmt.Errorf("wanted %v; Got %v", exp, got)
-	}
-	return nil
-}
+// func assertEq(exp, got interface{}) error {
+// 	if !reflect.DeepEqual(exp, got) {
+// 		return fmt.Errorf("wanted %v; Got %v", exp, got)
+// 	}
+// 	return nil
+// }

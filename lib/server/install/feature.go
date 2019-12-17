@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -74,7 +74,7 @@ type Feature struct {
 	// embedded tells if the feature is embedded in deploy
 	embedded bool
 	// Installers defines the installers available for the feature
-	installers map[Method.Enum]Installer
+	installers map[method.Enum]Installer
 	// Dependencies lists other feature(s) (by name) needed by this one
 	//dependencies []string
 	// Management contains a string map of data that could be used to manage the feature (if it makes sense)
@@ -99,7 +99,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 		files, err := ioutil.ReadDir(path)
 		if err == nil {
 			for _, f := range files {
-				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
+				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
 					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if err != nil {
 						logrus.Error(err) // FIXME Don't hide errors
@@ -182,14 +182,12 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 		default:
 			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
-	} else {
-		if v.IsSet("feature") {
-			feat = Feature{
-				fileName:    name + ".yml",
-				displayName: name,
-				specs:       v,
-				task:        task,
-			}
+	} else if v.IsSet("feature") {
+		feat = Feature{
+			fileName:    name + ".yml",
+			displayName: name,
+			specs:       v,
+			task:        task,
 		}
 	}
 	return &feat, err
@@ -217,22 +215,22 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err err
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
-func (f *Feature) installerOfMethod(method Method.Enum) Installer {
+func (f *Feature) installerOfMethod(m method.Enum) Installer {
 	var installer Installer
-	switch method {
-	case Method.Bash:
+	switch m {
+	case method.Bash:
 		installer = NewBashInstaller()
-	case Method.Apt:
+	case method.Apt:
 		installer = NewAptInstaller()
-	case Method.Yum:
+	case method.Yum:
 		installer = NewYumInstaller()
-	case Method.Dnf:
+	case method.Dnf:
 		installer = NewDnfInstaller()
-	case Method.DCOS:
+	case method.DCOS:
 		installer = NewDcosInstaller()
-		//	case Method.Ansible:
+		//	case method.Ansible:
 		//		installer = NewAnsibleInstaller()
-		//	case Method.Helm:
+		//	case method.Helm:
 		//		installer = NewHelmInstaller()
 	}
 	return installer
@@ -419,9 +417,11 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	results := Results{}
+	var (
+		results   Results
+		installer Installer
+	)
 	methods := t.Methods()
-	var installer Installer
 	for _, method := range methods {
 		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
 			installer = f.installerOfMethod(method)

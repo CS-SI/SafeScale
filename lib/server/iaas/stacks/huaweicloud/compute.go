@@ -42,9 +42,9 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
@@ -286,7 +286,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		err := defaultGateway.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 			hostNetworkV1 := v.(*propsv1.HostNetwork)
 			defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 			defaultGatewayID = defaultGateway.ID
@@ -347,7 +347,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if request.DiskSize > template.DiskSize {
 		template.DiskSize = request.DiskSize
 	} else if template.DiskSize == 0 {
-		if template.Cores < 16 {
+		if template.Cores < 16 { // nolint
 			template.DiskSize = 100
 		} else if template.Cores < 32 {
 			template.DiskSize = 200
@@ -401,7 +401,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		hostNetworkV1.IsGateway = isGateway
 		hostNetworkV1.DefaultNetworkID = defaultNetworkID
@@ -415,7 +415,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	// Adds Host property SizingV1
 	// template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		hostSizingV1.Template = request.TemplateID
@@ -530,11 +530,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}()
 
 		// Updates Host property NetworkV1 in host instance
-		err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 			hostNetworkV1 := v.(*propsv1.HostNetwork)
-			if IPVersion.IPv4.Is(fip.PublicIPAddress) {
+			if ipversion.IPv4.Is(fip.PublicIPAddress) {
 				hostNetworkV1.PublicIPv4 = fip.PublicIPAddress
-			} else if IPVersion.IPv6.Is(fip.PublicIPAddress) {
+			} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
 				hostNetworkV1.PublicIPv6 = fip.PublicIPAddress
 			}
 			userData.PublicIP = fip.PublicIPAddress
@@ -628,7 +628,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			}
 
 			host.LastState = toHostState(server.Status)
-			if host.LastState != HostState.ERROR && host.LastState != HostState.STARTING {
+			if host.LastState != hoststate.ERROR && host.LastState != hoststate.STARTING {
 				log.Infof("host status of '%s' is '%s'", host.ID, server.Status)
 				err = nil
 				return nil
@@ -691,7 +691,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	host.LastState = toHostState(server.Status)
 
 	// Updates Host Property propsv1.HostDescription
-	err = host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
 		hostDescriptionV1 := v.(*propsv1.HostDescription)
 		hostDescriptionV1.Created = server.Created
 		hostDescriptionV1.Updated = server.Updated
@@ -702,7 +702,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property HostNetwork
-	return host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4
@@ -715,17 +715,17 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 			ipv4Addresses := map[string]string{}
 			ipv6Addresses := map[string]string{}
 			for netid, netname := range hostNetworkV1.NetworksByID {
-				if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
+				if ip, ok := addresses[ipversion.IPv4][netid]; ok {
 					ipv4Addresses[netid] = ip
-				} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
+				} else if ip, ok := addresses[ipversion.IPv4][netname]; ok {
 					ipv4Addresses[netid] = ip
 				} else {
 					ipv4Addresses[netid] = ""
 				}
 
-				if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
+				if ip, ok := addresses[ipversion.IPv6][netid]; ok {
 					ipv6Addresses[netid] = ip
-				} else if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
+				} else if ip, ok := addresses[ipversion.IPv6][netname]; ok {
 					ipv6Addresses[netid] = ip
 				} else {
 					ipv6Addresses[netid] = ""
@@ -740,13 +740,13 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 			for _, netid := range networks {
 				networksByID[netid] = ""
 
-				if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
+				if ip, ok := addresses[ipversion.IPv4][netid]; ok {
 					ipv4Addresses[netid] = ip
 				} else {
 					ipv4Addresses[netid] = ""
 				}
 
-				if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
+				if ip, ok := addresses[ipversion.IPv6][netid]; ok {
 					ipv6Addresses[netid] = ip
 				} else {
 					ipv6Addresses[netid] = ""
@@ -777,10 +777,10 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 // collectAddresses converts adresses returned by the OpenStack driver
 // Returns string slice containing the name of the networks, string map of IP addresses
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[IPVersion.Enum]map[string]string, string, string, error) {
+func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
 	var (
 		networks      = []string{}
-		addrs         = map[IPVersion.Enum]map[string]string{}
+		addrs         = map[ipversion.Enum]map[string]string{}
 		AcccessIPv4   string
 		AcccessIPv6   string
 		allInterfaces = []nics.Interface{}
@@ -799,8 +799,8 @@ func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[IPVersion.
 		return networks, addrs, "", "", err
 	}
 
-	addrs[IPVersion.IPv4] = map[string]string{}
-	addrs[IPVersion.IPv6] = map[string]string{}
+	addrs[ipversion.IPv4] = map[string]string{}
+	addrs[ipversion.IPv6] = map[string]string{}
 
 	for _, item := range allInterfaces {
 		networks = append(networks, item.NetID)
@@ -815,9 +815,9 @@ func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[IPVersion.
 				}
 			} else {
 				if ipv4 {
-					addrs[IPVersion.IPv4][item.NetID] = fixedIP
+					addrs[ipversion.IPv4][item.NetID] = fixedIP
 				} else {
-					addrs[IPVersion.IPv6][item.NetID] = fixedIP
+					addrs[ipversion.IPv6][item.NetID] = fixedIP
 				}
 			}
 		}
@@ -909,12 +909,13 @@ func (s *Stack) DeleteHost(id string) error {
 				func() error {
 					host, err = servers.Get(s.Stack.ComputeClient, id).Extract()
 					if err == nil {
-						if toHostState(host.Status) == HostState.ERROR {
+						if toHostState(host.Status) == hoststate.ERROR {
 							return nil
 						}
 						return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
 					}
-					switch err.(type) {
+					// FIXME: capture more error types
+					switch err.(type) { // nolint
 					case gc.ErrDefault404:
 						resourcePresent = false
 						return nil
@@ -1090,7 +1091,7 @@ func (s *Stack) getOpenstackPortID(host *resources.Host) (*string, error) {
 	return nil, resources.ResourceNotFoundError("Port ID corresponding to host", host.Name)
 }
 
-// toHostSize converts flavor attributes returned by OpenStack driver into resources.HostProperty.v1.HostSize
+// toHostSize converts flavor attributes returned by OpenStack driver into resources.hostproperty.v1.HostSize
 func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
@@ -1107,18 +1108,18 @@ func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 }
 
 // toHostState converts host status returned by FlexibleEngine driver into HostState enum
-func toHostState(status string) HostState.Enum {
+func toHostState(status string) hoststate.Enum {
 	switch status {
 	case "BUILD", "build", "BUILDING", "building":
-		return HostState.STARTING
+		return hoststate.STARTING
 	case "ACTIVE", "active":
-		return HostState.STARTED
+		return hoststate.STARTED
 	case "RESCUED", "rescued":
-		return HostState.STOPPING
+		return hoststate.STOPPING
 	case "STOPPED", "stopped", "SHUTOFF", "shutoff":
-		return HostState.STOPPED
+		return hoststate.STOPPED
 	default:
-		return HostState.ERROR
+		return hoststate.ERROR
 	}
 }
 
@@ -1141,11 +1142,11 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			if err != nil {
 				return err
 			}
-			if host.LastState == HostState.ERROR {
+			if host.LastState == hoststate.ERROR {
 				hostInError = true
 				return nil
 			}
-			if host.LastState != HostState.STARTED {
+			if host.LastState != hoststate.STARTED {
 				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
 			}
 			return nil

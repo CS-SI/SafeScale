@@ -51,8 +51,8 @@ func getTester() (*tests.ServiceTester, error) {
 func getService() (iaas.Service, error) {
 	if service == nil {
 		tenant_name := ""
-		if tenant_override := os.Getenv("TEST_LOCAL"); tenant_override != "" {
-			tenant_name = tenant_override
+		if tenantOverride := os.Getenv("TEST_LOCAL"); tenantOverride != "" {
+			tenant_name = tenantOverride
 		}
 		service, err := iaas.UseService(tenant_name)
 		if err != nil || service == nil {

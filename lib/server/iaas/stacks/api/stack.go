@@ -18,7 +18,7 @@ package api
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
@@ -81,7 +81,7 @@ type Stack interface {
 	// GetHostByName returns the host identified by name
 	GetHostByName(string) (*resources.Host, error)
 	// GetHostState returns the current state of the host identified by id
-	GetHostState(interface{}) (HostState.Enum, error)
+	GetHostState(interface{}) (hoststate.Enum, error)
 	// ListHosts lists all hosts
 	ListHosts() ([]*resources.Host, error)
 	// DeleteHost deletes the host identified by id

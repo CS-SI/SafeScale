@@ -32,56 +32,56 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
-func toVolumeState(status string) VolumeState.Enum {
+func toVolumeState(status string) volumestate.Enum {
 	switch status {
 	case "creating":
-		return VolumeState.CREATING
+		return volumestate.CREATING
 	case "available":
-		return VolumeState.AVAILABLE
+		return volumestate.AVAILABLE
 	case "attaching":
-		return VolumeState.ATTACHING
+		return volumestate.ATTACHING
 	case "detaching":
-		return VolumeState.DETACHING
+		return volumestate.DETACHING
 	case "in-use":
-		return VolumeState.USED
+		return volumestate.USED
 	case "deleting":
-		return VolumeState.DELETING
+		return volumestate.DELETING
 	case "error", "error_deleting", "error_backing-up", "error_restoring", "error_extending":
-		return VolumeState.ERROR
+		return volumestate.ERROR
 	default:
-		return VolumeState.OTHER
+		return volumestate.OTHER
 	}
 }
 
-func (s *Stack) getVolumeType(speed VolumeSpeed.Enum) string {
+func (s *Stack) getVolumeType(speed volumespeed.Enum) string {
 	for t, s := range s.cfgOpts.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
 	}
 	switch speed {
-	case VolumeSpeed.SSD:
-		return s.getVolumeType(VolumeSpeed.HDD)
-	case VolumeSpeed.HDD:
-		return s.getVolumeType(VolumeSpeed.COLD)
+	case volumespeed.SSD:
+		return s.getVolumeType(volumespeed.HDD)
+	case volumespeed.HDD:
+		return s.getVolumeType(volumespeed.COLD)
 	default:
 		return ""
 	}
 }
 
-func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
+func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 	speed, ok := s.cfgOpts.VolumeSpeeds[vType]
 	if ok {
 		return speed
 	}
-	return VolumeSpeed.HDD
+	return volumespeed.HDD
 }
 
 // CreateVolume creates a block volume

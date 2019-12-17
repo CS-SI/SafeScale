@@ -25,14 +25,13 @@ import (
 	"sync/atomic"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -67,94 +66,94 @@ set -x
 // var featureScriptTemplate *template.Template
 var featureScriptTemplate atomic.Value
 
-// parseTargets validates targets on the cluster from the feature specification
-// Without error, returns 'master target', 'private node target' and 'public node target'
-func parseTargets(specs *viper.Viper) (string, string, string, error) {
-	if !specs.IsSet("feature.target.cluster") {
-		return "", "", "", fmt.Errorf("feature isn't suitable for a cluster")
-	}
+// // parseTargets validates targets on the cluster from the feature specification
+// // Without error, returns 'master target', 'private node target' and 'public node target'
+// func parseTargets(specs *viper.Viper) (string, string, string, error) {
+// 	if !specs.IsSet("feature.target.cluster") {
+// 		return "", "", "", fmt.Errorf("feature isn't suitable for a cluster")
+// 	}
 
-	master := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.master")))
-	switch master {
-	case "":
-		fallthrough
-	case "false":
-		fallthrough
-	case "no":
-		fallthrough
-	case "none":
-		fallthrough
-	case "0":
-		master = "0"
-	case "any":
-		fallthrough
-	case "one":
-		fallthrough
-	case "1":
-		master = "1"
-	case "all":
-		fallthrough
-	case "*":
-		master = "*"
-	default:
-		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.master'", master)
-	}
+// 	master := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.master")))
+// 	switch master {
+// 	case "":
+// 		fallthrough
+// 	case "false":
+// 		fallthrough
+// 	case "no":
+// 		fallthrough
+// 	case "none":
+// 		fallthrough
+// 	case "0":
+// 		master = "0"
+// 	case "any":
+// 		fallthrough
+// 	case "one":
+// 		fallthrough
+// 	case "1":
+// 		master = "1"
+// 	case "all":
+// 		fallthrough
+// 	case "*":
+// 		master = "*"
+// 	default:
+// 		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.master'", master)
+// 	}
 
-	privnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.private")))
-	switch privnode {
-	case "false":
-		fallthrough
-	case "no":
-		fallthrough
-	case "none":
-		privnode = "0"
-	case "any":
-		fallthrough
-	case "one":
-		fallthrough
-	case "1":
-		privnode = "1"
-	case "":
-		fallthrough
-	case "all":
-		fallthrough
-	case "*":
-		privnode = "*"
-	default:
-		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.private'", privnode)
-	}
+// 	privnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.private")))
+// 	switch privnode {
+// 	case "false":
+// 		fallthrough
+// 	case "no":
+// 		fallthrough
+// 	case "none":
+// 		privnode = "0"
+// 	case "any":
+// 		fallthrough
+// 	case "one":
+// 		fallthrough
+// 	case "1":
+// 		privnode = "1"
+// 	case "":
+// 		fallthrough
+// 	case "all":
+// 		fallthrough
+// 	case "*":
+// 		privnode = "*"
+// 	default:
+// 		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.private'", privnode)
+// 	}
 
-	pubnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.public")))
-	switch pubnode {
-	case "":
-		fallthrough
-	case "false":
-		fallthrough
-	case "no":
-		fallthrough
-	case "none":
-		fallthrough
-	case "0":
-		pubnode = "0"
-	case "any":
-		fallthrough
-	case "one":
-		fallthrough
-	case "1":
-		pubnode = "1"
-	case "all":
-		fallthrough
-	case "*":
-		pubnode = "*"
-	default:
-		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.public'", pubnode)
-	}
+// 	pubnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.public")))
+// 	switch pubnode {
+// 	case "":
+// 		fallthrough
+// 	case "false":
+// 		fallthrough
+// 	case "no":
+// 		fallthrough
+// 	case "none":
+// 		fallthrough
+// 	case "0":
+// 		pubnode = "0"
+// 	case "any":
+// 		fallthrough
+// 	case "one":
+// 		fallthrough
+// 	case "1":
+// 		pubnode = "1"
+// 	case "all":
+// 		fallthrough
+// 	case "*":
+// 		pubnode = "*"
+// 	default:
+// 		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.public'", pubnode)
+// 	}
 
-	if master == "0" && privnode == "0" && pubnode == "0" {
-		return "", "", "", fmt.Errorf("invalid 'feature.target.cluster': no target designated")
-	}
-	return master, privnode, pubnode, nil
-}
+// 	if master == "0" && privnode == "0" && pubnode == "0" {
+// 		return "", "", "", fmt.Errorf("invalid 'feature.target.cluster': no target designated")
+// 	}
+// 	return master, privnode, pubnode, nil
+// }
 
 // UploadFile uploads a file to remote host
 func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) (err error) {
@@ -186,7 +185,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", remotepath), Outputs.COLLECT, temporal.GetBigDelay(), temporal.GetExecutionTimeout())
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", remotepath), outputs.COLLECT, temporal.GetBigDelay(), temporal.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -209,7 +208,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		return fmt.Errorf("an unrecoverable network error has occurred")
 	}
 	if retryErr != nil {
-		switch retryErr.(type) {
+		switch retryErr.(type) { // nolint
 		case retry.ErrTimeout:
 			return fmt.Errorf("timeout trying to copy temporary file to '%s': %s", to, retryErr.Error())
 		}
@@ -236,7 +235,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = sshClt.Run(host.Name, cmd, Outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
+			retcode, _, _, err = sshClt.Run(host.Name, cmd, outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -370,15 +369,15 @@ func replaceVariablesInString(text string, v Variables) (string, error) {
 	return dataBuffer.String(), nil
 }
 
-func findConcernedHosts(list []string, c *Feature) (string, error) {
-	// No metadata yet for features, first host is designated concerned host
-	if len(list) > 0 {
-		return list[0], nil
-	}
-	return "", fmt.Errorf("no hosts")
-	//for _, h := range list {
-	//}
-}
+// func findConcernedHosts(list []string, c *Feature) (string, error) {
+// 	// No metadata yet for features, first host is designated concerned host
+// 	if len(list) > 0 {
+// 		return list[0], nil
+// 	}
+// 	return "", fmt.Errorf("no hosts")
+// 	//for _, h := range list {
+// 	//}
+// }
 
 // determineContext ...
 func determineContext(t Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarget) {

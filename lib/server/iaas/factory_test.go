@@ -83,7 +83,7 @@ func TestTenantsWithNoClientTenantFile(t *testing.T) {
 }
 
 func createTenantFile() {
-	filename, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
+	filename, _ := filepath.Abs(filepath.Join(".", "tenants.toml"))
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
 	if err != nil {
 		panic(err)
@@ -107,7 +107,7 @@ func createTenantFile() {
 	_ = file.Sync()
 }
 func createNoClientTenantFile() {
-	filename, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
+	filename, _ := filepath.Abs(filepath.Join(".", "tenants.toml"))
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
 	if err != nil {
 		panic(err)
@@ -131,7 +131,7 @@ func createNoClientTenantFile() {
 	_ = file.Sync()
 }
 func createNoNameTenantFile() {
-	filename, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
+	filename, _ := filepath.Abs(filepath.Join(".", "tenants.toml"))
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
 	if err != nil {
 		panic(err)
@@ -171,7 +171,7 @@ func TestViper(t *testing.T) {
 	viper.SetConfigName("tenants")
 	err := viper.ReadInConfig() // Find and read the config file
 	if err != nil {             // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %s \n", err))
+		panic(fmt.Errorf("fatal error config file: %s", err))
 	}
 	fmt.Println(viper.ConfigFileUsed())
 	settings := viper.AllSettings()

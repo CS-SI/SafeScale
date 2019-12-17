@@ -172,6 +172,10 @@ func asyncRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.
 	}
 
 	params, ok := p.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("p", "must be a 'data.Map'")
+	}
+
 	var (
 		bridge    PipeBridge
 		displayCh chan outputItem

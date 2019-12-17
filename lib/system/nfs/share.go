@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 )
 
 // ExportOptions ...
@@ -44,7 +44,7 @@ type ExportACL struct {
 	//Host contains the pattern of hosts authorized (cf. exports man page)
 	Host string
 	//SecurityMode contains all the security mode allowed for the Host
-	SecurityModes []SecurityFlavor.Enum
+	SecurityModes []securityflavor.Enum
 	//Options contains the options of the export ACL
 	Options ExportOptions
 }

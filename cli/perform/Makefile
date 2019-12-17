@@ -34,8 +34,9 @@ generate:
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
 	@echo "package main" > $(VERSIONFILE)
+	@echo "// Build constants" >> $(VERSIONFILE)
 	@echo "const (" >> $(VERSIONFILE)
-	@echo "  VERSION = \"$(VERSION)\"" >> $(VERSIONFILE)
-	@echo "  BUILD_DATE = \"$(BUILD_DATE)\"" >> $(VERSIONFILE)
-	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
+	@echo "    Version   = \"$(VERSION)\"" >> $(VERSIONFILE)
+	@echo "    BuildDate = \"$(BUILD_DATE)\"" >> $(VERSIONFILE)
+	@echo "    Revision  = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)

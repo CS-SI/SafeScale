@@ -94,7 +94,7 @@ func work() {
 
 	logrus.Infoln("Registering services")
 	pb.RegisterBucketServiceServer(s, &listeners.BucketListener{})
-	pb.RegisterDataServiceServer(s, &listeners.DataListener{})
+	// pb.RegisterDataServiceServer(s, &listeners.DataListener{})
 	pb.RegisterHostServiceServer(s, &listeners.HostListener{})
 	pb.RegisterImageServiceServer(s, &listeners.ImageListener{})
 	pb.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
@@ -111,7 +111,7 @@ func work() {
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 
-	version := VERSION + ", build " + REV + " (" + BUILD_DATE + ")"
+	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	fmt.Printf("Safescaled version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		logrus.Fatalf("Failed to serve: %v", err)
@@ -124,7 +124,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "safescaled"
 	app.Usage = "safescaled [OPTIONS]"
-	app.Version = VERSION + ", build " + REV + " (" + BUILD_DATE + ")"
+	app.Version = Version + ", build " + Revision + " (" + BuildDate + ")"
 
 	app.Authors = []cli.Author{
 		cli.Author{

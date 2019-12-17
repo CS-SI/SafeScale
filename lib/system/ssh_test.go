@@ -18,11 +18,12 @@ package system_test
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"io/ioutil"
 	"os/user"
 	"strings"
 	"testing"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	"github.com/stretchr/testify/assert"
 
@@ -39,13 +40,13 @@ func Test_Command(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	ssh_conf := system.SSHConfig{
+	sshConf := system.SSHConfig{
 		User:       usr.Name,
 		Host:       "127.0.0.1",
 		Port:       22,
 		PrivateKey: string(content),
 	}
-	cmd, err := ssh_conf.Command("whoami")
+	cmd, err := sshConf.Command("whoami")
 	assert.Nil(t, err)
 	out, err := cmd.Output() // FIXME Correct this test
 	if err != nil {
@@ -53,11 +54,11 @@ func Test_Command(t *testing.T) {
 	}
 	assert.Nil(t, err)
 	assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
-	gateway := ssh_conf
+	gateway := sshConf
 
 	if !utils.IsEmpty(gateway) {
-		ssh_conf.GatewayConfig = &gateway
-		cmd, err := ssh_conf.Command("bash -c whoami")
+		sshConf.GatewayConfig = &gateway
+		cmd, err := sshConf.Command("bash -c whoami")
 		assert.Nil(t, err)
 		out, err := cmd.Output()
 		assert.Nil(t, err)
@@ -66,8 +67,8 @@ func Test_Command(t *testing.T) {
 
 	if !utils.IsEmpty(gateway) {
 		gw := gateway
-		ssh_conf.GatewayConfig.GatewayConfig = &gw
-		cmd, err := ssh_conf.Command("bash -c whoami")
+		sshConf.GatewayConfig.GatewayConfig = &gw
+		cmd, err := sshConf.Command("bash -c whoami")
 		assert.Nil(t, err)
 		out, err := cmd.Output()
 		assert.Nil(t, err)

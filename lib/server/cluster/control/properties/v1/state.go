@@ -19,15 +19,15 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // State contains the bare minimum information about a cluster
 type State struct {
 	// State of the cluster
-	State ClusterState.Enum
+	State clusterstate.Enum
 	// StateCollectInterval in seconds
 	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`
 }
@@ -53,5 +53,5 @@ func (s *State) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.StateV1, &State{})
+	serialize.PropertyTypeRegistry.Register("clusters", property.StateV1, &State{})
 }

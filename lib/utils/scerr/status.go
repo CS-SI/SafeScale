@@ -7,16 +7,16 @@ type ErrorLike interface {
 	IsError() bool
 }
 
-func iserror(err error) bool {
-	if err == nil {
-		return false
-	}
-	ei, ok := err.(ErrorLike)
-	if !ok {
-		return true
-	}
-	return ei.IsError()
-}
+// func iserror(err error) bool {
+// 	if err == nil {
+// 		return false
+// 	}
+// 	ei, ok := err.(ErrorLike)
+// 	if !ok {
+// 		return true
+// 	}
+// 	return ei.IsError()
+// }
 
 // Status interface
 type Status interface {

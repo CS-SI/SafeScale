@@ -12,4 +12,3 @@ vet:
 
 clean:
 	@$(RM) */enum_string.go || true
-

@@ -30,9 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -44,7 +44,7 @@ type ssh struct {
 }
 
 // Run executes the command
-func (s *ssh) Run(hostName, command string, outputs Outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	var (
 		retcode        int
 		stdout, stderr string
@@ -81,7 +81,7 @@ func (s *ssh) Run(hostName, command string, outputs Outputs.Enum, connectionTime
 				return err
 			}
 
-			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(nil, outputs, executionTimeout)
+			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(nil, outs, executionTimeout)
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if breakErr != nil {
@@ -98,8 +98,8 @@ func (s *ssh) Run(hostName, command string, outputs Outputs.Enum, connectionTime
 			return nil
 		},
 		connectionTimeout,
-		func(t retry.Try, v Verdict.Enum) {
-			if v == Verdict.Retry {
+		func(t retry.Try, v verdict.Enum) {
+			if v == verdict.Retry {
 				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
 			}
 		},
@@ -246,7 +246,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		connectionTimeout,
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
+		switch retryErr.(type) { // nolint
 		case retry.ErrTimeout:
 			return -1, "", "", fmt.Errorf("failed to copy after %v: %s", connectionTimeout, err.Error())
 		}
@@ -284,8 +284,8 @@ func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) e
 			return sshCfg.Enter(username, shell)
 		},
 		temporal.GetConnectSSHTimeout(),
-		func(t retry.Try, v Verdict.Enum) {
-			if v == Verdict.Retry {
+		func(t retry.Try, v verdict.Enum) {
+			if v == verdict.Retry {
 				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostname)
 			}
 		},
@@ -328,8 +328,8 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 			return nil
 		},
 		temporal.GetConnectSSHTimeout(),
-		func(t retry.Try, v Verdict.Enum) {
-			if v == Verdict.Retry {
+		func(t retry.Try, v verdict.Enum) {
+			if v == verdict.Retry {
 				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
 			}
 		},

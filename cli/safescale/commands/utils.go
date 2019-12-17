@@ -22,10 +22,10 @@ import (
 	"strconv"
 
 	"github.com/denisbrodbeck/machineid"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -75,7 +75,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 		}
 		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
 	}
-	retcode, _, _, err = SSHClient.Run(hostname, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, err = SSHClient.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 func (rfc RemoteFileItem) RemoveRemote(hostname string) error {
 	SSHClient := client.New().SSH
 	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, err := SSHClient.Run(hostname, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, err := SSHClient.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to remove file '%s:%s'", hostname, rfc.Remote)
 	}
@@ -129,7 +129,7 @@ func (rfh *RemoteFilesHandler) Cleanup(hostname string) {
 	for _, v := range rfh.items {
 		err := v.RemoveRemote(hostname)
 		if err != nil {
-			log.Warnf(err.Error())
+			logrus.Warnf(err.Error())
 		}
 	}
 }

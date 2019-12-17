@@ -18,14 +18,15 @@ package retry
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-func quick_sleepy() error {
+func quickSleepy() error {
 	fmt.Println("Quick OK")
 	time.Sleep(1 * time.Second)
 	return nil
@@ -37,26 +38,26 @@ func sleepy() error {
 	return nil
 }
 
-func sleepy_failure() error {
+func sleepyFailure() error {
 	fmt.Println("Slow fail")
 	time.Sleep(1 * time.Minute)
 	return fmt.Errorf("always fails")
 }
 
-func quick_sleepy_failure() error {
+func quickSleepyFailure() error {
 	fmt.Println("Quick fail")
 	time.Sleep(1 * time.Second)
 	return fmt.Errorf("always fails")
 }
 
-func complex_sleepy_failure() error {
+func complexSleepyFailure() error {
 	fmt.Println("Quick fail")
 	time.Sleep(1 * time.Second)
 	return scerr.NotFoundError("Not here")
 }
 
 func CreateErrorWithNConsequences(n uint) (err error) {
-	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*time.Second)
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -75,7 +76,7 @@ func CreateSkippableError() (err error) {
 }
 
 func CreateComplexErrorWithNConsequences(n uint) (err error) {
-	err = WhileUnsuccessfulDelay1Second(complex_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(complexSleepyFailure, time.Duration(5)*time.Second)
 	if err != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -109,7 +110,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (err error) {
 		}
 	}()
 
-	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*time.Second)
 	return err
 }
 
@@ -123,7 +124,7 @@ func CreateWrappedDeferredErrorWithNConsequences(n uint) (err error) {
 		}
 	}()
 
-	err = WhileUnsuccessfulDelay1Second(quick_sleepy_failure, time.Duration(5)*time.Second)
+	err = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*time.Second)
 	return err
 }
 
@@ -278,9 +279,9 @@ func TestWhileUnsuccessfulDelay5Seconds(t *testing.T) {
 		wantErr bool
 	}{
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false},
-		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true},
-		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false},
-		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true},
+		{"OneTimeSlowFails", args{sleepyFailure, time.Duration(15) * time.Second}, true},
+		{"OneTimeQuickOK", args{quickSleepy, time.Duration(15) * time.Second}, false},
+		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * time.Second}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -303,9 +304,9 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		wantTOErr bool
 	}{
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false, true},
-		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true, true},
-		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false, false},
-		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true, true},
+		{"OneTimeSlowFails", args{sleepyFailure, time.Duration(15) * time.Second}, true, true},
+		{"OneTimeQuickOK", args{quickSleepy, time.Duration(15) * time.Second}, false, false},
+		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * time.Second}, true, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -341,9 +342,9 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 		wantTOErr bool
 	}{
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, true, false},
-		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true, false},
-		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false, false},
-		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true, false},
+		{"OneTimeSlowFails", args{sleepyFailure, time.Duration(15) * time.Second}, true, false},
+		{"OneTimeQuickOK", args{quickSleepy, time.Duration(15) * time.Second}, false, false},
+		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * time.Second}, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

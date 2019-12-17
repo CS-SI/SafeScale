@@ -17,7 +17,7 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -64,18 +64,12 @@ func (n *Nodes) Replace(p serialize.Property) serialize.Property {
 	n.Masters = make([]*Node, len(src.Masters))
 	n.PublicNodes = make([]*Node, len(src.PublicNodes))
 	n.PrivateNodes = make([]*Node, len(src.PrivateNodes))
-	for k, v := range src.Masters {
-		n.Masters[k] = v
-	}
-	for k, v := range src.PublicNodes {
-		n.PublicNodes[k] = v
-	}
-	for k, v := range src.PrivateNodes {
-		n.PrivateNodes[k] = v
-	}
+	copy(n.Masters, src.Masters)
+	copy(n.PublicNodes, src.PublicNodes)
+	copy(n.PrivateNodes, src.PrivateNodes)
 	return n
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.NodesV1, newNodes())
+	serialize.PropertyTypeRegistry.Register("clusters", property.NodesV1, newNodes())
 }

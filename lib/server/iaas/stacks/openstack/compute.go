@@ -42,9 +42,9 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
@@ -402,18 +402,18 @@ func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 }
 
 // toHostState converts host status returned by OpenStack driver into HostState enum
-func toHostState(status string) HostState.Enum {
+func toHostState(status string) hoststate.Enum {
 	switch strings.ToLower(status) {
 	case "build", "building":
-		return HostState.STARTING
+		return hoststate.STARTING
 	case "active":
-		return HostState.STARTED
+		return hoststate.STARTED
 	case "rescued":
-		return HostState.STOPPING
+		return hoststate.STOPPING
 	case "stopped", "shutoff":
-		return HostState.STOPPED
+		return hoststate.STOPPED
 	default:
-		return HostState.ERROR
+		return hoststate.ERROR
 	}
 }
 
@@ -492,8 +492,8 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 			}
 
 			lastState := toHostState(server.Status)
-			if lastState != HostState.ERROR && lastState != HostState.STARTING {
-				if lastState != HostState.STARTED {
+			if lastState != hoststate.ERROR && lastState != hoststate.STARTING {
+				if lastState != hoststate.STARTED {
 					logrus.Warnf("unexpected: host status of '%s' is '%s'", id, server.Status)
 				}
 				err = nil
@@ -529,16 +529,16 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
 func (s *Stack) interpretAddresses(
 	addresses map[string]interface{},
-) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
+) ([]string, map[ipversion.Enum]map[string]string, string, string) {
 	var (
 		networks    = []string{}
-		addrs       = map[IPVersion.Enum]map[string]string{}
+		addrs       = map[ipversion.Enum]map[string]string{}
 		AcccessIPv4 string
 		AcccessIPv6 string
 	)
 
-	addrs[IPVersion.IPv4] = map[string]string{}
-	addrs[IPVersion.IPv6] = map[string]string{}
+	addrs[ipversion.IPv4] = map[string]string{}
+	addrs[ipversion.IPv6] = map[string]string{}
 
 	for n, obj := range addresses {
 		networks = append(networks, n)
@@ -556,9 +556,9 @@ func (s *Stack) interpretAddresses(
 			} else {
 				switch version {
 				case 4:
-					addrs[IPVersion.IPv4][n] = fixedIP
+					addrs[ipversion.IPv4][n] = fixedIP
 				case 6:
-					addrs[IPVersion.IPv6][n] = fixedIP
+					addrs[ipversion.IPv6][n] = fixedIP
 				}
 			}
 
@@ -584,12 +584,12 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	host.LastState = toHostState(server.Status)
-	if host.LastState == HostState.ERROR || host.LastState == HostState.STARTING {
+	if host.LastState == hoststate.ERROR || host.LastState == hoststate.STARTING {
 		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
 	}
 
 	// Updates Host Property propsv1.HostDescription
-	err := host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+	err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
 		hpDescriptionV1 := v.(*propsv1.HostDescription)
 		hpDescriptionV1.Created = server.Created
 		hpDescriptionV1.Updated = server.Updated
@@ -600,7 +600,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hpSizingV1 := v.(*propsv1.HostSizing)
 		if hpSizingV1.AllocatedSize == nil {
 			hpSizingV1.AllocatedSize = s.toHostSize(server.Flavor)
@@ -612,7 +612,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property propsv1.HostNetwork
-	return host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4
@@ -620,20 +620,20 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 		if hostNetworkV1.PublicIPv6 == "" {
 			hostNetworkV1.PublicIPv6 = ipv6
 		}
-		// networks contains network names, but HostProperty.NetworkV1.IPxAddresses has to be
+		// networks contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
 		// indexed on network ID. Tries to convert if possible, if we already have correspondance
 		// between network ID and network Name in Host definition
 		if len(hostNetworkV1.NetworksByID) > 0 {
 			ipv4Addresses := map[string]string{}
 			ipv6Addresses := map[string]string{}
 			for netid, netname := range hostNetworkV1.NetworksByID {
-				if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
+				if ip, ok := addresses[ipversion.IPv4][netname]; ok {
 					ipv4Addresses[netid] = ip
 				} else {
 					ipv4Addresses[netid] = ""
 				}
 
-				if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
+				if ip, ok := addresses[ipversion.IPv6][netname]; ok {
 					ipv6Addresses[netid] = ip
 				} else {
 					ipv6Addresses[netid] = ""
@@ -659,13 +659,13 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 				}
 				networksByID[net.ID] = ""
 
-				if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
+				if ip, ok := addresses[ipversion.IPv4][netname]; ok {
 					ipv4Addresses[net.ID] = ip
 				} else {
 					ipv4Addresses[net.ID] = ""
 				}
 
-				if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
+				if ip, ok := addresses[ipversion.IPv6][netname]; ok {
 					ipv6Addresses[net.ID] = ip
 				} else {
 					ipv6Addresses[net.ID] = ""
@@ -848,7 +848,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		hostNetworkV1.DefaultNetworkID = defaultNetworkID
 		hostNetworkV1.DefaultGatewayID = defaultGatewayID
@@ -861,7 +861,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	// Adds Host property SizingV1
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		hostSizingV1.Template = request.TemplateID
@@ -975,11 +975,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			return nil, userData, scerr.Wrap(err, msg)
 		}
 
-		err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 			hostNetworkV1 := v.(*propsv1.HostNetwork)
-			if IPVersion.IPv4.Is(ip.IP) {
+			if ipversion.IPv4.Is(ip.IP) {
 				hostNetworkV1.PublicIPv4 = ip.IP
-			} else if IPVersion.IPv6.Is(ip.IP) {
+			} else if ipversion.IPv6.Is(ip.IP) {
 				hostNetworkV1.PublicIPv6 = ip.IP
 			}
 			userData.PublicIP = ip.IP
@@ -1050,12 +1050,12 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	}
 
 	var host *resources.Host
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
 		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
+		host = hostParam
 	}
 	if host == nil {
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")
@@ -1074,7 +1074,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 				return err
 			}
 			host = hostTmp
-			if host.LastState != HostState.STARTED {
+			if host.LastState != hoststate.STARTED {
 				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
 			}
 			return nil
@@ -1093,16 +1093,16 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *resources.Host; any other type will return an scerr.InvalidParameterError
-func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	if s == nil {
-		return HostState.ERROR, scerr.InvalidInstanceError()
+		return hoststate.ERROR, scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
-		return HostState.ERROR, err
+		return hoststate.ERROR, err
 	}
 	return host.LastState, nil
 }
@@ -1231,12 +1231,13 @@ func (s *Stack) DeleteHost(id string) error {
 				func() error {
 					host, err := servers.Get(s.ComputeClient, id).Extract()
 					if err == nil {
-						if toHostState(host.Status) == HostState.ERROR {
+						if toHostState(host.Status) == hoststate.ERROR {
 							return nil
 						}
 						return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
 					}
-					switch err.(type) {
+					// FIXME: captures more error types
+					switch err.(type) { // nolint
 					case gc.ErrDefault404:
 						resourcePresent = false
 						return nil

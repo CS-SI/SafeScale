@@ -7,7 +7,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -216,7 +216,7 @@ func (w LoggedProvider) GetHostByName(name string) (*resources.Host, error) {
 }
 
 // GetHostState ...
-func (w LoggedProvider) GetHostState(something interface{}) (HostState.Enum, error) {
+func (w LoggedProvider) GetHostState(something interface{}) (hoststate.Enum, error) {
 	defer w.prepare(w.trace("GetHostState"))
 	return w.InnerProvider.GetHostState(something)
 }

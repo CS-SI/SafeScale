@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 )
@@ -101,9 +101,9 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
 		AutoHostNetworkInterfaces: true,
-		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"standard":   VolumeSpeed.COLD,
-			"performant": VolumeSpeed.HDD,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"standard":   volumespeed.COLD,
+			"performant": volumespeed.HDD,
 		},
 		DNSList:          dnsServers,
 		MetadataBucket:   metadataBucketName,

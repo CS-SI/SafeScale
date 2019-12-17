@@ -19,8 +19,9 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"regexp"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
 
@@ -90,8 +91,8 @@ func UseService(tenantName string) (newService Service, err error) {
 	}
 
 	var (
-		tenantInCfg = false
-		found       = false
+		tenantInCfg bool
+		found       bool
 		name        string
 		svc         Service
 		svcProvider = "__not_found__"

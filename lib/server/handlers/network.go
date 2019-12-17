@@ -28,9 +28,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
@@ -51,7 +51,7 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(context.Context, string, string, IPVersion.Enum, resources.SizingRequirements, string, string, bool) (*resources.Network, error)
+	Create(context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool) (*resources.Network, error)
 	List(context.Context, bool) ([]*resources.Network, error)
 	Inspect(context.Context, string) (*resources.Network, error)
 	Delete(context.Context, string) error
@@ -60,7 +60,7 @@ type NetworkAPI interface {
 // NetworkHandler an implementation of NetworkAPI
 type NetworkHandler struct {
 	service   iaas.Service
-	ipVersion IPVersion.Enum
+	ipVersion ipversion.Enum
 }
 
 // NewNetworkHandler Creates new Network service
@@ -73,7 +73,7 @@ func NewNetworkHandler(svc iaas.Service) NetworkAPI {
 // Create creates a network
 func (handler *NetworkHandler) Create(
 	ctx context.Context,
-	name string, cidr string, ipVersion IPVersion.Enum,
+	name string, cidr string, ipVersion ipversion.Enum,
 	sizing resources.SizingRequirements, theos string, gwname string,
 	failover bool,
 ) (network *resources.Network, err error) {
@@ -569,7 +569,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	userData.IsPrimaryGateway = primary
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
-	err = gw.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = gw.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		gwSizingV1 := v.(*propsv1.HostSizing)
 		gwSizingV1.RequestedSize = &propsv1.HostSize{
 			Cores:     sizing.MinCores,
@@ -824,7 +824,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 
 	// Check if hosts are still attached to network according to metadata
 	var errorMsg string
-	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+	err = network.Properties.LockForRead(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		hostsLen := len(networkHostsV1.ByName)
 		if hostsLen > 0 {
@@ -1006,7 +1006,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	// case <-ctx.Done():
 	// 	logrus.Warnf("Network delete cancelled by user")
 	// 	hostSizingV1 := propsv1.NewHostSizing()
-	// 	err := metadataHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	// 	err := metadataHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 	// 		hostSizingV1 = v.(*propsv1.HostSizing)
 	// 		return nil
 	// 	})

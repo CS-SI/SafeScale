@@ -42,7 +42,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -200,7 +200,7 @@ func getFreePort() (int, error) {
 	}
 	tcp, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
-		return 0, fmt.Errorf("Invalid listener.Addr()")
+		return 0, fmt.Errorf("invalid listener.Addr()")
 	}
 
 	port := tcp.Port
@@ -413,7 +413,7 @@ func (sc *SSHCommand) Start() error {
 
 // Display ...
 func (sc *SSHCommand) Display() string {
-	return strings.Join(sc.cmd.Args[:], " ")
+	return strings.Join(sc.cmd.Args, " ")
 }
 
 // Run starts the specified command and waits for it to complete.
@@ -426,16 +426,16 @@ func (sc *SSHCommand) Display() string {
 // type *ExitError. Other error types may be returned for other situations.
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
-func (sc *SSHCommand) Run(t concurrency.Task, outputs Outputs.Enum) (int, string, string, error) {
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outputs.String()), true).WithStopwatch().GoingIn()
+func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, string, error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outs.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	return sc.RunWithTimeout(t, outputs, 0)
+	return sc.RunWithTimeout(t, outs, 0)
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs Outputs.Enum, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outputs.String(), timeout), true).WithStopwatch().GoingIn()
+func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, error) {
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outs.String(), timeout), true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 
@@ -519,7 +519,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs Outputs.Enum
 	_, err = subtask.StartWithTimeout(sc.taskExecute, data.Map{
 		"stdout":          stdoutPipe,
 		"stderr":          stderrPipe,
-		"collect_outputs": outputs != Outputs.DISPLAY,
+		"collect_outputs": outs != outputs.DISPLAY,
 	}, timeout)
 	if err != nil {
 		return -1, "", "", err
@@ -627,8 +627,8 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 	if err == nil {
 		result["retcode"] = 0
 		if collectOutputs {
-			result["stdout"] = string(msgOut[:])
-			result["stderr"] = string(msgErr[:])
+			result["stdout"] = string(msgOut)
+			result["stderr"] = string(msgErr)
 		}
 	} else {
 		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
@@ -654,8 +654,8 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		}
 		result["retcode"] = retCode
 		if collectOutputs {
-			result["stdout"] = string(msgOut[:])
-			result["stderr"] = fmt.Sprint(string(msgErr[:]), msgError)
+			result["stdout"] = string(msgOut)
+			result["stderr"] = fmt.Sprint(string(msgErr), msgError)
 		} else {
 			result["stderr"] = msgError
 		}
@@ -761,11 +761,11 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString, username, shell string, withT
 	}
 
 	if cmd != "" {
-		sshCmdString = sshCmdString + " " + cmd + " " + shell
+		sshCmdString += " " + cmd + " " + shell
 	}
 
 	if cmdString != "" {
-		sshCmdString = sshCmdString + fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
+		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
 	return sshCmdString, f, nil
 
@@ -837,7 +837,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				return err
 			}
 
-			retcode, stdout, stderr, err = cmd.RunWithTimeout(nil, Outputs.COLLECT, timeout)
+			retcode, stdout, stderr, err = cmd.RunWithTimeout(nil, outputs.COLLECT, timeout)
 			if err != nil {
 				return err
 			}
@@ -907,7 +907,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		keyFile: identityfile,
 	}
 
-	return sshCommand.Run(nil, Outputs.COLLECT) // FIXME It CAN lock, use .RunWithTimeout instead
+	return sshCommand.Run(nil, outputs.COLLECT) // FIXME It CAN lock, use .RunWithTimeout instead
 }
 
 // Exec executes the cmd using ssh

@@ -31,15 +31,15 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	_ "github.com/CS-SI/SafeScale/lib/server" // Imported to initialise tenants
@@ -221,7 +221,7 @@ func RunScanner(targetedTenant string) {
 	}
 
 	if len(targetedProviders) < 1 {
-		log.Warn("No scannable tenant found. Consider marking a tennant as Scannable as stated in documentation")
+		logrus.Warn("No scannable tenant found. Consider marking a tennant as Scannable as stated in documentation")
 		return
 	}
 
@@ -235,7 +235,7 @@ func RunScanner(targetedTenant string) {
 		}
 
 		if !targetedTenantIsInTenantsList {
-			log.Fatalf("Tenant %s not found.", targetedTenant)
+			logrus.Fatalf("Tenant %s not found.", targetedTenant)
 		}
 	}
 
@@ -270,7 +270,7 @@ func RunScanner(targetedTenant string) {
 			fmt.Printf("Error working with tenant %s\n", tenantName)
 		}
 		if err := collect(tenantName); err != nil {
-			log.Warn(fmt.Printf("failed to save scanned info from tenant %s", tenantName))
+			logrus.Warn(fmt.Printf("failed to save scanned info from tenant %s", tenantName))
 		}
 	}
 }
@@ -301,7 +301,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 	serviceProvider, err := iaas.UseService(theTenant)
 	if err != nil {
-		log.Warnf("Unable to get serviceProvider for tenant '%s': %s", theTenant, err.Error())
+		logrus.Warnf("Unable to get serviceProvider for tenant '%s': %s", theTenant, err.Error())
 		return err
 	}
 
@@ -321,7 +321,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	}
 	img, err := serviceProvider.SearchImage("Ubuntu 18.04")
 	if err != nil {
-		log.Warnf("No image here...")
+		logrus.Warnf("No image here...")
 		return err
 	}
 
@@ -332,7 +332,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 	netName := "net-safescale" // FIXME Hardcoded string
 	if network, err = serviceProvider.GetNetwork(netName); network != nil && err == nil {
-		log.Warnf("Network '%s' already there", netName)
+		logrus.Warnf("Network '%s' already there", netName)
 	} else {
 		there = false
 	}
@@ -340,7 +340,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	if !there {
 		network, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
-			IPVersion: IPVersion.IPv4,
+			IPVersion: ipversion.IPv4,
 			Name:      netName,
 		})
 		if err != nil {
@@ -353,7 +353,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 		defer func() {
 			delerr := serviceProvider.DeleteNetwork(network.ID)
 			if delerr != nil {
-				log.Warnf("Error deleting network '%s'", network.ID)
+				logrus.Warnf("Error deleting network '%s'", network.ID)
 			}
 			err = scerr.AddConsequence(err, delerr)
 		}()
@@ -397,50 +397,50 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				return nil
 			}
 
-			log.Printf("Checking template %s\n", template.Name)
+			logrus.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
 			hostHandler := handlers.NewHostHandler(serviceProvider)
 
 			host, err := hostHandler.Create(context.Background(), hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
 			if err != nil {
-				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
+				logrus.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
 
 			defer func() {
-				log.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.ID)
+				logrus.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.ID)
 				delerr := hostHandler.Delete(context.Background(), host.ID)
 				if delerr != nil {
-					log.Warnf("Error deleting host '%s'", host.ID)
+					logrus.Warnf("Error deleting host '%s'", host.ID)
 				}
 			}()
 
 			sshSvc := handlers.NewSSHHandler(serviceProvider)
 			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
 			if err != nil {
-				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
+				logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
 			_, nerr := ssh.WaitServerReady("ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
-				log.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
+				logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
 			}
 			c, err := ssh.Command(cmd)
 			if err != nil {
-				log.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
+				logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
-			_, cout, _, err := c.RunWithTimeout(nil, Outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
+			_, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
 			if err != nil {
-				log.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
+				logrus.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
 				return err
 			}
 
 			daCPU, err := createCPUInfo(cout)
 			if err != nil {
-				log.Warnf("template [%s]: Problem building cpu info: %v", template.Name, err)
+				logrus.Warnf("template [%s]: Problem building cpu info: %v", template.Name, err)
 				return err
 			}
 
@@ -453,16 +453,16 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 			daOut, err := json.MarshalIndent(daCPU, "", "\t")
 			if err != nil {
-				log.Warnf("template [%s] : Problem marshaling json data: %v", template.Name, err)
+				logrus.Warnf("template [%s] : Problem marshaling json data: %v", template.Name, err)
 				return err
 			}
 
 			nerr = ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json"), daOut, 0666)
 			if nerr != nil {
-				log.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
+				logrus.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
 				return nerr
 			}
-			log.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
+			logrus.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
 		} else {
 			return fmt.Errorf("no gateway network")
 		}
@@ -479,7 +479,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			defer func() { <-sem }()
 			lerr := hostAnalysis(inner)
 			if lerr != nil {
-				log.Warnf("Error running scanner: %+v", lerr)
+				logrus.Warnf("Error running scanner: %+v", lerr)
 			}
 		}(localTarget)
 	}
@@ -560,7 +560,7 @@ func dumpImages(service iaas.Service, tenant string) (err error) {
 }
 
 func main() {
-	log.Printf("%s version %s\n", os.Args[0], VERSION+", build "+REV+" ("+BUILD_DATE+")")
+	logrus.Printf("%s version %s\n", os.Args[0], Version+", build "+Revision+" ("+BuildDate+")")
 
 	safescaledPort := 50051
 
@@ -574,12 +574,12 @@ func main() {
 	timeout := time.Duration(1 * time.Second)
 	_, err := net.DialTimeout("tcp", "localhost:"+strconv.Itoa(safescaledPort), timeout)
 	if err != nil {
-		log.Fatalf("You must run safescaled first...")
+		logrus.Fatalf("You must run safescaled first...")
 	}
 
 	cmd := exec.Command("safescale", "help")
 	if err := cmd.Run(); err != nil {
-		log.Fatalf("You must have safescale in your $PATH")
+		logrus.Fatalf("You must have safescale in your $PATH")
 	}
 
 	if len(os.Args) == 1 {
@@ -602,7 +602,7 @@ func main() {
 	fmt.Println("Scanner will start in 10 sec, this is your last chance to cancel with Control+C")
 	time.Sleep(time.Duration(10) * time.Second)
 
-	log.Info("Starting scanner...")
+	logrus.Info("Starting scanner...")
 	if len(os.Args) > 1 {
 		RunScanner(os.Args[1])
 	} else {

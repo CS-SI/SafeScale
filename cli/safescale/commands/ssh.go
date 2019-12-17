@@ -24,15 +24,14 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -79,7 +78,7 @@ var sshRun = cli.Command{
 			timeout = temporal.GetHostTimeout()
 
 		}
-		retcode, _, _, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), Outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := client.New().SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
 		}
@@ -126,7 +125,7 @@ var sshCopy = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
 		}
 		if retcode != 0 {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode))))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode))))
 		}
 		return clitools.SuccessResponse(nil)
 	},

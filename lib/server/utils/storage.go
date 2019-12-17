@@ -36,7 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sethvargo/go-password/password"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 //
@@ -105,7 +105,7 @@ func loadRsaPrivateKey(keyFilePath string) (*rsa.PrivateKey, error) {
 func Hash(reader io.Reader) string {
 	h := sha256.New()
 	if _, err := io.Copy(h, reader); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
@@ -163,7 +163,7 @@ func NewShard(bucket objectstorage.Bucket) (*Shard, error) {
 
 	for i := 0; ; i++ {
 		if i > 10 {
-			return nil, fmt.Errorf("Issue on random shard name generations (or extremely++ unlucky)  : %v", err)
+			return nil, fmt.Errorf("issue on random shard name generations (or extremely++ unlucky)  : %v", err)
 		}
 		// To be accepted by a maximum of objects storage providers, passwords should be generated without symbols
 		if name, err = generateAesPassword(false); err != nil {
