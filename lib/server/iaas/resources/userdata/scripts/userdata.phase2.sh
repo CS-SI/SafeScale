@@ -475,9 +475,8 @@ EOF
     # Applies fw rules
     sfFirewallReload
 
-    grep -vi AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
-    echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new
-    mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
+    sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 196
+    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
     systemctl restart sshd
 
     echo done
