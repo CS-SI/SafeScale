@@ -54,8 +54,8 @@ func getMockableService(t *testing.T) (*tests.ServiceTester, *mocks.MockProvider
 	if mock_tester == nil {
 		skip := false
 		tenant_name := ""
-		if tenant_override := os.Getenv("TEST_OVH"); tenant_override != "" {
-			tenant_name = tenant_override
+		if tenantOverride := os.Getenv("TEST_OVH"); tenantOverride != "" {
+			tenant_name = tenantOverride
 		} else {
 			skip = true
 		}

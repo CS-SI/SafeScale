@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 )
@@ -110,10 +110,10 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		DNSList:             []string{"1.1.1.1"},
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
-		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"SATA": VolumeSpeed.COLD,
-			"SAS":  VolumeSpeed.HDD,
-			"SSD":  VolumeSpeed.SSD,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"SATA": volumespeed.COLD,
+			"SAS":  volumespeed.HDD,
+			"SSD":  volumespeed.SSD,
 		},
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,

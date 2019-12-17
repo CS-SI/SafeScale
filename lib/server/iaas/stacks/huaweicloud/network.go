@@ -33,12 +33,12 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -78,9 +78,10 @@ type vpcCreateResult struct {
 type vpcGetResult struct {
 	vpcCommonResult
 }
-type vpcDeleteResult struct {
-	gophercloud.ErrResult
-}
+
+// type vpcDeleteResult struct {
+// 	gophercloud.ErrResult
+// }
 
 // CreateVPC creates a network, which is managed by VPC in FlexibleEngine
 func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
@@ -383,11 +384,11 @@ type subnetDeleteResult struct {
 }
 
 // convertIPv4ToNumber converts a net.IP to a uint32 representation
-func convertIPv4ToNumber(IP net.IP) (uint32, error) {
-	if IP.To4() == nil {
+func convertIPv4ToNumber(ip net.IP) (uint32, error) {
+	if ip.To4() == nil {
 		return 0, fmt.Errorf("not an IPv4")
 	}
-	n := uint32(IP[0])*0x1000000 + uint32(IP[1])*0x10000 + uint32(IP[2])*0x100 + uint32(IP[3])
+	n := uint32(ip[0])*0x1000000 + uint32(ip[1])*0x10000 + uint32(ip[2])*0x100 + uint32(ip[3])
 	return n, nil
 }
 
@@ -493,8 +494,8 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 			return err
 		},
 		temporal.GetContextTimeout(),
-		func(try retry.Try, verdict Verdict.Enum) {
-			if verdict != Verdict.Done {
+		func(try retry.Try, v verdict.Enum) {
+			if v != verdict.Done {
 				log.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
 			}
 		},
@@ -567,7 +568,7 @@ func (s *Stack) deleteSubnet(id string) error {
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil,
-		func(t retry.Try, verdict Verdict.Enum) {
+		func(t retry.Try, v verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
@@ -610,12 +611,12 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 	return &subnet, nil
 }
 
-func fromIntIPVersion(v int) IPVersion.Enum {
+func fromIntIPVersion(v int) ipversion.Enum {
 	if v == 4 {
-		return IPVersion.IPv4
+		return ipversion.IPv4
 	}
 	if v == 6 {
-		return IPVersion.IPv6
+		return ipversion.IPv6
 	}
 	return -1
 }

@@ -17,8 +17,8 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -134,7 +134,7 @@ type HostTemplate struct {
 type Host struct {
 	ID         string                    `json:"id,omitempty"`
 	Name       string                    `json:"name,omitempty"`
-	LastState  HostState.Enum            `json:"state,omitempty"`
+	LastState  hoststate.Enum            `json:"state,omitempty"`
 	PrivateKey string                    `json:"private_key,omitempty"`
 	Password   string                    `json:"password,omitempty"`
 	Properties *serialize.JSONProperties `json:"properties,omitempty"`
@@ -175,7 +175,7 @@ func (h *Host) GetAccessIP() string {
 // GetPublicIP computes public IP of the host
 func (h *Host) GetPublicIP() string {
 	var ip string
-	err := h.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(value interface{}) error {
+	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(value interface{}) error {
 		hostNetworkV1 := value.(*propsv1.HostNetwork)
 		ip = hostNetworkV1.PublicIPv4
 		if ip == "" {
@@ -192,7 +192,7 @@ func (h *Host) GetPublicIP() string {
 // GetPrivateIP ...
 func (h *Host) GetPrivateIP() string {
 	var ip string
-	err := h.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if len(hostNetworkV1.IPv4Addresses) > 0 {
 			ip = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]

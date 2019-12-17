@@ -2,9 +2,10 @@ package api
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/sirupsen/logrus"
 )
@@ -313,7 +314,7 @@ func (w ErrorTraceProvider) GetHostByName(name string) (_ *resources.Host, err e
 }
 
 // GetHostState ...
-func (w ErrorTraceProvider) GetHostState(something interface{}) (_ HostState.Enum, err error) {
+func (w ErrorTraceProvider) GetHostState(something interface{}) (_ hoststate.Enum, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)

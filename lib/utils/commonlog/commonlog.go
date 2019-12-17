@@ -20,14 +20,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	baseTimestamp time.Time
-	emptyFieldMap logrus.FieldMap
+	// baseTimestamp time.Time
+	// emptyFieldMap logrus.FieldMap
 
 	// LogLevelFnMap is a map between loglevel and log functions from logrus
 	LogLevelFnMap = map[logrus.Level]func(args ...interface{}){

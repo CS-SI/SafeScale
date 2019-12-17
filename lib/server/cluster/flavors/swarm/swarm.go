@@ -31,8 +31,8 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -48,6 +48,7 @@ var (
 	Makers = control.Makers{
 		MinimumRequiredServers:      minimumRequiredServers,
 		DefaultGatewaySizing:        gatewaySizing,
+		DefaultMasterSizing:         masterSizing,
 		DefaultNodeSizing:           nodeSizing,
 		DefaultImage:                defaultImage,
 		GetTemplateBox:              getTemplateBox,
@@ -58,15 +59,14 @@ var (
 
 func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
 	var masterCount, privateNodeCount int
-	complexity := foreman.Cluster().GetIdentity(task).Complexity
-	switch complexity {
-	case Complexity.Small:
+	switch foreman.Cluster().GetIdentity(task).Complexity {
+	case complexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
-	case Complexity.Normal:
+	case complexity.Normal:
 		masterCount = 3
 		privateNodeCount = 3
-	case Complexity.Large:
+	case complexity.Large:
 		masterCount = 5
 		privateNodeCount = 3
 	}
@@ -179,16 +179,16 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 	return anon.(string), nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 
 	switch hostType {
-	case NodeType.Gateway:
+	case nodetype.Gateway:
 		script = "swarm_install_gateway.sh"
-	case NodeType.Master:
+	case nodetype.Master:
 		script = "swarm_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "swarm_install_node.sh"
 	}
 	return script, data

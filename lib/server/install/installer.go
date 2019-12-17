@@ -18,8 +18,6 @@ package install
 
 //go:generate mockgen -destination=../mocks/mock_installer.go -package=mocks github.com/CS-SI/SafeScale/lib/server/install Installer
 
-import "github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
-
 // Installer defines the API of an Installer
 type Installer interface {
 	// Check checks if the feature is installed
@@ -30,5 +28,5 @@ type Installer interface {
 	Remove(*Feature, Target, Variables, Settings) (Results, error)
 }
 
-// installerMap keeps a map of available installers sorted by Method
-type installerMap map[Method.Enum]Installer
+// // installerMap keeps a map of available installers sorted by Method
+// type installerMap map[method.Enum]Installer

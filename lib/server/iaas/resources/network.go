@@ -17,9 +17,10 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // GatewayRequest to create a Gateway into a network
@@ -40,7 +41,7 @@ type GatewayRequest struct {
 type NetworkRequest struct {
 	Name string
 	// IPVersion must be IPv4 or IPv6 (see IPVersion)
-	IPVersion IPVersion.Enum
+	IPVersion ipversion.Enum
 	// CIDR mask
 	CIDR string
 	// DNSServers
@@ -57,7 +58,7 @@ type Network struct {
 	GatewayID          string                    `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
 	SecondaryGatewayID string                    `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
 	VIP                *VIP                      `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
-	IPVersion          IPVersion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
+	IPVersion          ipversion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
 	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
 }
 

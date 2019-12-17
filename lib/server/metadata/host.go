@@ -251,7 +251,7 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 		return nil, err
 	}
 	// mn := NewNetwork(svc)
-	// err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	// err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 	// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
 	// 	for netID := range hostNetworkV1.NetworksByID {
 	// 		err := mn.ReadByID(netID)

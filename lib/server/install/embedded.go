@@ -20,11 +20,10 @@ import (
 	"bytes"
 	"fmt"
 
+	rice "github.com/GeertJohan/go.rice"
 	"github.com/spf13/viper"
 
-	rice "github.com/GeertJohan/go.rice"
-
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 //go:generate rice embed-go
@@ -33,9 +32,9 @@ const featureFileExt = ".yml"
 
 var (
 	templateBox *rice.Box
-	emptyParams = map[string]interface{}{}
+	// emptyParams = map[string]interface{}{}
 
-	availableEmbeddedMap = map[Method.Enum]map[string]*Feature{}
+	availableEmbeddedMap = map[method.Enum]map[string]*Feature{}
 	allEmbeddedMap       = map[string]*Feature{}
 	allEmbedded          = []*Feature{}
 )
@@ -195,20 +194,20 @@ func kubernetesFeature() *Feature {
 	}
 }
 
-// nexusFeature ...
-func nexusFeature() *Feature {
-	name := "nexus3"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
+// // nexusFeature ...
+// func nexusFeature() *Feature {
+// 	name := "nexus3"
+// 	filename, specs, err := loadSpecFile(name)
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
+// 	return &Feature{
+// 		displayName: name,
+// 		fileName:    filename,
+// 		embedded:    true,
+// 		specs:       specs,
+// 	}
+// }
 
 // elasticsearchFeature ...
 func elasticsearchFeature() *Feature {

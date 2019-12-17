@@ -18,16 +18,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"runtime"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/cluster"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -37,26 +38,25 @@ func Run() {
 
 	clusterName := "test-cluster"
 	instance, err := cluster.Load(concurrency.RootTask(), clusterName)
-	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-			cinstance, cerr := cluster.Create(concurrency.RootTask(), control.Request{
-				Name:       clusterName,
-				Complexity: Complexity.Small,
-				//Complexity: Complexity.Normal,
-				//Complexity: Complexity.Large,
-				CIDR:   "192.168.0.0/28",
-				Flavor: Flavor.DCOS,
-			})
-			if cerr != nil {
-				fmt.Printf("failed to create cluster: %s\n", cerr.Error())
-				return
-			}
-			instance = cinstance
-		} else {
-			fmt.Printf("failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
+
+	if _, ok := err.(scerr.ErrNotFound); ok {
+		logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
+		cinstance, cerr := cluster.Create(concurrency.RootTask(), control.Request{
+			Name:       clusterName,
+			Complexity: complexity.Small,
+			//Complexity: complexity.Normal,
+			//Complexity: complexity.Large,
+			CIDR:   "192.168.0.0/28",
+			Flavor: flavor.DCOS,
+		})
+		if cerr != nil {
+			fmt.Printf("failed to create cluster: %s\n", cerr.Error())
 			return
 		}
+		instance = cinstance
+	} else if err != nil {
+		fmt.Printf("failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
+		return
 	}
 
 	state, err := instance.GetState(concurrency.RootTask())

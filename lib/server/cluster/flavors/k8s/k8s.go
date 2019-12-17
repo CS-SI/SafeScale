@@ -30,10 +30,10 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/server/install"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
@@ -60,19 +60,18 @@ var (
 )
 
 func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
-	complexity := foreman.Cluster().GetIdentity(task).Complexity
 	masterCount := 0
 	privateNodeCount := 0
 	publicNodeCount := 0
 
-	switch complexity {
-	case Complexity.Small:
+	switch foreman.Cluster().GetIdentity(task).Complexity {
+	case complexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
-	case Complexity.Normal:
+	case complexity.Normal:
 		masterCount = 3
 		privateNodeCount = 3
-	case Complexity.Large:
+	case complexity.Large:
 		masterCount = 5
 		privateNodeCount = 6
 	}
@@ -145,15 +144,15 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 
 	switch nodeType {
-	case NodeType.Gateway:
-	case NodeType.Master:
+	case nodetype.Gateway:
+	case nodetype.Master:
 		script = "k8s_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "k8s_install_node.sh"
 	}
 	return script, data
@@ -231,7 +230,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 
 	// Check worker belongs to k8s
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err := clientSSH.Run(selectedMaster, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err := clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -243,7 +242,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl drain %s --delete-local-data --force --ignore-daemonsets", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -252,7 +251,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl delete node %s", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -262,7 +261,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 
 	// check node no longer belongs to k8s
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err = clientSSH.Run(selectedMaster, cmd, Outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err = clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}

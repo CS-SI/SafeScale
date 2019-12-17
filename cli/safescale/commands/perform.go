@@ -28,9 +28,9 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 )
 
 var (
@@ -74,12 +74,12 @@ var performCreateCommand = cli.Command{
 		}
 
 		complexityStr := c.String("complexity")
-		complexity, err := Complexity.Parse(complexityStr)
+		clusterComplexity, err := complexity.Parse(complexityStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --complexity|-C: %s\n", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
-		if complexity == Complexity.Small {
+		if clusterComplexity == complexity.Small {
 			msg := fmt.Sprintf("Invalid option --complexity|-C: Small is not permitted with perform")
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
@@ -116,13 +116,29 @@ func createMonitoredK8S(complexity string) error {
 	var SafescaleCmd = "safescale"
 
 	err = runCommand(tmplString)
+	if err != nil {
+		return err
+	}
 	// Install helm
 	cmdStr = fmt.Sprintf("%s platform add-feature %s helm", SafescaleCmd, clusterName)
+	err = runCommand(cmdStr)
+	if err != nil {
+		return err
+	}
 
 	// Adds harbour repo to Kubernetes
 	cmdStr = fmt.Sprintf("%s ssh run %s su - cladm -i kubectl ...platform add-feature %s ", SafescaleCmd, clusterName, "k8s.harbour")
+	err = runCommand(cmdStr)
+	if err != nil {
+		return err
+	}
 
 	cmdStr = fmt.Sprintf("%s platform add-feature %s monitored-k8s", SafescaleCmd, clusterName)
+	err = runCommand(cmdStr)
+	if err != nil {
+		return err
+	}
+
 	// // Installs feature Spark
 	// cmdStr = fmt.Sprintf("safescale platform add-feature %s sparkmaster", clusterName)
 	// err = runCommand(cmdStr)
@@ -153,20 +169,20 @@ func runCommand(cmdStr string) error {
 
 	err := cmd.Start()
 	if err != nil {
-		return cli.NewExitError(err.Error(), int(ExitCode.Run))
+		return cli.NewExitError(err.Error(), int(exitcode.Run))
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		return cli.NewExitError(err.Error(), int(ExitCode.Run))
+		return cli.NewExitError(err.Error(), int(exitcode.Run))
 	}
 	return nil
 }
 
-func getSafeScaleCommand() string {
-	ex, err := os.Executable()
-	if err != nil {
-		return "safescale"
-	}
-	return ex
-}
+// func getSafeScaleCommand() string {
+// 	ex, err := os.Executable()
+// 	if err != nil {
+// 		return "safescale"
+// 	}
+// 	return ex
+// }

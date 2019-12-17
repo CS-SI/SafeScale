@@ -30,7 +30,7 @@ import (
 
 // AbsPathify ...
 func AbsPathify(inPath string) string {
-	r, _ := regexp.Compile("(\\$[\\{]{1}[A-Z]+[\\}]{1})|(\\$[A-Z]+)")
+	r := regexp.MustCompile(`(\$[\{]{1}[A-Z]+[\}]{1})|(\$[A-Z]+)`)
 	found := r.FindAllString(inPath, -1)
 
 	// Special variable treatment goes here

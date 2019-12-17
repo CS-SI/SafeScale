@@ -18,10 +18,11 @@ package utils
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 var networks = map[string]*net.IPNet{}
@@ -63,7 +64,7 @@ func CIDRToLongRange(cidr string) (uint32, uint32, error) {
 		start = ip
 	}
 
-	ip = ip | (0xFFFFFFFF >> bits)
+	ip |= 0xFFFFFFFF >> bits
 	if end < ip {
 		end = ip
 	}

@@ -21,19 +21,18 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // CreateNetwork creates a network named name
@@ -55,15 +54,13 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
 	if recnet != nil && err == nil {
 		recreateSafescaleNetwork = false
-	} else {
-		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok {
-				if gerr.Code != 404 {
-					return nil, err
-				}
-			} else {
+	} else if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok {
+			if gerr.Code != 404 {
 				return nil, err
 			}
+		} else {
+			return nil, err
 		}
 	}
 
@@ -133,7 +130,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	subnet.ID = strconv.FormatUint(gcpSubNet.Id, 10)
 	subnet.Name = gcpSubNet.Name
 	subnet.CIDR = gcpSubNet.IpCidrRange
-	subnet.IPVersion = IPVersion.IPv4
+	subnet.IPVersion = ipversion.IPv4
 
 	buildNewRule := true
 	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, gcpSubNet.Name)
@@ -141,15 +138,13 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
 	if fws != nil && err == nil {
 		buildNewRule = false
-	} else {
-		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok {
-				if gerr.Code != 404 {
-					return nil, err
-				}
-			} else {
+	} else if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok {
+			if gerr.Code != 404 {
 				return nil, err
 			}
+		} else {
+			return nil, err
 		}
 	}
 
@@ -192,15 +187,13 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	rfs, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
 	if rfs != nil && err == nil {
 		buildNewNATRule = false
-	} else {
-		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok {
-				if gerr.Code != 404 {
-					return nil, err
-				}
-			} else {
+	} else if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok {
+			if gerr.Code != 404 {
 				return nil, err
 			}
+		} else {
+			return nil, err
 		}
 	}
 
@@ -459,7 +452,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	}
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		hostSizingV1.Template = req.TemplateID
 		return nil

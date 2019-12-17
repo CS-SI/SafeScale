@@ -28,11 +28,11 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/ErrorCode"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/errorcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -56,7 +56,7 @@ var (
 	// funcMap defines the custom functions to be used in templates
 	funcMap = txttmpl.FuncMap{
 		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.StringMap[msg]; ok {
+			if code, ok := errorcode.StringMap[msg]; ok {
 				return int(code)
 			}
 			return 1023
@@ -85,13 +85,13 @@ func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int
 	privateNodeCount := 0
 
 	switch foreman.Cluster().GetIdentity(task).Complexity {
-	case Complexity.Small:
+	case complexity.Small:
 		masterCount = 1
 		privateNodeCount = 2
-	case Complexity.Normal:
+	case complexity.Normal:
 		masterCount = 3
 		privateNodeCount = 4
-	case Complexity.Large:
+	case complexity.Large:
 		masterCount = 5
 		privateNodeCount = 6
 	}
@@ -162,8 +162,8 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index int, 
 		return err
 	}
 	if retcode != 0 {
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
+		if retcode < int(errorcode.NextErrorCode) {
+			errcode := errorcode.Enum(retcode)
 			logrus.Debugf("[%s] configuration failed:\nretcode:%d (%s)", hostLabel, errcode, errcode.String())
 			return fmt.Errorf("scripted Master configuration failed with error code %d (%s)", errcode, errcode.String())
 		}
@@ -195,8 +195,8 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 		return err
 	}
 	if retcode != 0 {
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
+		if retcode < int(errorcode.NextErrorCode) {
+			errcode := errorcode.Enum(retcode)
 			logrus.Debugf("[%s] configuration failed: retcode: %d (%s)", hostLabel, errcode, errcode.String())
 			return fmt.Errorf("scripted Agent configuration failed with error code %d (%s)", errcode, errcode.String())
 		}
@@ -207,14 +207,14 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType nodetype.Enum) (string, map[string]interface{}) {
 	data := map[string]interface{}{}
 
 	var script string
 	switch hostType {
-	case NodeType.Master:
+	case nodetype.Master:
 		script = "dcos_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "dcos_install_node.sh"
 	}
 	return script, data
@@ -243,7 +243,7 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 	}
 
 	identity := cluster.GetIdentity(task)
-	// VPL: FIXME: use Property.NetworkV2 with VIP awareness...
+	// VPL: FIXME: use property.NetworkV2 with VIP awareness...
 	data := map[string]interface{}{
 		"reserved_CommonRequirements": globalSystemRequirements,
 		// "BootstrapIP":                 netCfg.PrimaryGatewayPrivateIP,
@@ -263,8 +263,8 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 		return err
 	}
 	if retcode != 0 {
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
+		if retcode < int(errorcode.NextErrorCode) {
+			errcode := errorcode.Enum(retcode)
 			logrus.Errorf("[gateway] configuration failed:\nretcode=%d (%s)", errcode, errcode.String())
 			return fmt.Errorf("scripted gateway configuration failed with error code %d (%s)", errcode, errcode.String())
 		}
@@ -339,7 +339,7 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 
 // getState returns the current state of the cluster
 // This method will trigger a effective state collection at each call
-func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum, error) {
+func getState(task concurrency.Task, foreman control.Foreman) (clusterstate.Enum, error) {
 	var (
 		retcode int
 		ran     bool // Tells if command has been run on remote host
@@ -351,27 +351,27 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	safescaleCltHost := safescaleClt.Host
 	masterID, err := foreman.Cluster().FindAvailableMaster(task)
 	if err != nil {
-		return ClusterState.Unknown, err
+		return clusterstate.Unknown, err
 	}
 	sshCfg, err := safescaleCltHost.SSHConfig(masterID)
 	if err != nil {
 		logrus.Errorf("failed to get ssh config to connect to master '%s': %s", masterID, err.Error())
-		return ClusterState.Error, err
+		return clusterstate.Error, err
 
 	}
 	_, err = sshCfg.WaitServerReady("ready", temporal.GetContextTimeout())
 	if err != nil {
-		return ClusterState.Error, err
+		return clusterstate.Error, err
 	}
-	retcode, _, stderr, err = safescaleClt.SSH.Run(masterID, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, stderr, err = safescaleClt.SSH.Run(masterID, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		logrus.Errorf("failed to run remote command to get cluster state: %v\n%s", err, stderr)
-		return ClusterState.Error, err
+		return clusterstate.Error, err
 	}
 	ran = true
 
 	if ran && retcode == 0 {
-		return ClusterState.Nominal, nil
+		return clusterstate.Nominal, nil
 	}
-	return ClusterState.Error, err
+	return clusterstate.Error, err
 }

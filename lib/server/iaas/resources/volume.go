@@ -17,8 +17,8 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -26,7 +26,7 @@ import (
 type VolumeRequest struct {
 	Name  string           `json:"name,omitempty"`
 	Size  int              `json:"size,omitempty"`
-	Speed VolumeSpeed.Enum `json:"speed,omitempty"`
+	Speed volumespeed.Enum `json:"speed,omitempty"`
 }
 
 // Volume represents a block volume
@@ -34,8 +34,8 @@ type Volume struct {
 	ID         string                    `json:"id,omitempty"`
 	Name       string                    `json:"name,omitempty"`
 	Size       int                       `json:"size,omitempty"`
-	Speed      VolumeSpeed.Enum          `json:"speed,omitempty"`
-	State      VolumeState.Enum          `json:"state,omitempty"`
+	Speed      volumespeed.Enum          `json:"speed,omitempty"`
+	State      volumestate.Enum          `json:"state,omitempty"`
 	Properties *serialize.JSONProperties `json:"properties,omitempty"`
 }
 
