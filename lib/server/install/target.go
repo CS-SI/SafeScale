@@ -17,12 +17,12 @@
 package install
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 )
@@ -37,7 +37,7 @@ type Target interface {
 	Type() string
 	// Methods returns a list of installation methods usable on the target, ordered from
 	// upper to lower priority (1 = highest priority)
-	Methods() map[uint8]Method.Enum
+	Methods() map[uint8]method.Enum
 	// Installed returns a list of installed features
 	Installed() []string
 }
@@ -45,7 +45,7 @@ type Target interface {
 // HostTarget defines a target of type Host, satisfying TargetAPI
 type HostTarget struct {
 	host    *pb.Host
-	methods map[uint8]Method.Enum
+	methods map[uint8]method.Enum
 	name    string
 }
 
@@ -61,7 +61,7 @@ func NewHostTarget(host *pb.Host) (Target, error) {
 func createHostTarget(host *pb.Host) (*HostTarget, error) {
 	var (
 		index   uint8
-		methods = map[uint8]Method.Enum{}
+		methods = map[uint8]method.Enum{}
 	)
 	//TODO: LinuxKind field doesn't exist, it should contain the $LINUX_KIND value
 	//switch host.LinuxKind {
@@ -74,13 +74,13 @@ func createHostTarget(host *pb.Host) (*HostTarget, error) {
 	//	fallthrough
 	//case "ubuntu":
 	index++
-	methods[index] = Method.Apt
+	methods[index] = method.Apt
 	//case "fedora":
 	//	index++
 	//	methods[index] = Method.Dnf
 	//}
 	index++
-	methods[index] = Method.Bash
+	methods[index] = method.Bash
 	return &HostTarget{
 		host:    host,
 		methods: methods,
@@ -99,7 +99,7 @@ func (t *HostTarget) Name() string {
 }
 
 // Methods returns a list of packaging managers usable on the target
-func (t *HostTarget) Methods() map[uint8]Method.Enum {
+func (t *HostTarget) Methods() map[uint8]method.Enum {
 	return t.methods
 }
 
@@ -112,7 +112,7 @@ func (t *HostTarget) Installed() []string {
 // ClusterTarget defines a target of type Host, satisfying TargetAPI
 type ClusterTarget struct {
 	cluster clusterapi.Cluster
-	methods map[uint8]Method.Enum
+	methods map[uint8]method.Enum
 	name    string
 }
 
@@ -123,15 +123,15 @@ func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) (Target
 	}
 	var (
 		index   uint8
-		methods = map[uint8]Method.Enum{}
+		methods = map[uint8]method.Enum{}
 	)
 	identity := cluster.GetIdentity(task)
-	if identity.Flavor == Flavor.DCOS {
+	if identity.Flavor == flavor.DCOS {
 		index++
-		methods[index] = Method.DCOS
+		methods[index] = method.DCOS
 	}
 	index++
-	methods[index] = Method.Bash
+	methods[index] = method.Bash
 	return &ClusterTarget{
 		cluster: cluster,
 		methods: methods,
@@ -150,7 +150,7 @@ func (t *ClusterTarget) Name() string {
 }
 
 // Methods returns a list of packaging managers usable on the target
-func (t *ClusterTarget) Methods() map[uint8]Method.Enum {
+func (t *ClusterTarget) Methods() map[uint8]method.Enum {
 	return t.methods
 }
 

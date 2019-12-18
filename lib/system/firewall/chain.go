@@ -19,13 +19,13 @@ package firewall
 import (
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/system/firewall/Policy"
+	"github.com/CS-SI/SafeScale/lib/system/firewall/policy"
 )
 
 // Chain ...
 type Chain struct {
 	Name   string
-	Policy Policy.Enum
+	Policy policy.Enum
 	Rules  []Rule
 	lock   sync.RWMutex
 }

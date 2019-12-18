@@ -29,10 +29,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/install"
@@ -108,7 +108,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 		}
 	}
 
-	err = handler.service.WaitHostState(id, HostState.STARTED, temporal.GetHostTimeout())
+	err = handler.service.WaitHostState(id, hoststate.STARTED, temporal.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrNotFound, *scerr.ErrTimeout:
@@ -151,7 +151,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) { 
 		}
 	}
 
-	err = handler.service.WaitHostState(id, HostState.STOPPED, temporal.GetHostTimeout())
+	err = handler.service.WaitHostState(id, hoststate.STOPPED, temporal.GetHostTimeout())
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrNotFound, *scerr.ErrTimeout:
@@ -193,7 +193,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	}
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			return handler.service.WaitHostState(id, HostState.STARTED, temporal.GetHostTimeout())
+			return handler.service.WaitHostState(id, hoststate.STARTED, temporal.GetHostTimeout())
 		},
 		temporal.GetHostTimeout(),
 	)
@@ -253,9 +253,9 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 		}
 	}
 
-	if host.Properties.Lookup(HostProperty.SizingV1) {
+	if host.Properties.Lookup(hostproperty.SizingV1) {
 		descent := false
-		err = host.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		err = host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 			nhs := v.(*propsv1.HostSizing)
 			descent = descent || (hostSizeRequest.MinCores < nhs.RequestedSize.Cores)
 			descent = descent || (hostSizeRequest.MinRAMSize < nhs.RequestedSize.RAMSize)
@@ -514,7 +514,7 @@ func (handler *HostHandler) Create(
 	}()
 
 	if sizing != nil {
-		err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 			hostSizingV1 := v.(*propsv1.HostSizing)
 			hostSizingV1.Template = hostRequest.TemplateID
 			hostSizingV1.RequestedSize = &propsv1.HostSize{
@@ -527,7 +527,7 @@ func (handler *HostHandler) Create(
 			return nil
 		})
 	} else {
-		err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 			hostSizingV1 := v.(*propsv1.HostSizing)
 			hostSizingV1.Template = hostRequest.TemplateID
 			hostSizingV1.RequestedSize = &propsv1.HostSize{
@@ -548,7 +548,7 @@ func (handler *HostHandler) Create(
 	creator := ""
 	hostname, _ := os.Hostname()
 	if curUser, err := user.Current(); err == nil {
-		creator := curUser.Username
+		creator = curUser.Username
 		if hostname != "" {
 			creator += "@" + hostname
 		}
@@ -558,7 +558,7 @@ func (handler *HostHandler) Create(
 	} else {
 		creator = "unknown@" + hostname
 	}
-	err = host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
 		hostDescriptionV1 := v.(*propsv1.HostDescription)
 		hostDescriptionV1.Created = time.Now()
 		hostDescriptionV1.Creator = creator
@@ -573,7 +573,7 @@ func (handler *HostHandler) Create(
 		defaultNetworkID string
 		gatewayID        string
 	)
-	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		defaultNetworkID = hostNetworkV1.DefaultNetworkID // set earlier by handler.service.CreateHost()
 		if !public {
@@ -646,7 +646,7 @@ func (handler *HostHandler) Create(
 
 	// Updates host link with networks
 	for _, i := range networks {
-		err = i.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+		err = i.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
 			networkHostsV1 := v.(*propsv1.NetworkHosts)
 			networkHostsV1.ByName[host.Name] = host.ID
 			networkHostsV1.ByID[host.ID] = host.Name
@@ -790,7 +790,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 
 	request := resources.NetworkRequest{
 		Name:      resources.SingleHostNetworkName,
-		IPVersion: IPVersion.IPv4,
+		IPVersion: ipversion.IPv4,
 		CIDR:      "10.0.0.0/8",
 	}
 
@@ -907,7 +907,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 	// Don't remove a host having shares that are currently remotely mounted
 	var shares map[string]*propsv1.HostShare
-	err = host.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		shares = v.(*propsv1.HostShares).ByID
 		for _, share := range shares {
 			count := uint(len(share.ClientsByID))
@@ -923,7 +923,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 
 	// Don't remove a host with volumes attached
-	err = host.Properties.LockForRead(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(v interface{}) error {
 		nAttached := uint(len(v.(*propsv1.HostVolumes).VolumesByID))
 		if nAttached > 0 {
 			return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
@@ -935,7 +935,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 
 	// Don't remove a host that is a gateway
-	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		if v.(*propsv1.HostNetwork).IsGateway {
 			return fmt.Errorf("cannot delete host, it's a gateway that can only be deleted through its network")
 		}
@@ -948,7 +948,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	// If host mounted shares, unmounts them before anything else
 	shareHandler := NewShareHandler(handler.service)
 	var mounts []*propsv1.HostShare
-	err = host.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
 		hostMountsV1 := v.(*propsv1.HostMounts)
 		for _, i := range hostMountsV1.RemoteMountsByPath {
 			// Gets share data
@@ -987,7 +987,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 	// Update networks property prosv1.NetworkHosts to remove the reference to the host
 	netHandler := NewNetworkHandler(handler.service)
-	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		errors := []error{}
 
@@ -998,7 +998,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 				errors = append(errors, err)
 				continue
 			}
-			err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+			err = network.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
 				networkHostsV1 := v.(*propsv1.NetworkHosts)
 				delete(networkHostsV1.ByID, host.ID)
 				delete(networkHostsV1.ByName, host.Name)
@@ -1043,7 +1043,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	if moreTimeNeeded {
 		if state, ko := handler.service.GetHostState(host.ID); ko == nil { // FIXME Unhandled timeout, GetHostState uses retry too, a HostState.ERROR can be a Timeout and not a HostState.ERROR
 			log.Warnf("While deleting the status was [%s]", state)
-			if state != HostState.ERROR {
+			if state != hoststate.ERROR {
 				deleteMetadataOnly = true
 			} else {
 				return err
@@ -1066,9 +1066,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	case <-ctx.Done():
 		log.Warnf("Host delete cancelled by safescale")
 		var hostBis *resources.Host
-		err2 := host.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		err2 := host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 			hostSizingV1 := v.(*propsv1.HostSizing)
-			return host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+			return host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 				hostNetworkV1 := v.(*propsv1.HostNetwork)
 				//FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
 				var err3 error

@@ -17,7 +17,7 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -51,5 +51,5 @@ func (n *Network) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.NetworkV1, &Network{})
+	serialize.PropertyTypeRegistry.Register("clusters", property.NetworkV1, &Network{})
 }

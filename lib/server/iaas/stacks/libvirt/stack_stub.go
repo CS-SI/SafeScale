@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
@@ -170,8 +170,8 @@ func (s *Stack) GetHostByName(string) (*resources.Host, error) {
 }
 
 // GetHostState stub
-func (s *Stack) GetHostState(interface{}) (HostState.Enum, error) {
-	return HostState.ERROR, fmt.Errorf(errorStr)
+func (s *Stack) GetHostState(interface{}) (hoststate.Enum, error) {
+	return hoststate.ERROR, fmt.Errorf(errorStr)
 }
 
 // ListHosts stub

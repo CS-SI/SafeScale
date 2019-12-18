@@ -24,8 +24,8 @@ import (
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -42,7 +42,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 
 	selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
-	if request.Speed == VolumeSpeed.SSD {
+	if request.Speed == volumespeed.SSD {
 		selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
 	}
 
@@ -81,9 +81,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	nvol := resources.NewVolume()
 	nvol.Name = gcpDisk.Name
 	if strings.Contains(gcpDisk.Type, "pd-ssd") {
-		nvol.Speed = VolumeSpeed.SSD
+		nvol.Speed = volumespeed.SSD
 	} else {
-		nvol.Speed = VolumeSpeed.HDD
+		nvol.Speed = volumespeed.HDD
 	}
 	nvol.Size = int(gcpDisk.SizeGb)
 	nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
@@ -113,9 +113,9 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 	}
 	nvol.Name = gcpDisk.Name
 	if strings.Contains(gcpDisk.Type, "pd-ssd") {
-		nvol.Speed = VolumeSpeed.SSD
+		nvol.Speed = volumespeed.SSD
 	} else {
-		nvol.Speed = VolumeSpeed.HDD
+		nvol.Speed = volumespeed.HDD
 	}
 	nvol.Size = int(gcpDisk.SizeGb)
 	nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
@@ -123,18 +123,18 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 	return nvol, nil
 }
 
-func volumeStateConvert(gcpDriveStatus string) (VolumeState.Enum, error) {
+func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, error) {
 	switch gcpDriveStatus {
 	case "CREATING":
-		return VolumeState.CREATING, nil
+		return volumestate.CREATING, nil
 	case "DELETING":
-		return VolumeState.DELETING, nil
+		return volumestate.DELETING, nil
 	case "FAILED":
-		return VolumeState.ERROR, nil
+		return volumestate.ERROR, nil
 	case "READY":
-		return VolumeState.AVAILABLE, nil
+		return volumestate.AVAILABLE, nil
 	case "RESTORING":
-		return VolumeState.CREATING, nil
+		return volumestate.CREATING, nil
 	default:
 		return -1, fmt.Errorf("unexpected volume status: [%s]", gcpDriveStatus)
 	}
@@ -163,9 +163,9 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 			nvolume.Size = int(instance.SizeGb)
 			nvolume.State, _ = volumeStateConvert(instance.Status)
 			if strings.Contains(instance.Type, "pd-ssd") {
-				nvolume.Speed = VolumeSpeed.SSD
+				nvolume.Speed = volumespeed.SSD
 			} else {
-				nvolume.Speed = VolumeSpeed.HDD
+				nvolume.Speed = volumespeed.HDD
 			}
 			volumes = append(volumes, *nvolume)
 		}

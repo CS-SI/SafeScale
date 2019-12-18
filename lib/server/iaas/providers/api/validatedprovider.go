@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/sirupsen/logrus"
 	"time"
@@ -309,7 +309,7 @@ func (w ValidatedProvider) GetHostByName(name string) (res *resources.Host, err 
 }
 
 // GetHostState ...
-func (w ValidatedProvider) GetHostState(something interface{}) (res HostState.Enum, err error) {
+func (w ValidatedProvider) GetHostState(something interface{}) (res hoststate.Enum, err error) {
 	return w.InnerProvider.GetHostState(something)
 }
 

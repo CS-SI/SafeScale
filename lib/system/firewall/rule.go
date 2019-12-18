@@ -17,12 +17,12 @@
 package firewall
 
 import (
-	"github.com/CS-SI/SafeScale/lib/system/firewall/Action"
+	"github.com/CS-SI/SafeScale/lib/system/firewall/action"
 )
 
 // Rule defines a firewall rule
 type Rule struct {
-	Action   Action.Enum
+	Action   action.Enum
 	Protocol string
 	From     string
 	FromPort string

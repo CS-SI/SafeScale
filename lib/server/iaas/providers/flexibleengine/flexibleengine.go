@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
 	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -133,9 +133,9 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		DNSList:             []string{"100.125.0.41", "100.126.0.41"},
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
-		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"SATA": VolumeSpeed.COLD,
-			"SSD":  VolumeSpeed.SSD,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"SATA": volumespeed.COLD,
+			"SSD":  volumespeed.SSD,
 		},
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,
@@ -222,11 +222,11 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 // 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "t2.")
 // }
 
-func isS3Template(tpl resources.HostTemplate) bool {
+func isS3Template(tpl resources.HostTemplate) bool { // nolint
 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "S3.")
 }
 
-func templateFromWhite(regr string) templatefilters.Predicate {
+func templateFromWhite(regr string) templatefilters.Predicate { // nolint
 	return func(tpl resources.HostTemplate) bool {
 		re, err := regexp.Compile(regr)
 		if err != nil || len(regr) == 0 {
@@ -236,7 +236,7 @@ func templateFromWhite(regr string) templatefilters.Predicate {
 	}
 }
 
-func templateFromBlack(regr string) templatefilters.Predicate {
+func templateFromBlack(regr string) templatefilters.Predicate { // nolint
 	return func(tpl resources.HostTemplate) bool {
 		re, err := regexp.Compile(regr)
 		if err != nil || len(regr) == 0 {
@@ -246,7 +246,7 @@ func templateFromBlack(regr string) templatefilters.Predicate {
 	}
 }
 
-func imageFromWhite(regr string) imagefilters.Predicate {
+func imageFromWhite(regr string) imagefilters.Predicate { // nolint
 	return func(image resources.Image) bool {
 		re, err := regexp.Compile(regr)
 		if err != nil || len(regr) == 0 {
@@ -256,7 +256,7 @@ func imageFromWhite(regr string) imagefilters.Predicate {
 	}
 }
 
-func imageFromBlack(regr string) imagefilters.Predicate {
+func imageFromBlack(regr string) imagefilters.Predicate { // nolint
 	return func(image resources.Image) bool {
 		re, err := regexp.Compile(regr)
 		if err != nil || len(regr) == 0 {

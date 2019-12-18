@@ -17,7 +17,7 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -52,5 +52,5 @@ func (c *Composite) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.CompositeV1, newComposite())
+	serialize.PropertyTypeRegistry.Register("clusters", property.CompositeV1, newComposite())
 }

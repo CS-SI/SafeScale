@@ -26,13 +26,13 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -121,7 +121,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		User:       user,
 	}
 
-	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.DefaultGatewayID != "" {
 			hostSvc := NewHostHandler(handler.service)
@@ -173,7 +173,6 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 		}
 		_, waitErr := ssh.WaitServerReady(ctx, "ready", timeout)
 		echan <- waitErr
-		return
 	}()
 
 	select {
@@ -229,8 +228,8 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 				return err
 			},
 			temporal.GetHostTimeout(),
-			func(t retry.Try, v Verdict.Enum) {
-				if v == Verdict.Retry {
+			func(t retry.Try, v verdict.Enum) {
+				if v == verdict.Retry {
 					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostName)
 				}
 			},

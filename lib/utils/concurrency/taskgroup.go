@@ -47,12 +47,12 @@ type taskGroup struct {
 }
 
 // NewTaskGroup ...
-func NewTaskGroup(parentTask Task) (*taskGroup, error) {
+func NewTaskGroup(parentTask Task) (*taskGroup, error) { // nolint
 	return newTaskGroup(context.TODO(), parentTask)
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context, parentTask Task) (*taskGroup, error) {
+func NewTaskGroupWithContext(ctx context.Context, parentTask Task) (*taskGroup, error) { // nolint
 	return newTaskGroup(ctx, parentTask)
 }
 

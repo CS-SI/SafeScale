@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/libvirt/libvirt-go"
@@ -80,15 +80,15 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 		return nil, fmt.Errorf(fmt.Sprintf("failed get Unmarshal networks's xml description  : %s", err.Error()))
 	}
 
-	var ipVersion IPVersion.Enum
+	var ipVersion ipversion.Enum
 	if networkDescription.IPv6 == "" {
-		ipVersion = IPVersion.IPv4
+		ipVersion = ipversion.IPv4
 	} else {
-		ipVersion = IPVersion.IPv6
+		ipVersion = ipversion.IPv6
 	}
 
 	cidr := ""
-	if ipVersion == IPVersion.IPv4 {
+	if ipVersion == ipversion.IPv4 {
 		netmaskBloc := strings.Split(networkDescription.IPs[0].Netmask, ".")
 		ipBlocstring := strings.Split(networkDescription.IPs[0].Address, ".")
 		var ipBloc [4]int
@@ -131,7 +131,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	cidr := req.CIDR
 	dns := req.DNSServers
 
-	if ipVersion != IPVersion.IPv4 {
+	if ipVersion != ipversion.IPv4 {
 		// TODO implement IPV6 networks
 		return nil, scerr.NotImplementedError("only ipv4 networks are implemented")
 	}

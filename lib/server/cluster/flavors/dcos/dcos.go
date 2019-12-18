@@ -27,10 +27,10 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/errorcode"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
@@ -56,7 +56,7 @@ var (
 	// funcMap defines the custom functions to be used in templates
 	funcMap = txttmpl.FuncMap{
 		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.StringMap[msg]; ok {
+			if code, ok := errorcode.StringMap[msg]; ok {
 				return int(code)
 			}
 			return 1023
@@ -85,13 +85,13 @@ func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (uin
 	var privateNodeCount uint
 
 	switch foreman.Cluster().GetIdentity(task).Complexity {
-	case Complexity.Small:
+	case complexity.Small:
 		masterCount = 1
 		privateNodeCount = 2
-	case Complexity.Normal:
+	case complexity.Normal:
 		masterCount = 3
 		privateNodeCount = 4
-	case Complexity.Large:
+	case complexity.Large:
 		masterCount = 5
 		privateNodeCount = 6
 	}
@@ -203,8 +203,8 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index uint, h
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
 	richErrc := fmt.Sprintf("%d", retcode)
-	if retcode < int(ErrorCode.NextErrorCode) {
-		errCode := ErrorCode.Enum(retcode)
+	if retcode < int(errorcode.NextErrorCode) {
+		errCode := errorcode.Enum(retcode)
 		richErrc = fmt.Sprintf("%d (%s)", errCode, errCode.String())
 	}
 
@@ -243,14 +243,14 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType nodetype.Enum) (string, map[string]interface{}) {
 	nodeData := map[string]interface{}{}
 
 	var script string
 	switch hostType {
-	case NodeType.Master:
+	case nodetype.Master:
 		script = "dcos_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "dcos_install_node.sh"
 	}
 	return script, nodeData
@@ -376,7 +376,7 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 
 // getState returns the current state of the cluster
 // This method will trigger a effective state collection at each call
-func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum, error) {
+func getState(task concurrency.Task, foreman control.Foreman) (clusterstate.Enum, error) {
 	var (
 		retcode int
 		ran     bool // Tells if command has been run on remote host
@@ -388,31 +388,31 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	safescaleCltHost := safescaleClt.Host
 	master, err := foreman.Cluster().FindAvailableMaster(task)
 	if err != nil {
-		return ClusterState.Unknown, err
+		return clusterstate.Unknown, err
 	}
 	sshCfg, err := safescaleCltHost.SSHConfig(master.ID)
 	if err != nil {
-		return ClusterState.Error, scerr.Wrap(err, fmt.Sprintf("failed to get ssh config to connect to master '%s': %s", master.ID, err.Error()))
+		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to get ssh config to connect to master '%s': %s", master.ID, err.Error()))
 
 	}
 
 	ctx, err := task.GetContext()
 	if err != nil {
-		return ClusterState.Error, scerr.Wrap(err, fmt.Sprintf("failed to get valid context : %s", err.Error()))
+		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to get valid context : %s", err.Error()))
 	}
 
 	_, err = sshCfg.WaitServerReady(ctx, "ready", temporal.GetContextTimeout())
 	if err != nil {
-		return ClusterState.Error, err
+		return clusterstate.Error, err
 	}
 	retcode, _, stderr, err = safescaleClt.SSH.Run(ctx, master.ID, cmd, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
-		return ClusterState.Error, scerr.Wrap(err, fmt.Sprintf("failed to run remote command to get cluster state: %v\n%s", err, stderr))
+		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to run remote command to get cluster state: %v\n%s", err, stderr))
 	}
 	ran = true
 
 	if ran && retcode == 0 {
-		return ClusterState.Nominal, nil
+		return clusterstate.Nominal, nil
 	}
-	return ClusterState.Error, err
+	return clusterstate.Error, err
 }

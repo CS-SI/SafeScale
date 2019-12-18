@@ -21,27 +21,27 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 )
 
 // Arbiter sleeps or selects any amount of time for each attempt.
-type Arbiter func(Try) (Verdict.Enum, error)
+type Arbiter func(Try) (verdict.Enum, error)
 
 // PrevailRetry aggregates verdicts from Arbiters for a try :
 // - Returns Abort and the error as soon as an arbiter decides for an Abort.
 // - If at least one arbiter returns Retry without any Abort from others, returns Retry with nil error.
 // - Otherwise returns Done with nil error.
 func PrevailRetry(arbiters ...Arbiter) Arbiter {
-	return func(t Try) (Verdict.Enum, error) {
-		final := Verdict.Done
+	return func(t Try) (verdict.Enum, error) {
+		final := verdict.Done
 		for _, a := range arbiters {
-			verdict, err := a(t)
+			v, err := a(t)
 
-			switch verdict {
-			case Verdict.Retry:
-				final = Verdict.Retry
-			case Verdict.Abort:
-				return Verdict.Abort, err
+			switch v {
+			case verdict.Retry:
+				final = verdict.Retry
+			case verdict.Abort:
+				return verdict.Abort, err
 			}
 		}
 		return final, nil
@@ -53,16 +53,16 @@ func PrevailRetry(arbiters ...Arbiter) Arbiter {
 // - If at least one arbiter return Done without any Abort, returns Done with nil error.
 // - Otherwise returns Retry with nil error.
 func PrevailDone(arbiters ...Arbiter) Arbiter {
-	return func(t Try) (Verdict.Enum, error) {
-		final := Verdict.Retry
+	return func(t Try) (verdict.Enum, error) {
+		final := verdict.Retry
 		for _, a := range arbiters {
-			verdict, err := a(t)
+			v, err := a(t)
 
-			switch verdict {
-			case Verdict.Done:
-				final = Verdict.Done
-			case Verdict.Abort:
-				return Verdict.Abort, err
+			switch v {
+			case verdict.Done:
+				final = verdict.Done
+			case verdict.Abort:
+				return verdict.Abort, err
 			}
 		}
 		return final, nil
@@ -72,140 +72,140 @@ func PrevailDone(arbiters ...Arbiter) Arbiter {
 
 // Unsuccessful returns Retry when the try produced an error.
 func Unsuccessful() Arbiter {
-	return func(t Try) (Verdict.Enum, error) {
+	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
 			if _, ok := t.Err.(ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
-			return Verdict.Retry, nil
+			return verdict.Retry, nil
 		}
-		return Verdict.Done, nil
+		return verdict.Done, nil
 	}
 }
 
 // UnsuccessfulWhereRetcode255 returns Retry when the try produced an error with code 255,
 // all other codes are considered as successful and returns Done.
 func UnsuccessfulWhereRetcode255() Arbiter {
-	return func(t Try) (Verdict.Enum, error) {
+	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
 			if _, ok := t.Err.(ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			_, retCode, _ := utils.ExtractRetCode(t.Err)
 			if retCode == 255 {
-				return Verdict.Retry, nil
+				return verdict.Retry, nil
 			}
 		}
-		return Verdict.Done, nil
+		return verdict.Done, nil
 	}
 }
 
 // Successful returns Retry when the try produced no error.
 func Successful() Arbiter {
-	return func(t Try) (Verdict.Enum, error) {
+	return func(t Try) (verdict.Enum, error) {
 		if t.Err == nil {
 			if _, ok := t.Err.(ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
-			return Verdict.Retry, nil
+			return verdict.Retry, nil
 		}
-		return Verdict.Done, nil
+		return verdict.Done, nil
 	}
 }
 
 // Timeout returns Abort after a duration of time passes since the first try.
 func Timeout(limit time.Duration) Arbiter {
-	return func(t Try) (Verdict.Enum, error) {
+	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
 			if _, ok := t.Err.(ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if time.Since(t.Start) >= limit {
-				return Verdict.Abort, TimeoutError(limit, t.Err)
+				return verdict.Abort, TimeoutError(limit, t.Err)
 			}
-			return Verdict.Retry, nil
+			return verdict.Retry, nil
 		}
-		return Verdict.Done, nil
+		return verdict.Done, nil
 	}
 }
 
 // Max errors after a limited number of tries
 func Max(limit uint) Arbiter {
-	return func(t Try) (Verdict.Enum, error) {
+	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
 			if _, ok := t.Err.(ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*ErrAborted); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
-				return Verdict.Done, t.Err
+				return verdict.Done, t.Err
 			}
 
 			if t.Count >= limit {
-				return Verdict.Abort, LimitError(limit, t.Err)
+				return verdict.Abort, LimitError(limit, t.Err)
 			}
-			return Verdict.Retry, nil
+			return verdict.Retry, nil
 		}
-		return Verdict.Done, nil
+		return verdict.Done, nil
 	}
 }

@@ -122,10 +122,10 @@ func (ud *Content) Prepare(
 	var (
 		err error
 		// autoHostNetworkInterfaces bool
-		useLayer3Networking = true
+		useLayer3Networking bool
 		dnsList             []string
 		operatorUsername    string
-		useNATService       = false
+		useNATService       bool
 	)
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)

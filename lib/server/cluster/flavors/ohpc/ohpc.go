@@ -31,9 +31,9 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/ohpc/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/ohpc/enums/errorcode"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
@@ -56,7 +56,7 @@ var (
 			return i + 1
 		},
 		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.StringMap[msg]; ok {
+			if code, ok := errorcode.StringMap[msg]; ok {
 				return int(code)
 			}
 			return 1023
@@ -79,15 +79,15 @@ var (
 )
 
 func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (uint, uint, uint) {
-	complexity := foreman.Cluster().GetIdentity(task).Complexity
+	c := foreman.Cluster().GetIdentity(task).Complexity
 	var privateNodeCount uint
 
-	switch complexity {
-	case Complexity.Small:
+	switch c {
+	case complexity.Small:
 		privateNodeCount = 1
-	case Complexity.Normal:
+	case complexity.Normal:
 		privateNodeCount = 3
-	case Complexity.Large:
+	case complexity.Large:
 		privateNodeCount = 7
 	}
 
@@ -124,7 +124,7 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return centos
 }
 
-func configureCluster(task concurrency.Task, foreman control.Foreman) error {
+func configureCluster(task concurrency.Task, foreman control.Foreman) error { // nolint
 	// Install feature ohpc-slurm-master on cluster...
 	feature, err := install.NewFeature(task, "ohpc-slurm-master")
 	if err != nil {
@@ -170,13 +170,13 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 	switch nodeType {
-	case NodeType.Master:
+	case nodetype.Master:
 		script = "ohpc_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "ohpc_install_node.sh"
 	}
 

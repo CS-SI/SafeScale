@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -74,7 +74,7 @@ type Feature struct {
 	// embedded tells if the feature is embedded in deploy
 	embedded bool
 	// Installers defines the installers available for the feature
-	installers map[Method.Enum]Installer
+	installers map[method.Enum]Installer
 	// Dependencies lists other feature(s) (by name) needed by this one
 	//dependencies []string
 	// Management contains a string map of data that could be used to manage the feature (if it makes sense)
@@ -223,18 +223,18 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err err
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
-func (f *Feature) installerOfMethod(method Method.Enum) Installer {
+func (f *Feature) installerOfMethod(m method.Enum) Installer {
 	var installer Installer
-	switch method {
-	case Method.Bash:
+	switch m {
+	case method.Bash:
 		installer = NewBashInstaller()
-	case Method.Apt:
+	case method.Apt:
 		installer = NewAptInstaller()
-	case Method.Yum:
+	case method.Yum:
 		installer = NewYumInstaller()
-	case Method.Dnf:
+	case method.Dnf:
 		installer = NewDnfInstaller()
-	case Method.DCOS:
+	case method.DCOS:
 		installer = NewDcosInstaller()
 		//	case Method.Ansible:
 		//		installer = NewAnsibleInstaller()
@@ -581,7 +581,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		}
 
 		// v["Hostname"] = host.Name
-		// v["HostIP"] = host.PrivateIp
+		// v["HostIP"] = host.PrivateIP
 		// FIXME:
 		gw := gatewayFromHost(host)
 		if gw != nil {

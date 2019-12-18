@@ -22,7 +22,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 )
@@ -172,11 +172,11 @@ func ToPBHost(in *resources.Host) (pbHost *pb.Host) {
 		}
 	}()
 
-	err := in.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 = v.(*propsv1.HostNetwork)
-		return in.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 			hostSizingV1 = v.(*propsv1.HostSizing)
-			return in.Properties.LockForRead(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
+			return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(v interface{}) error {
 				hostVolumesV1 = v.(*propsv1.HostVolumes)
 				for k := range hostVolumesV1.VolumesByName {
 					volumes = append(volumes, k)

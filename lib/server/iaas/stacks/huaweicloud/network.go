@@ -34,12 +34,12 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -79,7 +79,7 @@ type vpcCreateResult struct {
 type vpcGetResult struct {
 	vpcCommonResult
 }
-type vpcDeleteResult struct {
+type vpcDeleteResult struct { // nolint
 	gophercloud.ErrResult
 }
 
@@ -472,7 +472,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
 		tErr := openstack.TranslateProviderError(err)
-		switch tErr.(type) {
+		switch tErr.(type) { // nolint
 		case *scerr.ErrInvalidRequest:
 			body := map[string]interface{}{}
 			err = json.Unmarshal([]byte(tErr.Error()), &body)
@@ -514,8 +514,8 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 			return err
 		},
 		temporal.GetContextTimeout(),
-		func(try retry.Try, verdict Verdict.Enum) {
-			if verdict != Verdict.Done {
+		func(try retry.Try, v verdict.Enum) {
+			if v != verdict.Done {
 				log.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
 			}
 		},
@@ -588,7 +588,7 @@ func (s *Stack) deleteSubnet(id string) error {
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil,
-		func(t retry.Try, verdict Verdict.Enum) {
+		func(t retry.Try, verdict verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
@@ -631,12 +631,12 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 	return &subnet, nil
 }
 
-func fromIntIPVersion(v int) IPVersion.Enum {
+func fromIntIPVersion(v int) ipversion.Enum {
 	if v == 4 {
-		return IPVersion.IPv4
+		return ipversion.IPv4
 	}
 	if v == 6 {
-		return IPVersion.IPv6
+		return ipversion.IPv6
 	}
 	return -1
 }

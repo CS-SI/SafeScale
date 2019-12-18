@@ -26,8 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
@@ -79,20 +79,20 @@ func Load(task concurrency.Task, name string) (api.Cluster, error) {
 }
 
 func setForeman(task concurrency.Task, controller *control.Controller) error {
-	flavor := controller.GetIdentity(task).Flavor
-	switch flavor {
-	case Flavor.DCOS:
+	f := controller.GetIdentity(task).Flavor
+	switch f {
+	case flavor.DCOS:
 		return controller.Restore(task, control.NewForeman(controller, dcos.Makers))
-	case Flavor.BOH:
+	case flavor.BOH:
 		return controller.Restore(task, control.NewForeman(controller, boh.Makers))
 	// case Flavor.OHPC:
 	// 	controller.Restore(task, control.NewForeman(controller, ohpc.Makers))
-	case Flavor.K8S:
+	case flavor.K8S:
 		return controller.Restore(task, control.NewForeman(controller, k8s.Makers))
-	case Flavor.SWARM:
+	case flavor.SWARM:
 		return controller.Restore(task, control.NewForeman(controller, swarm.Makers))
 	default:
-		return scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", flavor.String()))
+		return scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", f.String()))
 	}
 }
 
@@ -127,17 +127,17 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 	}
 	req.Tenant = tenant.Name
 	switch req.Flavor {
-	case Flavor.BOH:
+	case flavor.BOH:
 		err = controller.Create(task, req, control.NewForeman(controller, boh.Makers))
 		if err != nil {
 			return nil, err
 		}
-	case Flavor.DCOS:
+	case flavor.DCOS:
 		err = controller.Create(task, req, control.NewForeman(controller, dcos.Makers))
 		if err != nil {
 			return nil, err
 		}
-	case Flavor.K8S:
+	case flavor.K8S:
 		err = controller.Create(task, req, control.NewForeman(controller, k8s.Makers))
 		if err != nil {
 			return nil, err
@@ -147,7 +147,7 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 	// 	if err != nil {
 	// 		return nil, err
 	// 	}
-	case Flavor.SWARM:
+	case flavor.SWARM:
 		err = controller.Create(task, req, control.NewForeman(controller, swarm.Makers))
 		if err != nil {
 			return nil, err
@@ -224,13 +224,13 @@ func List() (clusterList []api.Cluster, err error) {
 // upgradePropertyNodesIfNeeded upgrade current Nodes to last Nodes (currently NodesV2)
 func upgradePropertyNodesIfNeeded(t concurrency.Task, c *control.Controller) error {
 	properties := c.GetProperties(t)
-	if !properties.Lookup(Property.NodesV2) {
+	if !properties.Lookup(property.NodesV2) {
 		// Replace NodesV1 by NodesV2 properties
 		return c.UpdateMetadata(t, func() error {
-			return properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+			return properties.LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
 				nodesV2 := v.(*clusterpropsv2.Nodes)
 
-				return properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+				return properties.LockForWrite(property.NodesV1).ThenUse(func(v interface{}) error {
 					nodesV1, ok := v.(*clusterpropsv1.Nodes)
 					if !ok {
 						return fmt.Errorf("invalid metadata")

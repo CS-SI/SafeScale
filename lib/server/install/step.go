@@ -25,7 +25,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -246,7 +246,7 @@ type step struct {
 	// Name is the name of the step
 	Name string
 	// Action is the action of the step (check, add, remove)
-	Action Action.Enum
+	Action action.Enum
 	// Targets contains the host targets to select
 	Targets stepTargets
 	// Script contains the script to execute
@@ -300,7 +300,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			}
 
 			if !results[h.Name].Successful() {
-				if is.Worker.action == Action.Check { // Checks can fail and it's ok
+				if is.Worker.action == action.Check { // Checks can fail and it's ok
 					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
@@ -353,7 +353,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
-				if is.Worker.action == Action.Check { // Checks can fail and it's ok
+				if is.Worker.action == action.Check { // Checks can fail and it's ok
 					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())

@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 )
 
 // Server structure
@@ -62,7 +62,7 @@ func (s *Server) AddShare(ctx context.Context, path string, secutityModes []stri
 
 	acl := ExportACL{
 		Host:          "*",
-		SecurityModes: []SecurityFlavor.Enum{},
+		SecurityModes: []securityflavor.Enum{},
 		Options: ExportOptions{
 			ReadOnly:       readOnly,
 			NoRootSquash:   !rootSquash,
@@ -80,13 +80,13 @@ func (s *Server) AddShare(ctx context.Context, path string, secutityModes []stri
 	for _, securityMode := range secutityModes {
 		switch securityMode {
 		case "sys":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Sys)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Sys)
 		case "krb5":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5)
 		case "krb5i":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5i)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5i)
 		case "krb5p":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5p)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5p)
 		default:
 			return fmt.Errorf("cannot add the share, %s is not a valid security mode", securityMode)
 		}

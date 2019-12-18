@@ -41,7 +41,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "perform"
 	app.Usage = "perform COMMAND"
-	app.Version = VERSION + ", build " + REV + " (" + BUILD_DATE + ")"
+	app.Version = Version + ", build " + Revision + " (" + BuildDate + ")"
 	app.Copyright = "(c) 2018-2019 CS-SI"
 	app.Compiled = time.Now()
 	app.Authors = []cli.Author{

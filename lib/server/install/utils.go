@@ -71,7 +71,7 @@ var featureScriptTemplate atomic.Value
 
 // parseTargets validates targets on the cluster from the feature specification
 // Without error, returns 'master target', 'private node target' and 'public node target'
-func parseTargets(specs *viper.Viper) (string, string, string, error) {
+func parseTargets(specs *viper.Viper) (string, string, string, error) { // nolint
 	if !specs.IsSet("feature.target.cluster") {
 		return "", "", "", fmt.Errorf("feature isn't suitable for a cluster")
 	}
@@ -211,8 +211,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		return fmt.Errorf("an unrecoverable network error has occurred")
 	}
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case *retry.ErrTimeout:
+		if _, ok := retryErr.(*retry.ErrTimeout); ok {
 			return fmt.Errorf("timeout trying to copy temporary file to '%s': %s", to, retryErr.Error())
 		}
 		return retryErr
@@ -371,7 +370,7 @@ func replaceVariablesInString(text string, v Variables) (string, error) {
 	return dataBuffer.String(), nil
 }
 
-func findConcernedHosts(list []string, c *Feature) (string, error) {
+func findConcernedHosts(list []string, c *Feature) (string, error) { // nolint
 	// No metadata yet for features, first host is designated concerned host
 	if len(list) > 0 {
 		return list[0], nil

@@ -17,8 +17,8 @@
 package propertiesv2
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -35,12 +35,12 @@ type Network struct {
 	PrimaryPublicIP    string            `json:"primary_public_ip"`    // contains the public IP of the primary gateway
 	SecondaryPublicIP  string            `json:"secondary_public_ip"`  // contains the public IP of the secondary gateway
 	EndpointIP         string            `json:"endpoint_ip"`          // contains the IP of the external Endpoint
-	NetworkState       NetworkState.Enum `json:"status"`
+	NetworkState       networkstate.Enum `json:"status"`
 }
 
 func newNetwork() *Network {
 	return &Network{
-		NetworkState: NetworkState.UNKNOWNSTATE,
+		NetworkState: networkstate.UNKNOWNSTATE,
 	}
 }
 
@@ -61,5 +61,5 @@ func (n *Network) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.NetworkV2, &Network{})
+	serialize.PropertyTypeRegistry.Register("clusters", property.NetworkV2, &Network{})
 }

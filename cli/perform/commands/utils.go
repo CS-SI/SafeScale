@@ -27,7 +27,7 @@ import (
 	//log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/cli/perform/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/cli/perform/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/server/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -37,8 +37,8 @@ var (
 	clusterName     string
 	clusterInstance clusterapi.Cluster
 	nodeName        string
-	serviceName     string
-	featureName     string
+	// serviceName     string
+	// featureName     string
 
 	// RebrandingPrefix is used to store the optional prefix to use when calling external SafeScale commands
 	RebrandingPrefix string
@@ -87,12 +87,12 @@ func runCommand(cmdStr string) error {
 
 	err := cmd.Start()
 	if err != nil {
-		return cli.NewExitError(err.Error(), int(ExitCode.Run))
+		return cli.NewExitError(err.Error(), int(exitcode.Run))
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		return cli.NewExitError(err.Error(), int(ExitCode.Run))
+		return cli.NewExitError(err.Error(), int(exitcode.Run))
 	}
 	return nil
 }
@@ -102,21 +102,21 @@ func extractClusterArgument(c *cli.Context) error {
 	if !c.Command.HasName("list") {
 		clusterName = c.Args().First()
 		if clusterName == "" {
-			return cli.NewExitError("Invalid argument CLUSTERNAME", int(ExitCode.InvalidArgument))
+			return cli.NewExitError("Invalid argument CLUSTERNAME", int(exitcode.InvalidArgument))
 		}
 		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
 			if _, ok := err.(*scerr.ErrNotFound); ok {
 				msg := fmt.Sprintf("Cluster '%s' not found", clusterName)
-				return cli.NewExitError(msg, int(ExitCode.NotFound))
+				return cli.NewExitError(msg, int(exitcode.NotFound))
 			}
 
 			msg := fmt.Sprintf("failed to get cluster '%s' information: %s", clusterName, err.Error())
-			return cli.NewExitError(msg, int(ExitCode.RPC))
+			return cli.NewExitError(msg, int(exitcode.RPC))
 		}
 		if c.Command.HasName("create") {
 			msg := fmt.Sprintf("Cluster '%s' already exists", clusterName)
-			return cli.NewExitError(msg, int(ExitCode.Duplicate))
+			return cli.NewExitError(msg, int(exitcode.Duplicate))
 		}
 	}
 	return nil
@@ -126,7 +126,7 @@ func extractNodeArgument(c *cli.Context) error {
 	if !c.Command.HasName("list") {
 		nodeName = c.Args().Get(1)
 		if nodeName == "" {
-			return cli.NewExitError("Invalid argument NODENAME", int(ExitCode.InvalidArgument))
+			return cli.NewExitError("Invalid argument NODENAME", int(exitcode.InvalidArgument))
 		}
 	}
 	return nil
@@ -136,7 +136,7 @@ func extractFeatureArgument(c *cli.Context) error {
 	if !c.Command.HasName("list") {
 		featureName := c.Args().Get(1)
 		if featureName == "" {
-			return cli.NewExitError("Invalid argument FEATURENAME", int(ExitCode.InvalidArgument))
+			return cli.NewExitError("Invalid argument FEATURENAME", int(exitcode.InvalidArgument))
 		}
 	}
 	return nil

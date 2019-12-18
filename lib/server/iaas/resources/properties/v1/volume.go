@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumeproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -100,6 +100,6 @@ func (va *VolumeAttachments) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.volume", VolumeProperty.DescriptionV1, NewVolumeDescription())
-	serialize.PropertyTypeRegistry.Register("resources.volume", VolumeProperty.AttachedV1, NewVolumeAttachments())
+	serialize.PropertyTypeRegistry.Register("resources.volume", volumeproperty.DescriptionV1, NewVolumeDescription())
+	serialize.PropertyTypeRegistry.Register("resources.volume", volumeproperty.AttachedV1, NewVolumeAttachments())
 }
