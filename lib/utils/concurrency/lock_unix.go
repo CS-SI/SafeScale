@@ -6,6 +6,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func goid() int {
+func goid() int { // nolint
 	return unix.Gettid()
 }

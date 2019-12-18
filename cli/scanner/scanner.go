@@ -36,7 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -338,7 +338,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	if !there {
 		network, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
-			IPVersion: IPVersion.IPv4,
+			IPVersion: ipversion.IPv4,
 			Name:      netName,
 		})
 		if err != nil {
@@ -558,7 +558,7 @@ func dumpImages(service iaas.Service, tenant string) (err error) {
 }
 
 func main() {
-	log.Printf("%s version %s\n", os.Args[0], VERSION+", build "+REV+" ("+BUILD_DATE+")")
+	log.Printf("%s version %s\n", os.Args[0], Version+", build "+Revision+" ("+BuildDate+")")
 
 	safescaledPort := 50051
 

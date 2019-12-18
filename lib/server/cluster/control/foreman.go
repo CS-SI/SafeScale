@@ -37,10 +37,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/install"
@@ -71,7 +71,7 @@ var (
 	// systemTemplateBox *rice.Box
 
 	// bashLibraryContent contains the script containing bash library
-	bashLibraryContent *string
+	// bashLibraryContent *string
 )
 
 // Makers ...
@@ -81,7 +81,7 @@ type Makers struct {
 	DefaultMasterSizing         func(task concurrency.Task, b Foreman) pb.HostDefinition  // default sizing of master(s)
 	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition  // default sizing of node(s)
 	DefaultImage                func(task concurrency.Task, b Foreman) string             // default image of server(s)
-	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType NodeType.Enum) (string, map[string]interface{})
+	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType nodetype.Enum) (string, map[string]interface{})
 	GetGlobalSystemRequirements func(task concurrency.Task, b Foreman) (string, error)
 	GetTemplateBox              func() (*rice.Box, error)
 	ConfigureGateway            func(task concurrency.Task, b Foreman) error
@@ -97,7 +97,7 @@ type Makers struct {
 	JoinNodeToCluster           func(task concurrency.Task, b Foreman, pbHost *pb.Host) error
 	LeaveMasterFromCluster      func(task concurrency.Task, b Foreman, pbHost *pb.Host) error
 	LeaveNodeFromCluster        func(task concurrency.Task, b Foreman, pbHost *pb.Host, selectedMaster string) error
-	GetState                    func(task concurrency.Task, b Foreman) (ClusterState.Enum, error)
+	GetState                    func(task concurrency.Task, b Foreman) (clusterstate.Enum, error)
 }
 
 //go:generate mockgen -destination=../mocks/mock_foreman.go -package=mocks github.com/CS-SI/SafeScale/lib/server/cluster/control Foreman
@@ -187,18 +187,18 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
 	)()
 
-	state := ClusterState.Unknown
+	state := clusterstate.Unknown
 
 	defer func() {
 		if err != nil {
-			state = ClusterState.Error
+			state = clusterstate.Error
 		} else {
-			state = ClusterState.Created
+			state = clusterstate.Created
 		}
 
 		metaErr := b.cluster.UpdateMetadata(task, func() error {
 			// Cluster created and configured successfully
-			return b.cluster.GetProperties(task).LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
+			return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(v interface{}) error {
 				v.(*clusterpropsv1.State).State = state
 				return nil
 			})
@@ -302,7 +302,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Determine if Gateway Failover must be set
 	caps := svc.GetCapabilities()
-	gwFailoverDisabled := req.Complexity == Complexity.Small || !caps.PrivateVirtualIP
+	gwFailoverDisabled := req.Complexity == complexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {
 			gwFailoverDisabled = true
@@ -399,7 +399,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	b.cluster.Identity.Keypair = kp
 	b.cluster.Identity.AdminPassword = cladmPassword
 	err = b.cluster.UpdateMetadata(task, func() error {
-		err := b.cluster.GetProperties(task).LockForWrite(Property.DefaultsV2).ThenUse(func(v interface{}) error {
+		err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(func(v interface{}) error {
 			defaultsV2 := v.(*clusterpropsv2.Defaults)
 			defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(*gatewaysDef.Sizing)
 			defaultsV2.MasterSizing = srvutils.FromPBHostSizing(*mastersDef.Sizing)
@@ -411,15 +411,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			return err
 		}
 
-		err = b.cluster.GetProperties(task).LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
-			v.(*clusterpropsv1.State).State = ClusterState.Creating
+		err = b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(v interface{}) error {
+			v.(*clusterpropsv1.State).State = clusterstate.Creating
 			return nil
 		})
 		if err != nil {
 			return err
 		}
 
-		err = b.cluster.GetProperties(task).LockForWrite(Property.CompositeV1).ThenUse(func(v interface{}) error {
+		err = b.cluster.GetProperties(task).LockForWrite(property.CompositeV1).ThenUse(func(v interface{}) error {
 			v.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
 			return nil
 		})
@@ -427,7 +427,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			return err
 		}
 
-		return b.cluster.GetProperties(task).LockForWrite(Property.NetworkV2).ThenUse(func(v interface{}) error {
+		return b.cluster.GetProperties(task).LockForWrite(property.NetworkV2).ThenUse(func(v interface{}) error {
 			networkV2 := v.(*clusterpropsv2.Network)
 			networkV2.NetworkID = req.NetworkID
 			networkV2.CIDR = req.CIDR
@@ -438,7 +438,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 				networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
 				networkV2.DefaultRouteIP = network.VirtualIp.PrivateIp
 				// VPL: no public IP on VIP yet...
-				// networkV2.EndpointIP = network.VirtualIp.PublicIp
+				// networkV2.EndpointIP = network.VirtualIp.PublicIP
 				networkV2.EndpointIP = primaryGateway.GetPublicIP()
 				networkV2.PrimaryPublicIP = primaryGateway.GetPublicIP()
 				networkV2.SecondaryPublicIP = secondaryGateway.GetPublicIP()
@@ -696,11 +696,11 @@ func complementHostDefinition(req *pb.HostDefinition, def pb.HostDefinition) *pb
 }
 
 // GetState returns "actively" the current state of the cluster
-func (b *foreman) getState(task concurrency.Task) (ClusterState.Enum, error) {
+func (b *foreman) getState(task concurrency.Task) (clusterstate.Enum, error) {
 	if b.makers.GetState != nil {
 		return b.makers.GetState(task, b)
 	}
-	return ClusterState.Unknown, fmt.Errorf("no maker defined for 'GetState'")
+	return clusterstate.Unknown, fmt.Errorf("no maker defined for 'GetState'")
 }
 
 // configureNode ...
@@ -806,7 +806,7 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
-		p                                = data.Map{}
+		p                                data.Map
 		ok                               bool
 		primaryGateway, secondaryGateway *resources.Host
 	)
@@ -1249,7 +1249,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 }
 
 // installNodeRequirements ...
-func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeType.Enum, pbHost *pb.Host, hostLabel string) (err error) {
+func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodetype.Enum, pbHost *pb.Host, hostLabel string) (err error) {
 	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1289,7 +1289,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	}
 	params["reserved_CommonRequirements"] = globalSystemRequirements
 
-	if nodeType == NodeType.Master {
+	if nodeType == nodetype.Master {
 		tp := b.cluster.GetService(task).GetTenantParameters()
 		content := map[string]interface{}{
 			"tenants": []map[string]interface{}{
@@ -1428,7 +1428,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 }
 
 // getNodeInstallationScript ...
-func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	if b.makers.GetNodeInstallationScript != nil {
 		return b.makers.GetNodeInstallationScript(task, b, nodeType)
 	}
@@ -1487,7 +1487,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	}
 
 	// Installs requirements as defined by cluster Flavor (if it exists)
-	err = b.installNodeRequirements(t, NodeType.Gateway, pbGateway, hostLabel)
+	err = b.installNodeRequirements(t, nodetype.Gateway, pbGateway, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1667,7 +1667,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	}
 
 	hostDef := *def
-	hostDef.Name, err = b.buildHostname(t, "master", NodeType.Master)
+	hostDef.Name, err = b.buildHostname(t, "master", nodetype.Master)
 	if err != nil {
 		return nil, err
 	}
@@ -1682,7 +1682,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 			properties := b.cluster.GetProperties(t)
 
 			// References new node in cluster
-			return properties.LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+			return properties.LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
 				nodesV2 := v.(*clusterpropsv2.Nodes)
 
 				nodesV2.GlobalLastIndex++
@@ -1717,7 +1717,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	}
 
 	// Installs cluster-level system requirements...
-	err = b.installNodeRequirements(t, NodeType.Master, pbHost, hostLabel)
+	err = b.installNodeRequirements(t, nodetype.Master, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -1995,7 +1995,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 
 	// Create the host
 	hostDef := *def
-	hostDef.Name, err = b.buildHostname(t, "node", NodeType.Node)
+	hostDef.Name, err = b.buildHostname(t, "node", nodetype.Node)
 	if err != nil {
 		return nil, err
 	}
@@ -2010,7 +2010,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	if pbHost != nil {
 		mErr := b.cluster.UpdateMetadata(t, func() error {
 			// Locks for write the NodesV2 extension...
-			return b.cluster.GetProperties(t).LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+			return b.cluster.GetProperties(t).LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
 				nodesV2 := v.(*clusterpropsv2.Nodes)
 				// Registers the new Agent in the swarmCluster struct
 				nodesV2.GlobalLastIndex++
@@ -2044,7 +2044,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, err
 	}
 
-	err = b.installNodeRequirements(t, NodeType.Node, pbHost, hostLabel)
+	err = b.installNodeRequirements(t, nodetype.Node, pbHost, hostLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -2180,7 +2180,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
 		if !disabled {
 			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
@@ -2225,7 +2225,7 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
 		if !disabled {
 			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
@@ -2287,7 +2287,7 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 			return inErr
 		}
 
-		_ = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+		_ = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
 			_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
 			return nil
 		})
@@ -2339,7 +2339,7 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
@@ -2402,7 +2402,7 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 }
 
 // BuildHostname builds a unique hostname in the Cluster
-func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType NodeType.Enum) (cluid string, err error) {
+func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType nodetype.Enum) (cluid string, err error) {
 	var index int
 
 	defer scerr.OnPanic(&err)()
@@ -2412,13 +2412,13 @@ func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType Nod
 	if err != nil {
 		return "", err
 	}
-	outerErr := b.cluster.GetProperties(task).LockForWrite(Property.NodesV2).ThenUse(func(v interface{}) error {
+	outerErr := b.cluster.GetProperties(task).LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
 		nodesV2 := v.(*clusterpropsv2.Nodes)
 		switch nodeType {
-		case NodeType.Node:
+		case nodetype.Node:
 			nodesV2.PrivateLastIndex++
 			index = nodesV2.PrivateLastIndex
-		case NodeType.Master:
+		case nodetype.Master:
 			nodesV2.MasterLastIndex++
 			index = nodesV2.MasterLastIndex
 		}

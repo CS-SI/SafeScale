@@ -27,11 +27,11 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -56,8 +56,8 @@ type alterCommandCB func(string) string
 type worker struct {
 	feature   *Feature
 	target    Target
-	method    Method.Enum
-	action    Action.Enum
+	method    method.Enum
+	action    action.Enum
 	variables Variables
 	settings  Settings
 	startTime time.Time
@@ -86,7 +86,7 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(f *Feature, t Target, m Method.Enum, a Action.Enum, cb alterCommandCB) (*worker, error) {
+func newWorker(f *Feature, t Target, m method.Enum, a action.Enum, cb alterCommandCB) (*worker, error) {
 	w := worker{
 		feature:   f,
 		target:    t,
@@ -410,7 +410,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 	order := strings.Split(pace, ",")
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
-	if w.action == Action.Add && !s.SkipProxy {
+	if w.action == action.Add && !s.SkipProxy {
 		if w.cluster != nil {
 			err := w.setReverseProxy()
 			if err != nil {
@@ -525,15 +525,15 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		anon, ok = stepMap[yamlTargetsKeyword]
 		if ok {
 			for i, j := range anon.(map[string]interface{}) {
-				switch j.(type) {
+				switch j := j.(type) {
 				case bool:
-					if j.(bool) {
+					if j {
 						stepT[i] = "true"
 					} else {
 						stepT[i] = "false"
 					}
 				case string:
-					stepT[i] = j.(string)
+					stepT[i] = j
 				}
 			}
 		} else {
@@ -553,11 +553,11 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	// Get the content of the action based on method
 	keyword := yamlRunKeyword
 	switch w.method {
-	case Method.Apt:
+	case method.Apt:
 		fallthrough
-	case Method.Yum:
+	case method.Yum:
 		fallthrough
-	case Method.Dnf:
+	case method.Dnf:
 		keyword = yamlPackageKeyword
 	}
 	anon, ok = stepMap[keyword]
@@ -584,17 +584,17 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			ok      bool
 			content interface{}
 		)
-		complexity := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
+		c := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
 		for k, anon := range options {
 			avails[strings.ToLower(k)] = anon
 		}
-		if content, ok = avails[complexity]; !ok {
-			if complexity == strings.ToLower(Complexity.Large.String()) {
-				complexity = Complexity.Normal.String()
+		if content, ok = avails[c]; !ok {
+			if c == strings.ToLower(complexity.Large.String()) {
+				c = complexity.Normal.String()
 			}
-			if complexity == strings.ToLower(Complexity.Normal.String()) {
-				if content, ok = avails[complexity]; !ok {
-					content, ok = avails[Complexity.Small.String()]
+			if c == strings.ToLower(complexity.Normal.String()) {
+				if content, ok = avails[c]; !ok {
+					content, ok = avails[complexity.Small.String()]
 				}
 			}
 		}
@@ -689,7 +689,7 @@ func (w *worker) validateContextForCluster() error {
 		flavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
 		for _, k := range flavors {
 			k = strings.ToLower(k)
-			e, err := Flavor.Parse(k)
+			e, err := flavor.Parse(k)
 			if (err == nil && clusterFlavor == e) || (err != nil && k == "all") {
 				return nil
 			}
@@ -833,15 +833,15 @@ func (w *worker) setReverseProxy() (err error) {
 			targets[targetHosts] = "yes"
 		} else {
 			for i, j := range anon {
-				switch j.(type) {
+				switch j := j.(type) {
 				case bool:
-					if j.(bool) {
+					if j {
 						targets[i.(string)] = "yes"
 					} else {
 						targets[i.(string)] = "no"
 					}
 				case string:
-					targets[i.(string)] = j.(string)
+					targets[i.(string)] = j
 				}
 			}
 		}
@@ -950,7 +950,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		}
 		hostsList = append(hostsList, host)
 	case "*":
-		if w.action == Action.Add {
+		if w.action == action.Add {
 			all, err = w.identifyConcernedMasters()
 		} else {
 			all, err = w.identifyAllMasters()
@@ -969,7 +969,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		}
 		hostsList = append(hostsList, host)
 	case "*":
-		if w.action == Action.Add {
+		if w.action == action.Add {
 			all, err = w.identifyConcernedNodes()
 		} else {
 			all, err = w.identifyAllNodes()
@@ -988,7 +988,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		}
 		hostsList = append(hostsList, host)
 	case "*":
-		if w.action == Action.Add {
+		if w.action == action.Add {
 			all, err = w.identifyConcernedGateways()
 		} else {
 			all, err = w.identifyAllGateways()

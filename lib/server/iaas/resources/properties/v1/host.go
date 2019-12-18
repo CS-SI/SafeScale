@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -572,10 +572,10 @@ func (p *HostFeatures) Reset() {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.DescriptionV1, NewHostDescription())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.NetworkV1, NewHostNetwork())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.SizingV1, NewHostSizing())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.SharesV1, NewHostShares())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.VolumesV1, NewHostVolumes())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.MountsV1, NewHostMounts())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.DescriptionV1, NewHostDescription())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.NetworkV1, NewHostNetwork())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV1, NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SharesV1, NewHostShares())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.VolumesV1, NewHostVolumes())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.MountsV1, NewHostMounts())
 }

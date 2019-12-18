@@ -32,8 +32,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
@@ -60,19 +60,19 @@ var (
 )
 
 func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (uint, uint, uint) {
-	complexity := foreman.Cluster().GetIdentity(task).Complexity
+	c := foreman.Cluster().GetIdentity(task).Complexity
 	var masterCount uint
 	var privateNodeCount uint
 	var publicNodeCount uint
 
-	switch complexity {
-	case Complexity.Small:
+	switch c {
+	case complexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
-	case Complexity.Normal:
+	case complexity.Normal:
 		masterCount = 3
 		privateNodeCount = 3
-	case Complexity.Large:
+	case complexity.Large:
 		masterCount = 5
 		privateNodeCount = 6
 	}
@@ -134,15 +134,15 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 
 	switch nodeType {
-	case NodeType.Gateway:
-	case NodeType.Master:
+	case nodetype.Gateway:
+	case nodetype.Master:
 		script = "k8s_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "k8s_install_node.sh"
 	}
 	return script, data

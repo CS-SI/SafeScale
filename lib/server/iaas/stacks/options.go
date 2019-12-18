@@ -19,7 +19,7 @@ package stacks
 import (
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 )
 
 // AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
@@ -109,7 +109,7 @@ type ConfigurationOptions struct {
 	AutoHostNetworkInterfaces bool
 
 	// VolumeSpeeds map volume types with volume speeds
-	VolumeSpeeds map[string]VolumeSpeed.Enum
+	VolumeSpeeds map[string]volumespeed.Enum
 
 	// DefaultImage names the image to use when not specified by the user
 	DefaultImage string

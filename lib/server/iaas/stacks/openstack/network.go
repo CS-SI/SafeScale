@@ -33,8 +33,8 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -62,7 +62,7 @@ type Subnet struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 	//IPVersion is IPv4 or IPv6 (see IPVersion)
-	IPVersion IPVersion.Enum `json:"ip_version,omitempty"`
+	IPVersion ipversion.Enum `json:"ip_version,omitempty"`
 	//Mask mask in CIDR notation
 	Mask string `json:"mask,omitempty"`
 	//NetworkID id of the parent network
@@ -377,7 +377,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	}()
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		hostSizingV1.Template = req.TemplateID
 		return nil
@@ -403,33 +403,33 @@ func (s *Stack) DeleteGateway(id string) error {
 }
 
 // ToGopherIPversion ...
-func ToGopherIPversion(v IPVersion.Enum) gophercloud.IPVersion {
-	if v == IPVersion.IPv4 {
+func ToGopherIPversion(v ipversion.Enum) gophercloud.IPVersion {
+	if v == ipversion.IPv4 {
 		return gophercloud.IPv4
 	}
-	if v == IPVersion.IPv6 {
+	if v == ipversion.IPv6 {
 		return gophercloud.IPv6
 	}
 	return -1
 }
 
-func fromGopherIPversion(v gophercloud.IPVersion) IPVersion.Enum {
+func fromGopherIPversion(v gophercloud.IPVersion) ipversion.Enum { // nolint
 	if v == gophercloud.IPv4 {
-		return IPVersion.IPv4
+		return ipversion.IPv4
 	}
 	if v == gophercloud.IPv6 {
-		return IPVersion.IPv6
+		return ipversion.IPv6
 	}
 	return -1
 }
 
 // FromIntIPversion ...
-func FromIntIPversion(v int) IPVersion.Enum {
+func FromIntIPversion(v int) ipversion.Enum {
 	if v == 4 {
-		return IPVersion.IPv4
+		return ipversion.IPv4
 	}
 	if v == 6 {
-		return IPVersion.IPv6
+		return ipversion.IPv6
 	}
 	return -1
 }
@@ -438,7 +438,7 @@ func FromIntIPversion(v int) IPVersion.Enum {
 // - netID ID of the parent network
 // - name is the name of the sub network
 // - mask is a network mask defined in CIDR notation
-func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum, dnsServers []string) (subn *Subnet, err error) {
+func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion ipversion.Enum, dnsServers []string) (subn *Subnet, err error) {
 	// You must associate a new subnet with an existing network - to do this you
 	// need its UUID. You must also provide a well-formed CIDR value.
 	dhcp := true
@@ -479,7 +479,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 	r := subnets.Create(s.NetworkClient, opts)
 	subnet, err := r.Extract()
 	if err != nil {
-		switch r.Err.(type) {
+		switch r.Err.(type) { // nolint
 		case gophercloud.ErrDefault400:
 			neutronError := ParseNeutronError(r.Err.Error())
 			if neutronError != nil {
@@ -538,7 +538,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 
 // calcDhcpAllocationPool calculates the start and the end of the DHCP allocation pool based on cidr
 // Keeps 10 IP addresses out of the pool to allow static and VIP addresses
-func calcDhcpAllocationPool(cidr string) (string, string, error) {
+func calcDhcpAllocationPool(cidr string) (string, string, error) { // nolint
 	_, _, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid cidr '%s'", cidr)
@@ -636,23 +636,24 @@ func (s *Stack) deleteSubnet(id string) error {
 		func() error {
 			r := subnets.Delete(s.NetworkClient, id)
 			err = r.ExtractErr()
-			if err != nil {
-				if _, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
-					neutronError := ParseNeutronError(err.Error())
-					switch neutronError["type"] {
-					case "SubnetInUse":
-						msg := fmt.Sprintf("hosts or services are still attached")
-						log.Warnf(utils.Capitalize(msg))
-						return resources.ResourceNotAvailableError("subnet", id)
-					default:
-						log.Debugf("NeutronError: type = %s", neutronError["type"])
-					}
-				} else {
-					msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-					log.Errorf(utils.Capitalize(msg))
-					return fmt.Errorf(msg)
+
+			if _, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
+				neutronError := ParseNeutronError(err.Error())
+				switch neutronError["type"] {
+				case "SubnetInUse":
+					msg := fmt.Sprintf("hosts or services are still attached")
+					log.Warnf(utils.Capitalize(msg))
+					return resources.ResourceNotAvailableError("subnet", id)
+				default:
+					log.Debugf("NeutronError: type = %s", neutronError["type"])
 				}
 			}
+			if err != nil {
+				msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
+				log.Errorf(utils.Capitalize(msg))
+				return fmt.Errorf(msg)
+			}
+
 			return nil
 		},
 		temporal.GetContextTimeout(),

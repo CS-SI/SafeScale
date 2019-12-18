@@ -28,8 +28,8 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
@@ -145,9 +145,9 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*resources.V
 
 	volume.Name = volumeDescription.Name
 	volume.Size = int(volumeDescription.Capacity.Value / 1024 / 1024 / 1024)
-	volume.Speed = VolumeSpeed.HDD
+	volume.Speed = volumespeed.HDD
 	volume.ID = hash
-	volume.State = VolumeState.AVAILABLE
+	volume.State = volumestate.AVAILABLE
 
 	return volume, nil
 }

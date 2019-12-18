@@ -36,11 +36,11 @@ import (
 
 //Default chunk sizes that will used to spit files (in Bytes)
 const (
-	keyFilePathConst  = "$HOME/.safescale/rsa.key"
-	chunkSizeConst    = int(10 * (1 << (10 * 2)))
-	parityNumConst    = 4
-	parityDenConst    = 4
-	parityRatioConst  = parityNumConst / parityDenConst
+	keyFilePathConst = "$HOME/.safescale/rsa.key"
+	chunkSizeConst   = int(10 * (1 << (10 * 2)))
+	parityNumConst   = 4
+	parityDenConst   = 4
+	// parityRatioConst  = parityNumConst / parityDenConst
 	batchMaxSizeConst = 4
 )
 

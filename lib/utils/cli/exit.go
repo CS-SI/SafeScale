@@ -19,30 +19,30 @@ package cli
 import (
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 )
 
 // ExitOnErrorWithMessage informs cli to exit with message and error code
-func ExitOnErrorWithMessage(exitcode ExitCode.Enum, msg string) error {
+func ExitOnErrorWithMessage(exitcode exitcode.Enum, msg string) error {
 	return cli.NewExitError(msg, int(exitcode))
 }
 
 // ExitOnInvalidArgument ...
 func ExitOnInvalidArgument(msg string) error {
-	return ExitOnErrorWithMessage(ExitCode.InvalidArgument, msg)
+	return ExitOnErrorWithMessage(exitcode.InvalidArgument, msg)
 }
 
 // ExitOnInvalidOption ...
 func ExitOnInvalidOption(msg string) error {
-	return ExitOnErrorWithMessage(ExitCode.InvalidOption, msg)
+	return ExitOnErrorWithMessage(exitcode.InvalidOption, msg)
 }
 
 // ExitOnRPC ...
 func ExitOnRPC(msg string) error {
-	return ExitOnErrorWithMessage(ExitCode.RPC, msg)
+	return ExitOnErrorWithMessage(exitcode.RPC, msg)
 }
 
 // ExitOnNotFound ...
 func ExitOnNotFound(msg string) error {
-	return ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+	return ExitOnErrorWithMessage(exitcode.NotFound, msg)
 }

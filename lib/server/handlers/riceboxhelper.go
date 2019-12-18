@@ -80,7 +80,6 @@ func exec(ctx context.Context, script string, data interface{}, hostid string, s
 		}
 		_, err = cmd.Output()
 		echan <- err
-		return
 	}()
 
 	select {

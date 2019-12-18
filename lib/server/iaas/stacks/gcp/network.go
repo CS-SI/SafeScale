@@ -26,8 +26,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
@@ -131,7 +131,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	subnet.ID = strconv.FormatUint(gcpSubNet.Id, 10)
 	subnet.Name = gcpSubNet.Name
 	subnet.CIDR = gcpSubNet.IpCidrRange
-	subnet.IPVersion = IPVersion.IPv4
+	subnet.IPVersion = ipversion.IPv4
 
 	buildNewRule := true
 	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, gcpSubNet.Name)
@@ -475,7 +475,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (_ *resources.Host, 
 	}()
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		hostSizingV1.Template = req.TemplateID
 		return nil

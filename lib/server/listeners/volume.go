@@ -28,7 +28,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -145,7 +145,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	}
 
 	handler := handlers.NewVolumeHandler(tenant.Service)
-	vol, err := handler.Create(ctx, name, int(size), VolumeSpeed.Enum(speed))
+	vol, err := handler.Create(ctx, name, int(size), volumespeed.Enum(speed))
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot create volume").ToGRPCStatus()
 	}

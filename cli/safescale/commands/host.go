@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -141,7 +141,7 @@ var hostList = cli.Command{
 		result := []map[string]interface{}{}
 		err = json.Unmarshal([]byte(jsoned), &result)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
 		}
 		for _, v := range result {
 			delete(v, "private_key")
@@ -427,11 +427,11 @@ var hostAddFeatureCommand = cli.Command{
 
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 		values := install.Variables{}
 		params := c.StringSlice("param")
@@ -468,7 +468,7 @@ var hostAddFeatureCommand = cli.Command{
 			if Debug || Verbose {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -493,7 +493,7 @@ var hostListFeaturesCommand = cli.Command{
 		features, err := install.ListFeatures("host")
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		return clitools.SuccessResponse(features)
 	},
@@ -528,11 +528,11 @@ var hostCheckFeatureCommand = cli.Command{
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
 		values := install.Variables{}
@@ -567,7 +567,7 @@ var hostCheckFeatureCommand = cli.Command{
 			if Verbose || Debug {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -602,11 +602,11 @@ var hostDeleteFeatureCommand = cli.Command{
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
 		values := install.Variables{}
@@ -641,7 +641,7 @@ var hostDeleteFeatureCommand = cli.Command{
 			if Verbose || Debug {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},

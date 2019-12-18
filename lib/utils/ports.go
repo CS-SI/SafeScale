@@ -62,7 +62,7 @@ func Check(port int) (status bool, err error) {
 
 }
 
-func runAway(site string, port string) {
+func runAway(site string, port string) { // nolint
 	timeout := time.Second
 	_, err := net.DialTimeout("tcp", site+":"+port, timeout)
 	if err != nil {

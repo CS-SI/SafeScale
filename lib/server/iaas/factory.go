@@ -91,8 +91,8 @@ func UseService(tenantName string) (newService Service, err error) {
 	}
 
 	var (
-		tenantInCfg = false
-		found       = false
+		tenantInCfg bool
+		found       bool
 		name        string
 		svc         Service
 		svcProvider = "__not_found__"
@@ -250,15 +250,15 @@ func UseService(tenantName string) (newService Service, err error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocation objectstorage.Location, fakeMetaLocation objectstorage.Location) (Service, error) {
+func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocation objectstorage.Location, fakeMetaLocation objectstorage.Location) (Service, error) { // nolint
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		tenantInCfg = false
-		found       = false
+		tenantInCfg bool
+		found       bool
 		name        string
 		svc         Service
 		svcProvider = "__not_found__"
@@ -710,8 +710,7 @@ func loadConfig() error {
 }
 
 func getTenantsFromCfg() ([]interface{}, *viper.Viper, error) {
-	var v *viper.Viper
-	v = viper.New()
+	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
 	v.AddConfigPath("$HOME/.config/safescale")

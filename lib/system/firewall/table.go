@@ -21,7 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/system/firewall/Policy"
+	"github.com/CS-SI/SafeScale/lib/system/firewall/policy"
 )
 
 // Table defines a table of the firewall
@@ -32,7 +32,7 @@ type Table struct {
 }
 
 // NewChain creates a new
-func (t *Table) NewChain(name string, policy Policy.Enum) *Chain {
+func (t *Table) NewChain(name string, policy policy.Enum) *Chain {
 	chain := Chain{
 		Name:   name,
 		Policy: policy,

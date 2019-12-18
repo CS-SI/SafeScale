@@ -19,7 +19,7 @@ package install
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/sirupsen/logrus"
 )
 
@@ -63,7 +63,7 @@ func init() {
 		allEmbeddedMap[item.DisplayName()] = item
 		installers := item.specs.GetStringMap("feature.install")
 		for k := range installers {
-			method, err := Method.Parse(k)
+			method, err := method.Parse(k)
 			if err != nil {
 				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install method '%s' unknown!",
 					item.DisplayName(), item.DisplayFilename(), k))

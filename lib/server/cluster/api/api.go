@@ -19,7 +19,7 @@ package api
 import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	propsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -91,7 +91,7 @@ type Cluster interface {
 	// Stop stops the cluster
 	Stop(concurrency.Task) error
 	// GetState returns the current state of the cluster
-	GetState(concurrency.Task) (ClusterState.Enum, error)
+	GetState(concurrency.Task) (clusterstate.Enum, error)
 	// AddNode adds a node
 	AddNode(concurrency.Task, *pb.HostDefinition) (string, error)
 	// AddNodes adds several nodes

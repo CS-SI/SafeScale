@@ -27,7 +27,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
@@ -121,7 +121,7 @@ func (handler *ShareHandler) Create(
 	}
 
 	// Check if the path to share isn't a remote mount or contains a remote mount
-	err = server.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
 		serverMountsV1 := v.(*propsv1.HostMounts)
 		if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
 			return fmt.Errorf("path to export '%s' is a mounted share", sharePath)
@@ -149,7 +149,7 @@ func (handler *ShareHandler) Create(
 		return nil, err
 	}
 
-	err = server.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
 		if len(serverSharesV1.ByID) == 0 {
 			// Host doesn't have shares yet, so install NFS
@@ -178,7 +178,7 @@ func (handler *ShareHandler) Create(
 	}()
 
 	// Updates Host Property propsv1.HostShares
-	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
 
 		share = propsv1.NewHostShare()
@@ -207,7 +207,7 @@ func (handler *ShareHandler) Create(
 	newShare := share
 	defer func() {
 		if err != nil {
-			err2 := server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 				serverSharesV1 := v.(*propsv1.HostShares)
 				delete(serverSharesV1.ByID, newShare.ID)
 				delete(serverSharesV1.ByName, newShare.Name)
@@ -276,7 +276,7 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 		return fmt.Errorf("delete share: unable to found share of host '%s'", name)
 	}
 
-	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
 		if len(share.ClientsByName) > 0 {
 			var list []string
@@ -373,7 +373,7 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 			return nil, err
 		}
 
-		err = host.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 			hostSharesV1 := v.(*propsv1.HostShares)
 			shares[serverID] = hostSharesV1.ByID
 			return nil
@@ -443,7 +443,7 @@ func (handler *ShareHandler) Mount(
 
 	// Check if share is already mounted
 	// Check if there is already volume mounted in the path (or in subpath)
-	err = target.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+	err = target.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
 		targetMountsV1 := v.(*propsv1.HostMounts)
 		if s, ok := targetMountsV1.RemoteMountsByShareID[share.ID]; ok {
 			return fmt.Errorf("already mounted in '%s:%s'", target.Name, targetMountsV1.RemoteMountsByPath[s].Path)
@@ -468,7 +468,7 @@ func (handler *ShareHandler) Mount(
 	}
 
 	export := ""
-	err = target.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = target.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		if v.(*propsv1.HostNetwork).DefaultGatewayPrivateIP == server.GetPrivateIP() {
 			export = server.GetPrivateIP() + ":" + share.Path
 		} else {
@@ -487,7 +487,7 @@ func (handler *ShareHandler) Mount(
 	}
 
 	// Mount the share on host
-	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
 		_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
 		if !found {
@@ -545,10 +545,10 @@ func (handler *ShareHandler) Mount(
 		}
 	}()
 
-	err = target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
 		targetMountsV1 := v.(*propsv1.HostMounts)
 		// Make sure the HostMounts is correctly init if there are no mount yet
-		if !target.Properties.Lookup(HostProperty.MountsV1) {
+		if !target.Properties.Lookup(hostproperty.MountsV1) {
 			targetMountsV1.Reset()
 		}
 		mount = propsv1.NewHostRemoteMount()
@@ -571,7 +571,7 @@ func (handler *ShareHandler) Mount(
 	}
 	defer func() {
 		if err != nil {
-			err2 := server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 				serverSharesV1 := v.(*propsv1.HostShares)
 				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByName, target.Name)
 				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByID, target.ID)
@@ -599,7 +599,7 @@ func (handler *ShareHandler) Mount(
 	newMount := mount
 	defer func() {
 		if err != nil {
-			err2 := target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+			err2 := target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
 				targetMountsV1 := v.(*propsv1.HostMounts)
 				delete(targetMountsV1.RemoteMountsByShareID, newMount.ShareID)
 				delete(targetMountsV1.RemoteMountsByPath, newMount.Path)
@@ -654,7 +654,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	}
 
 	var shareID string
-	err = server.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
 		var found bool
 		shareID, found = serverSharesV1.ByName[shareName]
@@ -681,7 +681,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	}
 
 	var mountPath string
-	err = target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
 		targetMountsV1 := v.(*propsv1.HostMounts)
 		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
 		if !found {
@@ -714,7 +714,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	}
 
 	// Remove host from client lists of the share
-	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
 		delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
 		delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
@@ -817,7 +817,7 @@ func (handler *ShareHandler) Inspect(
 	var (
 		shareID string
 	)
-	err = server.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
 		var found bool
 		shareID, found = serverSharesV1.ByName[shareName]
@@ -846,7 +846,7 @@ func (handler *ShareHandler) Inspect(
 			continue
 		}
 
-		err = client.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+		err = client.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
 			clientMountsV1 := v.(*propsv1.HostMounts)
 			mountPath, ok := clientMountsV1.RemoteMountsByShareID[shareID]
 			if ok {
