@@ -26,21 +26,21 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ntp &>/dev/null || sfFail 1
+                                    dpkg -l | grep ntp &>/dev/null || sfFail 192
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ntp &>/dev/null || sfFail 1
+                                    rpm -qa | grep ntp &>/dev/null || sfFail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 1
+                                    sfFail 193
                                     ;;
                             esac
                             sfExit
@@ -50,47 +50,46 @@ feature:
                 steps:
                     ntp-server:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ntp"
+                                    sfRetry 5m 3 "sfApt update && sfApt install -y ntp" || sfFail 192
                                     ;;
                                 centos|rhel)
                                     yum install -y ntp || sfFail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 193
                                     ;;
                             esac
                             sfExit
 
                     firewall:
                         targets:
-                            gateways: all
+                            gateways: no
                             hosts: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             # Makes sure firewalld is running, starting first its dependency dbus...
                             sfService start dbus
                             # then firewalld  itself
                             sfService restart firewalld
                             sfFirewallAdd --zone=public --add-port=123/udp --permanent
-                            sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfFirewallReload || sfFail 194 "Firewall problem"
 
                     ready:
                         targets:
-                            gateways: all
-                            hosts: no
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -119,10 +118,10 @@ feature:
                 steps:
                     ntp-server:
                         targets:
-                            gateways: all
-                            hosts: no
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
