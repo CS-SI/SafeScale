@@ -33,8 +33,9 @@ var networkCmdName = "network"
 
 // NetworkCmd command
 var NetworkCmd = cli.Command{
-	Name:  "network",
-	Usage: "network COMMAND",
+	Name:    "network",
+	Aliases: []string{"net"},
+	Usage:   "network COMMAND",
 	Subcommands: []cli.Command{
 		networkCreate,
 		networkDelete,
