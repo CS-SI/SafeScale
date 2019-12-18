@@ -850,7 +850,7 @@ feature:
                               && mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/sbin || sfFail 195
 
                             rm -drf ${SF_TMPDIR}/linux-amd64 \
-                              && rm -rf ${SF_TMPDIR}/helm-v{{.Version}}-linux-amd64.tar.gz || sfFail 196
+                              && rm -rf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 196
                             sfExit
 
                     helm-account:
