@@ -834,7 +834,7 @@ feature:
                             sfExit
 
                     helm-binary:
-                        target:
+                        targets:
                             masters: all
                         run: |
                             # Install Helm
