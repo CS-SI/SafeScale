@@ -72,8 +72,8 @@ feature:
                                 centos|redhat)
                                     yum install -y epel-release && \
                                     yum makecache fast && \
-                                    yum groupinstall -y -t "X Window system" && \
-                                    yum groupinstall -y -t Xfce && \
+                                    yum groupinstall -y -t "X Window system" --skip-broken && \
+                                    yum groupinstall -y -t Xfce --skip-broken && \
                                     yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     ;;
                                 debian|ubuntu)
