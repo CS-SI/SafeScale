@@ -376,10 +376,9 @@ configure_network_redhat() {
         }
     fi
 
-
     # We don't want NetworkManager
-    disable_svc NetworkManager &>/dev/null
     stop_svc NetworkManager &>/dev/null
+    disable_svc NetworkManager &>/dev/null
     yum remove -y NetworkManager &>/dev/null
 
     # Configure all network interfaces in dhcp
@@ -389,6 +388,7 @@ configure_network_redhat() {
 DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
+NM_CONTROLLED=no
 EOF
             {{- if .DNSServers }}
             i=1
@@ -410,6 +410,8 @@ EOF
 
     enable_svc network
     restart_svc network
+
+    echo "exclude=NetworkManager" >>/etc/yum.conf
 
     reset_fw || fail 200
 
@@ -833,8 +835,6 @@ ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
 #insert_tag
 
 force_dbus_restart
-
-ls -lR /opt/safescale
 
 set +x
 exit 0
