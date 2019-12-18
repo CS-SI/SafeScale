@@ -19,6 +19,10 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+
+    parameters:
+        - Peers=
+
     install:
         bash:
             check:
@@ -28,7 +32,7 @@ feature:
                         targets:
                             hosts: yes
                             gateways: all
-                            masters: all
+                            masters: no
                             nodes: all
                         run: |
                             case $LINUX_KIND in
@@ -51,21 +55,21 @@ feature:
                         targets:
                             hosts: yes
                             gateways: all
-                            masters: all
+                            masters: no
                             nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ntpdate" || sfFail 194
+                                    sfRetry 5m 3 "sfApt install -y ntpdate" || sfFail 192
                                     ;;
                                 centos|rhel)
-                                    yum install -y ntpdate || sfFail 194
+                                    yum install -y ntpdate || sfFail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 193
                                     ;;
                             esac
                             sfExit
@@ -74,56 +78,67 @@ feature:
                         targets:
                             hosts: yes
                             gateways: all
-                            masters: all
+                            masters: no
                             nodes: all
                         run: |
-                            echo "{{.GatewayIP}}  NTP-server-host" >> /etc/hosts
-                            ntpdate NTP-server-host || sfFail 201
+                            ntpdate pool.ntp.org || sfFail 194
                             timedatectl set-ntp off
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt install -y ntp ntpstat" || sfFail 202
-                                    sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf  || sfFail 203
-                                    sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf  || sfFail 204
+                                    sfRetry 5m 3 "sfApt install -y ntp ntpstat" || sfFail 195
+                                    {{ if .Peers }}
+                                    sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 196
+                                    sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf || sfFail 197
+                                    {{ end }}
                                     ;;
                                 centos|rhel)
-                                    yum install -y ntp || sfFail 202
-                                    sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 203
+                                    yum install -y ntp || sfFail 195
+                                    {{ if .Peers }}
+                                    sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 196
+                                    {{ end }}
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 198
                                     ;;
                             esac
-                            echo "server NTP-server-host prefer iburst" >> /etc/ntp.conf
+
+                            {{ if .Peers }}
+                            cat >>/etc/ntp.conf <<EOF
+
+                            # Using masters as time servers
+                            {{ range .Peers }}server {{ . }} prefer iburst
+                            {{ end }}
+                            EOF
+                            {{ end }}
                             sfExit
 
                     ready:
                         targets:
-                            gateways: all
                             hosts: yes
-                            masters: all
+                            gateways: all
+                            masters: no
                             nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfService enable ntp || sfFail 195
-                                    sfService restart ntp || sfFail 196
+                                    sfService enable ntp || sfFail 199
+                                    sfService restart ntp || sfFail 200
                                     op=-1
                                     sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && sfFail 197
+                                    [ $op -ne 0 ] && sfFail 201
                                     ;;
                                 centos|rhel)
-                                    sfService enable ntpd || sfFail 195
-                                    sfService restart ntpd || sfFail 196
+                                    sfService enable ntpd || sfFail 202
+                                    sfService restart ntpd || sfFail 203
                                     op=-1
                                     sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && sfFail 197
+                                    [ $op -ne 0 ] && sfFail 204
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 205
                                     ;;
                             esac
                             sfExit
@@ -133,9 +148,9 @@ feature:
                 steps:
                     ntpdate:
                         targets:
-                            gateways: all
                             hosts: yes
-                            masters: all
+                            gateways: all
+                            masters: no
                             nodes: all
                         run: |
                             case $LINUX_KIND in
