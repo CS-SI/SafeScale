@@ -704,6 +704,9 @@ func (handler *HostHandler) Create(
 	if err != nil {
 		return nil, err
 	}
+	if retcode != 0 && retcode != 255 {
+		return nil, scerr.Wrap(fmt.Errorf("retcode=%d", retcode), "reboot command failed")
+	}
 
 	log.Infof("Waiting for reboot... of host '%s', stderr=[%s]", host.Name, stderr)
 	// Wait like 5 min for the machine to reboot
