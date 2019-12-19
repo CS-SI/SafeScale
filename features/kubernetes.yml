@@ -54,6 +54,7 @@ feature:
 
     parameters:
         - AllowPodsOnMasters=false
+        - AllowPodsOnGateways=false
         - CNI=calico
         - Dashboard=true
         - Hardening=true
@@ -178,7 +179,7 @@ feature:
                             sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
                 steps:
                     sysconf:
                         targets:
@@ -191,10 +192,10 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfRetry 5m 5 sfApt install -y ebtables socat || sfFail 194
+                                    sfRetry 5m 5 sfApt install -y ebtables socat || sfFail 192
                                     ;;
                                 redhat|centos)
-                                    sfRetry 5m 5 yum install -y ebtables socat || sfFail 195
+                                    sfRetry 5m 5 yum install -y ebtables socat || sfFail 193
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
                             net.bridge.bridge-nf-call-iptables = 1
@@ -217,7 +218,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution '$LINUX_KIND'"
-                                    sfFail 192
+                                    sfFail 194
                                     ;;
                             esac
 
@@ -251,25 +252,25 @@ feature:
                             {{ if eq .Hardening "true" }}
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
-                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 193
+                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 196
                                     ;;
 
                                 centos|redhat)
-                                    yum -y install audit audit-libs quota || sfFail 193
+                                    yum -y install audit audit-libs quota || sfFail 197
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
-                                   sfFail 193
+                                   sfFail 198
                                    ;;
                             esac
 
-                            ## Configures ulimit
-                            cat >> /etc/security/limits.conf <<EOF
-                            *      soft      nproc      100
-                            *      hard      nproc      200
-                            *      soft      nofile      1024
-                            *      hard      nofile      2048
-                            EOF
+                            ## Configures ulimit - not compatible with a host on which a user graphical system is used - like remote desktop...
+                            # cat >> /etc/security/limits.conf <<EOF
+                            # *      soft      nproc      100
+                            # *      hard      nproc      200
+                            # *      soft      nofile      1024
+                            # *      hard      nofile      2048
+                            # EOF
 
                             ## Configures audit rules
                             cat >/etc/audit/rules.d/docker.rules <<EOF
@@ -300,9 +301,9 @@ feature:
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
                             {{ if .KubeVersion }}
-                                    sfApt update && sfApt install -y kubelet={{.KubeVersion}}-00 kubeadm={{.KubeVersion}}-00 kubectl={{.KubeVersion}}-00 || sfFail 192
+                                    sfApt update && sfApt install -y kubelet={{.KubeVersion}}-00 kubeadm={{.KubeVersion}}-00 kubectl={{.KubeVersion}}-00 || sfFail 199
                             {{ else }}
-                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 192
+                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 199
                             {{ end }}
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
@@ -319,14 +320,14 @@ feature:
                             exclude=kube*
                             EOF
                             {{ if .KubeVersion }}
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 194
+                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199
                             {{ else }}
-                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 194
+                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 199
                             {{ end }}
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
-                                   sfFail 195
+                                   sfFail 200
                             esac
                             sfService enable kubelet && sfService start kubelet
 
@@ -341,7 +342,7 @@ feature:
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
-                            [ -z "${TARGET_DIR+x}" ] && sfFail 196
+                            [ -z "${TARGET_DIR+x}" ] && sfFail 201
 
                             cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
                             upstream kubernetes-api-cluster {
@@ -381,13 +382,52 @@ feature:
                                 local:
                                     dataDir: /var/lib/etcd
                             networking:
+                                dnsDomain: cluster.local
                                 podSubnet: 10.244.0.0/16
+                                serviceSubnet: 10.96.0.0/12
+                            {{ if eq .Hardening "true" }}
+                            apiServer:
+                                timeoutForControlPlane: 4m0s
+                                extraArgs:
+                                    #? API server is restarted because of health check fail
+                                    #? Modern K8S deploys preferes RBAC admission associate to PodSecurityPolicy to authorization control
+                                    # anonymous-auth: "false"
+                                    ##? EventRateLimit error running kubeadm init, alpha version
+                                    ##? DenyEscalatingExec, deprecated
+                                    enable-admission-plugins: AlwaysPullImages,DefaultStorageClass,NamespaceLifecycle,ServiceAccount,NodeRestriction,PodSecurityPolicy
+                                    ## disable-admission-plugins: DynamicAuditing
+                                    ##? error running kubeadm init
+                                    # RBAC is used to grant permission to client, restrict access to anonymous users
+                                    authorization-mode: RBAC,Node
+                                    #!allow-privileged: "false"
+                                    ##? kube-proxy cannot be run
+                                    ##? RBAC admission provide fine grained control
+                                    audit-log-path: /var/log/k8s_audit.log
+                                    audit-log-maxage: "30"
+                                    audit-log-maxbackup: "10"
+                                    audit-log-maxsize: "100"
+                                    service-account-lookup: "true"
+                                    #? crash during init phase, to be investigated ...
+                                    ## encryption-provider-config: aescbc
+                                    profiling: "false"
+                            controllerManager:
+                                extraArgs:
+                                    terminated-pod-gc-threshold: "12500"
+                                    profiling: "false"
+                                    use-service-account-credentials: "true"
+                                    feature-gates: RotateKubeletServerCertificate=true
+                            {{ end }}
+                            certificatesDir: /etc/kubernetes/pki
+                            clusterName: kubernetes
+                            dns:
+                                type: CoreDNS
+                            imageRepository: k8s.gcr.io
                             EOF
 
-                            sfRetry 5m 5 kubeadm config images pull || sfFail 197
-                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 198
-                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 199
-                            cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 200
+                            sfRetry 5m 5 kubeadm config images pull || sfFail 202
+                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 203
+                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 204
+                            cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 205
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
                             mkdir -p ~{{.ClusterAdminUsername}}/.kube
@@ -403,26 +443,20 @@ feature:
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 201
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 206
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
                             echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
                             cat ${SF_TMPDIR}/cp_join_cmd.sh
-                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 202
-                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 203
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 207
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 208
                             for ip in {{range .MasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
-                                sfDropzoneSync $ip || sfFail 204
+                                sfDropzoneSync $ip || sfFail 209
                             done
                             rm ${SF_TMPDIR}/cp_join_cmd.sh ${SF_TMPDIR}/init_cluster_admin_kube.sh
                             sfDropzoneClean
-
-                            # waits availability of key pods
-                            set -u -o pipefail
-                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 205
-                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 206
-                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 207
 
                             {{ if eq .Hardening "true" }}
                                 cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
@@ -552,9 +586,15 @@ feature:
                             EOF
 
                                 # Apply policies
-                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 208
-                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 209
+                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 210
+                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 211
                             {{ end }}
+
+                            # waits availability of key pods
+                            set -u -o pipefail
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 212
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 213
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 214
 
                             touch /etc/kubernetes/.joined
                             echo "cp1 init done"
@@ -565,13 +605,13 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            case {{.CNI}} in
+                            case {{ .CNI }} in
                                 flannel) # To be removed
-                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 210
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 215
 
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 211 "Firewall problem"
+                                    sfFirewallReload || sfFail 216 "Firewall problem"
                                     ;;
                                 calico)
                                     # Should already exist...
@@ -579,7 +619,7 @@ feature:
 
                                     # Applies RBAC Calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/rbac/rbac-kdd-calico.yaml -P /etc/kubernetes/kubeadm/
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 212
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 217
 
                                     # Downloads default calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml -P /etc/kubernetes/kubeadm/
@@ -665,15 +705,15 @@ feature:
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
                                         debian|ubuntu)
-                                            sfApt update && sfApt install -y patch || sfFail 213
+                                            sfApt update && sfApt install -y patch || sfFail 218
                                             ;;
 
                                         centos|redhat)
-                                            yum -y install patch || sfFail 213
+                                            yum -y install patch || sfFail 219
                                             ;;
 
                                         *) echo "unsupported linux distribution ''"
-                                           sfFail 213
+                                           sfFail 220
                                            ;;
                                     esac
 
@@ -681,10 +721,10 @@ feature:
                                     patch -l /etc/kubernetes/kubeadm/calico.yaml /etc/kubernetes/kubeadm/calico.yaml.patch
 
                                     # Applies patched file
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 214
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 221
 
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 215 "Firewall problem"
+                                    sfFirewallReload || sfFail 222 "Firewall problem"
                                     ;;
                             esac
                             sfExit 0
@@ -696,30 +736,30 @@ feature:
                             # Don't try to init a kubernetes cluster already running
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 216
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 223
                             sfDropzoneClean
 
-                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 217
-                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 218
-                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 219
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 220
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 224
+                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 225
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 226
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 227
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 221
-                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 222
-                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 223
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 228
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 229
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 230
 
                             # Configure firewall
                             case {{.CNI}} in
                                 flannel)
                                     sfFirewallAdd --zone=trusted --add-interface=flannel.1
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 224 "Firewall problem"
+                                    sfFirewallReload || sfFail 231 "Firewall problem"
                                     ;;
                                 calico)
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 225 "Firewall problem"
+                                    sfFirewallReload || sfFail 232 "Firewall problem"
                                     ;;
                             esac
 
@@ -743,8 +783,8 @@ feature:
                                 MASTERIP=$m
                                 break
                             done
-                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 226
-                            eval $NODE_JOIN_CMD || sfFail 227
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 233
+                            eval $NODE_JOIN_CMD || sfFail 234
                             touch /etc/kubernetes/.joined
                             sfExit
 
@@ -752,7 +792,9 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            sfKubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 228
+                            {{-  if ne .AllowPodsOnGateways "true" }}
+                            sfKubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 235
+                            {{ end }}
                             sfExit
 
                     helm-certs:
@@ -839,18 +881,16 @@ feature:
                         run: |
                             # Install Helm
                             cd ${SF_TMPDIR}
-                            wget https://get.helm.sh/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 192
+                            wget https://get.helm.sh/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 236
 
-                            tar -zxvf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz -C ${SF_TMPDIR} || sfFail 193
+                            tar -zxvf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz -C ${SF_TMPDIR} || sfFail 237
 
-                            chmod a+rx ${SF_TMPDIR}/linux-amd64/helm \
-                              && chmod a+rx ${SF_TMPDIR}/linux-amd64/tiller || sfFail 194
-
-                            mv ${SF_TMPDIR}/linux-amd64/helm /usr/local/sbin \
-                              && mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/sbin || sfFail 195
-
-                            rm -drf ${SF_TMPDIR}/linux-amd64 \
-                              && rm -rf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 196
+                            mv ${SF_TMPDIR}/linux-amd64/helm /usr/local/bin && \
+                            mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/bin && \
+                            chmod a+rx /usr/local/bin/helm && \
+                            chmod a+rx /usr/local/bin/tiller && \
+                            rm -drf ${SF_TMPDIR}/linux-amd64 && \
+                            rm -rf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 238
                             sfExit
 
                     helm-account:
@@ -858,7 +898,7 @@ feature:
                             masters: one
                         run: |
                             ## Create serviceaccount
-                            sfKubectl create serviceaccount tiller -n kube-system || sfFail 197
+                            sfKubectl create serviceaccount tiller -n kube-system || sfFail 239
                             sfExit
 
                     helm-rbac-files:
@@ -882,102 +922,14 @@ feature:
                                   namespace: kube-system
                             EOF
 
-                            cat > ${SF_ETCDIR}/helm/tiller-role-{{.HelmDefaultNamespace}}.yaml <<EOF
-                            kind: Role
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            metadata:
-                                name: tiller-role-{{ .HelmDefaultNamespace }}
-                                namespace: {{ .HelmDefaultNamespace }}
-                            rules:
-                                - apiGroups: ["", "batch", "extensions", "apps"]
-                                  resources: ["*"]
-                                  verbs: ["*"]
-                            EOF
-
-                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding-{{.HelmDefaultNamespace}}.yaml <<EOF
-                            kind: RoleBinding
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            metadata:
-                                name: tiller-rolebinding
-                                namespace: {{.HelmDefaultNamespace}}
-                            subjects:
-                                - kind: ServiceAccount
-                                  name: tiller
-                                  namespace: kube-system
-                            roleRef:
-                                kind: Role
-                                name: tiller-role-{{.HelmDefaultNamespace}}
-                                apiGroup: rbac.authorization.k8s.io
-                            EOF
-
-                            cat > ${SF_ETCDIR}/helm/tiller-role-system.yaml <<EOF
-                            kind: Role
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            metadata:
-                                name: tiller-role-system
-                                namespace: kube-system
-                            rules:
-                                - apiGroups: ["", "extensions", "apps"]
-                                  resources: ["configmaps"]
-                                  verbs: ["*"]
-                            EOF
-
-                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml <<EOF
-                            kind: RoleBinding
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            metadata:
-                                name: tiller-rolebinding-system
-                                namespace: kube-system
-                            subjects:
-                                - kind: ServiceAccount
-                                  name: tiller
-                                  namespace: kube-system
-                            roleRef:
-                                kind: Role
-                                name: tiller-role-system
-                                apiGroup: rbac.authorization.k8s.io
-                            EOF
-
-                            cat > ${SF_ETCDIR}/helm/tiller-role-secret.yaml <<EOF
-                            kind: Role
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            metadata:
-                                name: tiller-role-secret
-                                namespace: kube-system
-                            rules:
-                                - apiGroups: [""]
-                                  resources: ["secrets"]
-                                  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-                            EOF
-
-                            cat > ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml <<EOF
-                            kind: RoleBinding
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            metadata:
-                                name: tiller-rolebinding-secret
-                                namespace: kube-system
-                            subjects:
-                                - kind: ServiceAccount
-                                  name: tiller
-                                  namespace: kube-system
-                            roleRef:
-                                kind: Role
-                                name: tiller-role-secret
-                                apiGroup: rbac.authorization.k8s.io
-                            EOF
+                            sfExit
 
                     helm-rbac-apply:
                         targets:
                             masters: one
                         run: |
                             ## Apply RBAC policy
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 198
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-{{.HelmDefaultNamespace}}.yaml || sfFail 199
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-{{.HelmDefaultNamespace}}.yaml || sfFail 200
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-system.yaml || sfFail 201
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml || sfFail 202
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-role-secret.yaml || sfFail 203
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml || sfFail 204
+                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 240
                             sfExit
 
                     helm-init:
@@ -994,7 +946,7 @@ feature:
                                 --tls-ca-cert ${SF_ETCDIR}/helm/ca/ca.cert.pem \
                                 --service-account tiller \
                                 --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' \
-                                || sfFail 205
+                                || sfFail 247
 
                             mkdir -p /home/{{.ClusterAdminUsername}}/.helm
                             cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
@@ -1007,12 +959,12 @@ feature:
                             # Push .helm configuration to all the other masters
                             # Creates an archive of the .helm directory
                             cd /home/{{ .ClusterAdminUsername }} && \
-                            tar -zcvf ${SF_TMPDIR}/helm_config.tar.gz .helm || sfFail 206
+                            tar -zcvf ${SF_TMPDIR}/helm_config.tar.gz .helm || sfFail 248
 
                             # Push the archive in the dropzone and synchronize
-                            sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 207
+                            sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 249
                             for ip in {{ range .MasterIPs }}{{ . }} {{ end }}; do
-                                sfDropzoneSync $ip || sfFail 208
+                                sfDropzoneSync $ip || sfFail 250
                             done
                             rm -f ${SF_TMPDIR}/helm_config.tar.gz
                             sfExit
@@ -1021,11 +973,11 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 192
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 251
                             sfDropzoneClean
 
-                            [ -f ${SF_TMPDIR}/helm_config.tar.gz ] || sfFail 193
-                            tar -zxvf ${SF_TMPDIR}/helm_config.tar.gz -C /home/{{ .ClusterAdminUsername }} || sfFail 194
+                            [ -f ${SF_TMPDIR}/helm_config.tar.gz ] || sfFail 252
+                            tar -zxvf ${SF_TMPDIR}/helm_config.tar.gz -C /home/{{ .ClusterAdminUsername }} || sfFail 253
                             rm -f ${SF_TMPDIR}/helm_config.tar.gz
                             sfExit
 
@@ -1034,7 +986,10 @@ feature:
                             masters: one
                         run: |
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
-                            [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
+                            if [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ]; then
+                                sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
+                            fi
+
                             # Adds namespace safescale
                             sfKubectl create namespace safescale
                             # FIXME: add label to namespace (in prevision of network policies)
@@ -1042,10 +997,10 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 229 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 254 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 230 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 255 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi
@@ -1063,19 +1018,17 @@ feature:
                             if sfKubectl -n kube-system get deployment tiller-deploy &>/dev/null; then
                                 sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
                             fi
+                            ## Delete service
+                            sfKubectl delete service -n kube-system tiller-deploy || sfFail 193
                             ## Delete account
                             if sfKubectl get serviceaccount tiller -n kube-system &>/dev/null; then
-                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 193
+                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 194
                             fi
+                            ## Delete secret
+                            sfKubectl delete secret -n kube-system tiller-secret || sfFail 195
                             ## Delete RBAC policy
                             if sfKubectl get role tiller-rolebinding-secret -n kube-system &>/dev/null; then
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 194
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-{{ .HelmDefaultNamespace }}.yaml || sfFail 195
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-{{.HelmDefaultNamespace}}.yaml || sfFail 196
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-system.yaml || sfFail 197
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-system.yaml || sfFail 198
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-role-secret.yaml || sfFail 199
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-rolebinding-secret.yaml || sfFail 200
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 196
                             fi
                             sfExit
 
@@ -1083,8 +1036,8 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            rm -f /usr/local/sbin/helm || sfFail 201
-                            rm -f /usr/local/sbin/tiller || sfFail 202
+                            rm -f /usr/local/bin/helm || sfFail 201
+                            rm -f /usr/local/bin/tiller || sfFail 202
                             rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm || sfFail 203
                             sfExit
 
