@@ -200,7 +200,7 @@ func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
 // hosts fail feature check.
 // The checks are done in parallel.
 func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) {
-	concernedHosts := []*pb.Host{}
+	var concernedHosts []*pb.Host
 	dones := map[*pb.Host]chan error{}
 	results := map[*pb.Host]chan Results{}
 	for _, h := range hosts {
@@ -288,7 +288,7 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 
 	if w.allNodes == nil {
 		hostClt := client.New().Host
-		allHosts := []*pb.Host{}
+		var allHosts []*pb.Host
 		for _, i := range w.cluster.ListNodeIDs(w.feature.task) {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
@@ -894,7 +894,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 	}
 
 	var (
-		hostsList = []*pb.Host{}
+		hostsList []*pb.Host
 		all       []*pb.Host
 	)
 

@@ -531,7 +531,7 @@ func (s *Stack) interpretAddresses(
 	addresses map[string]interface{},
 ) ([]string, map[ipversion.Enum]map[string]string, string, string) {
 	var (
-		networks    = []string{}
+		networks    []string
 		addrs       = map[ipversion.Enum]map[string]string{}
 		AcccessIPv4 string
 		AcccessIPv6 string

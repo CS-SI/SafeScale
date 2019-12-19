@@ -779,11 +779,11 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
 func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
 	var (
-		networks      = []string{}
+		networks      []string
 		addrs         = map[ipversion.Enum]map[string]string{}
 		AcccessIPv4   string
 		AcccessIPv6   string
-		allInterfaces = []nics.Interface{}
+		allInterfaces []nics.Interface
 	)
 
 	pager := s.listInterfaces(host.ID)

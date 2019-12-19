@@ -926,7 +926,7 @@ var clusterKubectlCommand = cli.Command{
 
 		clientID := GenerateClientIdentity()
 		args := c.Args().Tail()
-		filteredArgs := []string{}
+		var filteredArgs []string
 		ignoreNext := false
 		valuesOnRemote := &RemoteFilesHandler{}
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
@@ -1013,7 +1013,7 @@ var clusterHelmCommand = cli.Command{
 
 		clientID := GenerateClientIdentity()
 		useTLS := " --tls"
-		filteredArgs := []string{}
+		var filteredArgs []string
 		args := c.Args().Tail()
 		ignoreNext := false
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
@@ -1421,7 +1421,7 @@ var clusterNodeListCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 		hostClt := client.New().Host
-		formatted := []map[string]interface{}{}
+		var formatted []map[string]interface{}
 
 		list := clusterInstance.ListNodeIDs(concurrency.RootTask())
 		for _, i := range list {
@@ -1651,7 +1651,7 @@ var clusterMasterListCommand = cli.Command{
 		}
 
 		hostClt := client.New().Host
-		formatted := []map[string]interface{}{}
+		var formatted []map[string]interface{}
 
 		list := clusterInstance.ListMasterIDs(concurrency.RootTask())
 		for _, i := range list {

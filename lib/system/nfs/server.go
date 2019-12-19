@@ -19,9 +19,9 @@ package nfs
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/system"
 )
 
 // Server structure

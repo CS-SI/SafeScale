@@ -26,15 +26,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/cli/perform/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/server/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 var (
-	clusterName     string
-	clusterInstance clusterapi.Cluster
-	nodeName        string
+	clusterName string
+	// clusterInstance clusterapi.Cluster
+	nodeName string
 	// serviceName     string
 	// featureName     string
 
@@ -102,7 +101,7 @@ func extractClusterArgument(c *cli.Context) error {
 		if clusterName == "" {
 			return cli.NewExitError("Invalid argument CLUSTERNAME", int(exitcode.InvalidArgument))
 		}
-		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
+		_, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
 			if _, ok := err.(scerr.ErrNotFound); ok {
 				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)

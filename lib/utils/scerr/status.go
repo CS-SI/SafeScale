@@ -49,16 +49,16 @@ func Success(msg string, args ...interface{}) Status {
 }
 
 // Message ...
-func (me *status) Message() string {
-	return me.message
+func (stat *status) Message() string {
+	return stat.message
 }
 
 // Cause ...
-func (me *status) Cause() error {
-	return me.cause
+func (stat *status) Cause() error {
+	return stat.cause
 }
 
 // IsError ...
-func (me *status) IsError() bool {
-	return me.cause != nil || !me.success
+func (stat *status) IsError() bool {
+	return stat.cause != nil || !stat.success
 }

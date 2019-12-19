@@ -738,8 +738,8 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 	}
 
 	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat %s/user_data.phase2.log; exit $?", utils.LogFolder))
-	warnings := []string{}
-	errs := []string{}
+	var warnings []string
+	var errs []string
 
 	if recoverCode == 0 && recoverErr == nil {
 		lines := strings.Split(recoverStdOut, "\n")

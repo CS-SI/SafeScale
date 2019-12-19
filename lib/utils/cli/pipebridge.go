@@ -91,7 +91,7 @@ func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, erro
 		return nil, scerr.InvalidParameterError("pipes", "cannot be nil")
 	}
 
-	validatedBridges := []PipeBridge{}
+	var validatedBridges []PipeBridge
 	for _, v := range bridges {
 		if v != nil {
 			validatedBridges = append(validatedBridges, v)

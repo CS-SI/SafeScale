@@ -120,15 +120,19 @@ var networkInspect = cli.Command{
 		} else {
 			mapped["gateway_name"] = "<unknown>"
 		}
-		mapped["gateway_name"] = pgw.Name
-		if network.GetSecondaryGatewayId() != "" {
-			sgw, err = client.New().Host.Inspect(sgwID, temporal.GetExecutionTimeout())
-			if err == nil {
-				mapped["secondary_gateway_name"] = sgw.Name
-			} else {
-				mapped["secondary_gateway_name"] = "<unknown>"
+
+		if pgw != nil {
+			mapped["gateway_name"] = pgw.Name
+			if network.GetSecondaryGatewayId() != "" {
+				sgw, err = client.New().Host.Inspect(sgwID, temporal.GetExecutionTimeout())
+				if err == nil {
+					mapped["secondary_gateway_name"] = sgw.Name
+				} else {
+					mapped["secondary_gateway_name"] = "<unknown>"
+				}
 			}
 		}
+
 		// Removed entry virtual_ip if empty
 		if len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
 			delete(mapped, "virtual_ip")

@@ -26,7 +26,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
@@ -198,7 +198,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *google_protobuf.Empty, err error) {
+func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *googleprotobuf.Empty, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
@@ -232,5 +232,5 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	}
 
 	log.Infof("Network '%s' successfully deleted.", ref)
-	return &google_protobuf.Empty{}, nil
+	return &googleprotobuf.Empty{}, nil
 }
