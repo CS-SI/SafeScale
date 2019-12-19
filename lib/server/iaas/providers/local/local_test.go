@@ -34,14 +34,14 @@ var service iaas.Service
 
 func getTester() (*tests.ServiceTester, error) {
 	if tester == nil {
-		the_service, err := getService()
+		theService, err := getService()
 		if err != nil {
 			tester = nil
-			the_service = nil
+			theService = nil
 			return nil, err
 		}
 		tester = &tests.ServiceTester{
-			Service: the_service,
+			Service: theService,
 		}
 
 	}
@@ -50,13 +50,13 @@ func getTester() (*tests.ServiceTester, error) {
 
 func getService() (iaas.Service, error) {
 	if service == nil {
-		tenant_name := ""
-		if tenant_override := os.Getenv("TEST_LOCAL"); tenant_override != "" {
-			tenant_name = tenant_override
+		tenantName := ""
+		if tenantOverride := os.Getenv("TEST_LOCAL"); tenantOverride != "" {
+			tenantName = tenantOverride
 		}
-		service, err := iaas.UseService(tenant_name)
+		service, err := iaas.UseService(tenantName)
 		if err != nil || service == nil {
-			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name)
+			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
 		}
 		tester = &tests.ServiceTester{
 			Service: service,

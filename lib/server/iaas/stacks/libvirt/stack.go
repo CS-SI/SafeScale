@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	libvirt "github.com/libvirt/libvirt-go"
+	"github.com/libvirt/libvirt-go"
 )
 
 type Stack struct {

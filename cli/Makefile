@@ -27,6 +27,9 @@ cli/perform:
 	@(cd perform && $(MAKE))
 
 generate:
+	@(cd safescale && $(MAKE) $(@))
+	@(cd safescaled && $(MAKE) $(@))
+	@(cd scanner && $(MAKE) $(@))
 	@(cd perform && $(MAKE) $(@))
 
 clean:

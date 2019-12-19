@@ -208,7 +208,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 		richErrc = fmt.Sprintf("%d (%s)", errCode, errCode.String())
 	}
 
-	collected := []string{}
+	var collected []string
 	if stdout != "" {
 		errLines := strings.Split(stdout, "\n")
 		for _, errline := range errLines {

@@ -709,7 +709,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 
 	// Updates Host Property HostNetwork
 	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		errors := []error{}
+		var errors []error
 
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
@@ -793,11 +793,11 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
 func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
 	var (
-		networks      = []string{}
+		networks      []string
 		addrs         = map[ipversion.Enum]map[string]string{}
 		AcccessIPv4   string
 		AcccessIPv6   string
-		allInterfaces = []nics.Interface{}
+		allInterfaces []nics.Interface
 	)
 
 	pager := s.listInterfaces(host.ID)

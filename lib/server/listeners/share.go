@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // safescale nas|share create share1 host1 --path="/shared/data"
@@ -98,8 +98,8 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *
 }
 
 // Delete call share service deletion
-func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
@@ -152,7 +152,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 }
 
 // List return the list of all available shares
-func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.ShareList, err error) {
+func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.ShareList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -254,8 +254,8 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 }
 
 // Unmount unmounts share from the given host
-func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}

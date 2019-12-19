@@ -92,7 +92,7 @@ func (r Results) Transpose() Results {
 
 // Keys returns the keys of the Results
 func (r Results) Keys() []string {
-	keys := []string{}
+	var keys []string
 	for k := range r {
 		keys = append(keys, k)
 	}

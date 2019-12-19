@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/grpc/status"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 
@@ -63,8 +63,8 @@ type StoredCPUInfo struct {
 }
 
 // Start ...
-func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -110,8 +110,8 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 }
 
 // Stop shutdowns a host.
-func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -163,8 +163,8 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 }
 
 // Reboot reboots a host.
-func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -495,8 +495,8 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 }
 
 // Delete an host
-func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}

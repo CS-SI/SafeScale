@@ -22,7 +22,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -38,8 +38,8 @@ import (
 type JobManagerListener struct{}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -90,7 +90,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 }
 
 // List running process
-func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *pb.JobList, err error) {
+func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *pb.JobList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}

@@ -642,7 +642,7 @@ func (handler *HostHandler) Create(
 		return nil, scerr.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
 	}
 
-	errors := []error{}
+	var errors []error
 
 	// Updates host link with networks
 	for _, i := range networks {
@@ -742,8 +742,8 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 	}
 
 	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat /opt/safescale/var/log/user_data.phase2.log; exit $?"))
-	warnings := []string{}
-	errs := []string{}
+	var warnings []string
+	var errs []string
 
 	if recoverCode == 0 && recoverErr == nil {
 		lines := strings.Split(recoverStdOut, "\n")
@@ -989,7 +989,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	netHandler := NewNetworkHandler(handler.service)
 	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
-		errors := []error{}
+		var errors []error
 
 		for k := range hostNetworkV1.NetworksByID {
 			network, err := netHandler.Inspect(ctx, k)

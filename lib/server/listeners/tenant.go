@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"github.com/asaskevich/govalidator"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -71,7 +71,7 @@ func getCurrentTenant() *Tenant {
 type TenantListener struct{}
 
 // List registered tenants
-func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantList, err error) {
+func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -115,7 +115,7 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (_
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantName, err error) {
+func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantName, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -152,8 +152,8 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (_ 
 }
 
 // Set the the tenant to use for each command
-func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
@@ -233,7 +233,7 @@ func getCurrentStorageTenants() *StorageTenants {
 }
 
 // StorageList lists registered storage tenants
-func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantList, err error) {
+func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantList, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
@@ -282,7 +282,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Em
 }
 
 // StorageGet returns the name of the current storage tenants used for data related commands
-func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (_ *pb.TenantNameList, err error) {
+func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantNameList, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
@@ -320,8 +320,8 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Emp
 }
 
 // StorageSet set the tenants to use for data related commands
-func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}

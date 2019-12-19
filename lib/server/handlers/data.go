@@ -76,7 +76,7 @@ func getFileNames(fileName string) (string, string) {
 
 func (handler *DataHandler) getBuckets() (map[string]objectstorage.Bucket, []string, []objectstorage.Bucket) {
 	buckets := handler.storageServices.GetBuckets()
-	bucketNames := []string{}
+	var bucketNames []string
 	bucketMap := map[string]objectstorage.Bucket{}
 	for i := range buckets {
 		bucketName := buckets[i].GetName()
@@ -351,7 +351,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 	}
 
 	//check if some buckets of the object storage are missing and then if the file can be reconstructed
-	missingBuckets := []string{}
+	var missingBuckets []string
 	for _, bucketName := range chunkGroup.GetBucketNames() {
 		if _, ok := bucketMap[bucketName]; !ok {
 			missingBuckets = append(missingBuckets, bucketName)
@@ -509,7 +509,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) (err er
 	}
 	nbDataShards, nbParityShards := chunkGroup.GetNbShards()
 
-	errors := []error{}
+	var errors []error
 
 	var wg sync.WaitGroup
 	wg.Add(nbDataShards + nbParityShards)

@@ -23,6 +23,8 @@ vet:
 clean:
 	@($(RM) $(EXEC) || true)
 
+generate: gensrc
+
 gensrc:
 	@($(RM) -f $(VERSIONFILE) || true)
 	@echo "package main" > $(VERSIONFILE)

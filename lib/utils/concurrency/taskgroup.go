@@ -197,7 +197,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 
 		results[sid] = result
 	}
-	errors := []string{}
+	var errors []string
 	for i, e := range errs {
 		errors = append(errors, fmt.Sprintf("%s: %s", i, e))
 	}

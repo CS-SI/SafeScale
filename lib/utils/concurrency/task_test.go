@@ -67,7 +67,7 @@ func TestWaitingGame(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	tarray := []Task{}
+	var tarray []Task
 
 	for ind := 0; ind < 800; ind++ {
 		got, err := NewTask(nil)
@@ -229,7 +229,7 @@ func TestSingleTaskTryWaitKO(t *testing.T) {
 
 	single, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
 		time.Sleep(time.Duration(30) * time.Millisecond)
-		return "Ahhhh", fmt.Errorf("Chaos")
+		return "Ahhhh", fmt.Errorf("chaos")
 	}, nil)
 	require.Nil(t, err)
 

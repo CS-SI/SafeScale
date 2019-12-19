@@ -115,7 +115,7 @@ func (l *location) ListBuckets(prefix string) ([]string, error) {
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", prefix), concurrency.IsLogActive("Trace.Location")).GoingIn().OnExitTrace()()
 
-	list := []string{}
+	var list []string
 	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
 		func(c stow.Container, err error) error {
 			if err != nil {
