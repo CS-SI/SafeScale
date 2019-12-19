@@ -19,6 +19,7 @@ package k8s
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -35,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 //go:generate rice embed-go
@@ -123,14 +123,14 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	}
 
 	// Initializes variables
-	v := data.Map{}
+	v := install.Variables{}
 
-	// If hardening is disabled, set the appropriate variable for the kubernetes feature
+	// If hardening is disabled, set the appropriate parameter of the kubernetes feature
 	_, ok := req.DisabledDefaultFeatures["hardening"]
-	v["Hardening"] = !ok
+	v["Hardening"] = strconv.FormatBool(!ok)
 
 	// Installs kubernetes feature
-	results, err := feature.Add(target, install.Variables{}, install.Settings{})
+	results, err := feature.Add(target, v, install.Settings{})
 	if err != nil {
 		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
 		return err
