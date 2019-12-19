@@ -84,7 +84,7 @@ func (s StepResults) ErrorMessages() string {
 // UncompletedEntries returns an array of string of all keys where the script
 // to run action wasn't completed
 func (s StepResults) UncompletedEntries() []string {
-	output := []string{}
+	var output []string
 	for k, v := range s {
 		if !v.Completed() {
 			output = append(output, k)

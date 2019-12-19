@@ -31,7 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	libvirt "github.com/libvirt/libvirt-go"
+	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -235,7 +235,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 
 	if info.Available < uint64(request.Size)*1024*1024*1024 {
-		return nil, fmt.Errorf("Free disk space is not sufficient to create a new volume, only %f GB left", float32(info.Available)/1024/1024/1024)
+		return nil, fmt.Errorf("free disk space is not sufficient to create a new volume, only %f GB left", float32(info.Available)/1024/1024/1024)
 	}
 
 	storagePoolXML, err := storagePool.GetXMLDesc(0)
@@ -356,7 +356,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
 
-	diskNames := []string{}
+	var diskNames []string
 	for _, disk := range domainDescription.Devices.Disks {
 		diskNames = append(diskNames, disk.Target.Dev)
 	}
@@ -380,7 +380,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 	attachment, err := getAttachmentFromVolumeAndDomain(libvirtVolume, domain)
 	if err != nil {
-		return "", fmt.Errorf("Faild to get attachment from domain and volume : %s", err.Error())
+		return "", fmt.Errorf("failed to get attachment from domain and volume : %s", err.Error())
 	}
 
 	return attachment.ID, nil
@@ -402,7 +402,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 	attachment, err := getAttachmentFromVolumeAndDomain(libvirtVolume, domain)
 	if err != nil {
-		return nil, fmt.Errorf("Faild to get attachment from domain and volume : %s", err.Error())
+		return nil, fmt.Errorf("failed to get attachment from domain and volume : %s", err.Error())
 	}
 
 	return attachment, nil

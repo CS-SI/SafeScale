@@ -146,7 +146,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 
 func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
-	data := map[string]interface{}{}
+	theData := map[string]interface{}{}
 
 	switch nodeType {
 	case nodetype.Gateway:
@@ -155,7 +155,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, n
 	case nodetype.Node:
 		script = "k8s_install_node.sh"
 	}
-	return script, data
+	return script, theData
 }
 
 func getTemplateBox() (*rice.Box, error) {

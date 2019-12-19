@@ -76,7 +76,7 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s)", path, prefix), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
-	list := []string{}
+	var list []string
 
 	fullPath := buildFullPath(path, prefix)
 

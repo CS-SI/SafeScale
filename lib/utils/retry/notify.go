@@ -17,17 +17,14 @@
 package retry
 
 import (
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/sirupsen/logrus"
 )
 
 // Notify ...
 type Notify func(Try, verdict.Enum)
 
-var (
-	// NotifyByLog logs the status of each try
-	NotifyByLog = func(try Try, v verdict.Enum) {
-		logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, v.String(), try.Err)
-	}
-)
+// NotifyByLog logs the status of each try
+func NotifyByLog(try Try, verdict verdict.Enum) {
+	logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, verdict.String(), try.Err)
+}

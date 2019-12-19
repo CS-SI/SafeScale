@@ -148,7 +148,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	}
 
 	if libvirtNetwork != nil {
-		return nil, fmt.Errorf("Network %s already exists", name)
+		return nil, fmt.Errorf("network %s already exists", name)
 	}
 
 	ip, netmask, dhcpStart, dhcpEnd, err := infoFromCidr(cidr)

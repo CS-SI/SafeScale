@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -131,8 +131,8 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 }
 
 // Attach a volume to an host and create a mount point
-func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *google_protobuf.Empty, err error) {
-	empty := &google_protobuf.Empty{}
+func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *googleprotobuf.Empty, err error) {
+	empty := &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
@@ -186,8 +186,8 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 }
 
 // Detach a volume from an host. It umount associated mountpoint
-func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_ *google_protobuf.Empty, err error) {
-	empty := &google_protobuf.Empty{}
+func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_ *googleprotobuf.Empty, err error) {
+	empty := &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
@@ -230,8 +230,8 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 }
 
 // Delete a volume
-func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *google_protobuf.Empty, err error) {
-	empty := &google_protobuf.Empty{}
+func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googleprotobuf.Empty, err error) {
+	empty := &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}

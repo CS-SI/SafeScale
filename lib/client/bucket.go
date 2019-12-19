@@ -24,7 +24,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -43,7 +43,7 @@ func (c *bucket) List(timeout time.Duration) (*pb.BucketList, error) {
 		return nil, err
 	}
 
-	return service.List(ctx, &google_protobuf.Empty{})
+	return service.List(ctx, &googleprotobuf.Empty{})
 }
 
 // Create ...

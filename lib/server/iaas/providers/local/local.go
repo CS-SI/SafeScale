@@ -107,7 +107,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	uri, found := compute["uri"].(string)
 	if !found {
-		return nil, fmt.Errorf("Uri is not set")
+		return nil, fmt.Errorf("uri is not set")
 	}
 	imagesJSONPath, found := compute["imagesJSONPath"].(string)
 	if !found {
@@ -160,22 +160,22 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	return config, nil
 }
 
-func (provider *provider) GetName() string {
+func (p *provider) GetName() string {
 	return "local"
 }
 
 // ListImages ...
-func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
-	return provider.Stack.ListImages()
+func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+	return p.Stack.ListImages()
 }
 
 // ListTemplates ...
-func (provider *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	return provider.Stack.ListTemplates()
+func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+	return p.Stack.ListTemplates()
 }
 
-func (provider *provider) ListAvailabilityZones() (map[string]bool, error) {
-	return provider.Stack.ListAvailabilityZones()
+func (p *provider) ListAvailabilityZones() (map[string]bool, error) {
+	return p.Stack.ListAvailabilityZones()
 }
 
 // GetTenantParameters returns the tenant parameters as-is
