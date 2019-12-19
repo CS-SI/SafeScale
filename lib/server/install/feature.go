@@ -88,14 +88,14 @@ type Feature struct {
 // ListFeatures lists all features suitable for hosts or clusters
 func ListFeatures(suitableFor string) ([]interface{}, error) {
 	features := allEmbeddedMap
-	cfgFiles := []interface{}{}
+	var cfgFiles []interface{}
 
 	var paths []string
 	paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
 	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
 	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
 
-	errors := []error{}
+	var errors []error
 
 	for _, path := range paths {
 		files, err := ioutil.ReadDir(path)
@@ -300,9 +300,9 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 
 	methods := t.Methods()
 	var installer Installer
-	for _, method := range methods {
-		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = f.installerOfMethod(method)
+	for _, meth := range methods {
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(meth.String()))) {
+			installer = f.installerOfMethod(meth)
 			if installer != nil {
 				break
 			}
@@ -354,9 +354,9 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 		i         uint8
 	)
 	for i = 1; i <= uint8(len(methods)); i++ {
-		method := methods[i]
-		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = f.installerOfMethod(method)
+		meth := methods[i]
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(meth.String()))) {
+			installer = f.installerOfMethod(meth)
 			if installer != nil {
 				break
 			}
@@ -427,9 +427,9 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 
 	methods := t.Methods()
 	var installer Installer
-	for _, method := range methods {
-		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = f.installerOfMethod(method)
+	for _, meth := range methods {
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(meth.String()))) {
+			installer = f.installerOfMethod(meth)
 			if installer != nil {
 				break
 			}

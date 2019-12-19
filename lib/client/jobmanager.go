@@ -19,7 +19,7 @@ package client
 import (
 	"time"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
@@ -41,7 +41,7 @@ func (c *jobManager) List(timeout time.Duration) (*pb.JobList, error) {
 		return nil, err
 	}
 
-	return service.List(ctx, &google_protobuf.Empty{})
+	return service.List(ctx, &googleprotobuf.Empty{})
 }
 
 // Stop sends a signal to the server to stop a running job

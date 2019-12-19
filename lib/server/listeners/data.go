@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"github.com/asaskevich/govalidator"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -38,7 +38,7 @@ import (
 type DataListener struct{}
 
 // List will returns all the files from one or several ObjectStorages
-func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.FileList, err error) {
+func (s *DataListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.FileList, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -78,8 +78,8 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *
 }
 
 // Push upload a file to one or several ObjectStorages
-func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -123,8 +123,8 @@ func (s *DataListener) Push(ctx context.Context, in *pb.File) (empty *google_pro
 }
 
 // Pull fetches a file from one or several ObjectStorages
-func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -168,8 +168,8 @@ func (s *DataListener) Pull(ctx context.Context, in *pb.File) (empty *google_pro
 }
 
 // Delete remove a file from one or several Object Storages
-func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *google_protobuf.Empty, err error) {
-	empty = &google_protobuf.Empty{}
+func (s *DataListener) Delete(ctx context.Context, in *pb.File) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
 	}

@@ -335,7 +335,9 @@ func TestUncathegorizedError(t *testing.T) {
 		t.Fail()
 	}
 
-	logrus.Warn(err.Error())
+	if err != nil {
+		logrus.Warn(err.Error())
+	}
 
 	_ = w.Close()
 	out, _ := ioutil.ReadAll(r)
@@ -362,7 +364,9 @@ func TestNotUncathegorizedError(t *testing.T) {
 		t.Fail()
 	}
 
-	logrus.Warn(err.Error())
+	if err != nil {
+		logrus.Warn(err.Error())
+	}
 
 	_ = w.Close()
 	out, _ := ioutil.ReadAll(r)

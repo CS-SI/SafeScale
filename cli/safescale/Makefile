@@ -27,6 +27,8 @@ clean:
 	@$(RM) $(EXEC-COVER) || true
 	@$(RM) $(EXEC) || true
 
+generate: gensrc
+
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
 	@echo "package main" > $(VERSIONFILE)

@@ -536,7 +536,7 @@ func (s *Stack) interpretAddresses(
 	addresses map[string]interface{},
 ) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
 	var (
-		networks    = []string{}
+		networks    []string
 		addrs       = map[ipversion.Enum]map[string]string{}
 		AcccessIPv4 string
 		AcccessIPv6 string
@@ -632,7 +632,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 
 	// Updates Host Property propsv1.HostNetwork
 	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		errors := []error{}
+		var errors []error
 
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {

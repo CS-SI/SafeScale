@@ -197,7 +197,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Image with id=%s not found", id)
+	return nil, fmt.Errorf("image with id=%s not found", id)
 }
 
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
@@ -293,7 +293,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 		}
 	}
 
-	return nil, fmt.Errorf("Template with id=%s not found", id)
+	return nil, fmt.Errorf("template with id=%s not found", id)
 }
 
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
@@ -463,12 +463,12 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 		}
 	}
 
-	return "", fmt.Errorf("Image with id=%s not found", id)
+	return "", fmt.Errorf("image with id=%s not found", id)
 }
 
 func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) ([]*libvirtxml.StorageVolume, error) {
-	volumeDescriptions := []*libvirtxml.StorageVolume{}
-	domainVolumePaths := []string{}
+	var volumeDescriptions []*libvirtxml.StorageVolume
+	var domainVolumePaths []string
 
 	//List paths of domain disks
 	domainXML, err := domain.GetXMLDesc(0)
@@ -832,20 +832,20 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		hostName = resourceName
 	}
 	if networks == nil || len(networks) == 0 {
-		return nil, userData, fmt.Errorf("The host %s must be on at least one network (even if public)", resourceName)
+		return nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
 	}
 	if defaultGateway == nil && !publicIP {
-		return nil, userData, fmt.Errorf("The host %s must have a gateway or be public", resourceName)
+		return nil, userData, fmt.Errorf("the host %s must have a gateway or be public", resourceName)
 	}
 	if templateID == "" {
-		return nil, userData, fmt.Errorf("The TemplateID is mandatory")
+		return nil, userData, fmt.Errorf("the TemplateID is mandatory")
 	}
 	if imageID == "" {
-		return nil, userData, fmt.Errorf("The ImageID is mandatory")
+		return nil, userData, fmt.Errorf("the ImageID is mandatory")
 	}
 	host, _, err = s.getHostAndDomainFromRef(resourceName)
 	if err == nil && host != nil {
-		return nil, userData, fmt.Errorf("The Host %s already exists", resourceName)
+		return nil, userData, fmt.Errorf("the Host %s already exists", resourceName)
 	}
 
 	//----Initialize----
@@ -965,7 +965,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
 	err = verifyVirtResizeCanAccessKernel()
 	if err != nil {
-		return nil, userData, fmt.Errorf("Libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+		return nil, userData, fmt.Errorf("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
 	}
 
 	var commands []string

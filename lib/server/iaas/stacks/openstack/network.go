@@ -878,7 +878,7 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) erro
 		return err
 	}
 	for _, p := range hostPorts {
-		newAllowedAddressPairs := []ports.AddressPair{}
+		var newAllowedAddressPairs []ports.AddressPair
 		for _, a := range p.AllowedAddressPairs {
 			if a.MACAddress != vipPort.MACAddress {
 				newAllowedAddressPairs = append(newAllowedAddressPairs, a)

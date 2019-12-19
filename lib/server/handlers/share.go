@@ -835,7 +835,7 @@ func (handler *ShareHandler) Inspect(
 		return nil, nil, nil, err
 	}
 
-	errors := []error{}
+	var errors []error
 
 	mounts := map[string]*propsv1.HostRemoteMount{}
 	for k := range share.ClientsByName {

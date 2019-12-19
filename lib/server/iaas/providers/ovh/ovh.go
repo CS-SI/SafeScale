@@ -304,7 +304,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		}
 	}
 
-	listAvailableTemplates := []resources.HostTemplate{}
+	var listAvailableTemplates []resources.HostTemplate
 	for _, template := range allTemplates {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)

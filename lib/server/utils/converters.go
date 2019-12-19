@@ -295,7 +295,7 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 
 // ToPBFileList convert a list of file names from api to protocolbuffer FileList format
 func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, fileBuckets [][]string) *pb.FileList {
-	files := []*pb.File{}
+	var files []*pb.File
 	nbFiles := int(math.Min(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))), float64(len(fileBuckets))))
 	for i := 0; i < nbFiles; i++ {
 		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})

@@ -1187,7 +1187,7 @@ var clusterNodeListCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 		hostClt := client.New().Host
-		formatted := []map[string]interface{}{}
+		var formatted []map[string]interface{}
 
 		list, err := clusterInstance.ListNodeIDs(concurrency.RootTask())
 		if err != nil {
@@ -1377,7 +1377,7 @@ var clusterMasterListCommand = cli.Command{
 		}
 
 		hostClt := client.New().Host
-		formatted := []map[string]interface{}{}
+		var formatted []map[string]interface{}
 
 		list, err := clusterInstance.ListMasterIDs(concurrency.RootTask())
 		if err != nil {

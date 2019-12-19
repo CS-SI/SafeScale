@@ -63,20 +63,20 @@ func init() {
 		allEmbeddedMap[item.DisplayName()] = item
 		installers := item.specs.GetStringMap("feature.install")
 		for k := range installers {
-			method, err := method.Parse(k)
+			meth, err := method.Parse(k)
 			if err != nil {
-				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install method '%s' unknown!",
+				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install meth '%s' unknown!",
 					item.DisplayName(), item.DisplayFilename(), k))
 				continue
 			}
-			if _, found := availableEmbeddedMap[method]; !found {
-				availableEmbeddedMap[method] = map[string]*Feature{
+			if _, found := availableEmbeddedMap[meth]; !found {
+				availableEmbeddedMap[meth] = map[string]*Feature{
 					item.DisplayName(): item,
 					// item.BaseFilename(): item,
 				}
 			} else {
-				availableEmbeddedMap[method][item.DisplayName()] = item
-				// availableEmbeddedMap[method][item.BaseFilename()] = item
+				availableEmbeddedMap[meth][item.DisplayName()] = item
+				// availableEmbeddedMap[meth][item.BaseFilename()] = item
 			}
 		}
 	}

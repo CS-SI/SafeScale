@@ -37,7 +37,7 @@ var (
 
 	availableEmbeddedMap = map[method.Enum]map[string]*Feature{}
 	allEmbeddedMap       = map[string]*Feature{}
-	allEmbedded          = []*Feature{}
+	allEmbedded          []*Feature
 )
 
 // loadSpecFile returns the content of the spec file of the feature named 'name'

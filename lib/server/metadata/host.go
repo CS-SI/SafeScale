@@ -224,7 +224,7 @@ func (mh *Host) Delete() (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
-	errList := []error{}
+	var errList []error
 
 	err1 := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
 	err2 := mh.item.DeleteFrom(ByNameFolderName, *mh.name)

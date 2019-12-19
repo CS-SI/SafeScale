@@ -338,7 +338,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					return nil, fmt.Errorf(noHostError)
 				}
 			} else {
-				images := []resources.StoredCPUInfo{}
+				var images []resources.StoredCPUInfo
 				for _, f := range imageList {
 					imageFound := resources.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
@@ -470,7 +470,7 @@ func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 	if len(filter) == 0 {
 		return imgs, nil
 	}
-	simgs := []scoredImage{}
+	var simgs []scoredImage
 	//fields := strings.Split(strings.ToUpper(osname), " ")
 	for _, img := range imgs {
 		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
@@ -485,7 +485,7 @@ func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 		}
 
 	}
-	fimgs := []resources.Image{}
+	var fimgs []resources.Image
 	sort.Sort(scoredImages(simgs))
 	for _, simg := range simgs {
 		fimgs = append(fimgs, simg.Image)
@@ -631,7 +631,7 @@ func (svc *service) ListHostsByName() (map[string]*resources.Host, error) {
 }
 
 func runeIndexes(s string, r rune) []int {
-	positions := []int{}
+	var positions []int
 	for i, l := range s {
 		if l == r {
 			positions = append(positions, i)
@@ -642,7 +642,7 @@ func runeIndexes(s string, r rune) []int {
 }
 
 func runesIndexes(ref string, s string) [][]int {
-	positions := [][]int{}
+	var positions [][]int
 	uref := strings.ToUpper(ref)
 	us := strings.ToUpper(s)
 	for _, r := range uref {
@@ -654,7 +654,7 @@ func runesIndexes(ref string, s string) [][]int {
 }
 
 func recPossiblePathes(positions [][]int, level int) [][]int {
-	newPathes := [][]int{}
+	var newPathes [][]int
 	if level >= len(positions) {
 		return [][]int{
 			[]int{},
