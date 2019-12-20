@@ -91,7 +91,7 @@ feature:
                                 monitoring.enabled: true
                                 ml.enabled: false
                             EOF
-                            chown -R safescale:safescale ${SF_ETCDIR}/packetbeat4safescale
+                            chown -R {{ .Username }}:{{ .Username }} ${SF_ETCDIR}/packetbeat4safescale
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/packetbeat4safescale/config.yml
 
                     compose:

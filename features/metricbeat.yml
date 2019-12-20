@@ -135,7 +135,7 @@ feature:
                                 monitoring.enabled: true
                                 ml.enabled: false
                             EOF
-                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat
+                            chown -R {{ .Username }}:{{ .Username }} ${SF_ETCDIR}/metricbeat
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat/config.yml
 
                     compose:
@@ -166,7 +166,7 @@ feature:
                                         - dac_read_search
                                     restart: always
                             EOF
-                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat
+                            chown -R {{ .Username }}:{{ .Username }} ${SF_ETCDIR}/metricbeat
                             chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat
 
                     start:
