@@ -1,0 +1,126 @@
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    suitableFor:
+        cluster: k8s
+
+    requirements:
+        features:
+            - kubernetes
+            - k8s.kong-ingress
+
+    parameters:
+        - RootURL=/grafana
+        - ChartVersion=4.0.4
+        - Namespace=default
+        - HelmRepoName=stable
+        - AdminPassword=
+
+    install:
+        bash:
+            check:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm list {{ .HelmRepoName}}/grafana || sfFail 192
+                            sfExit
+
+            add:
+                pace: prepare,helm
+                steps:
+                    prepare:
+                        targets:
+                            masters: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/grafana
+
+                            cat > ${SF_ETCDIR}/grafana/helm.values.yaml <<EOF
+                            affinity:
+                            #   nodeAffinity:
+                            #     requiredDuringSchedulingIgnoredDuringExecution:
+                            #       nodeSelectorTerms:
+                            #       - matchExpressions:
+                            #         - key: "node-role.kubernetes.io/worker"
+                            #           operator: In
+                            #           values:
+                            #           - <value>
+                              podAntiAffinity:
+                                requiredDuringSchedulingIgnoredDuringExecution:
+                                - labelSelector:
+                                    matchExpressions:
+                                    - key: release
+                                      operator: In
+                                      values:
+                                      - grafana
+                                  topologyKey: "kubernetes.io/hostname"
+                            EOF
+
+                            sfExit
+
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            {{ if eq .AdminPassword "" }}
+                            GRAFANA_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+                            {{ else }}
+                            GRAFANA_PASSWORD="{{ .AdminPassword }}"
+                            {{ end }}
+
+                            sfHelm install {{ .HelmRepoName }}/grafana \
+                                --version {{ .ChartVersion }} \
+                                --name grafana \
+                                --namespace {{ .NameSpace }} \
+                                --tls \
+                                # --set image.pullSecrets[0]="local-harbor" \
+                                # --set image.tag="${IMAGE_TAG}" \
+                                --set sidecar.dashboards.enabled=true \
+                                --set sidecar.datasources.enabled=true \
+                                --set adminPassword=${GRAFANA_PASSWORD} \
+                                --set metrics.servicemonitor.enabled=true \
+                                --set ingress.enabled="true" \
+                                --set ingress.path="/grafana" \
+                                --set 'grafana\.ini'.server.root_url="%(protocol)s://{{ .EndPointIP }}{{.RootURL}}" \
+                                --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
+                                --set 'grafana\.ini'.auth.disable_login_form="true" \
+                                --set 'grafana\.ini'.'auth\.anonymous'.enabled="true" \
+                                --set 'grafana\.ini'.'auth\.anonymous'.org_role="Admin" \
+                                --values values.yaml \
+                                || sfFail 193
+
+                            sfExit
+
+            remove:
+                pace: helm,cleanup
+                steps:
+                    helm:
+                        targets:
+                            masters: one
+                        run: |
+                            sfHelm delete --purge --tls grafana || sfFail 192
+                            sfExit
+
+                    cleanup:
+                        targets:
+                            masters: all
+                        run: |
+                            rm -rf ${SF_ETCDIR}/grafana
+                            sfExit
+
+...

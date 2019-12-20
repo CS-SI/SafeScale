@@ -238,7 +238,7 @@ feature:
                                                 Memory alert for Swarm task '{{"{{"}} $labels.container_label_com_docker_swarm_task_name {{"}}"}}'
                                                 on '{{"{{"}} $labels.container_label_com_docker_swarm_node_id {{"}}"}}'
                             EOF
-                            chown -R nobody:safescale ${SF_ETCDIR}/monitoring4platform/prometheus ${SF_VARDIR}/monitoring4platform/prometheus
+                            chown -R nobody:{{ .Username }} ${SF_ETCDIR}/monitoring4platform/prometheus ${SF_VARDIR}/monitoring4platform/prometheus
                             chmod -R u+rwx,g+rx-w,o-rwx ${SF_ETCDIR}/monitoring4platform/prometheus ${SF_VARDIR}/monitoring4platform/prometheus
                             sfExit
 
@@ -362,7 +362,7 @@ feature:
                             nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/monitoring4platform/alertmanager/templates ${SF_VARDIR}/monitoring4platform/alertmanager
-                            chown -R nobody:safescale ${SF_VARDIR}/monitoring4platform/alertmanager
+                            chown -R nobody:{{ .Username }} ${SF_VARDIR}/monitoring4platform/alertmanager
                             chmod 0750 ${SF_VARDIR}/monitoring4platform/alertmanager
 
                             cat >${SF_ETCDIR}/monitoring4platform/alertmanager/config.yml <<-EOF
@@ -399,7 +399,7 @@ feature:
                                   # Apply inhibition if the alertname is the same.
                                   equal: ['alertname']
                             EOF
-                            chown -R safescale:safescale ${SF_ETCDIR}/monitoring4platform/karma/
+                            chown -R {{ .Username }}:{{ .Username }} ${SF_ETCDIR}/monitoring4platform/karma/
                             chmod -R g-w,o-rwx ${SF_ETCDIR}/monitoring4platform/karma/
                             sfExit
 
@@ -472,7 +472,7 @@ feature:
                             EOF
 
                             # id=472 is the user used to run grafana in container
-                            chown -R 472:safescale ${SF_VARDIR}/monitoring4platform/grafana ${SF_LOGDIR}/monitoring4platform/grafana
+                            chown -R 472:{{ .Username }} ${SF_VARDIR}/monitoring4platform/grafana ${SF_LOGDIR}/monitoring4platform/grafana
                             chmod 0750 ${SF_VARDIR}/monitoring4platform/grafana ${SF_LOGDIR}/monitoring4platform/grafana
                             sfExit
 
