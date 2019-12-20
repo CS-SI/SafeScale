@@ -436,7 +436,7 @@ var clusterCreateCommand = cli.Command{
 		disable := c.StringSlice("disable")
 		disableFeatures := map[string]struct{}{}
 		for _, v := range disable {
-			disableFeatures[v] = struct{}{}
+			disableFeatures[strings.ToLower(v)] = struct{}{}
 		}
 
 		los := c.String("os")
