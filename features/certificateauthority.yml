@@ -1,0 +1,113 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+
+    parameters:
+        - ValidityDuration=10000
+
+    install:
+        bash:
+            check:
+                pace: ca
+                steps:
+                    curl:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ -f ${SF_ETCDIR}/pki/ca/ca.cert.pem ] || sfFail 192
+                            sfExit
+
+            add:
+                pace: generate,sync,deploy
+                steps:
+                    generate:
+                        targets:
+                            gateways: any
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/pki/ca
+                            [ -f ${SF_ETCDIR}/pki/ca/ca.cert.pem ] && sfExit
+
+                            openssl genrsa -out ${SF_ETCDIR}/pki/ca/ca.key.pem 4096 && \
+                            openssl req -key ${SF_ETCDIR}/pki/ca/ca.key.pem -new -x509 -days {{ .ValidityDuration }} -sha256 \
+                                        -out ${SF_ETCDIR}/pki/ca/ca.cert.pem -extensions v3_ca \
+                                        -subj "/C=FR/ST=Toulouse/L=Toulouse/O=CSSI/OU=Space/CN={{ .Hostname }}" && \
+                            chmod -R ug+r-w,o-rwx ${SF_ETCDIR}/pki && \
+                            find ${SF_ETCDIR}/pki -type d -exec chmod ug+x {} \; || sfFail 192
+                            chown -R root:root ${SF_ETCDIR}/pki && \
+                            sfExit
+
+                    sync:
+                        targets:
+                            gateways: any
+                        run: |
+                            sudo tar pzcvf ${SF_TMPDIR}/pki.tar.gz ${SF_ETCDIR}/pki
+                            sfDropzonePush ${SF_TMPDIR}/pki.tar.gz
+                            IPs="{{ .GatewayIP }}{{ if .SecondaryGatewayIP }} {{ .SecondaryGatewayIP }}{{ end }}"
+                            for i in $IPs; do
+                                [ "$i" = "{{ .HostIP }}"] && continue
+                                sfDropSync $i
+                            done
+                            for i in {{ range .MasterIPs}}{{ . }} {{ end }}; do
+                                sfDropSync $i
+                            done
+                            for i in {{ range .NodeIPs}}{{ . }} {{ end }}; do
+                                sfDropSync $i
+                            done
+                            sfDropzoneClean
+                            rm ${SF_TMPDIR}/pki.tar.gz
+                            sfExit
+
+                    deploy:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/pki/ca
+                            [ -f ${SF_ETCDIR}/pki/ca/ca.cert.pem ] && sfDropzoneClean && sfExit
+
+                            sfDropzonePop ${SF_TMPDIR} pki.tar.gz || sfFail 193
+                            sfDropzoneClean
+                            tar zxvf ${SF_TMPDIR}/pki.tar.gz -C ${SF_ETCDIR}/pki && \
+                            chmod -R ug+r-w,o-rwx ${SF_ETCDIR}/pki && \
+                            find ${SF_ETCDIR}/pki -type d -exec chmod ug+x {} \; && \
+                            chown -R root:root ${SF_ETCDIR}/pki || sfFail 194
+                            rm ${SF_TMPDIR}/pki.tar.gz
+                            sfExit
+
+            remove:
+                pace: ca
+                steps:
+                    ca:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            rm -rf ${SF_ETCDIR}/pki/ca
+                            sfExit
+
+...
