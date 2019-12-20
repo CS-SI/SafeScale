@@ -173,13 +173,13 @@ feature:
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
                                 [ $(sfKubectl get nodes | wc -l) -gt 1 ] || sfFail 194
-                                [ -f /usr/local/bin/helm || sfFail 195
+                                [ -f /usr/local/sbin/helm || sfFail 195
                                 sfExit
                             fi
                             sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
                 steps:
                     sysconf:
                         targets:
@@ -252,15 +252,15 @@ feature:
                             {{ if eq .Hardening "true" }}
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
-                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 196
+                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 193
                                     ;;
 
                                 centos|redhat)
-                                    yum -y install audit audit-libs quota || sfFail 197
+                                    yum -y install audit audit-libs quota || sfFail 193
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
-                                   sfFail 198
+                                   sfFail 193
                                    ;;
                             esac
 
@@ -459,26 +459,25 @@ feature:
                             sfDropzoneClean
 
                             {{ if eq .Hardening "true" }}
-                                cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
-                            ---
+                            cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
                             apiVersion: extensions/v1beta1
                             kind: PodSecurityPolicy
                             metadata:
                               name: default
                               annotations:
                                 seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default'
-                                seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
+                                seccomp.security.alpha.kubernetes.io/defaultProfileName:  'docker/default'
                             spec:
                               privileged: false
                               allowPrivilegeEscalation: false
-                              allowedCapabilities: []
+                              allowedCapabilities: []  # default set of capabilities are implicitly allowed
                               volumes:
-                                - 'configMap'
-                                - 'emptyDir'
-                                - 'projected'
-                                - 'secret'
-                                - 'downwardAPI'
-                                - 'persistentVolumeClaim'
+                              - 'configMap'
+                              - 'emptyDir'
+                              - 'projected'
+                              - 'secret'
+                              - 'downwardAPI'
+                              - 'persistentVolumeClaim'
                               hostNetwork: false
                               hostIPC: false
                               hostPID: false
@@ -496,14 +495,14 @@ feature:
                             metadata:
                               name: default-psp
                             rules:
-                              - apiGroups: ['policy']
-                                resources: ['podsecuritypolicies']
-                                verbs: ['use']
-                                resourceNames: ['default']
-                              - apiGroups: ['extensions']
-                                resources: ['podsecuritypolicies']
-                                verbs: ['use']
-                                resourceNames: ['default']
+                            - apiGroups: ['policy']
+                              resources: ['podsecuritypolicies']
+                              verbs:     ['use']
+                              resourceNames: ['default']
+                            - apiGroups: ['extensions']
+                              resources: ['podsecuritypolicies']
+                              verbs:     ['use']
+                              resourceNames: ['default']
                             ---
                             kind: ClusterRoleBinding
                             apiVersion: rbac.authorization.k8s.io/v1
@@ -514,13 +513,12 @@ feature:
                               name: default-psp
                               apiGroup: rbac.authorization.k8s.io
                             subjects:
-                              - kind: Group
-                                name: system:authenticated
-                                apiGroup: rbac.authorization.k8s.io
+                            - kind: Group
+                              name: system:authenticated
+                              apiGroup: rbac.authorization.k8s.io
                             EOF
 
                             cat >/etc/kubernetes/kubeadm/psp-privileged.yaml <<-'EOF'
-                            ---
                             apiVersion: extensions/v1beta1
                             kind: PodSecurityPolicy
                             metadata:
@@ -534,8 +532,8 @@ feature:
                               volumes: ['*']
                               hostNetwork: true
                               hostPorts:
-                                - min: 0
-                                  max: 65535
+                              - min: 0
+                                max: 65535
                               hostIPC: true
                               hostPID: true
                               runAsUser:
@@ -557,37 +555,36 @@ feature:
                               name: privileged-psp
                               apiGroup: rbac.authorization.k8s.io
                             subjects:
-                              # Allows access to resources required by the kubelet component
-                              - kind: Group
-                                apiGroup: rbac.authorization.k8s.io
-                                name: system:nodes
-                              # Allows access to resources required by the kubelet user
-                              - kind: User
-                                apiGroup: rbac.authorization.k8s.io
-                                name: kubelet # Legacy node ID
-                              # bind all service accounts in namespace kube-system (kube-proxy, CNI)
-                              - apiGroup: rbac.authorization.k8s.io
-                                kind: Group
-                                name: system:serviceaccounts:kube-system
+                            # Allows access to resources required by the kubelet component
+                            - kind: Group
+                              apiGroup: rbac.authorization.k8s.io
+                              name: system:nodes
+                            # Allows access to resources required by the kubelet user
+                            - kind: User
+                              apiGroup: rbac.authorization.k8s.io
+                              name: kubelet # Legacy node ID
+                            # bind all service accounts in namespace kube-system (kube-proxy, CNI)
+                            - apiGroup: rbac.authorization.k8s.io
+                              kind: Group
+                              name: system:serviceaccounts:kube-system
                             ---
                             kind: ClusterRole
                             apiVersion: rbac.authorization.k8s.io/v1
                             metadata:
                               name: privileged-psp
                             rules:
-                              - apiGroups: ['policy']
-                                resources: ['podsecuritypolicies']
-                                verbs: ['use']
-                                resourceNames: ['privileged']
-                              - apiGroups: ['extensions']
-                                resources: ['podsecuritypolicies']
-                                verbs: ['use']
-                                resourceNames: ['privileged']
+                            - apiGroups: ['policy']
+                              resources: ['podsecuritypolicies']
+                              verbs:     ['use']
+                              resourceNames: ['privileged']
+                            - apiGroups: ['extensions']
+                              resources: ['podsecuritypolicies']
+                              verbs:     ['use']
+                              resourceNames: ['privileged']
                             EOF
 
-                                # Apply policies
-                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 210
-                                sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 211
+                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 204
+                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 205
                             {{ end }}
 
                             # waits availability of key pods
@@ -619,7 +616,7 @@ feature:
 
                                     # Applies RBAC Calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/rbac/rbac-kdd-calico.yaml -P /etc/kubernetes/kubeadm/
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 217
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 212
 
                                     # Downloads default calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml -P /etc/kubernetes/kubeadm/
@@ -705,15 +702,15 @@ feature:
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
                                         debian|ubuntu)
-                                            sfApt update && sfApt install -y patch || sfFail 218
+                                            sfApt update && sfApt install -y patch || sfFail 213
                                             ;;
 
                                         centos|redhat)
-                                            yum -y install patch || sfFail 219
+                                            yum -y install patch || sfFail 213
                                             ;;
 
                                         *) echo "unsupported linux distribution ''"
-                                           sfFail 220
+                                           sfFail 213
                                            ;;
                                     esac
 
@@ -721,10 +718,10 @@ feature:
                                     patch -l /etc/kubernetes/kubeadm/calico.yaml /etc/kubernetes/kubeadm/calico.yaml.patch
 
                                     # Applies patched file
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 221
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 214
 
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 222 "Firewall problem"
+                                    sfFirewallReload || sfFail 215 "Firewall problem"
                                     ;;
                             esac
                             sfExit 0
@@ -739,10 +736,10 @@ feature:
                             sfDropzonePop ${SF_TMPDIR} || sfFail 223
                             sfDropzoneClean
 
-                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 224
-                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 225
-                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 226
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 227
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 217
+                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 218
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 219
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 220
 
                             # waits availability of key pods
                             set -u -o pipefail
@@ -759,7 +756,7 @@ feature:
                                     ;;
                                 calico)
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 232 "Firewall problem"
+                                    sfFirewallReload || sfFail 225 "Firewall problem"
                                     ;;
                             esac
 
