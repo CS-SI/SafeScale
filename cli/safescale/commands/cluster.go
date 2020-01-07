@@ -351,8 +351,12 @@ var clusterCreateCommand = cli.Command{
 			Usage: "Defines the CIDR of the network to use with cluster",
 		},
 		cli.StringSliceFlag{
-			Name:  "disable",
-			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
+			Name: "disable",
+			Usage: `Allows to disable addition of default features (must be used several times to disable several features)
+	Accepted features are:
+		remotedesktop (all flavors), reverseproxy (all flavors),
+		gateway-failover (all flavors with Normal or Large complexity),
+		hardening (flavor K8S), helm (flavor K8S)`,
 		},
 		cli.StringFlag{
 			Name:  "os",
@@ -906,7 +910,7 @@ var clusterDcosCommand = cli.Command{
 var clusterKubectlCommand = cli.Command{
 	Name:      "kubectl",
 	Category:  "Administrative commands",
-	Usage:     "kubectl CLUSTERNAME [COMMAND ...]",
+	Usage:     "kubectl CLUSTERNAME [KUBECTL_COMMAND]... [-- [KUBECTL_OPTIONS]...]",
 	ArgsUsage: "CLUSTERNAME",
 
 	// 	Help: &cli.HelpContent{
@@ -1133,13 +1137,20 @@ func executeCommand(command string, files *RemoteFilesHandler) error {
 	}
 
 	safescalessh := client.New().SSH
-	retcode, _, _, err := safescalessh.Run(master, command, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescalessh.Run(master, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master, err.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		return cli.NewExitError("", retcode)
+		msg := fmt.Sprintf("command executed on master '%s' with failure: %s", master, stdout)
+		if stderr != "" {
+			if stdout != "" {
+				msg += "\n"
+			}
+			msg += stderr
+		}
+		return cli.NewExitError(msg, retcode)
 	}
 	return nil
 }
