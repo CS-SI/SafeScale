@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,13 +130,20 @@ func (ms *Share) Write() error {
 }
 
 // ReadByReference tries to read 'ref' as an ID, and if not found as a name
-func (ms *Share) ReadByReference(id string) (err error) {
+func (ms *Share) ReadByReference(ref string) (err error) {
 	if ms == nil {
 		return scerr.InvalidInstanceError()
 	}
-	errID := ms.ReadByID(id)
+	if ms.item == nil {
+		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
+	}
+	if ref == "" {
+		return scerr.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	errID := ms.mayReadByID(ref)
 	if errID != nil {
-		errName := ms.ReadByName(id)
+		errName := ms.mayReadByName(ref)
 		if errName != nil {
 			return errName
 		}
@@ -144,14 +151,9 @@ func (ms *Share) ReadByReference(id string) (err error) {
 	return nil
 }
 
-// ReadByID reads the metadata of an export identified by ID from Object Storage
-func (ms *Share) ReadByID(id string) error {
-	if ms == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if ms.item == nil {
-		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
-	}
+// mayReadByID reads the metadata of an export identified by ID from Object Storage
+// Doesn't log error or validate parameters by design; caller does that
+func (ms *Share) mayReadByID(id string) error {
 	var si shareItem
 	err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
@@ -169,14 +171,9 @@ func (ms *Share) ReadByID(id string) error {
 	return nil
 }
 
-// ReadByName reads the metadata of a nas identified by name
-func (ms *Share) ReadByName(name string) error {
-	if ms == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if ms.item == nil {
-		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
-	}
+// mayReadByName reads the metadata of a nas identified by name
+// Doesn't log or validate parameters by design; caller does that
+func (ms *Share) mayReadByName(name string) error {
 	var si shareItem
 	err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
@@ -192,6 +189,44 @@ func (ms *Share) ReadByName(name string) error {
 		return err
 	}
 	return nil
+}
+
+// ReadByID reads the metadata of an export identified by ID from Object Storage
+func (ms *Share) ReadByID(id string) (err error) {
+	if ms == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if ms.item == nil {
+		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
+	}
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return ms.mayReadByID(id)
+}
+
+// ReadByName reads the metadata of a nas identified by name
+func (ms *Share) ReadByName(name string) (err error) {
+	if ms == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if ms.item == nil {
+		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
+	}
+	if name == "" {
+		return scerr.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return ms.mayReadByName(name)
 }
 
 // Delete updates the metadata corresponding to the share

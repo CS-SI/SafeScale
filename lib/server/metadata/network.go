@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,13 +34,11 @@ import (
 )
 
 const (
-	//NetworkFolderName is the technical name of the container used to store networks info
+	// NetworksFolderName is the technical name of the container used to store networks info
 	networksFolderName = "networks"
-	// //GatewayObjectName is the name of the object containing the id of the host acting as a default gateway for a network
-	// gatewayObjectName = "gw"
 )
 
-// Network links Object Storage folder and Network
+// Network links Object Storage folder and Network resource
 type Network struct {
 	item *metadata.Item
 	//inside *metadata.Folder
@@ -48,7 +46,7 @@ type Network struct {
 	id   *string
 }
 
-// NewNetwork creates an instance of network.Metadata
+// NewNetwork creates an instance of Network
 func NewNetwork(svc iaas.Service) (*Network, error) {
 	aNet, err := metadata.NewItem(svc, networksFolderName)
 	if err != nil {
@@ -70,8 +68,9 @@ func (m *Network) GetPath() (string, error) {
 		return "", scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return "", scerr.InvalidParameterError("m.item", "cannot be nil")
+		return "", scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
+
 	return m.item.GetPath(), nil
 }
 
@@ -80,15 +79,17 @@ func (m *Network) Carry(network *resources.Network) (*Network, error) {
 	if m == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+	if m.item == nil {
+		return nil, scerr.InvalidInstanceContentError("m.item", "m.item cannot be nil")
+	}
 	if network == nil {
 		return nil, scerr.InvalidParameterError("network", "cannot be nil")
 	}
-	if m.item == nil {
-		return nil, scerr.InvalidParameterError("m.item", "m.item cannot be nil")
-	}
+
 	if network.Properties == nil {
 		network.Properties = serialize.NewJSONProperties("resources")
 	}
+
 	m.item.Carry(network)
 	m.id = &network.ID
 	m.name = &network.Name
@@ -113,7 +114,7 @@ func (m *Network) Write() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -154,9 +155,23 @@ func (m *Network) Reload() (err error) {
 
 // ReadByReference tries to read first using 'ref' as an ID then as a name
 func (m *Network) ReadByReference(ref string) (err error) {
-	errID := m.ReadByID(ref)
+	if m == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
+	}
+	if ref == "" {
+		return scerr.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	errID := m.mayReadByID(ref)
 	if errID != nil {
-		errName := m.ReadByName(ref)
+		errName := m.mayReadByName(ref)
 		if errName != nil {
 			return errName
 		}
@@ -164,19 +179,9 @@ func (m *Network) ReadByReference(ref string) (err error) {
 	return nil
 }
 
-// ReadByID reads the metadata of a network identified by ID from Object Storage
-func (m *Network) ReadByID(id string) (err error) {
-	if m == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
-	}
-
-	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
+// mayReadByID reads the metadata of a network identified by ID from Object Storage
+// Doesn't log error or validate parameter by design; caller does that
+func (m *Network) mayReadByID(id string) (err error) {
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
@@ -194,22 +199,9 @@ func (m *Network) ReadByID(id string) (err error) {
 	return nil
 }
 
-// ReadByName reads the metadata of a network identified by name
-func (m *Network) ReadByName(name string) (err error) {
-	if m == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
-	}
-	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	tracer := concurrency.NewTracer(nil, "("+name+")", true).GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
+// mayReadByName reads the metadata of a network identified by name
+// Doesn't log error or validate parameter by design; caller does that
+func (m *Network) mayReadByName(name string) (err error) {
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
@@ -223,8 +215,45 @@ func (m *Network) ReadByName(name string) (err error) {
 	}
 	m.name = &(network.Name)
 	m.id = &(network.ID)
-	//	m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
 	return nil
+}
+
+// ReadByID reads the metadata of a network identified by ID from Object Storage
+func (m *Network) ReadByID(id string) (err error) {
+	if m == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
+	}
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return m.mayReadByID(id)
+}
+
+// ReadByName reads the metadata of a network identified by name
+func (m *Network) ReadByName(name string) (err error) {
+	if m == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
+	}
+	if name == "" {
+		return scerr.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return m.mayReadByName(name)
 }
 
 // Delete deletes the metadata corresponding to the network
@@ -233,7 +262,7 @@ func (m *Network) Delete() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -261,7 +290,7 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 	if callback == nil {
 		return scerr.InvalidParameterError("callback", "cannot be nil")
@@ -285,6 +314,9 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 func (m *Network) AttachHost(host *resources.Host) (err error) {
 	if m == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 	if host == nil {
 		return scerr.InvalidParameterError("host", "cannot be nil")
@@ -310,6 +342,9 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 func (m *Network) DetachHost(hostID string) (err error) {
 	if m == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 	if hostID == "" {
 		return scerr.InvalidParameterError("hostID", "cannot be empty string")
@@ -342,6 +377,9 @@ func (m *Network) DetachHost(hostID string) (err error) {
 func (m *Network) ListHosts() (list []*resources.Host, err error) {
 	if m == nil {
 		return nil, scerr.InvalidInstanceError()
+	}
+	if m.item == nil {
+		return nil, scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
