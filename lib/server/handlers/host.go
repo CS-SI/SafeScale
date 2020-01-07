@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,8 +40,10 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -297,10 +299,6 @@ func (handler *HostHandler) Create(
 	name string, net string, los string, public bool, sizingParam interface{}, force bool,
 ) (newHost *resources.Host, err error) {
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -310,6 +308,10 @@ func (handler *HostHandler) Create(
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
 		sizing       *resources.SizingRequirements
@@ -674,12 +676,39 @@ func (handler *HostHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	command := fmt.Sprintf("sudo bash %s; exit $?", filepath)
-	// Executes the script on the remote host
-	retcode, stdout, stderr, err := sshHandler.Run(ctx, host.Name, command)
-	if err != nil {
-		retrieveForensicsData(ctx, sshHandler, host)
 
+	sshConfig, err := sshHandler.GetConfig(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+
+	command := fmt.Sprintf("sudo bash %s; exit $?", filepath)
+	sshCmd, err := sshConfig.Command(command)
+	if err != nil {
+		return nil, err
+	}
+
+	// Executes the script on the remote host
+	// retcode, stdout, stderr, err := sshHandler.Run(ctx, host.Name, command)
+	var (
+		retcode        int
+		stdout, stderr string
+	)
+	retryErr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
+		func() error {
+			var inErr error
+			retcode, _, _, inErr = sshCmd.RunWithTimeout(nil, outputs.COLLECT, 0)
+			return inErr
+		},
+		temporal.GetHostTimeout(),
+		func(t retry.Try, v verdict.Enum) {
+			if v == verdict.Retry {
+				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostname)
+			}
+		},
+	)
+	if retryErr != nil {
+		retrieveForensicsData(ctx, sshHandler, host)
 		return nil, err
 	}
 	if retcode != 0 {
