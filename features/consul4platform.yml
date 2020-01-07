@@ -83,8 +83,8 @@ feature:
                                 "node_name": "{{ .Hostname }}",
                                 "server_name": "server.{{ .Hostname }}.consul",
                                 "skip_leave_on_interrupt": true,
-                            {{ if gt (len .MasterIPs) 1 }}
-                                "bootstrap_expect": {{ len .MasterIPs }},
+                            {{ if gt (len .ClusterMasterIPs) 1 }}
+                                "bootstrap_expect": {{ len .ClusterMasterIPs }},
                                 "retry_join": [
                                     "consul4platform_server"
                                 ],
