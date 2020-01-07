@@ -41,6 +41,8 @@ const (
 	DONE
 	// ABORTED the task has been aborted
 	ABORTED
+	// TIMEOUT the task ran out of time
+	TIMEOUT
 )
 
 // TaskParameters ...
@@ -65,6 +67,7 @@ type Task interface {
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	RunInSubTask(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
+	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, error)
 	StartInSubTask(TaskAction, TaskParameters) (Task, error)
 	TryWait() (bool, TaskResult, error)
 	Wait() (TaskResult, error)
@@ -224,7 +227,7 @@ func (t *task) ForceID(id string) (Task, error) {
 }
 
 // Start runs in goroutine the function with parameters
-func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
+func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -247,9 +250,13 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 		t.doneCh = make(chan bool, 1)
 		t.abortCh = make(chan bool, 1)
 		t.finishCh = make(chan struct{}, 1)
-		go t.controller(action, params)
+		go t.controller(action, params, timeout)
 	}
 	return t, nil
+}
+
+func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
+	return t.StartWithTimeout(action, params, 0)
 }
 
 // StartInSubTask runs in a subtask goroutine the function with parameters
@@ -267,37 +274,75 @@ func (t *task) StartInSubTask(action TaskAction, params TaskParameters) (Task, e
 }
 
 // controller controls the start, termination and possibly abortion of the action
-func (t *task) controller(action TaskAction, params TaskParameters) {
+func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
 	go t.run(action, params)
 
 	// tracer := NewTracer(true, t, "")
 	finish := false
-	for !finish {
-		select {
-		case <-t.ctx.Done():
-			// Context cancel signal received, propagating using abort signal
-			// tracer.Trace("receiving signal from context, aborting task...")
-			t.lock.Lock()
-			defer t.lock.Unlock()
-			t.status = ABORTED
-			t.err = scerr.AbortedError("cancel signal received", nil)
-			finish = true
-		case <-t.doneCh:
-			// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
-			// tracer.Trace("receiving done signal from go routine")
-			t.lock.Lock()
-			defer t.lock.Unlock()
-			t.status = DONE
-			finish = true
-			break
-		case <-t.abortCh:
-			// Abort signal received
-			// tracer.Trace("receiving abort signal")
-			t.lock.Lock()
-			defer t.lock.Unlock()
-			t.status = ABORTED
-			t.err = scerr.AbortedError("", nil)
-			finish = true
+
+	if timeout > 0 {
+		for !finish {
+			select {
+			case <-t.ctx.Done():
+				// Context cancel signal received, propagating using abort signal
+				// tracer.Trace("receiving signal from context, aborting task...")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = ABORTED
+				t.err = scerr.AbortedError("cancel signal received", nil)
+				finish = true
+			case <-t.doneCh:
+				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
+				// tracer.Trace("receiving done signal from go routine")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = DONE
+				finish = true
+				break
+			case <-t.abortCh:
+				// Abort signal received
+				// tracer.Trace("receiving abort signal")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = ABORTED
+				t.err = scerr.AbortedError("", nil)
+				finish = true
+			case <-time.After(timeout):
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = TIMEOUT
+				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+				finish = true
+			}
+		}
+	} else {
+		for !finish {
+			select {
+			case <-t.ctx.Done():
+				// Context cancel signal received, propagating using abort signal
+				// tracer.Trace("receiving signal from context, aborting task...")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = ABORTED
+				t.err = scerr.AbortedError("cancel signal received", nil)
+				finish = true
+			case <-t.doneCh:
+				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
+				// tracer.Trace("receiving done signal from go routine")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = DONE
+				finish = true
+				break
+			case <-t.abortCh:
+				// Abort signal received
+				// tracer.Trace("receiving abort signal")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = ABORTED
+				t.err = scerr.AbortedError("", nil)
+				finish = true
+			}
 		}
 	}
 
