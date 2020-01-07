@@ -179,7 +179,7 @@ feature:
                             sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
                 steps:
                     sysconf:
                         targets:
