@@ -1,0 +1,258 @@
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+
+    parameters:
+        - RootCAPassword
+
+    install:
+        bash:
+            check:
+                pace: certs
+                steps:
+                    certs:
+                        targets:
+                            masters: all
+                        run: |
+                            [ -d ${SF_ETCDIR}/pki/ca ] || sfFail 192
+                            sfExit
+
+            add:
+                pace: config,rootca,signca,spread
+                steps:
+                    config:
+                        targets:
+                            masters: one
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,newcerts,private}
+                            chmod 0700 ${SF_ETCDIR}/pki/ca/private
+                            touch ${SF_ETCDIR}/pki/ca/index.txt
+                            echo 1000 >${SF_ETCDIR}/pki/ca/serial
+
+                            cat >>${SF_ETCDIR}/pki/ca/openssl.cnf <<-EOF
+                            [ ca ]
+                            default_ca = CA_default
+
+                            [ CA_default ]
+                            # Directory and file locations.
+                            dir               = ${SF_ETCDIR}/pki/ca
+                            certs             = $dir/certs
+                            crl_dir           = $dir/crl
+                            new_certs_dir     = $dir/newcerts
+                            database          = $dir/index.txt
+                            serial            = $dir/serial
+                            RANDFILE          = $dir/private/.rand
+
+                            # The root key and root certificate.
+                            private_key       = $dir/private/rootca.key.pem
+                            certificate       = $dir/certs/rootca.cert.pem
+
+                            # For certificate revocation lists.
+                            crlnumber         = $dir/crlnumber
+                            crl               = $dir/crl/rootca.crl.pem
+                            crl_extensions    = crl_ext
+                            default_crl_days  = 30
+
+                            # SHA-1 is deprecated, so use SHA-2 instead.
+                            default_md        = sha256
+
+                            name_opt          = ca_default
+                            cert_opt          = ca_default
+                            default_days      = 375
+                            preserve          = no
+                            policy            = policy_strict
+
+                            [ policy_strict ]
+                            # The root CA should only sign signca certificates that match.
+                            # See the POLICY FORMAT section of `man ca`.
+                            countryName             = match
+                            stateOrProvinceName     = match
+                            organizationName        = match
+                            organizationalUnitName  = optional
+                            commonName              = supplied
+                            emailAddress            = optional
+
+                            [ policy_loose ]
+                            # Allow the signca CA to sign a more diverse range of certificates.
+                            # See the POLICY FORMAT section of the `ca` man page.
+                            countryName             = optional
+                            stateOrProvinceName     = optional
+                            localityName            = optional
+                            organizationName        = optional
+                            organizationalUnitName  = optional
+                            commonName              = supplied
+                            emailAddress            = optional
+
+                            [ req ]
+                            # Options for the `req` tool (`man req`).
+                            default_bits        = 4096
+                            distinguished_name  = req_distinguished_name
+                            string_mask         = utf8only
+
+                            # SHA-1 is deprecated, so use SHA-2 instead.
+                            default_md          = sha256
+
+                            # Extension to add when the -x509 option is used.
+                            x509_extensions     = v3_ca
+
+                            [ req_distinguished_name ]
+                            # See <https://en.wikipedia.org/wiki/Certificate_signing_request>.
+                            countryName                     = Country Name (2 letter code)
+                            stateOrProvinceName             = State or Province Name
+                            localityName                    = Locality Name
+                            0.organizationName              = Organization Name
+                            organizationalUnitName          = Organizational Unit Name
+                            commonName                      = Common Name
+                            emailAddress                    = Email Address
+
+                            # Optionally, specify some defaults.
+                            countryName_default             = FR
+                            stateOrProvinceName_default     = Haute-Garonne
+                            localityName_default            = Toulouse
+                            0.organizationName_default      = SafeScale
+                            organizationalUnitName_default  = CSGroup
+                            #emailAddress_default           =
+
+                            [ v3_ca ]
+                            # Extensions for a typical CA (`man x509v3_config`).
+                            subjectKeyIdentifier = hash
+                            authorityKeyIdentifier = keyid:always,issuer
+                            basicConstraints = critical, CA:true
+                            keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+                            [ v3_signca_ca ]
+                            # Extensions for a typical signca CA (`man x509v3_config`).
+                            subjectKeyIdentifier = hash
+                            authorityKeyIdentifier = keyid:always,issuer
+                            basicConstraints = critical, CA:true, pathlen:0
+                            keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+                            [ usr_cert ]
+                            # Extensions for client certificates (`man x509v3_config`).
+                            basicConstraints = CA:FALSE
+                            nsCertType = client, email
+                            nsComment = "OpenSSL Generated Client Certificate"
+                            subjectKeyIdentifier = hash
+                            authorityKeyIdentifier = keyid,issuer
+                            keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
+                            extendedKeyUsage = clientAuth, emailProtection
+
+                            [ server_cert ]
+                            # Extensions for server certificates (`man x509v3_config`).
+                            basicConstraints = CA:FALSE
+                            nsCertType = server
+                            nsComment = "OpenSSL Generated Server Certificate"
+                            subjectKeyIdentifier = hash
+                            authorityKeyIdentifier = keyid,issuer:always
+                            keyUsage = critical, digitalSignature, keyEncipherment
+                            extendedKeyUsage = serverAuth
+
+                            [ crl_ext ]
+                            # Extension for CRLs (`man x509v3_config`).
+                            authorityKeyIdentifier=keyid:always
+
+                            [ ocsp ]
+                            # Extension for OCSP signing certificates (`man ocsp`).
+                            basicConstraints = CA:FALSE
+                            subjectKeyIdentifier = hash
+                            authorityKeyIdentifier = keyid,issuer
+                            keyUsage = critical, digitalSignature
+                            extendedKeyUsage = critical, OCSPSigning
+                            EOF
+                            sfExit
+
+                    rootca:
+                        targets:
+                            masters: one
+                        run: |
+                            openssl genrsa -aes256 -out ${SF_ETCDIR}/pki/ca/private/rootca.key.pem 4096 || sfFail 193
+                            chmod 0400 ${SF_ETCDIR}/pki/ca/private/rootca.key.pem || sfFail 194
+
+                            openssl req -config ${SF_ETCDIR}/pki/ca/openssl.cnf \
+                                        -key ${SF_ETCDIR}/pki/ca/private/rootca.key.pem \
+                                        -new -x509 -days 10000 -sha256 -out ca.cert.pem \
+                                        -extensions v3_ca  || sfFail 195
+                            #-subj "/C=FR/ST=Toulouse/L=Toulouse/O=CSSI/OU=Space/CN={{ .Hostname }}"
+                            chmod 0444 ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem || sfFail 196
+                            sfExit
+
+                    signca:
+                        targets:
+                            masters: one
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/pki/ca/signca/{certs,crl,csr,newcerts,private}
+                            chmod 0700 ${SF_ETCDIR}/pki/ca/signca/private
+                            touch ${SF_ETCDIR}/pki/ca/signca/index
+                            echo 1000 >${SF_ETCDIR}/pki/ca/signca/serial
+                            echo 1000 >${SF_ETCDIR}/pki/ca/signca/crlnumber
+
+                            cp ${SF_ETCDIR}/pki/ca/openssl.cnf ${SF_ETCDIR}/pki/ca/signca
+                            sed -e -i "|^dir[[:space:]]+= ${SF_ETCDIR}/pki/ca$| s|$|/signca|" \
+                                   -i "s|^\(private_key[[:space:]]+= $dir/private/\)*$|\1signca.key.pem|" \
+                                   -i "s|^\(certificate[[:space:]]+= $dir/certs/\)*$|\1signca.cert.pem|" \
+                                   -i "s|^\(crl[[:space:]]+= $dir/crl/\)*$|\1signca.crl.pem|" \
+                                   -i "s|^\(policy[[:space:]]+= policy_\)*$|\1_loose|" \
+                                 ${SF_ETCDIR}/pki/ca/signca/openssl.cnf
+
+                            openssl genrsa -aes256 \
+                                           -out ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem 4096 || sfFail 197
+                            chmod 400 ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem
+
+                            openssl req -config ${SF_ETCDIR}/pki/ca/signca/openssl.cnf -new -sha256 \
+                                        -key ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
+                                        -out ${SF_ETCDIR}/pki/ca/signca/csr/signca.csr.pem || sfFail 198
+
+                            openssl ca -config ${SF_ETCDIR}/pki/ca/openssl.cnf -extensions v3_signca_ca \
+                                       -days 3650 -notext -md sha256 \
+                                       -in ${SF_ETCDIR}/pki/ca/signca/csr/signca.csr.pem \
+                                       -out ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem || sfFail 199
+                            chmod 444 ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem
+                            sfExit
+
+                    chainca:
+                        targets:
+                            masters: one
+                        run: |
+                            cat ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem \
+                            ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem >${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem
+                            chmod 444 ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem
+                            sfExit
+
+                    spread:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfExit
+
+            remove:
+                pace: clean
+                steps:
+                    clean:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            rm -f ${SF_ETCDIR}/pki/ca
+                            sfExit
+
+...
