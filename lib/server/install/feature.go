@@ -532,10 +532,14 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 				v["CIDR"] = networkCfg.CIDR
 			}
 		}
-		v["Masters"] = cluster.ListMasters(f.task)
-		v["MasterNames"] = cluster.ListMasterNames(f.task)
-		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
-		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
+		v["ClusterMasters"] = cluster.ListMasters(f.task)
+		v["ClusterMasterNames"] = cluster.ListMasterNames(f.task)
+		v["ClusterMasterIDs"] = cluster.ListMasterIDs(f.task)
+		v["ClusterMasterIPs"] = cluster.ListMasterIPs(f.task)
+		v["ClusterNodes"] = cluster.ListNodes(f.task)
+		v["ClusterNodeNames"] = cluster.ListNodeNames(f.task)
+		v["ClusterNodeIDs"] = cluster.ListNodeIDs(f.task)
+		v["ClusterNodeIPs"] = cluster.ListNodeIPs(f.task)
 		v["ClusterAdminUsername"] = "cladm"
 		v["ClusterAdminPassword"] = identity.AdminPassword
 	} else {
@@ -550,12 +554,11 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 			return scerr.InvalidParameterError("t", "must be a HostTarget or NodeTarget")
 		}
 
-		// v["Hostname"] = host.Name
-		// v["HostIP"] = host.PrivateIp
-		// FIXME:
+		// FIXME: host may be on a network with 2 gateways + missing variables like DefaultRouteIP, ...
 		gw := gatewayFromHost(host)
 		if gw != nil {
-			v["GatewayIP"] = gw.PrivateIp
+			v["GatewayIP"] = gw.PrivateIp // legacy
+			v["PrimaryGatewayIP"] = gw.PrivateIp
 			v["PublicIP"] = gw.PublicIp
 		} else {
 			v["PublicIP"] = host.PublicIp
