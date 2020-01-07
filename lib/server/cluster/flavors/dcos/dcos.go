@@ -247,15 +247,14 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 	data := map[string]interface{}{
 		"reserved_CommonRequirements": globalSystemRequirements,
 		// "BootstrapIP":                 netCfg.PrimaryGatewayPrivateIP,
-		"BootstrapIP":   netCfg.GatewayIP,
-		"BootstrapPort": bootstrapHTTPPort,
-		"ClusterName":   identity.Name,
-		"MasterIPs":     cluster.ListMasterIPs(task),
-		"DNSServerIPs":  dnsServers,
-		// "DefaultRouteIP": netCfg.VIP.PrivateIP,
-		"DefaultRouteIP": netCfg.GatewayIP,
-		"SSHPrivateKey":  identity.Keypair.PrivateKey,
-		"SSHPublicKey":   identity.Keypair.PublicKey,
+		"BootstrapIP":      netCfg.GatewayIP,
+		"BootstrapPort":    bootstrapHTTPPort,
+		"ClusterName":      identity.Name,
+		"ClusterMasterIPs": cluster.ListMasterIPs(task),
+		"DNSServerIPs":     dnsServers,
+		"DefaultRouteIP":   netCfg.DefaultRouteIP,
+		"SSHPrivateKey":    identity.Keypair.PrivateKey,
+		"SSHPublicKey":     identity.Keypair.PublicKey,
 	}
 	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", data, netCfg.GatewayID)
 	if err != nil {
