@@ -18,6 +18,7 @@ package concurrency
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
 	"strings"
@@ -242,12 +243,14 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	begin := time.Now()
 	waited, _, err := overlord.WaitFor(time.Duration(10) * 10 * time.Millisecond)
 	if err != nil {
-		t.Errorf("Unexpected: %s", err)
+		if _, ok := err.(*scerr.ErrTimeout); !ok {
+			t.Errorf("Unexpected group wait: %s", err)
+		}
 	}
 	end := time.Since(begin)
 
 	if end >= (time.Millisecond * 10 * 12) {
-		t.Errorf("It should have finished near 100 ms but it didn't !!")
+		t.Errorf("It should have finished near 100 ms but it didn't, it was %s !!", end)
 	}
 
 	if waited {
