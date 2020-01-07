@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -135,6 +135,10 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 		v["Dashboard"] = strconv.FormatBool(!ok)
 	}
 
+	// If helm installation is disabled, set the appropriate parameter of the kubernetes feature
+	_, ok = req.DisabledDefaultFeatures["helm"]
+	v["DisableHelm"] = strconv.FormatBool(!ok)
+
 	// Installs kubernetes feature
 	results, err := feature.Add(target, v, install.Settings{})
 	if err != nil {
@@ -155,10 +159,9 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, n
 	theData := map[string]interface{}{}
 
 	switch nodeType {
-	case nodetype.Gateway:
 	case nodetype.Master:
 		script = "k8s_install_master.sh"
-	case nodetype.Node:
+	case nodetype.Node, nodetype.Gateway:
 		script = "k8s_install_node.sh"
 	}
 	return script, theData
