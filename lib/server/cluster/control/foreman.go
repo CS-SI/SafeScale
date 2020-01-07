@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -533,7 +533,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return mastersStatus
 	}
 
-	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
+	// Step 3: run (not start so no parallelism here) gateway configuration (needs ClusterMasterIPs so masters must be installed first)
 	// Configure Gateway(s) and waits for the result
 	primaryGatewayTask, err = task.New()
 	if err != nil {
@@ -775,15 +775,8 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	}
 
 	// Installs reverseproxy feature on cluster (gateways)
-	err = b.installReverseProxy(task)
-	if err != nil {
-		return err
-	}
-
-	// Installs remotedesktop feature on cluster (all masters)
-	_, ok = req.DisabledDefaultFeatures["remotedesktop"]
-	if !ok {
-		err = b.installRemoteDesktop(task)
+	if _, ok := req.DisabledDefaultFeatures["reverseproxy"]; !ok {
+		err = b.installReverseProxy(task)
 		if err != nil {
 			return err
 		}
@@ -794,6 +787,13 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 		return b.makers.ConfigureCluster(task, b, req)
 	}
 
+	// Installs remotedesktop feature on cluster (all masters)
+	if _, ok := req.DisabledDefaultFeatures["remotedesktop"]; !ok {
+		err = b.installRemoteDesktop(task)
+		if err != nil {
+			return err
+		}
+	}
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil
 }
@@ -1362,11 +1362,20 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 	identity := b.cluster.GetIdentity(task)
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"] = b.cluster.ListMasterIPs(task)
+	params["ClusterMasterNames"] = b.cluster.ListMasterNames(task)
+	params["ClusterMasterIDs"] = b.cluster.ListMasterIDs(task)
+	params["ClusterMasterIPs"] = b.cluster.ListMasterIPs(task)
+	params["ClusterNodeNames"] = b.cluster.ListNodeNames(task)
+	params["ClusterNodeIDs"] = b.cluster.ListNodeIDs(task)
+	params["ClusterNodeIPs"] = b.cluster.ListNodeIPs(task)
 	params["CladmPassword"] = identity.AdminPassword
 	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["EndpointIP"] = netCfg.EndpointIP
-
+	params["GatewayIP"] = netCfg.GatewayIP // legacy
+	params["PrimaryGatewayIP"] = netCfg.GatewayIP
+	if netCfg.SecondaryGatewayIP != "" {
+		params["SecondaryGatewayIP"] = netCfg.SecondaryGatewayIP
+	}
 	retcode, _, _, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
 	if err != nil {
 		return err
@@ -2106,7 +2115,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 
 	disabled := false
 	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
+		_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
 		if !disabled {
 			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
 		}
