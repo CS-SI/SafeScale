@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,9 +131,16 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	if mv == nil {
 		return scerr.InvalidInstanceError()
 	}
-	errID := mv.ReadByID(ref)
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+	if ref == "" {
+		return scerr.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	errID := mv.mayReadByID(ref)
 	if errID != nil {
-		errName := mv.ReadByName(ref)
+		errName := mv.mayReadByName(ref)
 		if errName != nil {
 			return errName
 		}
@@ -141,15 +148,9 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	return nil
 }
 
-// ReadByID reads the metadata of a volume identified by ID from Object Storage
-func (mv *Volume) ReadByID(id string) error {
-	if mv == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
-	}
-
+// mayReadByID reads the metadata of a volume identified by ID from Object Storage
+// Doesn't log error or validate parameters by design; caller does that
+func (mv *Volume) mayReadByID(id string) error {
 	volume := resources.NewVolume()
 	err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
@@ -170,15 +171,9 @@ func (mv *Volume) ReadByID(id string) error {
 	return nil
 }
 
-// ReadByName reads the metadata of a volume identified by name
-func (mv *Volume) ReadByName(name string) error {
-	if mv == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
-	}
-
+// mayReadByName reads the metadata of a volume identified by name
+// Doesn't log error or validate parameters by design; caller does that
+func (mv *Volume) mayReadByName(name string) error {
 	volume := resources.NewVolume()
 	err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
@@ -195,8 +190,45 @@ func (mv *Volume) ReadByName(name string) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// ReadByID reads the metadata of a volume identified by ID from Object Storage
+func (mv *Volume) ReadByID(id string) (err error) {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return mv.mayReadByID(id)
+}
+
+// ReadByName reads the metadata of a volume identified by name
+func (mv *Volume) ReadByName(name string) (err error) {
+	if mv == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mv.item == nil {
+		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+	}
+	if name == "" {
+		return scerr.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return mv.mayReadByName(name)
 }
 
 // Delete delete the metadata corresponding to the volume

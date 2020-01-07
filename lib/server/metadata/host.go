@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,10 +101,24 @@ func (mh *Host) Write() (err error) {
 }
 
 // ReadByReference ...
-func (mh *Host) ReadByReference(id string) (err error) {
-	errID := mh.ReadByID(id)
+func (mh *Host) ReadByReference(ref string) (err error) {
+	if mh == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mh.item == nil {
+		return scerr.InvalidInstanceContentError("mh.item", "cannot be nil")
+	}
+	if ref == "" {
+		return scerr.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+
+	errID := mh.mayReadByID(ref)
 	if errID != nil {
-		errName := mh.ReadByName(id)
+		errName := mh.mayReadByName(ref)
 		if errName != nil {
 			return errName
 		}
@@ -112,19 +126,9 @@ func (mh *Host) ReadByReference(id string) (err error) {
 	return nil
 }
 
-// ReadByID reads the metadata of a network identified by ID from Object Storage
-func (mh *Host) ReadByID(id string) (err error) {
-	if mh.item == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
-	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
-
+// mayReadByID reads the metadata of a network identified by ID from Object Storage
+// Doesn't log error or validate parameter by design; caller does that
+func (mh *Host) mayReadByID(id string) (err error) {
 	host := resources.NewHost()
 	err = mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
@@ -141,22 +145,9 @@ func (mh *Host) ReadByID(id string) (err error) {
 	return nil
 }
 
-// ReadByName reads the metadata of a host identified by name
-func (mh *Host) ReadByName(name string) (err error) {
-	if mh == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if mh.item == nil {
-		return scerr.InvalidParameterError("mh.item", "cannot be nil")
-	}
-	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	tracer := concurrency.NewTracer(nil, "("+name+")", true).GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
-
+// mayReadByName reads the metadata of a host identified by name
+// Doesn't log error or validate parameter by design; caller does that
+func (mh *Host) mayReadByName(name string) (err error) {
 	host := resources.NewHost()
 	err = mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
@@ -171,6 +162,44 @@ func (mh *Host) ReadByName(name string) (err error) {
 	mh.name = &(host.Name)
 	mh.id = &(host.ID)
 	return nil
+}
+
+// ReadByID reads the metadata of a network identified by ID from Object Storage
+func (mh *Host) ReadByID(id string) (err error) {
+	if mh == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mh.item == nil {
+		return scerr.InvalidInstanceContentError("mh.item", "cannot be nil")
+	}
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+
+	return mh.mayReadByID(id)
+}
+
+// ReadByName reads the metadata of a host identified by name
+func (mh *Host) ReadByName(name string) (err error) {
+	if mh == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if mh.item == nil {
+		return scerr.InvalidParameterError("mh.item", "cannot be nil")
+	}
+	if name == "" {
+		return scerr.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+
+	return mh.mayReadByName(name)
 }
 
 // Delete updates the metadata corresponding to the host
