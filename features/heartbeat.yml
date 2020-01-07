@@ -85,7 +85,7 @@ feature:
                             output.elasticsearch:
                                 hosts:
                             {{- if .ClusterFlavor }}
-                                {{- range .MasterIPs }}
+                                {{- range .ClusterMasterIPs }}
                                     - "http://{{ . }}:9200/"
                                 {{ end -}}
                             {{ else }}

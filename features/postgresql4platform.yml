@@ -187,7 +187,7 @@ feature:
                             use_watchdog = off
                             EOF
 
-                            HOSTS=( {{ range .MasterNames }}"{{.}}" {{ end }})
+                            HOSTS=( {{ range .ClusterMasterNames }}"{{.}}" {{ end }})
                             for (( i = 0; i < ${#HOSTS[@]}; i++ )); do
                                 cat >>${SF_ETCDIR}/postgresql4platform/pgpool.conf.template <<-EOF
 
@@ -328,7 +328,7 @@ feature:
                             #local_node_id=\$(grep node_id /etc/postgresql/repmgr.conf | cut -d= -f2)
                             #local_master_count=0
                             #overall_master_count=0
-                            #for i in seq 1 {{ len .MasterIPs }}; do
+                            #for i in seq 1 {{ len .ClusterMasterIPs }}; do
                             #    wait_for_postgres_on_host dbhost-\${i} 60 || continue
                             #    result=\$(psql -c "select node_id,upstream_node_id,conninfo,type,active from repmgr.nodes sort by node_id" | tail -n -2) || continue
                             #    while IFS="|" read -r node_id,upstream_node_id,conninfo,type,active; do
@@ -345,7 +345,7 @@ feature:
                             ## Find the dbhost with the most active=t,type=primary
                             #designated_master=
                             #designated_master_count=0
-                            #for i in seq 1 {{ len .MasterIPs }}; do
+                            #for i in seq 1 {{ len .ClusterMasterIPs }}; do
                             #    if [ \$designated_master_count -lt \${nodes_master_count[\${i}]} ]; then
                             #        designated_master_count=\${nodes_master_count[\${i}]}
                             #        designated_master=dbhost-\${i}
@@ -360,7 +360,7 @@ feature:
                             ## A new loop to find if there is at least 2 dbhosts with the same count of master role (which can't be
                             ## automatically mitigated)
                             #dont_mitigate=0
-                            #for i in seq 1 {{ len .MasterIPs }}; do
+                            #for i in seq 1 {{ len .ClusterMasterIPs }}; do
                             #    if [ \$designated_master_count -eq \${nodes_master_count[\${i}]} ]; then
                             #        echo "Postgresql cluster is in inconsistent state:"
                             #        echo "2 instances (\$designated_master and dbhost-\${i}) believe there are master with equal chances to be right."
@@ -488,7 +488,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            MASTERS="{{ range .MasterNames }}{{.}},{{end}}"
+                            MASTERS="{{ range .ClusterMasterNames }}{{.}},{{end}}"
                             MASTERS=${MASTERS%,}
                             HOSTNAME_RADIX={{ .Hostname }}
                             HOSTNAME_RADIX=${HOSTNAME_RADIX%-*}
@@ -540,7 +540,7 @@ feature:
                                             aliases:
                                                 - dbmaster
                                                 - dbhost-1
-                            {{ if eq (len .MasterNames) 1 }}
+                            {{ if eq (len .ClusterMasterNames) 1 }}
                                     ports:
                                         - published: 63008
                                           target: 5432
@@ -671,7 +671,7 @@ feature:
 
                             cat >${TARGET_DIR}/includes/postgresql4platform.conf <<-'EOF'
                             upstream postgresql4platform {
-                                {{range .MasterIPs}}server {{.}}:63008;
+                                {{range .ClusterMasterIPs}}server {{.}}:63008;
                                 {{end}}
                             }
 
