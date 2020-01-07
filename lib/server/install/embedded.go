@@ -104,6 +104,21 @@ func dockerFeature() *Feature {
 // 	}
 // }
 
+// certificateAuthorityFeature ...
+func certificateAuthorityFeature() *Feature {
+	name := "certificateauthority"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
 // ntpServerFeature ...
 func ntpServerFeature() *Feature {
 	name := "ntpserver"

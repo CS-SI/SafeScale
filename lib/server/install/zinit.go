@@ -56,6 +56,7 @@ func init() {
 		consul4platformFeature(),
 		monitoring4platformFeature(),
 		geoserverFeature(),
+		certificateAuthorityFeature(),
 	}
 
 	for _, item := range allEmbedded {
