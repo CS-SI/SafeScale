@@ -544,7 +544,7 @@ sfPgsqlUpdatePassword() {
     docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "ALTER USER $username WITH PASSWORD '$password'"
     retcode=$?
     if [ $retcode -eq 0 ]; then
-        for i in {{ range .MasterIPs }}{{.}} {{end}}; do
+        for i in {{ range .ClusterMasterIPs }}{{.}} {{end}}; do
             id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_pooler | cut -d: -f2)
             retcode=$?
             if [ $retcode -eq 0 -a ! -z "$id" ]; then
