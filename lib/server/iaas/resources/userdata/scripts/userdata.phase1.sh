@@ -63,7 +63,7 @@ sfDetectFacts
 
 create_user() {
 	echo "Creating user {{.User}}..."
-	useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+	useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
 	echo "{{.User}}:{{.Password}}" | chpasswd
 	groupadd -r docker
 	usermod -aG docker {{.User}}

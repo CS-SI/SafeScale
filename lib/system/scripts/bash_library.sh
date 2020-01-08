@@ -830,7 +830,7 @@ sfRandomString() {
     [ $# -ge 1 ] && count=$1
     local charset="[:graph:]"
     [ $# -ge 2 ] && charset="$2"
-    </dev/urandom tr -dc "$charset" | head -c${count}
+    </dev/urandom tr -dc "$charset" | head -c${count} || true
     return 0
 }
 export -f sfRandomString
