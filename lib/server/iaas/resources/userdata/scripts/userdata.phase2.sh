@@ -70,8 +70,8 @@ reset_fw() {
 
     # Clear interfaces attached to zones
     for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
-        for nic in $(sfFirewall --zone=$zone --list-interfaces); do
-            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null
+        for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
+            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
         done
     done
 
