@@ -900,7 +900,7 @@ sfDetectFacts() {
     [ $val -le 0 ] && val=1
     FACTS["2/3_of_threads"]=$val
 
-    FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }})
+    FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }} || true)
 
     sfProbeGPU
 
