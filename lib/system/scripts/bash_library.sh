@@ -900,25 +900,27 @@ sfDetectFacts() {
     [ $val -le 0 ] && val=1
     FACTS["2/3_of_threads"]=$val
 
-    FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }} || true)
-
     sfProbeGPU
 
-    # Some facts about installed features
-    id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    # legacy...
-    [ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    [ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    FACTS["edgeproxy4network_docker_id"]=$id
+    if which docker &>/dev/null; then
+        FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }} || true)
 
-    id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    FACTS["ingress4platform_docker_id"]=$id
+        # Some facts about installed features
+        id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+        # legacy...
+        [ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+        [ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+        FACTS["edgeproxy4network_docker_id"]=$id
 
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2)
-    FACTS["postgresql4platform_docker_id"]=$id
+        id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
+        FACTS["ingress4platform_docker_id"]=$id
 
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2)
-    FACTS["keycloak4platform_docker_id"]=$id
+        id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2)
+        FACTS["postgresql4platform_docker_id"]=$id
+
+        id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2)
+        FACTS["keycloak4platform_docker_id"]=$id
+    fi
 
     # "Serialize" facts to file
     declare -p FACTS >"${SERIALIZED_FACTS}"
