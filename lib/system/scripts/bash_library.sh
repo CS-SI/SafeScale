@@ -874,7 +874,7 @@ sfDetectFacts() {
         debian|ubuntu)
             FACTS["redhat_like"]=0
             FACTS["debian_like"]=1
-            FACTS["docker_version"]=$(apt info docker-ce 2>/dev/null | grep "^Version" | cut -d: -f2 | cut -d~ -f1)
+            FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f2 | cut -d~ -f1)
             ;;
     esac
     if systemctl | grep '\-.mount' &>/dev/null; then
