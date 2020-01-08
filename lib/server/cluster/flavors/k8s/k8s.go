@@ -118,7 +118,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	}
 	feature, err := install.NewFeature(task, "kubernetes")
 	if err != nil {
-		logrus.Errorf("[cluster %s] failed to instanciate feature 'kubernetes': %v", clusterName, err)
+		logrus.Errorf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err)
 		return fmt.Errorf("failed to prepare feature 'kubernetes': %s", err.Error())
 	}
 
@@ -126,8 +126,14 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	v := install.Variables{}
 
 	// If hardening is disabled, set the appropriate parameter of the kubernetes feature
-	_, ok := req.DisabledDefaultFeatures["hardening"]
-	v["Hardening"] = strconv.FormatBool(!ok)
+	if _, ok := req.DisabledDefaultFeatures["hardening"]; ok {
+		v["Hardening"] = strconv.FormatBool(!ok)
+	}
+
+	// Disable dashboard if requested
+	if _, ok := req.DisabledDefaultFeatures["dashboard"]; ok {
+		v["Dashboard"] = strconv.FormatBool(!ok)
+	}
 
 	// Installs kubernetes feature
 	results, err := feature.Add(target, v, install.Settings{})
