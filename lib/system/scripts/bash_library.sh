@@ -380,7 +380,7 @@ export -f sfKubectl
 sfHelm() {
     # analyzes parameters...
     local use_tls=
-    for p in $@; do
+    for p in "$@"; do
         case "$p" in
             "search"|"repo") ;;
             "init") echo "sfHelm init is forbidden" && return 1
@@ -589,7 +589,7 @@ sfKeycloakGetClient() {
     [ $# -eq 0 ] && return 1
     local name=$1
     shift
-    sfKeycloakRun get clients $@ | tail -n +1 | jq ".[] | select(.clientId == \"$name\")"
+    sfKeycloakRun get clients "$@" | tail -n +1 | jq ".[] | select(.clientId == \"$name\")"
 }
 export -f sfKeycloakGetClient
 
@@ -598,10 +598,10 @@ sfKeycloakDeleteClient() {
     local name=$1
     shift
 
-    local clientID=$(sfKeycloakGetClient $name $@)
+    local clientID=$(sfKeycloakGetClient $name "$@")
     [ -z "$clientID" ] && return 1
 
-    sfKeycloakRun delete clients/$clientID $@
+    sfKeycloakRun delete clients/$clientID "$@"
 }
 export -f sfKeycloakDeleteClient
 
@@ -611,7 +611,7 @@ sfKeycloakGetGroup() {
     [ $# -eq 0 ] && return 1
     local name=$1
     shift
-    sfKeycloakRun get groups $@ | tail -n +1 | jq ".[] | select(.name == \"$name\")"
+    sfKeycloakRun get groups "$@" | tail -n +1 | jq ".[] | select(.name == \"$name\")"
 }
 export -f sfKeycloakGetGroup
 
@@ -620,10 +620,10 @@ sfKeycloakDeleteGroup() {
     local name=$1
     shift
 
-    local clientID=$(sfKeycloakGetGroup $name $@)
+    local clientID=$(sfKeycloakGetGroup $name "$@")
     [ -z "$clientID" ] && return 1
 
-    sfKeycloakRun delete clients/$clientID $@
+    sfKeycloakRun delete clients/$clientID "$@"
 }
 export -f sfKeycloakDeleteGroup
 
