@@ -64,7 +64,7 @@ export -f sfWaitForApt
 sfApt() {
     echo "waiting for apt lock..."
     sfWaitForApt
-    echo "running apt $@"
+    echo "running apt " "$@"
     DEBIAN_FRONTEND=noninteractive apt "$@"
 }
 export -f sfApt
@@ -596,7 +596,7 @@ sfKeycloakGetClient() {
     [ $# -eq 0 ] && return 1
     local name=$1
     shift
-    sfKeycloakRun get clients $@ | tail -n +1 | jq ".[] | select(.clientId == \"$name\")"
+    sfKeycloakRun get clients "$@" | tail -n +1 | jq ".[] | select(.clientId == \"$name\")"
 }
 export -f sfKeycloakGetClient
 
@@ -605,10 +605,10 @@ sfKeycloakDeleteClient() {
     local name=$1
     shift
 
-    local clientID=$(sfKeycloakGetClient $name $@)
+    local clientID=$(sfKeycloakGetClient $name "$@")
     [ -z "$clientID" ] && return 1
 
-    sfKeycloakRun delete clients/$clientID $@
+    sfKeycloakRun delete clients/$clientID "$@"
 }
 export -f sfKeycloakDeleteClient
 
@@ -618,7 +618,7 @@ sfKeycloakGetGroup() {
     [ $# -eq 0 ] && return 1
     local name=$1
     shift
-    sfKeycloakRun get groups $@ | tail -n +1 | jq ".[] | select(.name == \"$name\")"
+    sfKeycloakRun get groups "$@" | tail -n +1 | jq ".[] | select(.name == \"$name\")"
 }
 export -f sfKeycloakGetGroup
 
@@ -627,10 +627,10 @@ sfKeycloakDeleteGroup() {
     local name=$1
     shift
 
-    local clientID=$(sfKeycloakGetGroup $name $@)
+    local clientID=$(sfKeycloakGetGroup $name "$@")
     [ -z "$clientID" ] && return 1
 
-    sfKeycloakRun delete clients/$clientID $@
+    sfKeycloakRun delete clients/$clientID "$@"
 }
 export -f sfKeycloakDeleteGroup
 
