@@ -35,10 +35,12 @@ sfFail() {
     fi
     exit $1
 }
+export -f sfFail
 
 function sfExit() {
     exit 0
 }
+export -f sfExit
 
 sfFinishPreviousInstall() {
     local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
@@ -96,6 +98,7 @@ sfIP2long() {
     IFS=. read -r a b c d <<<$*
     echo $(((((((a << 8) | b) << 8) | c) << 8) | d))
 }
+export -f sfIP2long
 
 sfLong2IP() {
     local ui32=$1
@@ -106,6 +109,7 @@ sfLong2IP() {
     done
     echo $ip
 }
+export -f sfLong2IP
 
 # Convert netmask to CIDR
 sfNetmask2cidr() {
@@ -869,12 +873,12 @@ sfDetectFacts() {
         redhat|centos)
             FACTS["redhat_like"]=1
             FACTS["debian_like"]=0
-            FACTS["docker_version"]=$(yum info docker-ce)
+			      FACTS["docker_version"]=$(yum info docker-ce || true)
             ;;
         debian|ubuntu)
             FACTS["redhat_like"]=0
             FACTS["debian_like"]=1
-            FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f2 | cut -d~ -f1)
+            FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f3 | cut -d~ -f1 || true)
             ;;
     esac
     if systemctl | grep '\-.mount' &>/dev/null; then
@@ -920,6 +924,7 @@ sfDetectFacts() {
     declare -p FACTS >"${SERIALIZED_FACTS}"
     return 0
 }
+export -f sfDetectFacts
 
 sfGetFact() {
     [ $# -eq 0 ] && return
