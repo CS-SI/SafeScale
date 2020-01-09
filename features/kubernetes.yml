@@ -21,6 +21,7 @@ feature:
     requirements:
         features:
             - docker
+            - certificateauthority
 
         # "clusterSizing" not honored currently
         clusterSizing:
@@ -60,6 +61,7 @@ feature:
         - Hardening=true
         - KubeVersion=1.14.1
         - HelmVersion=2.14.1
+        - DisableHelm=false
         - HelmDefaultNamespace=default
 
     install:
@@ -158,7 +160,7 @@ feature:
                 steps:
                     others:
                         targets:
-                            gateway: all
+                            gateways: all
                             nodes: all
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
@@ -179,11 +181,11 @@ feature:
                             sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
                 steps:
                     sysconf:
                         targets:
-                            gateway: all
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -256,7 +258,7 @@ feature:
 
                     syshardening:
                         targets:
-                            gateway: all
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -299,7 +301,7 @@ feature:
 
                     common-tools:
                         targets:
-                            gateway: all
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -357,7 +359,7 @@ feature:
 
                             cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
                             upstream kubernetes-api-cluster {
-                                {{range .MasterIPs}}server {{.}}:6443;
+                                {{range .ClusterMasterIPs}}server {{.}}:6443;
                                 {{end}}
                             }
 
@@ -367,6 +369,19 @@ feature:
                             }
                             EOF
                             sfReverseProxyReload
+                            sfExit
+
+                    ca:
+                        targets:
+                            masters: one
+                        run: |
+                            mkdir -p /etc/kubernetes/pki
+                            if [ -f ${SF_ETCDIR}/etc/pki/ca/signca/certs/ca-chain.cert.pem ]; then
+                                [ -f /etc/kubernetes/pki/ca.crt ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.crt.notused
+                                [ -f /etc/kubernetes/pki/ca.key ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.key.notused
+                                ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /etc/kubernetes/pki/ca.crt
+                                ln -s ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem /etc/kubernetes/pki/ca.key
+                            fi
                             sfExit
 
                     cp1-init:
@@ -427,6 +442,8 @@ feature:
                                     profiling: "false"
                                     use-service-account-credentials: "true"
                                     feature-gates: RotateKubeletServerCertificate=true
+                                    cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
+                                    cluster-signing-key-file: /etc/kubernetes/pki/ca.key
                             {{ end }}
                             certificatesDir: /etc/kubernetes/pki
                             clusterName: kubernetes
@@ -436,7 +453,7 @@ feature:
                             EOF
 
                             sfRetry 5m 5 kubeadm config images pull || sfFail 202
-                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 203
+                            sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 203
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 204
                             cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 205
 
@@ -462,7 +479,7 @@ feature:
                             cat ${SF_TMPDIR}/cp_join_cmd.sh
                             sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 207
                             sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 208
-                            for ip in {{range .MasterIPs}}{{.}} {{end}}; do
+                            for ip in {{range .ClusterMasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
                                 sfDropzoneSync $ip || sfFail 209
                             done
@@ -775,15 +792,15 @@ feature:
                             echo "cpx init done"
                             sfExit
 
-                    join:
+                    join-gws:
                         targets:
-                            gateway: all
+                            gateways: all
                             nodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
                             MASTERIP=
-                            for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
+                            for m in {{ range .ClusterMasterIPs }}{{.}} {{ end -}}; do
                                 op=-1
                                 NODE_JOIN_CMD=$(sfRemoteExec $m kubeadm token create --print-join-command) && op=$? || true
                                 [ $op -ne 0 ] && continue
@@ -793,30 +810,48 @@ feature:
                             done
                             [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 233
                             eval $NODE_JOIN_CMD || sfFail 234
+
+                            sfRemoteExec $MASTER_IP sudo -u {{ .ClusterAdminUsername }} -i kubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 235
+
                             touch /etc/kubernetes/.joined
                             sfExit
 
-                    no-schedule:
+                    join-nodes:
                         targets:
                             gateways: all
+                            nodes: all
                         run: |
-                            {{-  if ne .AllowPodsOnGateways "true" }}
-                            sfKubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 235
-                            {{ end }}
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
+                            MASTERIP=
+                            for m in {{ range .ClusterMasterIPs }}{{.}} {{ end -}}; do
+                                op=-1
+                                NODE_JOIN_CMD=$(sfRemoteExec $m kubeadm token create --print-join-command) && op=$? || true
+                                [ $op -ne 0 ] && continue
+                                NODE_JOIN_CMD=$(echo $NODE_JOIN_CMD | head -1)
+                                MASTERIP=$m
+                                break
+                            done
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 233
+                            eval $NODE_JOIN_CMD || sfFail 234
+
+                            touch /etc/kubernetes/.joined
                             sfExit
 
                     helm-certs:
                         targets:
                             masters: one
                         run: |
-                            mkdir -p ${SF_ETCDIR}/helm/pki ${SF_ETCDIR}/helm/ca
+                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
+
+                            mkdir -p ${SF_ETCDIR}/helm/pki
                             cd ${SF_TMPDIR}
 
-                            ## Generate Certificate Authority
-                            openssl genrsa -out ca.key.pem 4096
-                            openssl req -key ca.key.pem -new -x509 \
-                                -days 10000 -sha256 -out ca.cert.pem \
-                                -extensions v3_ca -subj "/C=FR/ST=Toulouse/L=Toulouse/O=CSSI/OU=Space/CN={{ .Hostname }}"
+                            # ## Generate Certificate Authority
+                            # openssl genrsa -out ca.key.pem 4096
+                            # openssl req -key ca.key.pem -new -x509 \
+                            #     -days 10000 -sha256 -out ca.cert.pem \
+                            #     -extensions v3_ca -subj "/C=FR/ST=Toulouse/L=Toulouse/O=CSSI/OU=Space/CN={{ .Hostname }}"
 
                             ## Generate keys
                             openssl genrsa -out tiller.key.pem 4096
@@ -860,18 +895,24 @@ feature:
                             EOF
 
                             ## Generate the certificates signing request based on the config file
-                            openssl req -new -key tiller.key.pem -out tiller.csr.pem -config csr.conf
-                            openssl req -new -key helm.key.pem -out helm.csr.pem -config csr.conf
+                            openssl req -new -key tiller.key.pem -out tiller.csr.pem -config ${SF_ETCDIR}/pki/ca/signca/openssl.cnf
+                            openssl req -new -key helm.key.pem -out helm.csr.pem -config ${SF_ETCDIR}/pki/ca/signca/openssl.cnf
 
-                            ## Generate certificates using the ca.key.pem, ca.crt.pem and xxxx.csr.pem
-                            openssl x509 -req -CA ca.cert.pem -CAkey ca.key.pem -CAcreateserial -in tiller.csr.pem -out tiller.cert.pem -days 365 -extfile csr.conf
+                            ## Generate certificates using the ca-chain.key.pem, ca-chain.cert.pem and xxxx.csr.pem
+                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
+                                              -CAkey ${SF_ETCDIR}/pki/ca/sinca/private/signca.key.pem \
+                                              -CAcreateserial \
+                                              -in tiller.csr.pem -out tiller.cert.pem -days 375 -extfile csr.conf
 
                             #openssl x509 -req -in helm.csr.pem -CA ca.cert.pem -CAkey ca.key.pem \
-                            openssl x509 -req -CA ca.cert.pem -CAkey ca.key.pem -CAcreateserial -in helm.csr.pem -out helm.cert.pem  -days 365 -extfile csr.conf
+                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
+                                              -CAkey ${SF_ETCDIR}/pki/ca/sinca/private/signca.key.pem \
+                                              -CAcreateserial \
+                                              -in helm.csr.pem -out helm.cert.pem -days 375 -extfile csr.conf
 
                             ## Backup certificate and private key
                             mkdir -p ${SF_ETCDIR}/helm/pki
-                            mv ca.cert.pem ca.key.pem ${SF_ETCDIR}/helm/ca
+                            # mv ca.cert.pem ca.key.pem ${SF_ETCDIR}/helm/ca
                             mv helm.cert.pem helm.key.pem ${SF_ETCDIR}/helm/pki
                             mv tiller.cert.pem tiller.key.pem ${SF_ETCDIR}/helm/pki
 
@@ -887,6 +928,8 @@ feature:
                         targets:
                             masters: all
                         run: |
+                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
+
                             # Install Helm
                             cd ${SF_TMPDIR}
                             wget https://get.helm.sh/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 236
@@ -905,6 +948,8 @@ feature:
                         targets:
                             masters: one
                         run: |
+                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
+
                             ## Create serviceaccount
                             sfKubectl create serviceaccount tiller -n kube-system || sfFail 239
                             sfExit
@@ -913,6 +958,8 @@ feature:
                         targets:
                             masters: all
                         run: |
+                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
+
                             mkdir -p ${SF_ETCDIR}/helm
 
                             cat > ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml <<EOF
@@ -936,6 +983,8 @@ feature:
                         targets:
                             masters: one
                         run: |
+                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
+
                             ## Apply RBAC policy
                             sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 240
                             sfExit
@@ -944,6 +993,8 @@ feature:
                         targets:
                             masters: one
                         run: |
+                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
+
                             ## Install Helm as {{ .ClusterAdminUsername }} (the user that runs kubectl) client with TLS authentication with Tiller
                             sudo -u {{ .ClusterAdminUsername }} -i helm init \
                                 --tiller-tls \
@@ -951,13 +1002,13 @@ feature:
                                 --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
                                 --tiller-tls-key ${SF_ETCDIR}/helm/pki/tiller.key.pem \
                                 --tiller-tls-verify \
-                                --tls-ca-cert ${SF_ETCDIR}/helm/ca/ca.cert.pem \
+                                --tls-ca-cert ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
                                 --service-account tiller \
                                 --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' \
                                 || sfFail 247
 
                             mkdir -p /home/{{.ClusterAdminUsername}}/.helm
-                            cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
+                            # cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
                             cp ${SF_ETCDIR}/helm/pki/helm.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/cert.pem
                             cp ${SF_ETCDIR}/helm/pki/helm.key.pem /home/{{ .ClusterAdminUsername }}/.helm/key.pem
 
@@ -971,7 +1022,7 @@ feature:
 
                             # Push the archive in the dropzone and synchronize
                             sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 249
-                            for ip in {{ range .MasterIPs }}{{ . }} {{ end }}; do
+                            for ip in {{ range .ClusterMasterIPs }}{{ . }} {{ end }}; do
                                 sfDropzoneSync $ip || sfFail 250
                             done
                             rm -f ${SF_TMPDIR}/helm_config.tar.gz
@@ -981,6 +1032,8 @@ feature:
                         targets:
                             masters: all
                         run: |
+                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
+
                             sfDropzonePop ${SF_TMPDIR} || sfFail 251
                             sfDropzoneClean
 
@@ -1027,13 +1080,17 @@ feature:
                                 sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
                             fi
                             ## Delete service
-                            sfKubectl delete service -n kube-system tiller-deploy || sfFail 193
+                            if sfKubectl get service -n kube-system tiller-deploy &>/dev/null; then
+                                sfKubectl delete service -n kube-system tiller-deploy || sfFail 193
+                            fi
                             ## Delete account
                             if sfKubectl get serviceaccount tiller -n kube-system &>/dev/null; then
                                 sfKubectl delete serviceaccount tiller -n kube-system || sfFail 194
                             fi
                             ## Delete secret
-                            sfKubectl delete secret -n kube-system tiller-secret || sfFail 195
+                            if sfKubectl get secret -n kube-system tiller-secret &>/dev/null; then
+                                sfKubectl delete secret -n kube-system tiller-secret || sfFail 195
+                            fi
                             ## Delete RBAC policy
                             if sfKubectl get role tiller-rolebinding-secret -n kube-system &>/dev/null; then
                                 sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 196
@@ -1044,9 +1101,9 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            rm -f /usr/local/bin/helm || sfFail 201
-                            rm -f /usr/local/bin/tiller || sfFail 202
-                            rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm || sfFail 203
+                            rm -f /usr/local/bin/helm
+                            rm -f /usr/local/bin/tiller
+                            rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm
                             sfExit
 
                     node:
@@ -1080,7 +1137,6 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfApt purge -y kubectl kubeadm kubelet || sfFail 204 "failure purging kubernetes"
