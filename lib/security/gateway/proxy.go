@@ -132,7 +132,7 @@ func httpForward(w http.ResponseWriter, req *http.Request, url *url.URL) {
 
 	req.Host = url.Host
 
-	//add CORS to the respoonse header
+	//add CORS to the response header
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
 
@@ -141,7 +141,7 @@ func httpForward(w http.ResponseWriter, req *http.Request, url *url.URL) {
 
 }
 
-//httpProxyFunc forward authorized request to pr++++++++++++otected service
+//httpProxyFunc forward authorized request to protected service
 func httpProxyFunc(w http.ResponseWriter, r *http.Request) {
 
 	info := parseRequest(r)
