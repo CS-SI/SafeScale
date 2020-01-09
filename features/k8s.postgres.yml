@@ -20,7 +20,6 @@ feature:
     requirements:
         features:
             - kubernetes
-            - helm
 
     parameters:
         - ChartVersion=1.4.0
@@ -35,13 +34,14 @@ feature:
     install:
         bash:
             check:
-                pace: list_helm
+                pace: helm
                 steps:
                     list_helm:
                         targets:
                             masters: any
                         run: |
-                            sudo -u cladm -i helm search ...
+                            sfHelm ls | grep postgres-infra | fFail 192
+                            sfExit
 
         add:
             pace: config,install,ready
@@ -52,7 +52,7 @@ feature:
                     run: |
                         mkdir -p ${SF_ETCDIR}/k8s.postgres
 
-                        cat >${SF_TMPDIR}/k8s.postgres.values.yaml <<-EOF
+                        cat >${SF_ETCDIR}/k8s.postgres.values.yaml <<-EOF
                         master:
                           affinity:
                             nodeAffinity:
@@ -131,8 +131,8 @@ feature:
                     run: |
                         #Install PostgreSQL Helm chart for Harbor
                         sfHelm install {{ .HelmRepoName }}/stolon \
-                            --name postgresql-infra \
-                            --clusterName postgresql-infra
+                            --name postgres-infra \
+                            --clusterName postgres-infra
                             --namespace {{ .Namespace }} \
                             --version {{ .ChartVersion }} \
                             # --tls \
@@ -154,10 +154,10 @@ feature:
                             --set proxy.replicaCount=3 \
                             --set sentinel.replicaCount=2 \
                             # --set metrics.image.registry="{{ .DockerRegistryURL }}/prometheus-exporter" \
-                            --values ${SF_TMPDIR}/k8s.postgres.values.yaml \
+                            --values ${SF_ETCDIR}/k8s.postgres.values.yaml \
                             || sfFail 192
 
-                        rm -f ${SF_TMPDIR}/k8s.postgres.values.yaml
+                        sfExit
 
                 ready:
                     targets:
@@ -167,13 +167,20 @@ feature:
                         sfExit
 
         remove:
-            pace: helm
+            pace: helm,cleanup
             steps:
                 helm:
                     targets:
                         masters: any
                     run: |
                         sfHelm delete postgresql-infra || sfFail 192
+                        sfExit
+
+                cleanup:
+                    targets:
+                        masters: all
+                    run: |
+                        rm -rf ${SF_ETCDIR}/k8s.postgres
                         sfExit
 
 ...

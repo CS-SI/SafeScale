@@ -20,7 +20,6 @@ feature:
     requirements:
         features:
             - kubernetes
-            - k8s.helm
             - k8s.kong-ingress
 
     parameters:
@@ -28,13 +27,14 @@ feature:
         - ChartVersion=4.0.4
         - Namespace=default
         - HelmRepoName=stable
+        - AdminPassword=
 
     install:
         bash:
             check:
-                pace: list_helm
+                pace: helm
                 steps:
-                    list_helm:
+                    helm:
                         targets:
                             masters: any
                         run: |
@@ -46,7 +46,7 @@ feature:
                 steps:
                     prepare:
                         targets:
-                            masters: any
+                            masters: all
                         run: |
                             mkdir -p ${SF_ETCDIR}/grafana
 
@@ -77,7 +77,11 @@ feature:
                         targets:
                             masters: any
                         run: |
+                            {{ if eq .AdminPassword "" }}
                             GRAFANA_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+                            {{ else }}
+                            GRAFANA_PASSWORD="{{ .AdminPassword }}"
+                            {{ end }}
 
                             sfHelm install {{ .HelmRepoName }}/grafana \
                                 --version {{ .ChartVersion }} \
@@ -103,13 +107,20 @@ feature:
                             sfExit
 
             remove:
-                pace: helm
+                pace: helm,cleanup
                 steps:
                     helm:
                         targets:
                             masters: one
                         run: |
                             sfHelm delete --purge --tls grafana || sfFail 192
+                            sfExit
+
+                    cleanup:
+                        targets:
+                            masters: all
+                        run: |
+                            rm -rf ${SF_ETCDIR}/grafana
                             sfExit
 
 ...

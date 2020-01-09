@@ -155,7 +155,7 @@ feature:
                             wget -O pkg.zip https://github.com/bitsensor/elastalert-kibana-plugin/releases/download/1.0.4/elastalert-kibana-plugin-1.0.4-7.1.1.zip || sfFail 193
                             unzip pkg.zip || sfFail 194
                             {{- if .ClusterFlavor }}
-                            ./bin/kibana-plugin https://{{ .GatewayIP }}/monitoring/kibana/ || sfFail 195
+                            ./bin/kibana-plugin https://{{ .DefaultRouteIP }}/monitoring/kibana/ || sfFail 195
                             {{ else }}
                             ./bin/kibana-plugin {{ .KibanaURL }} || sfFail 196
                             {{ end -}}

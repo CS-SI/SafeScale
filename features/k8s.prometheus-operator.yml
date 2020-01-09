@@ -31,7 +31,6 @@ feature:
 
     requirements:
         - kubernetes
-        - k8s.helm
         - k8s.kong-ingress
 
     install:
@@ -51,9 +50,9 @@ feature:
                             masters: any
                         run: |
                             sfKubectl create secret generic etcd-client \
-                                --from-file=${SF_ETCDIR}/kubernetes/pki/etcd/ca.crt \
-                                --from-file=${SF_ETCDIR}/kubernetes/pki/etcd/server.key \
-                                --from-file=${SF_ETCDIR}/kubernetes/pki/etcd/server.crt \
+                                --from-file=/etc/kubernetes/pki/etcd/ca.crt \
+                                --from-file=/etc/kubernetes/pki/etcd/server.key \
+                                --from-file=/etc/kubernetes/pki/etcd/server.crt \
                                 --namespace {{ .Namespace }} \
                                 || sfFail 192
                             sfExit
@@ -150,7 +149,7 @@ feature:
                         sfKubectl delete servicemonitor -n {{ .Namespace }} docker-daemon-metrics || sfFail 193
                         sfKubectl delete service -n {{ .Namespace }} docker-daemon-metrics || sfFail 194
 
-                        sfHelm delete --purge --tls prometheus-operator || sfFail 195
+                        sfHelm delete --purge --tls --namespace {{ .Namespace }} prometheus-operator || sfFail 195
 
                         sfKubectl delete crd podmonitors.monitoring.coreos.com || sfFail 196
                         sfKubectl delete crd prometheuses.monitoring.coreos.com || sfFail 197

@@ -27,10 +27,20 @@ feature:
     requirements:
         features:
             - kubernetes
-            - k8s.helm2
+            - k8s.grafana
 
     install:
         bash:
+            check:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm ls {{ .HelmRepoName }}/dashboards || sfFail 192
+                            sfExit
+
             add:
                 pace: helm
                 steps:
@@ -38,12 +48,22 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            helm install {{ .HelmRepoName }}/dashboards \
+                            sfHelm install {{ .HelmRepoName }}/dashboards \
                                 --name dashboards \
                                 --namespace {{ .Namespace }} \
                                 --version {{ Version }} \
                                 --tls \
                                 || sfFail 192
+                            sfExit
+
+            remove:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm delete --namespace {{ .Namespace }} dashboards || sfFail 192
                             sfExit
 
 ---
