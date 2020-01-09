@@ -223,15 +223,15 @@ feature:
                                     sfFail 194
                                     ;;
                             esac
-    
+
                             kernel_version=$(cat /proc/version | awk '{ print $3 }' | cut -d. -f1)
-                            
+
                             echo "# IPVS modules used by Kubernetes" >>/etc/modules
                             for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh; do
                                 echo $i >>/etc/modules
                                 modprobe $i 2>/dev/null || sfFail 201 "Error enabling kernel module $i, error code $?"
                             done
-    
+
                             op=-1
                             for i in nf_conntrack_ipv4 nf_conntrack; do
                                 echo $i >>/etc/modules
@@ -810,7 +810,7 @@ feature:
                             [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 233
                             eval $NODE_JOIN_CMD || sfFail 234
 
-                            sfRemoteExec $MASTER_IP sudo -u {{ .ClusterAdminUsername }} -i kubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 235
+                            sfRemoteExec $MASTERIP sudo -u {{ .ClusterAdminUsername }} -i kubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 235
 
                             touch /etc/kubernetes/.joined
                             sfExit
