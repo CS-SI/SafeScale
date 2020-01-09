@@ -795,7 +795,6 @@ feature:
                     join-gws:
                         targets:
                             gateways: all
-                            nodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
@@ -818,7 +817,6 @@ feature:
 
                     join-nodes:
                         targets:
-                            gateways: all
                             nodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && sfExit
