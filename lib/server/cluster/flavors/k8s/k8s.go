@@ -135,7 +135,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 
 	// If helm installation is disabled, set the appropriate parameter of the kubernetes feature
 	_, ok = req.DisabledDefaultFeatures["helm"]
-	v["DisableHelm"] = strconv.FormatBool(!ok)
+	v["DisableHelm"] = strconv.FormatBool(ok)
 
 	// Installs kubernetes feature
 	results, err := feature.Add(target, v, install.Settings{})
