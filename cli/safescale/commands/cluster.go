@@ -994,7 +994,7 @@ var clusterKubectlCommand = cli.Command{
 				filteredArgs = append(filteredArgs, arg)
 			}
 		}
-		cmdStr := `sudo -u cladm -i kubectl`
+		cmdStr := "sudo -u cladm -i kubectl"
 		if len(filteredArgs) > 0 {
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
