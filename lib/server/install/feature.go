@@ -150,6 +150,9 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -196,6 +199,9 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err error) {
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -521,10 +527,12 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 			// 	v["PublicIP"] = networkCfg.VIP.PublicIP // VPL: Should be replaced by the next entry
 			// 	v["EndpointIP"] = networkCfg.VIP.PublicIP
 			v["PrimaryGatewayIP"] = networkCfg.GatewayIP
-			v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
 			v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
 			v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
 			v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
+			if networkCfg.SecondaryGatewayIP != "" {
+				v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+			}
 			v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 			v["EndpointIP"] = networkCfg.EndpointIP
 			v["PublicIP"] = v["EndpointIP"] // legacy ...
