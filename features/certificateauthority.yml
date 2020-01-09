@@ -40,7 +40,7 @@ feature:
                             sfExit
 
             add:
-                pace: config,rootca,signca,chainca,spread-rootca,spread-signca
+                pace: config,rootca,signca,chainca,spread-on-masters,spread-on-others
                 steps:
                     config:
                         targets:
@@ -211,12 +211,12 @@ feature:
                             chmod 0400 ${SF_ETCDIR}/pki/ca/rootca/private/rootca.key.pem || sfFail 194
 
                             SUBJ=
-                            {{ if .CountryName }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
-                            {{ if .StateOrProvinceName }} SUBJ="${SUBJ}/ST={{.StateOrProvinceName}}" {{ end }}
-                            {{ if .LocalityName }} SUBJ="${SUBJ}/L={{.LocalityName}}" {{ end }}
-                            {{ if .OrganizationName }} SUBJ="${SUBJ}/O={{.OrganizationName}}" {{ end }}
+                            {{ if .CountryName            }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
+                            {{ if .StateOrProvinceName    }} SUBJ="${SUBJ}/ST={{.StateOrProvinceName}}" {{ end }}
+                            {{ if .LocalityName           }} SUBJ="${SUBJ}/L={{.LocalityName}}" {{ end }}
+                            {{ if .OrganizationName       }} SUBJ="${SUBJ}/O={{.OrganizationName}}" {{ end }}
                             {{ if .OrganizationalUnitName }} SUBJ="${SUBJ}/OU={{.OrganizationalUnitName}}" {{ end }}
-                            {{ if .EmailAddress }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
+                            {{ if .EmailAddress           }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
                             {{ if .ClusterFlavor }}
                             SUBJ="${SUBJ}/CN={{ .ClusterName }}-rootCA"
                             {{ else }}
@@ -240,13 +240,13 @@ feature:
                             chmod 400 ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem
 
                             SUBJ=
-                            {{ if .CountryName }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
-                            {{ if .StateOrProvinceName }} SUBJ="${SUBJ}/ST={{.StateOrProvinceName}}" {{ end }}
-                            {{ if .LocalityName }} SUBJ="${SUBJ}/L={{.LocalityName}}" {{ end }}
-                            {{ if .OrganizationName }} SUBJ="${SUBJ}/O={{.OrganizationName}}" {{ end }}
+                            {{ if .CountryName            }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
+                            {{ if .StateOrProvinceName    }} SUBJ="${SUBJ}/ST={{.StateOrProvinceName}}" {{ end }}
+                            {{ if .LocalityName           }} SUBJ="${SUBJ}/L={{.LocalityName}}" {{ end }}
+                            {{ if .OrganizationName       }} SUBJ="${SUBJ}/O={{.OrganizationName}}" {{ end }}
                             {{ if .OrganizationalUnitName }} SUBJ="${SUBJ}/OU={{.OrganizationalUnitName}}" {{ end }}
-                            {{ if .EmailAddress }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
-                            {{ if .ClusterFlavor }}
+                            {{ if .EmailAddress           }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
+                            {{ if .ClusterFlavor          }}
                             SUBJ="${SUBJ}/CN={{ .ClusterName }}-signCA"
                             {{ else }}
                             SUBJ="${SUBJ}/CN={{ .Hostname }}-signCA"
@@ -257,7 +257,7 @@ feature:
                                         -out ${SF_ETCDIR}/pki/ca/signca/csr/signca.csr.pem \
                                         -subj "$SUBJ" || sfFail 198
 
-                            openssl ca -config ${SF_ETCDIR}/pki/ca/rootca/openssl.cnf -extensions v3_signca_ca \
+                            openssl ca -batch -config ${SF_ETCDIR}/pki/ca/rootca/openssl.cnf -extensions v3_signca_ca \
                                        -days 3650 -notext -md sha256 \
                                        -in ${SF_ETCDIR}/pki/ca/signca/csr/signca.csr.pem \
                                        -out ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem || sfFail 199
@@ -274,60 +274,56 @@ feature:
                             chmod 444 ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem
 
                             {{ if .ClusterFlavor }}
-                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca/rootca && \
                             tar zcvf ${SF_TMPDIR}/safescale-signca.tar.gz ${SF_ETCDIR}/pki/ca/signca && \
-                            sfDropzonePush ${SF_TMPDIR}/safescale-ca.tar.gz && \
-                            rm -f ${SF_TMPDIR}/safescale-ca.tar.gz || sfFail 200
+                            sfDropzonePush ${SF_TMPDIR}/safescale-signca.tar.gz && rm -f ${SF_TMPDIR}/safescale-signca.tar.gz || sfFail 200
 
                             sfDropzoneSync {{ .PrimaryGatewayIP }}
-                              {{ if .SecondaryGatewayIP }}
-                            sfDropzoneSync {{ .SecondaryGatewayIP }}
-                              {{ end }}
-                            for i in {{ range .ClusterMasterIPs }}{{ . }} {{ end }}; do
+                            {{ if .SecondaryGatewayIP }} sfDropzoneSync {{ .SecondaryGatewayIP }} {{ end }}
+                            for i in {{ range .ClusterNodeIPs }}{{ . }} {{ end }}; do
                                 sfDropzoneSync $i
                             done
-                            for i in {{ range .ClusterNodeIPs }}{{ . }} {{ end }}; do
+
+                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca/rootca && \
+                            sfDropzonePush ${SF_TMPDIR}/safescale-rootca.tar.gz && rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 201
+                            for i in {{ range .ClusterMasterIPs }}{{ . }} {{ end }}; do
                                 sfDropzoneSync $i
                             done
                             {{ end }}
                             sfExit
 
-                    spread-rootca:
+                    spread-on-masters:
                         targets:
                             hosts: no
                             gateways: no
                             masters: all
                             nodes: no
                         run: |
-                            {{ if .ClusterFlavor }}
-                            # Recover chain-ca from Dropzone
-                            sfDropzonePop safescale-rootca.tar.gz ${SF_TMPDIR}
+                            # Recover rootca and chain-ca from Dropzone
+                            sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
-                            tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C /
-                            rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz
-                            {{ end }}
+                            tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C / && rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 201
+                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C / && rm -f ${SF_TMPDIR}/safescale-signca.tar.gz || sfFail 202
                             sfExit
 
-                    spread-signca:
+                    spread-on-others:
                         targets:
                             hosts: yes
                             gateways: all
-                            masters: all
+                            masters: no
                             nodes: all
                         run: |
                             {{ if .ClusterFlavor }}
                             # Recover chain-ca from Dropzone
-                            sfDropzonePop safescale-signca.tar.gz ${SF_TMPDIR}
+                            sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
-                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C /
-                            rm -f ${SF_TMPDIR}/safescale-signca.tar.gz
+                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C / && rm -f ${SF_TMPDIR}/safescale-signca.tar.gz || sfFail 203
                             {{ end }}
 
-                            # Add the new ca in system ca
+                            # Add the new CA in system CAs
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
                                     ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /usr/local/share/ca-certificates/{{ .ClusterName }}-CA.crt
-                                    update-ca-certificates || sfFail 201
+                                    update-ca-certificates || sfFail 204
                                     ;;
                                 redhat|centos)
                                     if [ $(sfGetFact "linux_version") = 6 ]; then
@@ -336,10 +332,10 @@ feature:
                                         TARGET=/etc/pki/ca-trust/source/anchors
                                     fi
                                     ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem "$TARGET"
-                                    /bin/update-ca-trust || sfFail 202
+                                    /bin/update-ca-trust || sfFail 205
                                     ;;
                                 *)
-                                    sfFail 203 "'spread' step not implemented for ($sfGetFact "linux_kind")"
+                                    sfFail 206 "'spread' step not implemented for ($sfGetFact "linux_kind")"
                                     ;;
                             esac
 
