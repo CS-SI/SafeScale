@@ -24,6 +24,7 @@ exec 2<&-
 exec 1<>/opt/safescale/var/log/dcos_configure_master.log
 exec 2>&1
 
+# shellcheck disable=SC1073
 {{ .reserved_BashLibrary }}
 
 ###############################################
@@ -83,7 +84,7 @@ sfAsyncWait DDI || exit 192
 # Needed modules for DCOS
 for i in raid1 dm_raid; do
     echo $i >>/etc/modules
-    modprobe $i
+    modprobe $i || exit 192
 done
 
 # Launch DCOS installation
