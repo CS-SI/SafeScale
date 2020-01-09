@@ -154,12 +154,21 @@ EOF
                                     sfFail 196
                                     ;;
                             esac
-
+    
                             echo "# IPVS modules used by Kubernetes" >>/etc/modules
-                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4; do
+                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh; do
                                 echo $i >>/etc/modules
-                                modprobe $i 2>/dev/null || echo "A warning occurred: error with module $i, error code $?"
+                                modprobe $i 2>/dev/null || sfFail 201 "Error enabling kernel module $i, error code $?"
                             done
+                            
+                            op=-1
+                            for i in nf_conntrack_ipv4 nf_conntrack; do
+                                echo $i >>/etc/modules
+                                modprobe $i 2>/dev/null && op=0 || true
+                            done
+                            if [ $op -eq -1 ]; then
+                                sfFail 201 "Error enabling kernel module nf_conntrack and nf_conntrack_ipv4"
+                            fi
 
                             echo "net.ipv4.ip_forward=1" >>/etc/sysctl.d/99-sysctl.conf
                             sysctl --system
