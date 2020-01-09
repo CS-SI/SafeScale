@@ -629,7 +629,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 
 			host.LastState = toHostState(server.Status)
 			if host.LastState != hoststate.ERROR && host.LastState != hoststate.STARTING {
-				log.Infof("host status of '%s' is '%s'", host.ID, server.Status)
+				log.Tracef("host status of '%s' is '%s'", host.ID, server.Status)
 				err = nil
 				return nil
 			}
