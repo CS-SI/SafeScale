@@ -225,7 +225,7 @@ feature:
                             echo "# IPVS modules used by Kubernetes" >>/etc/modules
                             for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4; do
                                 echo $i >>/etc/modules
-                                modprobe $i
+                                modprobe $i 2>/dev/null || echo "A warning occurred: error with module $i, error code $?"
                             done
 
                             echo "net.ipv4.ip_forward=1" >>/etc/sysctl.d/99-sysctl.conf

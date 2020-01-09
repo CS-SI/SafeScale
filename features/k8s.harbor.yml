@@ -158,7 +158,7 @@ EOF
                             echo "# IPVS modules used by Kubernetes" >>/etc/modules
                             for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4; do
                                 echo $i >>/etc/modules
-                                modprobe $i
+                                modprobe $i 2>/dev/null || echo "A warning occurred: error with module $i, error code $?"
                             done
 
                             echo "net.ipv4.ip_forward=1" >>/etc/sysctl.d/99-sysctl.conf
@@ -567,81 +567,81 @@ EOF
 
                                     # Creates our patch file
                                     cat >/etc/kubernetes/kubeadm/calico.yaml.patch <<-'EOF'
---- calico.yaml	2019-11-21 17:06:25.590230285 +0100
-+++ calico.yaml.new	2019-11-21 17:02:11.885017690 +0100
-@@ -24,7 +24,7 @@
-       "plugins": [
-         {
-           "type": "calico",
--          "log_level": "info",
-+          "log_level": "debug",
-           "datastore_type": "kubernetes",
-           "nodename": "__KUBERNETES_NODE_NAME__",
-           "mtu": __CNI_MTU__,
-@@ -516,7 +516,7 @@
-         # It can be deleted if this is a fresh installation, or if you have already
-         # upgraded to use calico-ipam.
-         - name: upgrade-ipam
--          image: calico/cni:v3.10.1
-+          image: calico/cni:v3.10.0
-           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
-           env:
-             - name: KUBERNETES_NODE_NAME
-@@ -536,7 +536,7 @@
-         # This container installs the CNI binaries
-         # and CNI network config file on each node.
-         - name: install-cni
--          image: calico/cni:v3.10.1
-+          image: calico/cni:v3.10.0
-           command: ["/install-cni.sh"]
-           env:
-             # Name of the CNI config file to create.
-@@ -570,7 +570,7 @@
-         # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
-         # to communicate with Felix over the Policy Sync API.
-         - name: flexvol-driver
--          image: calico/pod2daemon-flexvol:v3.10.1
-+          image: calico/pod2daemon-flexvol:v3.10.0
-           volumeMounts:
-           - name: flexvol-driver-host
-             mountPath: /host/driver
-@@ -579,7 +579,7 @@
-         # container programs network policy and routes on each
-         # host.
-         - name: calico-node
--          image: calico/node:v3.10.1
-+          image: calico/node:v3.10.0
-           env:
-             # Use Kubernetes API as the backing datastore.
-             - name: DATASTORE_TYPE
-@@ -606,6 +606,8 @@
-               value: "autodetect"
-             # Enable IPIP
-             - name: CALICO_IPV4POOL_IPIP
-+              value: "Never"
-+            - name: CALICO_IPV4POOL_VXLAN
-               value: "Always"
-             # Set MTU for tunnel device used if ipip is enabled
-             - name: FELIX_IPINIPMTU
-@@ -617,7 +619,7 @@
-             # chosen from this range. Changing this value after installation will have
-             # no effect. This should fall within `--cluster-cidr`.
-             - name: CALICO_IPV4POOL_CIDR
--              value: "192.168.0.0/16"
-+              value: "10.244.0.0/16"
-             # Disable file logging so `kubectl logs` works.
-             - name: CALICO_DISABLE_FILE_LOGGING
-               value: "true"
-@@ -753,7 +755,7 @@
-       priorityClassName: system-cluster-critical
-       containers:
-         - name: calico-kube-controllers
--          image: calico/kube-controllers:v3.10.1
-+          image: calico/kube-controllers:v3.10.0
-           env:
-             # Choose which controllers to run.
-             - name: ENABLED_CONTROLLERS
-EOF
+                                    --- calico.yaml	2019-11-21 17:06:25.590230285 +0100
+                                    +++ calico.yaml.new	2019-11-21 17:02:11.885017690 +0100
+                                    @@ -24,7 +24,7 @@
+                                           "plugins": [
+                                             {
+                                               "type": "calico",
+                                    -          "log_level": "info",
+                                    +          "log_level": "debug",
+                                               "datastore_type": "kubernetes",
+                                               "nodename": "__KUBERNETES_NODE_NAME__",
+                                               "mtu": __CNI_MTU__,
+                                    @@ -516,7 +516,7 @@
+                                             # It can be deleted if this is a fresh installation, or if you have already
+                                             # upgraded to use calico-ipam.
+                                             - name: upgrade-ipam
+                                    -          image: calico/cni:v3.10.1
+                                    +          image: calico/cni:v3.10.0
+                                               command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
+                                               env:
+                                                 - name: KUBERNETES_NODE_NAME
+                                    @@ -536,7 +536,7 @@
+                                             # This container installs the CNI binaries
+                                             # and CNI network config file on each node.
+                                             - name: install-cni
+                                    -          image: calico/cni:v3.10.1
+                                    +          image: calico/cni:v3.10.0
+                                               command: ["/install-cni.sh"]
+                                               env:
+                                                 # Name of the CNI config file to create.
+                                    @@ -570,7 +570,7 @@
+                                             # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
+                                             # to communicate with Felix over the Policy Sync API.
+                                             - name: flexvol-driver
+                                    -          image: calico/pod2daemon-flexvol:v3.10.1
+                                    +          image: calico/pod2daemon-flexvol:v3.10.0
+                                               volumeMounts:
+                                               - name: flexvol-driver-host
+                                                 mountPath: /host/driver
+                                    @@ -579,7 +579,7 @@
+                                             # container programs network policy and routes on each
+                                             # host.
+                                             - name: calico-node
+                                    -          image: calico/node:v3.10.1
+                                    +          image: calico/node:v3.10.0
+                                               env:
+                                                 # Use Kubernetes API as the backing datastore.
+                                                 - name: DATASTORE_TYPE
+                                    @@ -606,6 +606,8 @@
+                                                   value: "autodetect"
+                                                 # Enable IPIP
+                                                 - name: CALICO_IPV4POOL_IPIP
+                                    +              value: "Never"
+                                    +            - name: CALICO_IPV4POOL_VXLAN
+                                                   value: "Always"
+                                                 # Set MTU for tunnel device used if ipip is enabled
+                                                 - name: FELIX_IPINIPMTU
+                                    @@ -617,7 +619,7 @@
+                                                 # chosen from this range. Changing this value after installation will have
+                                                 # no effect. This should fall within `--cluster-cidr`.
+                                                 - name: CALICO_IPV4POOL_CIDR
+                                    -              value: "192.168.0.0/16"
+                                    +              value: "10.244.0.0/16"
+                                                 # Disable file logging so `kubectl logs` works.
+                                                 - name: CALICO_DISABLE_FILE_LOGGING
+                                                   value: "true"
+                                    @@ -753,7 +755,7 @@
+                                           priorityClassName: system-cluster-critical
+                                           containers:
+                                             - name: calico-kube-controllers
+                                    -          image: calico/kube-controllers:v3.10.1
+                                    +          image: calico/kube-controllers:v3.10.0
+                                               env:
+                                                 # Choose which controllers to run.
+                                                 - name: ENABLED_CONTROLLERS
+                                    EOF
 
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
