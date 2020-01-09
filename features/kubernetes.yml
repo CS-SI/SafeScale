@@ -63,6 +63,11 @@ feature:
         - HelmVersion=2.14.1
         - DisableHelm=false
         - HelmDefaultNamespace=default
+        - ExternalLoadBalancerHostname=
+        - OIDCRealm=
+        - OIDCClientName=default
+        - OIDCGroupName=user_groups
+        - OIDCUserName=username
 
     install:
         dcos:
@@ -376,11 +381,11 @@ feature:
                             masters: one
                         run: |
                             mkdir -p /etc/kubernetes/pki
-                            if [ -f ${SF_ETCDIR}/etc/pki/ca/signca/certs/ca-chain.cert.pem ]; then
+                            if [ -f ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem ]; then
                                 [ -f /etc/kubernetes/pki/ca.crt ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.crt.notused
                                 [ -f /etc/kubernetes/pki/ca.key ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.key.notused
-                                ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /etc/kubernetes/pki/ca.crt
-                                ln -s ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem /etc/kubernetes/pki/ca.key
+                                cp ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /etc/kubernetes/pki/ca.crt
+                                cp ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem /etc/kubernetes/pki/ca.key
                             fi
                             sfExit
 
@@ -450,6 +455,17 @@ feature:
                             dns:
                                 type: CoreDNS
                             imageRepository: k8s.gcr.io
+                            {{ if .OIDCRealm }}
+                                {{ if .ExternalLoadBalancerHostname }}
+                            oidc-issuer-url: "https://{{ .ExternalLoadBalancerHostname }}/realms/{{ .OIDCRealm }}"
+                                {{ else }}
+                            oidc-issuer-url: "https://{{ .EndpointIP }}/realms/{{ .OIDCRealm }}"
+                            # oidc-ca-file: "/opt/safescale/etc/pki/ca/signca/certs/ca-chain.cert.pem"
+                                {{ end }}
+                            oidc-client-id: "{{ .OIDCClientName }}"
+                            oidc-username-claim: "{{ .OIDCUserName }}"
+                            oidc-groups-claim: "{{ .OIDCGroupName }}"
+                            {{ end }}
                             EOF
 
                             sfRetry 5m 5 kubeadm config images pull || sfFail 202
