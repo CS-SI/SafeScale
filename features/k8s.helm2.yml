@@ -294,7 +294,7 @@ feature:
 
                             # Push the archive in the dropzone and synchronize
                             sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 207
-                            for ip in {{ range .MasterIPs }}{{ . }} {{ end }}; do
+                            for ip in {{ range .ClusterMasterIPs }}{{ . }} {{ end }}; do
                                 sfDropzoneSync $ip || sfFail 208
                             done
                             rm -f ${SF_TMPDIR}/helm_config.tar.gz

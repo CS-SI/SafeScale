@@ -28,10 +28,20 @@ feature:
     requirements:
         features:
             - kubernetes
-            - helm
+            - k8s.helm-repo.codecentric
 
     install:
         bash:
+            check:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm ls {{ .HelmRepoName }}/{{ .ReleaseName }} || sfFail 192
+                            sfExit
+
             add:
                 pace: helm
                 steps:
@@ -39,7 +49,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            helm install {{ .HelmRepoName }}/keycloak \
+                            sfHelm install {{ .HelmRepoName }}/keycloak \
                                 --name {{ .ReleaseName }}}} \
                                 --namespace "{{ .Namespace }}" \
                                 --version {{ .ChartVersion }} \
@@ -51,6 +61,7 @@ feature:
                                 --set ingress.controller="kong" \
                                 --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
                                 || sfFail 192
+                            sfExit
 
             remove:
                 pace: helm
@@ -59,5 +70,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            sfHelm delete {{ .ReleaseName }}
+                            sfHelm delete {{ .ReleaseName }} || sfFail 192
+                            sfExit
+
 ---
