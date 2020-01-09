@@ -126,14 +126,12 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	v := install.Variables{}
 
 	// If hardening is disabled, set the appropriate parameter of the kubernetes feature
-	if _, ok := req.DisabledDefaultFeatures["hardening"]; ok {
-		v["Hardening"] = strconv.FormatBool(!ok)
-	}
+	_, ok := req.DisabledDefaultFeatures["hardening"]
+	v["Hardening"] = strconv.FormatBool(!ok)
 
 	// Disable dashboard if requested
-	if _, ok := req.DisabledDefaultFeatures["dashboard"]; ok {
-		v["Dashboard"] = strconv.FormatBool(!ok)
-	}
+	_, ok = req.DisabledDefaultFeatures["dashboard"]
+	v["Dashboard"] = strconv.FormatBool(!ok)
 
 	// If helm installation is disabled, set the appropriate parameter of the kubernetes feature
 	_, ok = req.DisabledDefaultFeatures["helm"]
