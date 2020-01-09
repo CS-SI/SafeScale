@@ -339,7 +339,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+ref+")", true)
+	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
