@@ -109,7 +109,7 @@ EOF
 
 	chown -R safescale:safescale /opt/safescale
 	chmod -R 0640 /opt/safescale
-	find /opt/safescale -type d -exec chmod a+x {} \;
+	find /opt/safescale -type d -exec chmod a+rx {} \;
 	chmod 1777 /opt/safescale/var/tmp
 
 	chown -R {{.User}}:{{.User}} /home/{{.User}}
