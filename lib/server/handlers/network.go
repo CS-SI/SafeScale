@@ -257,16 +257,10 @@ func (handler *NetworkHandler) Create(
 		secondaryGatewayName = "gw2-" + network.Name
 	}
 
-	keypairName := "kp_" + network.Name
-	keypair, err := handler.service.CreateKeyPair(keypairName)
-	if err != nil {
-		return nil, err
-	}
-
 	gwRequest := resources.GatewayRequest{
-		ImageID:    img.ID,
-		Network:    network,
-		KeyPair:    keypair,
+		ImageID: img.ID,
+		Network: network,
+		// KeyPair:    keypair,
 		TemplateID: template.ID,
 		CIDR:       network.CIDR,
 	}
@@ -283,6 +277,11 @@ func (handler *NetworkHandler) Create(
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
 	primaryRequest.Name = primaryGatewayName
+	keypair, err := handler.service.CreateKeyPair("kp_" + primaryGatewayName)
+	if err != nil {
+		return nil, err
+	}
+	primaryRequest.KeyPair = keypair
 	primaryTask, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -300,6 +299,11 @@ func (handler *NetworkHandler) Create(
 	if failover {
 		secondaryRequest := gwRequest
 		secondaryRequest.Name = secondaryGatewayName
+		keypair, err = handler.service.CreateKeyPair("kp_" + secondaryGatewayName)
+		if err != nil {
+			return nil, err
+		}
+		secondaryRequest.KeyPair = keypair
 		secondaryTask, err = concurrency.NewTaskWithContext(ctx)
 		if err != nil {
 			return nil, err
