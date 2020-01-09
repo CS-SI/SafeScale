@@ -831,7 +831,7 @@ sfRandomString() {
     [ $# -ge 1 ] && count=$1
     local charset="[:graph:]"
     [ $# -ge 2 ] && charset="$2"
-    </dev/urandom tr -dc "$charset" | head -c${count}
+    </dev/urandom tr -dc "$charset" | head -c${count} || true
     return 0
 }
 export -f sfRandomString
@@ -879,7 +879,7 @@ sfDetectFacts() {
 		debian|ubuntu)
 			FACTS["redhat_like"]=0
 			FACTS["debian_like"]=1
-			FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f2 | cut -d~ -f1 || true)
+			FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f3 | cut -d~ -f1 || true)
 			;;
 	esac
 	if systemctl | grep '\-.mount' &>/dev/null; then
@@ -901,25 +901,27 @@ sfDetectFacts() {
     [ $val -le 0 ] && val=1
     FACTS["2/3_of_threads"]=$val
 
-    FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }})
-
     sfProbeGPU
 
-    # Some facts about installed features
-    id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    # legacy...
-    [ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    [ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    FACTS["edgeproxy4network_docker_id"]=$id
+    if which docker &>/dev/null; then
+        FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }} || true)
 
-    id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null)
-    FACTS["ingress4platform_docker_id"]=$id
+        # Some facts about installed features
+        id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
+        # legacy...
+        [ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
+        [ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
+        FACTS["edgeproxy4network_docker_id"]=$id
 
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2)
-    FACTS["postgresql4platform_docker_id"]=$id
+        id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
+        FACTS["ingress4platform_docker_id"]=$id
 
-    id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2)
-    FACTS["keycloak4platform_docker_id"]=$id
+        id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2 || true)
+        FACTS["postgresql4platform_docker_id"]=$id
+
+        id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2 || true)
+        FACTS["keycloak4platform_docker_id"]=$id
+    fi
 
     # "Serialize" facts to file
     declare -p FACTS >"${SERIALIZED_FACTS}"
