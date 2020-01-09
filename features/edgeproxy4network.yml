@@ -37,6 +37,7 @@ feature:
                             nodes: no
                         run: |
                             curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null || sfFail 192
+                            sfExit
 
             add:
 #                pace: config,secret,networks,start
