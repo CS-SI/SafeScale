@@ -193,12 +193,13 @@ feature:
                             EOF
 
                             cp ${SF_ETCDIR}/pki/ca/rootca/openssl.cnf ${SF_ETCDIR}/pki/ca/signca
-                            sed -e -i "s|^\(dir[[:space:]]+= ${SF_ETCDIR}/pki/ca/\)rootca$|\1signca|" \
-                                   -i "s|^\(private_key[[:space:]]+= \$dir/private/\)*$|\1signca.key.pem|" \
-                                   -i "s|^\(certificate[[:space:]]+= \$dir/certs/\)*$|\1signca.cert.pem|" \
-                                   -i "s|^\(crl[[:space:]]+= \$dir/crl/\)*$|\1signca.crl.pem|" \
-                                   -i "s|^\(policy[[:space:]]+= policy_\)*$|\1_loose|" \
-                                 ${SF_ETCDIR}/pki/ca/signca/openssl.cnf
+    
+                            sed -E -i 's|^(dir\s+= \$\{SF_ETCDIR\}/pki/ca/)+.*$|\1signca|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
+                            sed -E -i 's|^(private_key\s+= \$dir/private/)+.*$|\1signca.key.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
+                            sed -E -i 's|^(private_key\s+= \$dir/private/)+.*$|\1signca.key.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
+                            sed -E -i 's|^(certificate\s+= \$dir/certs/)+.*$|\1signca.cert.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
+                            sed -E -i 's|^(crl\s+= \$dir/crl/)+.*$|\1signca.crl.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
+                            sed -E -i 's|^(policy\s+= policy_)+.*$|\1_loose|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
 
                             sfExit
 
