@@ -384,7 +384,7 @@ feature:
                             if [ -f ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem ]; then
                                 [ -f /etc/kubernetes/pki/ca.crt ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.crt.notused
                                 [ -f /etc/kubernetes/pki/ca.key ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.key.notused
-                                cp ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /etc/kubernetes/pki/ca.crt
+                                cp ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem /etc/kubernetes/pki/ca.crt
                                 cp ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem /etc/kubernetes/pki/ca.key
                             fi
                             sfExit
@@ -670,11 +670,11 @@ feature:
                             --- calico.yaml	2019-11-21 17:06:25.590230285 +0100
                             +++ calico.yaml.new	2019-11-21 17:02:11.885017690 +0100
                             @@ -24,7 +24,7 @@
-                                "plugins": [
+                                  "plugins": [
                                     {
                                     "type": "calico",
-                            -          "log_level": "info",
-                            +          "log_level": "debug",
+                            -        "log_level": "info",
+                            +        "log_level": "debug",
                                     "datastore_type": "kubernetes",
                                     "nodename": "__KUBERNETES_NODE_NAME__",
                                     "mtu": __CNI_MTU__,
@@ -684,8 +684,8 @@ feature:
                                     - name: upgrade-ipam
                             -          image: calico/cni:v3.10.1
                             +          image: calico/cni:v3.10.0
-                                    command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
-                                    env:
+                                      command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
+                                      env:
                                         - name: KUBERNETES_NODE_NAME
                             @@ -536,7 +536,7 @@
                                     # This container installs the CNI binaries
@@ -693,8 +693,8 @@ feature:
                                     - name: install-cni
                             -          image: calico/cni:v3.10.1
                             +          image: calico/cni:v3.10.0
-                                    command: ["/install-cni.sh"]
-                                    env:
+                                      command: ["/install-cni.sh"]
+                                      env:
                                         # Name of the CNI config file to create.
                             @@ -570,7 +570,7 @@
                                     # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
@@ -702,8 +702,8 @@ feature:
                                     - name: flexvol-driver
                             -          image: calico/pod2daemon-flexvol:v3.10.1
                             +          image: calico/pod2daemon-flexvol:v3.10.0
-                                    volumeMounts:
-                                    - name: flexvol-driver-host
+                                      volumeMounts:
+                                      - name: flexvol-driver-host
                                         mountPath: /host/driver
                             @@ -579,7 +579,7 @@
                                     # container programs network policy and routes on each
@@ -711,16 +711,16 @@ feature:
                                     - name: calico-node
                             -          image: calico/node:v3.10.1
                             +          image: calico/node:v3.10.0
-                                    env:
+                                      env:
                                         # Use Kubernetes API as the backing datastore.
                                         - name: DATASTORE_TYPE
                             @@ -606,6 +606,8 @@
-                                        value: "autodetect"
+                                          value: "autodetect"
                                         # Enable IPIP
                                         - name: CALICO_IPV4POOL_IPIP
                             +              value: "Never"
                             +            - name: CALICO_IPV4POOL_VXLAN
-                                        value: "Always"
+                                          value: "Always"
                                         # Set MTU for tunnel device used if ipip is enabled
                                         - name: FELIX_IPINIPMTU
                             @@ -617,7 +619,7 @@
@@ -731,14 +731,14 @@ feature:
                             +              value: "10.244.0.0/16"
                                         # Disable file logging so `kubectl logs` works.
                                         - name: CALICO_DISABLE_FILE_LOGGING
-                                        value: "true"
+                                          value: "true"
                             @@ -753,7 +755,7 @@
-                                priorityClassName: system-cluster-critical
-                                containers:
+                                  priorityClassName: system-cluster-critical
+                                  containers:
                                     - name: calico-kube-controllers
                             -          image: calico/kube-controllers:v3.10.1
                             +          image: calico/kube-controllers:v3.10.0
-                                    env:
+                                      env:
                                         # Choose which controllers to run.
                                         - name: ENABLED_CONTROLLERS
                             EOF
