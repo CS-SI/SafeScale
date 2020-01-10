@@ -196,7 +196,6 @@ feature:
     
                             sed -E -i 's|^(dir\s+= \$\{SF_ETCDIR\}/pki/ca/)+.*$|\1signca|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
                             sed -E -i 's|^(private_key\s+= \$dir/private/)+.*$|\1signca.key.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
-                            sed -E -i 's|^(private_key\s+= \$dir/private/)+.*$|\1signca.key.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
                             sed -E -i 's|^(certificate\s+= \$dir/certs/)+.*$|\1signca.cert.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
                             sed -E -i 's|^(crl\s+= \$dir/crl/)+.*$|\1signca.crl.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
                             sed -E -i 's|^(policy\s+= policy_)+.*$|\1_loose|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
