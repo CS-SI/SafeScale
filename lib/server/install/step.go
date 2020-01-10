@@ -275,14 +275,15 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	)()
 
 	if is.Serial || s.Serialize {
-		subtask, err := concurrency.NewTask(is.Worker.feature.task)
-		if err != nil {
-			return nil, err
-		}
 
 		for _, h := range hosts {
 			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			is.Worker.startTime = time.Now()
+
+			subtask, err := concurrency.NewTask(is.Worker.feature.task)
+			if err != nil {
+				return nil, err
+			}
 
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
@@ -293,7 +294,6 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			}
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
 			results[h.Name] = result.(stepResult)
-			_, _ = subtask.Reset() // FIXME Later
 
 			if !results[h.Name].Successful() {
 				if is.Worker.action == action.Check { // Checks can fail and it's ok

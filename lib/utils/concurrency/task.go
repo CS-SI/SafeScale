@@ -70,7 +70,7 @@ type Task interface {
 	Unlock(TaskedLock)
 	RUnlock(TaskedLock)
 	New() (Task, error)
-	Reset() (Task, error)
+	// Reset() (Task, error) // VPL: disabled, may lead to DATARACE; need to either fix or definitively remove Reset()
 	// GetResult() TaskResult
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
@@ -421,22 +421,23 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 }
 
 // Reset resets the task for reuse
-func (t *task) Reset() (Task, error) {
-	tid, _ := t.GetID() // FIXME Later
+// VPL: DISABLED; need fix or definitive removal
+// func (t *task) Reset() (Task, error) {
+// 	tid, _ := t.GetID() // FIXME Later
 
-	status := t.GetStatus()
-	if status == RUNNING {
-		return nil, fmt.Errorf("cannot reset task '%s': task running", tid)
-	}
+// 	status := t.GetStatus()
+// 	if status == RUNNING {
+// 		return nil, fmt.Errorf("cannot reset task '%s': task running", tid)
+// 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+// 	t.lock.Lock()
+// 	defer t.lock.Unlock()
 
-	t.status = READY
-	t.err = nil
-	t.result = nil
-	return t, nil
-}
+// 	t.status = READY
+// 	t.err = nil
+// 	t.result = nil
+// 	return t, nil
+// }
 
 // // GetResult returns the result of the task action
 // func (t *task) GetResult() TaskResult {

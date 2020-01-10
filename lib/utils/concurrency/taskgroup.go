@@ -245,22 +245,22 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	}
 }
 
-// Reset resets the task for reuse
-func (tg *taskGroup) Reset() (Task, error) {
-	tid, _ := tg.GetID() // FIXME Later
+// // Reset resets the task for reuse
+// func (tg *taskGroup) Reset() (Task, error) {
+// 	tid, _ := tg.GetID() // FIXME Later
 
-	if tg.task.GetStatus() == RUNNING {
-		return nil, fmt.Errorf("cannot reset task group '%s': group is running", tid)
-	}
+// 	if tg.task.GetStatus() == RUNNING {
+// 		return nil, fmt.Errorf("cannot reset task group '%s': group is running", tid)
+// 	}
 
-	tg.task.lock.Lock()
-	defer tg.task.lock.Unlock()
-	tg.task.status = READY
-	tg.task.err = nil
-	tg.task.result = nil
-	tg.subtasks = []Task{}
-	return tg, nil
-}
+// 	tg.task.lock.Lock()
+// 	defer tg.task.lock.Unlock()
+// 	tg.task.status = READY
+// 	tg.task.err = nil
+// 	tg.task.result = nil
+// 	tg.subtasks = []Task{}
+// 	return tg, nil
+// }
 
 // // Result returns the result of the task action
 // func (tg *taskGroup) Result() TaskResult {

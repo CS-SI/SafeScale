@@ -403,7 +403,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// Starts gateway(s) installation
-	primaryTask, err = primaryTask.Reset()
+	primaryTask, err = concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +412,7 @@ func (handler *NetworkHandler) Create(
 		return nil, err
 	}
 	if failover && secondaryTask != nil {
-		secondaryTask, err = secondaryTask.Reset()
+		secondaryTask, err = concurrency.NewTaskWithContext(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -454,7 +454,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// Starts gateway(s) installation
-	primaryTask, err = primaryTask.Reset()
+	primaryTask, err = concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +466,7 @@ func (handler *NetworkHandler) Create(
 		return nil, err
 	}
 	if failover && secondaryTask != nil {
-		secondaryTask, err = secondaryTask.Reset()
+		secondaryTask, err = concurrency.NewTaskWithContext(ctx)
 		if err != nil {
 			return nil, err
 		}
