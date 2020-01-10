@@ -40,7 +40,7 @@ feature:
                             sfExit
 
             add:
-                pace: config,rootca,signca,chainca,spread-on-masters,spread-on-others
+                pace: config,rootca,signca,chainca,spread-on-masters,spread-on-others,register
                 steps:
                     config:
                         targets:
@@ -193,7 +193,7 @@ feature:
                             EOF
 
                             cp ${SF_ETCDIR}/pki/ca/rootca/openssl.cnf ${SF_ETCDIR}/pki/ca/signca
-    
+
                             sed -E -i 's|^(dir\s+= \$\{SF_ETCDIR\}/pki/ca/)+.*$|\1signca|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
                             sed -E -i 's|^(private_key\s+= \$dir/private/)+.*$|\1signca.key.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
                             sed -E -i 's|^(certificate\s+= \$dir/certs/)+.*$|\1signca.cert.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
@@ -319,10 +319,22 @@ feature:
                             tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C / && rm -f ${SF_TMPDIR}/safescale-signca.tar.gz || sfFail 203
                             {{ end }}
 
+                    register:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: all
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            CANAME="{{ .ClusterName }}-CA.crt"
+                            {{ else }}
+                            CANAME="{{ .Hostname }}-CA.crt"
+                            {{ end }}
                             # Add the new CA in system CAs
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
-                                    ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /usr/local/share/ca-certificates/{{ .ClusterName }}-CA.crt
+                                    ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /usr/local/share/ca-certificates/$CANAME
                                     update-ca-certificates || sfFail 204
                                     ;;
                                 redhat|centos)
@@ -331,7 +343,7 @@ feature:
                                     else
                                         TARGET=/etc/pki/ca-trust/source/anchors
                                     fi
-                                    ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem "$TARGET"
+                                    ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem "$TARGET/$CANAME"
                                     /bin/update-ca-trust || sfFail 205
                                     ;;
                                 *)
