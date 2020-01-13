@@ -191,7 +191,7 @@ func asyncRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.
 	}
 
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	// bufio.Scanner.Scan() may panic...
 	defer scerr.OnPanic(&err)()
