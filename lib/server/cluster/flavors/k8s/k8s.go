@@ -23,8 +23,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	txttmpl "text/template"
-
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
@@ -36,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 //go:generate rice embed-go
@@ -202,7 +201,8 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
+		// tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(nil, false)).Parse(tmplString)
+		tmplPrepared, err := template.Parse("install_requirements", tmplString, nil)
 		if err != nil {
 			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
