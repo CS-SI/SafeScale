@@ -144,5 +144,13 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/ovh/go-ovh"
   revision = "ba5adb4cf0148a3dbdbd30586f075266256a77b1"
 
+[[override]]
+  name = "github.com/denisbrodbeck/machineid"
+  version = "=v1.0.1"
+
+[[override]]
+  name = "github.com/Masterminds/sprig"
+  version = "=v2.22.0"
+
 [prune]
   go-tests = true
