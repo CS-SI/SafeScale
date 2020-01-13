@@ -54,6 +54,7 @@ var (
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
 		ConfigureCluster:            configureCluster,
+		UnconfigureCluster:          unconfigureCluster,
 		LeaveNodeFromCluster:        leaveNodeFromCluster,
 	}
 )
@@ -128,6 +129,30 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	_, ok := req.DisabledDefaultFeatures["hardening"]
 	v["Hardening"] = strconv.FormatBool(!ok)
 
+	// If complexity == Normal or Large, creates a VIP for Kubernetes attached to masters
+	// FIXME: find a way to store VIP in cluster metadata
+	var controlplaneEndointIP string
+	vip, err := foreman.Cluster().GetService().CreateVirtualIP()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			derr := foreman.Cluster().GetService().DeleteVirtualIP(task, vip)
+			if derr != nil {
+				logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+			}
+		}
+	}()
+
+	for _, id := range foreman.Cluster().ListMasterIPs(task) {
+		err = vip.BindHost(task, id)
+		if err != nil {
+			return err
+		}
+	}
+	controlplaneEndpointIP = vip.GetPrivateIP(task)
+
 	// Disable dashboard if requested
 	_, ok = req.DisabledDefaultFeatures["dashboard"]
 	v["Dashboard"] = strconv.FormatBool(!ok)
@@ -137,7 +162,11 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	v["DisableHelm"] = strconv.FormatBool(ok)
 
 	// Installs kubernetes feature
-	results, err := feature.Add(target, v, install.Settings{})
+	results, err := feature.Add(
+		target,
+		install.Variables{"ControlplaneEndpointIP": controlplaneEndpointIP},
+		install.Settings{},
+	)
 	if err != nil {
 		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
 		return err
@@ -148,6 +177,15 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 		return err
 	}
 	logrus.Println(fmt.Sprintf("[cluster %s] feature 'kubernetes' addition successful.", clusterName))
+	return nil
+}
+
+func unconfigureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
+	clusterName := foreman.Cluster().GetIdentity(task).Name
+	logrus.Println(fmt.Sprintf("[cluster %s] removing virtual IP...", clusterName))
+
+	// FIXME: find a way to store VIP in cluster metadata
+	logrus.Println(fmt.Sprintf("[cluster %s] virtual IP is not deleted, not implemented")
 	return nil
 }
 

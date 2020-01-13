@@ -68,6 +68,7 @@ feature:
         - OIDCClientName=default
         - OIDCGroupName=user_groups
         - OIDCUserName=username
+        - ControlplaneEndpointIP
 
     install:
         dcos:
@@ -270,15 +271,15 @@ feature:
                             {{ if eq .Hardening "true" }}
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
-                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 193
+                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 195
                                     ;;
 
                                 centos|redhat)
-                                    yum -y install audit audit-libs quota || sfFail 193
+                                    yum -y install audit audit-libs quota || sfFail 196
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
-                                   sfFail 193
+                                   sfFail 197
                                    ;;
                             esac
 
@@ -407,7 +408,7 @@ feature:
                             ---
                             apiVersion: kubeadm.k8s.io/v1beta1
                             kind: ClusterConfiguration
-                            controlPlaneEndpoint: "{{.DefaultRouteIP}}:6443"
+                            controlPlaneEndpoint: "{{.ControlplaneEndpointIP}}:6443"
                             kubernetesVersion: ${KUBE_VERSION}
                             etcd:
                                 local:
@@ -503,6 +504,7 @@ feature:
                             sfDropzoneClean
 
                             {{ if eq .Hardening "true" }}
+                            # define and apply Pod Security Polices (PSP)
                             cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
                             apiVersion: extensions/v1beta1
                             kind: PodSecurityPolicy
@@ -640,6 +642,8 @@ feature:
                             touch /etc/kubernetes/.joined
                             echo "cp1 init done"
 
+                            touch /etc/kubernetes/.joined
+                            echo "init done"
                             sfExit
 
                     cni:
@@ -660,10 +664,10 @@ feature:
 
                                     # Applies RBAC Calico
                                     wget https://docs.projectcalico.org/v3.10/manifests/rbac/rbac-kdd-calico.yaml -P /etc/kubernetes/kubeadm/
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 212
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 219
 
                                     # Downloads default calico
-                                    wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml -P /etc/kubernetes/kubeadm/
+                                    wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml -P /etc/kubernetes/kubeadm/ || sfFail 220
 
                                     # Creates our patch file
                                     cat >/etc/kubernetes/kubeadm/calico.yaml.patch <<-'EOF'
@@ -703,15 +707,15 @@ feature:
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
                                         debian|ubuntu)
-                                            sfApt update && sfApt install -y patch || sfFail 213
+                                            sfApt update && sfApt install -y patch || sfFail 221
                                             ;;
 
                                         centos|redhat)
-                                            yum -y install patch || sfFail 213
+                                            yum -y install patch || sfFail 222
                                             ;;
 
                                         *) echo "unsupported linux distribution ''"
-                                           sfFail 213
+                                           sfFail 223
                                            ;;
                                     esac
 
@@ -719,10 +723,10 @@ feature:
                                     patch -l /etc/kubernetes/kubeadm/calico.yaml /etc/kubernetes/kubeadm/calico.yaml.patch
 
                                     # Applies patched file
-                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 214
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 224
 
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 215 "Firewall problem"
+                                    sfFirewallReload || sfFail 225 "Firewall problem"
                                     ;;
                             esac
                             sfExit 0
@@ -737,10 +741,10 @@ feature:
                             sfDropzonePop ${SF_TMPDIR} || sfFail 223
                             sfDropzoneClean
 
-                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 217
-                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 218
-                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 219
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 220
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 227
+                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 228
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 229
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 230
 
                             # waits availability of key pods
                             set -u -o pipefail
@@ -757,7 +761,7 @@ feature:
                                     ;;
                                 calico)
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 225 "Firewall problem"
+                                    sfFirewallReload || sfFail 235 "Firewall problem"
                                     ;;
                             esac
 
@@ -811,7 +815,7 @@ feature:
 
                     helm-certs:
                         targets:
-                            masters: one
+                            masters: any
                         run: |
                             [ "{{ .DisableHelm }}" = "true" ] && sfExit
 
@@ -865,7 +869,7 @@ feature:
                             subjectAltName=@alt_names
                             EOF
 
-                            ## Generate the certificates signing request based on the config file
+                            # Generate the certificates signing request based on the config file
                             openssl req -new -key tiller.key.pem -out tiller.csr.pem -config csr.conf
                             openssl req -new -key helm.key.pem -out helm.csr.pem -config csr.conf
 
@@ -887,9 +891,9 @@ feature:
                             mv helm.cert.pem helm.key.pem ${SF_ETCDIR}/helm/pki
                             mv tiller.cert.pem tiller.key.pem ${SF_ETCDIR}/helm/pki
 
-                            chown -R root:{{ .ClusterAdminUsername }} ${SF_ETCDIR}/helm
-                            chmod -R u+rwx,g+r-wx,o-rwx ${SF_ETCDIR}/helm
-                            find ${SF_ETCDIR}/helm -exec chmod ug+x {} \;
+                            chown -R root:{{ .ClusterAdminUsername }} /etc/kubernetes/pki
+                            chmod -R u+rwx,g+r-wx,o-rwx /etc/kubernetes/pki
+                            find /etc/kubernetes/pki -type d -exec chmod ug+x {} \;
 
                             ## Clean directory
                             rm -f ca.srl csr.conf helm.csr.pem tiller.csr.pem
@@ -947,6 +951,7 @@ feature:
                                   name: tiller
                                   namespace: kube-system
                             EOF
+                            sfExit
 
                             sfExit
 
@@ -1036,7 +1041,6 @@ feature:
                                     fi
                                 fi
                             fi
-
                             sfExit
 
             remove:
@@ -1046,7 +1050,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            ## Delete deployment
+                            # Delete deployment
                             if sfKubectl -n kube-system get deployment tiller-deploy &>/dev/null; then
                                 sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
                             fi
@@ -1089,7 +1093,7 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            rm -f /etc/kong4gateway/includes/kubernetes.conf
+                            rm -f ${SF_ETCDIR}/kong4gateway/includes/kubernetes.conf
                             sfReverseProxyReload
                             sfExit
 
@@ -1110,14 +1114,14 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 204 "failure purging kubernetes"
+                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 223 "failure purging kubernetes"
                                     ;;
                                 redhat|centos)
-                                    yum remove -y kubectl kubeadm kubelet || sfFail 204 "failure purging kubernetes"
+                                    yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
                                     ;;
                             esac
-                            sfFirewallReload || sfFail 205 "Firewall problem"
-                            rm -rf /etc/kubernetes/.joined /home/{{ .ClusterAdminUsername }}/.kube
+                            sfFirewallReload || sfFail 200 "Firewall problem"
+                            rm -f /etc/kubernetes/.joined
                             sfExit
 
 ...
