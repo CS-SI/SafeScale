@@ -301,8 +301,17 @@ feature:
                             # Recover rootca and chain-ca from Dropzone
                             sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
-                            tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C / && rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 201
-                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C / && rm -f ${SF_TMPDIR}/safescale-signca.tar.gz || sfFail 202
+
+                            tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C /
+                            retcode=$?
+                            rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz
+                            [ $retcode -ne 0 ] && sfFail 201
+
+                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C /
+                            retcode=$?
+                            rm -f ${SF_TMPDIR}/safescale-signca.tar.gz
+                            [ $retcode -ne 0 ] && sfFail 202
+
                             sfExit
 
                     spread-on-others:
@@ -316,14 +325,18 @@ feature:
                             # Recover chain-ca from Dropzone
                             sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
-                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C / && rm -f ${SF_TMPDIR}/safescale-signca.tar.gz || sfFail 203
+                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C /
+                            retcode=$?
+                            rm -f ${SF_TMPDIR}/safescale-signca.tar.gz
+                            [ $retcode -ne 0 ] && sfFail 203
                             {{ end }}
+                            sfExit
 
                     register:
                         targets:
                             hosts: yes
                             gateways: all
-                            masters: no
+                            masters: all
                             nodes: all
                         run: |
                             {{ if .ClusterFlavor }}
@@ -347,7 +360,7 @@ feature:
                                     /bin/update-ca-trust || sfFail 205
                                     ;;
                                 *)
-                                    sfFail 206 "'spread' step not implemented for ($sfGetFact "linux_kind")"
+                                    sfFail 206 "'register' step not implemented for ($sfGetFact "linux_kind")"
                                     ;;
                             esac
 
