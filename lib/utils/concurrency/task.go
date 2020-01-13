@@ -279,6 +279,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 
 	// tracer := NewTracer(true, t, "")
 	finish := false
+	defer close(t.finishCh)
 
 	if timeout > 0 {
 		for !finish {
@@ -291,6 +292,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.status = ABORTED
 				t.err = scerr.AbortedError("cancel signal received", nil)
 				finish = true
+				t.finishCh <- struct{}{}
 			case <-t.doneCh:
 				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 				// tracer.Trace("receiving done signal from go routine")
@@ -298,6 +300,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				defer t.lock.Unlock()
 				t.status = DONE
 				finish = true
+				t.finishCh <- struct{}{}
 				break
 			case <-t.abortCh:
 				// Abort signal received
@@ -307,12 +310,14 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.status = ABORTED
 				t.err = scerr.AbortedError("", nil)
 				finish = true
+				t.finishCh <- struct{}{}
 			case <-time.After(timeout):
 				t.lock.Lock()
 				defer t.lock.Unlock()
 				t.status = TIMEOUT
 				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
 				finish = true
+				t.finishCh <- struct{}{}
 			}
 		}
 	} else {
@@ -326,6 +331,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.status = ABORTED
 				t.err = scerr.AbortedError("cancel signal received", nil)
 				finish = true
+				t.finishCh <- struct{}{}
 			case <-t.doneCh:
 				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 				// tracer.Trace("receiving done signal from go routine")
@@ -333,6 +339,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				defer t.lock.Unlock()
 				t.status = DONE
 				finish = true
+				t.finishCh <- struct{}{}
 				break
 			case <-t.abortCh:
 				// Abort signal received
@@ -342,12 +349,10 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.status = ABORTED
 				t.err = scerr.AbortedError("", nil)
 				finish = true
+				t.finishCh <- struct{}{}
 			}
 		}
 	}
-
-	t.finishCh <- struct{}{}
-	close(t.finishCh)
 }
 
 // run executes the function 'action'
@@ -519,7 +524,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	}
 }
 
-// Reset resets the task for reuse
+// Deprecated: Reset resets the task for reuse. Deprecated due to data race problems.
 func (t *task) Reset() (Task, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()

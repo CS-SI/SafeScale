@@ -294,7 +294,11 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			}
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
 			results[h.Name] = result.(stepResult)
-			_, err = subtask.Reset()
+			taskCtx, err := subtask.GetContext()
+			if err != nil {
+				return nil, err
+			}
+			_, err = concurrency.NewTaskWithContext(taskCtx, subtask)
 			if err != nil {
 				return nil, err
 			}
