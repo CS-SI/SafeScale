@@ -909,18 +909,18 @@ feature:
                             EOF
 
                             ## Generate the certificates signing request based on the config file
-                            openssl req -new -key tiller.key.pem -out tiller.csr.pem -config ${SF_ETCDIR}/pki/ca/signca/openssl.cnf
-                            openssl req -new -key helm.key.pem -out helm.csr.pem -config ${SF_ETCDIR}/pki/ca/signca/openssl.cnf
+                            openssl req -new -key tiller.key.pem -out tiller.csr.pem -config csr.conf
+                            openssl req -new -key helm.key.pem -out helm.csr.pem -config csr.conf
 
                             ## Generate certificates using the ca-chain.key.pem, ca-chain.cert.pem and xxxx.csr.pem
                             openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/sinca/private/signca.key.pem \
+                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
                                               -CAcreateserial \
                                               -in tiller.csr.pem -out tiller.cert.pem -days 375 -extfile csr.conf
 
                             #openssl x509 -req -in helm.csr.pem -CA ca.cert.pem -CAkey ca.key.pem \
                             openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/sinca/private/signca.key.pem \
+                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
                                               -CAcreateserial \
                                               -in helm.csr.pem -out helm.cert.pem -days 375 -extfile csr.conf
 
