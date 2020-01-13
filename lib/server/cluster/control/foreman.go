@@ -959,7 +959,8 @@ func uploadTemplateToFile(
 	if err != nil {
 		return "", fmt.Errorf("failed to load template: %s", err.Error())
 	}
-	tmplCmd, err := txttmpl.New(fileName).Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+	// tmplCmd, err := txttmpl.New(fileName).Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+	tmplCmd, err := template.Parse(fileName, tmplString, funcMap)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %s", err.Error())
 	}

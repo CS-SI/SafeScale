@@ -214,7 +214,8 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+		// tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+		tmplPrepared, err := template.Parse("install_requirements", tmplString, funcMap)
 		if err != nil {
 			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
