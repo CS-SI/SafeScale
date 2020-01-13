@@ -27,9 +27,9 @@ feature:
     install:
         bash:
             check:
-                pace: docker
+                pace: service
                 steps:
-                    pkg:
+                    service:
                         targets:
                             hosts: yes
                             masters: all
