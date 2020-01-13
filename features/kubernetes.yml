@@ -678,7 +678,7 @@ feature:
                                       "datastore_type": "kubernetes",
                                       "nodename": "__KUBERNETES_NODE_NAME__",
                                       "mtu": __CNI_MTU__,
-                            @@ -606,6 +606,8 @@
+                            @@ -606,6 +606,10 @@
                                           value: "autodetect"
                                         # Enable IPIP
                                         - name: CALICO_IPV4POOL_IPIP
@@ -689,7 +689,7 @@ feature:
                                           value: "Always"
                                         # Set MTU for tunnel device used if ipip is enabled
                                         - name: FELIX_IPINIPMTU
-                            @@ -617,7 +619,7 @@
+                            @@ -619,7 +621,7 @@
                                         # chosen from this range. Changing this value after installation will have
                                         # no effect. This should fall within `--cluster-cidr`.
                                         - name: CALICO_IPV4POOL_CIDR
