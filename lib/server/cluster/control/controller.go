@@ -523,8 +523,8 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 		task = concurrency.RootTask()
 	}
 
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true)
-	defer tracer.GoingIn().OnExitTrace()()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
+	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	found := false
@@ -807,8 +807,8 @@ func (c *Controller) AddNodes(task concurrency.Task, count uint, req *pb.HostDef
 		task = concurrency.RootTask()
 	}
 
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%d)", count), true)
-	defer tracer.GoingIn().OnExitTrace()()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%d)", count), true).GoingIn()
+	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	nodeDef := complementHostDefinition(req, pb.HostDefinition{})
