@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // ToPBSshConfig converts a system.SSHConfig into a SshConfig
@@ -164,12 +165,12 @@ func ToPBHost(in *resources.Host) *pb.Host {
 		volumes       []string
 	)
 
-	err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 = v.(*propsv1.HostNetwork)
-		return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-			hostSizingV1 = v.(*propsv1.HostSizing)
-			return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(v interface{}) error {
-				hostVolumesV1 = v.(*propsv1.HostVolumes)
+	err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 = clonable.(*propsv1.HostNetwork)
+		return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			hostSizingV1 = clonable.(*propsv1.HostSizing)
+			return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
+				hostVolumesV1 = clonable.(*propsv1.HostVolumes)
 				for k := range hostVolumesV1.VolumesByName {
 					volumes = append(volumes, k)
 				}
@@ -320,8 +321,8 @@ func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
 	}
 }
 
-// ToPBVirtualIP converts a resources.VIP to a pb.VirtualIp
-func ToPBVirtualIP(src resources.VIP) pb.VirtualIp {
+// ToPBVirtualIP converts a resources.VirtualIP to a pb.VirtualIp
+func ToPBVirtualIP(src resources.VirtualIP) pb.VirtualIp {
 	dest := pb.VirtualIp{
 		Id:        src.ID,
 		NetworkId: src.NetworkID,

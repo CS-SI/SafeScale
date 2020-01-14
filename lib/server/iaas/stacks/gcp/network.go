@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -452,8 +453,8 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	}
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 		hostSizingV1.Template = req.TemplateID
 		return nil
 	})
@@ -471,26 +472,26 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
 	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet")
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet")
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	return scerr.NotImplementedError("BindHostToVIP() not implemented yet")
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet")
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	return scerr.NotImplementedError("DeleteVIP() not implemented yet")
 }

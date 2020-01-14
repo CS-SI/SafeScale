@@ -17,15 +17,17 @@
 package serialize
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-	Data interface{}
+	Data data.Clonable
 	sync.RWMutex
 	module, key string
 }
@@ -54,7 +56,7 @@ type SyncedJSONProperty struct {
 // on 'apply' success.
 // If the extension is locked for read, no change will be encoded into the extension.
 // The lock applied on the extension is automatically released on exit.
-func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error) {
+func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err error) {
 	if sp == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -70,14 +72,14 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
 	defer sp.unlock()
 
-	if data, ok := sp.jsonProperty.Data.(Property); ok {
+	if data := sp.jsonProperty.Data; data != nil {
 		clone := data.Clone()
-		err := apply(clone.Content())
+		err := apply(clone)
 		if err != nil {
 			return err
 		}
 		if !sp.readLock {
-			sp.jsonProperty.Data.(Property).Replace(clone)
+			sp.jsonProperty.Data.Replace(clone)
 		}
 	}
 

@@ -18,10 +18,14 @@ package propertiesv1
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Features ...
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with updated/additional fields
 type Features struct {
 	// Installed ...
 	Installed map[string]string `json:"installed"`
@@ -37,18 +41,21 @@ func newFeatures() *Features {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (f *Features) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (f *Features) Content() data.Clonable {
 	return f
 }
 
-// Clone ... (serialize.Property interface)
-func (f *Features) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (f *Features) Clone() data.Clonable {
 	return newFeatures().Replace(f)
 }
 
-// Replace ... (serialize.Property interface)
-func (f *Features) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (f *Features) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Features)
 	f.Installed = make(map[string]string, len(src.Installed))
 	f.Disabled = make(map[string]struct{}, len(src.Installed))

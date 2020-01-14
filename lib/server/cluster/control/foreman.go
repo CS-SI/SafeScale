@@ -178,8 +178,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 		metaErr := b.cluster.UpdateMetadata(task, func() error {
 			// Cluster created and configured successfully
-			return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(v interface{}) error {
-				v.(*clusterpropsv1.State).State = state
+			return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+				clonable.(*clusterpropsv1.State).State = state
 				return nil
 			})
 		})
@@ -379,8 +379,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	b.cluster.Identity.Keypair = kp
 	b.cluster.Identity.AdminPassword = cladmPassword
 	err = b.cluster.UpdateMetadata(task, func() error {
-		err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(func(v interface{}) error {
-			defaultsV2 := v.(*clusterpropsv2.Defaults)
+		err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
+			defaultsV2 := clonable.(*clusterpropsv2.Defaults)
 			defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(*gatewaysDef.Sizing)
 			defaultsV2.MasterSizing = srvutils.FromPBHostSizing(*mastersDef.Sizing)
 			defaultsV2.NodeSizing = srvutils.FromPBHostSizing(*nodesDef.Sizing)
@@ -391,24 +391,24 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			return err
 		}
 
-		err = b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(v interface{}) error {
-			v.(*clusterpropsv1.State).State = clusterstate.Creating
+		err = b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+			clonable.(*clusterpropsv1.State).State = clusterstate.Creating
 			return nil
 		})
 		if err != nil {
 			return err
 		}
 
-		err = b.cluster.GetProperties(task).LockForWrite(property.CompositeV1).ThenUse(func(v interface{}) error {
-			v.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
+		err = b.cluster.GetProperties(task).LockForWrite(property.CompositeV1).ThenUse(func(clonable data.Clonable) error {
+			clonable.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
 			return nil
 		})
 		if err != nil {
 			return err
 		}
 
-		return b.cluster.GetProperties(task).LockForWrite(property.NetworkV2).ThenUse(func(v interface{}) error {
-			networkV2 := v.(*clusterpropsv2.Network)
+		return b.cluster.GetProperties(task).LockForWrite(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
+			networkV2 := clonable.(*clusterpropsv2.Network)
 			networkV2.NetworkID = req.NetworkID
 			networkV2.CIDR = req.CIDR
 			networkV2.GatewayID = primaryGateway.ID
@@ -1575,8 +1575,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 		// Updates cluster metadata to keep track of created host, before testing if an error occurred during the creation
 		mErr := b.cluster.UpdateMetadata(t, func() error {
 			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(v interface{}) error {
-				nodesV1 := v.(*clusterpropsv1.Nodes)
+			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
+				nodesV1 := clonable.(*clusterpropsv1.Nodes)
 				// Update swarmCluster definition in Object Storage
 				node := &clusterpropsv1.Node{
 					ID:        pbHost.Id,
@@ -1883,8 +1883,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	if pbHost != nil {
 		mErr := b.cluster.UpdateMetadata(t, func() error {
 			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(v interface{}) error {
-				nodesV1 := v.(*clusterpropsv1.Nodes)
+			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
+				nodesV1 := clonable.(*clusterpropsv1.Nodes)
 				// Registers the new Agent in the swarmCluster struct
 				node = &clusterpropsv1.Node{
 					ID:        pbHost.Id,
@@ -2115,11 +2115,11 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
-		if !disabled {
-			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
-		}
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+		// if !disabled {
+		// 	_, disabled = clonable.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+		// }
 		return nil
 	})
 	if err != nil {
@@ -2158,11 +2158,11 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
-		if !disabled {
-			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
-		}
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["remotedesktop"]
+		// if !disabled {
+		// 	_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+		// }
 		return nil
 	})
 	if err != nil {
@@ -2206,8 +2206,8 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 
 	disabled := false
 	b.cluster.RLock(task)
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
 	b.cluster.RUnlock(task)
@@ -2243,8 +2243,8 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 	disabled := false
 	b.cluster.RLock(task)
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
 	b.cluster.RUnlock(task)
@@ -2307,8 +2307,8 @@ func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType nod
 
 	// Locks for write the manager extension...
 	b.cluster.Lock(task)
-	outerErr := b.cluster.GetProperties(task).LockForWrite(property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
+	outerErr := b.cluster.GetProperties(task).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
+		nodesV1 := clonable.(*clusterpropsv1.Nodes)
 		switch nodeType {
 		case nodetype.Node:
 			nodesV1.PrivateLastIndex++

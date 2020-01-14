@@ -64,15 +64,15 @@ type Stack interface {
 	DeleteGateway(networkID string) error
 
 	// CreateVIP ...
-	CreateVIP(string, string) (*resources.VIP, error)
+	CreateVIP(string, string) (*resources.VirtualIP, error)
 	// AddPublicIPToVIP adds a public IP to VIP
-	AddPublicIPToVIP(*resources.VIP) error
+	AddPublicIPToVIP(*resources.VirtualIP) error
 	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-	BindHostToVIP(*resources.VIP, *resources.Host) error
+	BindHostToVIP(*resources.VirtualIP, *resources.Host) error
 	// UnbindHostFromVIP removes the bind between the VIP and a host
-	UnbindHostFromVIP(*resources.VIP, *resources.Host) error
+	UnbindHostFromVIP(*resources.VirtualIP, *resources.Host) error
 	// DeleteVIP deletes the port corresponding to the VIP
-	DeleteVIP(*resources.VIP) error
+	DeleteVIP(*resources.VirtualIP) error
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error)

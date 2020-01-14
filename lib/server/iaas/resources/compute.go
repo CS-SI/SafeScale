@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -175,8 +176,8 @@ func (h *Host) GetAccessIP() string {
 // GetPublicIP computes public IP of the host
 func (h *Host) GetPublicIP() string {
 	var ip string
-	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(value interface{}) error {
-		hostNetworkV1 := value.(*propsv1.HostNetwork)
+	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		ip = hostNetworkV1.PublicIPv4
 		if ip == "" {
 			ip = hostNetworkV1.PublicIPv6
@@ -192,8 +193,8 @@ func (h *Host) GetPublicIP() string {
 // GetPrivateIP ...
 func (h *Host) GetPrivateIP() string {
 	var ip string
-	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		if len(hostNetworkV1.IPv4Addresses) > 0 {
 			ip = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
 			if ip == "" {

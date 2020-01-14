@@ -234,7 +234,7 @@ func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateVIP ...
-func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *resources.VIP, err error) {
+func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *resources.VirtualIP, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -244,7 +244,7 @@ func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VIP) (err error) {
+func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -254,7 +254,7 @@ func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VIP) (err error) {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VIP, host *resources.Host) (err error) {
+func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -264,7 +264,7 @@ func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VIP, host *resources.Ho
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) (err error) {
+func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -274,7 +274,7 @@ func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VIP, host *resource
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (w ErrorTraceProvider) DeleteVIP(vip *resources.VIP) (err error) {
+func (w ErrorTraceProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)

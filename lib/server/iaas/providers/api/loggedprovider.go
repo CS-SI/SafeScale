@@ -168,31 +168,31 @@ func (w LoggedProvider) DeleteGateway(networkID string) error {
 }
 
 // CreateVIP ...
-func (w LoggedProvider) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+func (w LoggedProvider) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
 	defer w.prepare(w.trace("CreateVIP"))
 	return w.InnerProvider.CreateVIP(networkID, description)
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (w LoggedProvider) AddPublicIPToVIP(vip *resources.VIP) error {
+func (w LoggedProvider) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	defer w.prepare(w.trace("AddPublicIPToVIP"))
 	return w.InnerProvider.AddPublicIPToVIP(vip)
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w LoggedProvider) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (w LoggedProvider) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	defer w.prepare(w.trace("BindHostToVIP"))
 	return w.InnerProvider.BindHostToVIP(vip, host)
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (w LoggedProvider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (w LoggedProvider) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	defer w.prepare(w.trace("UnbindHostFromVIP"))
 	return w.InnerProvider.UnbindHostFromVIP(vip, host)
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (w LoggedProvider) DeleteVIP(vip *resources.VIP) error {
+func (w LoggedProvider) DeleteVIP(vip *resources.VirtualIP) error {
 	defer w.prepare(w.trace("DeleteVIP"))
 	return w.InnerProvider.DeleteVIP(vip)
 }

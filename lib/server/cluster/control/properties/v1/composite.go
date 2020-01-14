@@ -18,10 +18,14 @@ package propertiesv1
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Composite ...
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental fields
 type Composite struct {
 	// Array of tenants hosting a multu-tenant cluster (multi starting from 1)
 	Tenants []string `json:"tenants"`
@@ -33,18 +37,21 @@ func newComposite() *Composite {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (c *Composite) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (c *Composite) Content() data.Clonable {
 	return c
 }
 
-// Clone ... (serialize.Property interface)
-func (c *Composite) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (c *Composite) Clone() data.Clonable {
 	return newComposite().Replace(c)
 }
 
-// Replace ... (serialize.Property interface)
-func (c *Composite) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (c *Composite) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Composite)
 	c.Tenants = make([]string, len(src.Tenants))
 	copy(c.Tenants, src.Tenants)

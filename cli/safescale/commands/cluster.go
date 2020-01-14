@@ -43,6 +43,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -216,8 +217,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	}
 
 	properties := c.GetProperties(concurrency.RootTask())
-	err := properties.LockForRead(property.CompositeV1).ThenUse(func(v interface{}) error {
-		result["tenant"] = v.(*clusterpropsv1.Composite).Tenants[0]
+	err := properties.LockForRead(property.CompositeV1).ThenUse(func(clonable data.Clonable) error {
+		result["tenant"] = clonable.(*clusterpropsv1.Composite).Tenants[0]
 		return nil
 	})
 	if err != nil {
@@ -241,8 +242,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		result["public_ip"] = netCfg.EndpointIP // legacy ...
 	}
 	if !properties.Lookup(property.DefaultsV2) {
-		err = properties.LockForRead(property.DefaultsV1).ThenUse(func(v interface{}) error {
-			defaultsV1 := v.(*clusterpropsv1.Defaults)
+		err = properties.LockForRead(property.DefaultsV1).ThenUse(func(clonable data.Clonable) error {
+			defaultsV1 := clonable.(*clusterpropsv1.Defaults)
 			result["defaults"] = map[string]interface{}{
 				"image":  defaultsV1.Image,
 				"master": defaultsV1.MasterSizing,
@@ -251,8 +252,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 			return nil
 		})
 	} else {
-		err = properties.LockForRead(property.DefaultsV2).ThenUse(func(v interface{}) error {
-			defaultsV2 := v.(*clusterpropsv2.Defaults)
+		err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
+			defaultsV2 := clonable.(*clusterpropsv2.Defaults)
 			result["defaults"] = map[string]interface{}{
 				"image":   defaultsV2.Image,
 				"gateway": defaultsV2.GatewaySizing,
@@ -266,8 +267,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	err = properties.LockForRead(property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
+	err = properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
+		nodesV1 := clonable.(*clusterpropsv1.Nodes)
 		result["nodes"] = map[string]interface{}{
 			"masters": nodesV1.Masters,
 			"nodes":   nodesV1.PrivateNodes,
@@ -277,16 +278,16 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = properties.LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		result["features"] = v.(*clusterpropsv1.Features)
+	err = properties.LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		result["features"] = clonable.(*clusterpropsv1.Features)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	err = properties.LockForRead(property.StateV1).ThenUse(func(v interface{}) error {
-		state := v.(*clusterpropsv1.State).State
+	err = properties.LockForRead(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+		state := clonable.(*clusterpropsv1.State).State
 		result["last_state"] = state
 		result["last_state_label"] = state.String()
 		return nil

@@ -42,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -256,8 +257,8 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 
 	if host.Properties.Lookup(hostproperty.SizingV1) {
 		descent := false
-		err = host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-			nhs := v.(*propsv1.HostSizing)
+		err = host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			nhs := clonable.(*propsv1.HostSizing)
 			descent = descent || (hostSizeRequest.MinCores < nhs.RequestedSize.Cores)
 			descent = descent || (hostSizeRequest.MinRAMSize < nhs.RequestedSize.RAMSize)
 			descent = descent || (hostSizeRequest.MinGPU < nhs.RequestedSize.GPUNumber)
@@ -519,8 +520,8 @@ func (handler *HostHandler) Create(
 	}()
 
 	if sizing != nil {
-		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-			hostSizingV1 := v.(*propsv1.HostSizing)
+		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			hostSizingV1 := clonable.(*propsv1.HostSizing)
 			hostSizingV1.Template = hostRequest.TemplateID
 			hostSizingV1.RequestedSize = &propsv1.HostSize{
 				Cores:     sizing.MinCores,
@@ -532,8 +533,8 @@ func (handler *HostHandler) Create(
 			return nil
 		})
 	} else {
-		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-			hostSizingV1 := v.(*propsv1.HostSizing)
+		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			hostSizingV1 := clonable.(*propsv1.HostSizing)
 			hostSizingV1.Template = hostRequest.TemplateID
 			hostSizingV1.RequestedSize = &propsv1.HostSize{
 				Cores:     template.Cores,
@@ -563,8 +564,8 @@ func (handler *HostHandler) Create(
 	} else {
 		creator = "unknown@" + hostname
 	}
-	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
-		hostDescriptionV1 := v.(*propsv1.HostDescription)
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
+		hostDescriptionV1 := clonable.(*propsv1.HostDescription)
 		hostDescriptionV1.Created = time.Now()
 		hostDescriptionV1.Creator = creator
 		return nil
@@ -578,8 +579,8 @@ func (handler *HostHandler) Create(
 		defaultNetworkID string
 		gatewayID        string
 	)
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		defaultNetworkID = hostNetworkV1.DefaultNetworkID // set earlier by handler.service.CreateHost()
 		if !public {
 			if len(networks) > 0 {
@@ -649,8 +650,8 @@ func (handler *HostHandler) Create(
 
 	// Updates host link with networks
 	for _, i := range networks {
-		err = i.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
-			networkHostsV1 := v.(*propsv1.NetworkHosts)
+		err = i.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(clonable data.Clonable) error {
+			networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 			networkHostsV1.ByName[host.Name] = host.ID
 			networkHostsV1.ByID[host.ID] = host.Name
 			return nil
@@ -931,8 +932,8 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 	// Don't remove a host having shares that are currently remotely mounted
 	var shares map[string]*propsv1.HostShare
-	err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		shares = v.(*propsv1.HostShares).ByID
+	err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		shares = clonable.(*propsv1.HostShares).ByID
 		for _, share := range shares {
 			count := len(share.ClientsByID)
 			if count > 0 {
@@ -947,8 +948,8 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 
 	// Don't remove a host with volumes attached
-	err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(v interface{}) error {
-		nAttached := len(v.(*propsv1.HostVolumes).VolumesByID)
+	err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
+		nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
 		if nAttached > 0 {
 			return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
 		}
@@ -959,8 +960,8 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 
 	// Don't remove a host that is a gateway
-	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		if v.(*propsv1.HostNetwork).IsGateway {
+	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		if clonable.(*propsv1.HostNetwork).IsGateway {
 			return fmt.Errorf("cannot delete host, it's a gateway that can only be deleted through its network")
 		}
 		return nil
@@ -972,8 +973,8 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	// If host mounted shares, unmounts them before anything else
 	shareHandler := NewShareHandler(handler.service)
 	var mounts []*propsv1.HostShare
-	err = host.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
-		hostMountsV1 := v.(*propsv1.HostMounts)
+	err = host.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
+		hostMountsV1 := clonable.(*propsv1.HostMounts)
 		for _, i := range hostMountsV1.RemoteMountsByPath {
 			// Gets share data
 			_, share, _, err := shareHandler.Inspect(ctx, i.ShareID)
@@ -1011,16 +1012,16 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 
 	// Update networks property prosv1.NetworkHosts to remove the reference to the host
 	netHandler := NewNetworkHandler(handler.service)
-	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		for k := range hostNetworkV1.NetworksByID {
 			network, err := netHandler.Inspect(ctx, k)
 			if err != nil {
 				logrus.Errorf(err.Error())
 				continue
 			}
-			err = network.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
-				networkHostsV1 := v.(*propsv1.NetworkHosts)
+			err = network.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(clonable data.Clonable) error {
+				networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 				delete(networkHostsV1.ByID, host.ID)
 				delete(networkHostsV1.ByName, host.Name)
 				return nil
@@ -1081,10 +1082,10 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	case <-ctx.Done():
 		logrus.Warnf("Host delete cancelled by safescale")
 		var hostBis *resources.Host
-		err2 := host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-			hostSizingV1 := v.(*propsv1.HostSizing)
-			return host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-				hostNetworkV1 := v.(*propsv1.HostNetwork)
+		err2 := host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			hostSizingV1 := clonable.(*propsv1.HostSizing)
+			return host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+				hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 				//FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
 				var err3 error
 				sizing := resources.SizingRequirements{

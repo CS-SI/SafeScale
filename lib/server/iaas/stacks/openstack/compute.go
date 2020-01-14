@@ -50,6 +50,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -589,8 +590,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property propsv1.HostDescription
-	err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
-		hpDescriptionV1 := v.(*propsv1.HostDescription)
+	err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
+		hpDescriptionV1 := clonable.(*propsv1.HostDescription)
 		hpDescriptionV1.Created = server.Created
 		hpDescriptionV1.Updated = server.Updated
 		return nil
@@ -600,8 +601,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hpSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hpSizingV1 := clonable.(*propsv1.HostSizing)
 		if hpSizingV1.AllocatedSize == nil {
 			hpSizingV1.AllocatedSize = s.toHostSize(server.Flavor)
 		}
@@ -612,8 +613,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property propsv1.HostNetwork
-	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4
 		}
@@ -848,8 +849,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		hostNetworkV1.DefaultNetworkID = defaultNetworkID
 		hostNetworkV1.DefaultGatewayID = defaultGatewayID
 		hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
@@ -861,8 +862,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	// Adds Host property SizingV1
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		hostSizingV1.Template = request.TemplateID
 		hostSizingV1.AllocatedSize = converters.ModelHostTemplateToPropertyHostSize(template)
@@ -975,8 +976,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			return nil, userData, scerr.Wrap(err, msg)
 		}
 
-		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-			hostNetworkV1 := v.(*propsv1.HostNetwork)
+		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 			if ipversion.IPv4.Is(ip.IP) {
 				hostNetworkV1.PublicIPv4 = ip.IP
 			} else if ipversion.IPv6.Is(ip.IP) {
