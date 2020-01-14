@@ -21,10 +21,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // State contains the bare minimum information about a cluster
+// !!! FROZEN !!!
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with updated/additional fields
 type State struct {
 	// State of the cluster
 	State clusterstate.Enum
@@ -36,18 +40,21 @@ func newState() *State {
 	return &State{}
 }
 
-// Content ... (serialize.Property interface)
-func (s *State) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (s *State) Content() data.Clonable {
 	return s
 }
 
-// Clone ... (serialize.Property interface)
-func (s *State) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (s *State) Clone() data.Clonable {
 	return newState().Replace(s)
 }
 
-// Replace ... (serialize.Property interface)
-func (s *State) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (s *State) Replace(p data.Clonable) data.Clonable {
 	*s = *p.(*State)
 	return s
 }

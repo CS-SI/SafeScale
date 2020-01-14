@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -330,8 +331,8 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 	if err != nil {
 		return err
 	}
-	return network.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
-		networkHostsV1 := v.(*propsv1.NetworkHosts)
+	return network.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(clonable data.Clonable) error {
+		networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 		networkHostsV1.ByID[host.ID] = host.Name
 		networkHostsV1.ByName[host.Name] = host.ID
 		return nil
@@ -358,8 +359,8 @@ func (m *Network) DetachHost(hostID string) (err error) {
 	if err != nil {
 		return err
 	}
-	err = network.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
-		networkHostsV1 := v.(*propsv1.NetworkHosts)
+	err = network.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(func(clonable data.Clonable) error {
+		networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 		hostName, found := networkHostsV1.ByID[hostID]
 		if found {
 			delete(networkHostsV1.ByName, hostName)
@@ -390,8 +391,8 @@ func (m *Network) ListHosts() (list []*resources.Host, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = network.Properties.LockForRead(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
-		networkHostsV1 := v.(*propsv1.NetworkHosts)
+	err = network.Properties.LockForRead(networkproperty.HostsV1).ThenUse(func(clonable data.Clonable) error {
+		networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 		for id := range networkHostsV1.ByID {
 			mh, err := LoadHost(m.item.GetService(), id)
 			if err != nil {

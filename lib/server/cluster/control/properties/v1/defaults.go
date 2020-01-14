@@ -19,10 +19,14 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Defaults ...
+// !!! FROZEN !!!
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental fields
 type Defaults struct {
 	// GatewaySizing keeps the default node definition
 	GatewaySizing resources.HostDefinition `json:"gateway_sizing"`
@@ -38,18 +42,21 @@ func newDefaults() *Defaults {
 	return &Defaults{}
 }
 
-// Content ... (serialize.Property interface)
-func (d *Defaults) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (d *Defaults) Content() data.Clonable {
 	return d
 }
 
-// Clone ... (serialize.Property interface)
-func (d *Defaults) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (d *Defaults) Clone() data.Clonable {
 	return newDefaults().Replace(d)
 }
 
-// Replace ... (serialize.Property interface)
-func (d *Defaults) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (d *Defaults) Replace(p data.Clonable) data.Clonable {
 	*d = *p.(*Defaults)
 	return d
 }

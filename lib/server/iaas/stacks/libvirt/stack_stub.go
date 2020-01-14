@@ -120,27 +120,27 @@ func (s *Stack) DeleteGateway(string) error {
 }
 
 // CreateVIP stub
-func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
 // AddPublicIPToVIP stub
-func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 
 // BindHostToVIP stub
-func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	return fmt.Errorf(errorStr)
 }
 
 // UnbindHostFromVIP stub
-func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	return fmt.Errorf(errorStr)
 }
 
 // DeleteVIP stub
-func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 

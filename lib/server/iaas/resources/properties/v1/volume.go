@@ -20,13 +20,14 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumeproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
-// !!!FROZEN!!!
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with needed supplemental/overriding fields
 type VolumeDescription struct {
 	// Purpose contains the reason of the existence of the volume
 	Purpose string
@@ -39,26 +40,29 @@ func NewVolumeDescription() *VolumeDescription {
 	return &VolumeDescription{}
 }
 
-// Content ... (serialize.Property interface)
-func (vd *VolumeDescription) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (vd *VolumeDescription) Content() data.Clonable {
 	return vd
 }
 
-// Clone ... (serialize.Property interface)
-func (vd *VolumeDescription) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (vd *VolumeDescription) Clone() data.Clonable {
 	return NewVolumeDescription().Replace(vd)
 }
 
-// Replace ... (serialize.Property interface)
-func (vd *VolumeDescription) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (vd *VolumeDescription) Replace(p data.Clonable) data.Clonable {
 	*vd = *p.(*VolumeDescription)
 	return vd
 }
 
 // VolumeAttachments contains host ids where the volume is attached
-// !!!FROZEN!!!
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with needed supplemental/overriding fields
 type VolumeAttachments struct {
 	Shareable bool              `json:"shareable,omitempty"` // Tells if the volume can be shared with multiple host
 	Hosts     map[string]string `json:"hosts,omitempty"`     // Contains the name of the hosts mounting the volume, indexed by ID
@@ -78,18 +82,21 @@ func (va *VolumeAttachments) Reset() {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (va *VolumeAttachments) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (va *VolumeAttachments) Content() data.Clonable {
 	return va
 }
 
-// Clone ... (serialize.Property interface)
-func (va *VolumeAttachments) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (va *VolumeAttachments) Clone() data.Clonable {
 	return NewVolumeAttachments().Replace(va)
 }
 
-// Replace ... (serialize.Property interface)
-func (va *VolumeAttachments) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
 	src := p.(*VolumeAttachments)
 	*va = *src
 	va.Hosts = make(map[string]string, len(src.Hosts))

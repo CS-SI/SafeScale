@@ -30,6 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	gc "github.com/gophercloud/gophercloud"
@@ -286,8 +287,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		err := defaultGateway.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-			hostNetworkV1 := v.(*propsv1.HostNetwork)
+		err := defaultGateway.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 			defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 			defaultGatewayID = defaultGateway.ID
 			return nil
@@ -401,8 +402,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		hostNetworkV1.IsGateway = isGateway
 		hostNetworkV1.DefaultNetworkID = defaultNetworkID
 		hostNetworkV1.DefaultGatewayID = defaultGatewayID
@@ -415,8 +416,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	// Adds Host property SizingV1
 	// template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		hostSizingV1.Template = request.TemplateID
 		hostSizingV1.AllocatedSize = converters.ModelHostTemplateToPropertyHostSize(template)
@@ -530,8 +531,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}()
 
 		// Updates Host property NetworkV1 in host instance
-		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-			hostNetworkV1 := v.(*propsv1.HostNetwork)
+		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 			if ipversion.IPv4.Is(fip.PublicIPAddress) {
 				hostNetworkV1.PublicIPv4 = fip.PublicIPAddress
 			} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
@@ -691,8 +692,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	host.LastState = toHostState(server.Status)
 
 	// Updates Host Property propsv1.HostDescription
-	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
-		hostDescriptionV1 := v.(*propsv1.HostDescription)
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
+		hostDescriptionV1 := clonable.(*propsv1.HostDescription)
 		hostDescriptionV1.Created = server.Created
 		hostDescriptionV1.Updated = server.Updated
 		return nil
@@ -702,8 +703,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	// Updates Host Property HostNetwork
-	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4
 		}

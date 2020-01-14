@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -57,7 +58,7 @@ type Network struct {
 	CIDR               string                    `json:"mask,omitempty"`                 // network in CIDR notation
 	GatewayID          string                    `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
 	SecondaryGatewayID string                    `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
-	VIP                *VIP                      `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
+	VIP                *VirtualIP                `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
 	IPVersion          ipversion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
 	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
 }
@@ -117,12 +118,54 @@ func (n *Network) Deserialize(buf []byte) error {
 	return nil
 }
 
-// VIP is a structure containing information needed to manage VIP (virtual IP)
-type VIP struct {
+// VirtualIP is a structure containing information needed to manage VIP (virtual IP)
+type VirtualIP struct {
 	ID        string
 	Name      string
 	NetworkID string
 	PrivateIP string
 	PublicIP  string
 	Hosts     []*Host
+}
+
+// NewVirtualIP ...
+func NewVirtualIP() *VirtualIP {
+	return &VirtualIP{
+		Hosts: []*Host{},
+	}
+}
+
+// Reset ...
+func (vip *VirtualIP) Reset() {
+	*vip = VirtualIP{
+		Hosts: []*Host{},
+	}
+}
+
+// Content ...
+// satisfies interface data.Clonable
+func (vip *VirtualIP) Content() data.Clonable {
+	return vip
+}
+
+// Clone ...
+// satisfies interface data.Clonable
+func (vip *VirtualIP) Clone() data.Clonable {
+	return NewVirtualIP().Replace(vip)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
+	if p != nil {
+		src := p.(*VirtualIP)
+		*vip = *src
+		vip.Hosts = make([]*Host, len(src.Hosts))
+		copy(vip.Hosts, src.Hosts)
+		//FIXME: is it better to do this ?
+		//for _, v := range src.Hosts {
+		//	vip.Hosts = append(vip.Hosts, v.Clone.(*Host))
+		//}
+	}
+	return vip
 }

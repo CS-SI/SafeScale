@@ -573,8 +573,8 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	userData.IsPrimaryGateway = primary
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
-	err = gw.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		gwSizingV1 := v.(*propsv1.HostSizing)
+	err = gw.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		gwSizingV1 := clonable.(*propsv1.HostSizing)
 		gwSizingV1.RequestedSize = &propsv1.HostSize{
 			Cores:     sizing.MinCores,
 			RAMSize:   sizing.MinRAMSize,
@@ -744,7 +744,7 @@ func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) (err e
 	return derr
 }
 
-func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resources.Host) (err error) {
+func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
 	err = handler.service.UnbindHostFromVIP(vip, host)
 	if err != nil {
 		switch err.(type) {
@@ -828,8 +828,8 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 
 	// Check if hosts are still attached to network according to metadata
 	var errorMsg string
-	err = network.Properties.LockForRead(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
-		networkHostsV1 := v.(*propsv1.NetworkHosts)
+	err = network.Properties.LockForRead(networkproperty.HostsV1).ThenUse(func(clonable data.Clonable) error {
+		networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 		hostsLen := len(networkHostsV1.ByName)
 		if hostsLen > 0 {
 			list := make([]string, 0, hostsLen)
@@ -1010,7 +1010,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 	// case <-ctx.Done():
 	// 	logrus.Warnf("Network delete cancelled by user")
 	// 	hostSizingV1 := propsv1.NewHostSizing()
-	// 	err := metadataHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
+	// 	err := metadataHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
 	// 		hostSizingV1 = v.(*propsv1.HostSizing)
 	// 		return nil
 	// 	})

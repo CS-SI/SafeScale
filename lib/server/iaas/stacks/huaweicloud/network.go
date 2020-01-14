@@ -667,7 +667,7 @@ func (s *Stack) DeleteGateway(id string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -680,7 +680,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error)
 	if err != nil {
 		return nil, err
 	}
-	vip := resources.VIP{
+	vip := resources.VirtualIP{
 		ID:        port.ID,
 		Name:      name,
 		NetworkID: networkID,

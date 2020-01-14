@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
@@ -370,8 +371,8 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	}()
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 		hostSizingV1.Template = req.TemplateID
 		return nil
 	})
@@ -775,7 +776,7 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -792,7 +793,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error)
 	if err != nil {
 		return nil, err
 	}
-	vip := resources.VIP{
+	vip := resources.VirtualIP{
 		ID:        port.ID,
 		PrivateIP: port.FixedIPs[0].IPAddress,
 	}
@@ -800,7 +801,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error)
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -809,7 +810,7 @@ func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -846,7 +847,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -884,7 +885,7 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) erro
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
