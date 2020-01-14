@@ -178,15 +178,6 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 		controlplaneEndpointIP = list[0]
 	}
 
-		for _, id := range foreman.Cluster().ListMasterIPs(task) {
-			err = vip.BindHost(task, id)
-			if err != nil {
-				return err
-			}
-		}
-		controlplaneEndpointIP = vip.GetPrivateIP(task)
-	*/
-
 	// Disable dashboard if requested
 	_, ok = req.DisabledDefaultFeatures["dashboard"]
 	v["Dashboard"] = strconv.FormatBool(!ok)
