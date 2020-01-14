@@ -29,11 +29,15 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
@@ -130,25 +134,49 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	v["Hardening"] = strconv.FormatBool(!ok)
 
 	var controlplaneEndpointIP string
-
-	// FIXME: Uncomment this when compiles
-
-	/*
-		// If complexity == Normal or Large, creates a VIP for Kubernetes attached to masters
-		// FIXME: find a way to store VIP in cluster metadata
-		var controlplaneEndpointIP string
-		vip, err := foreman.Cluster().GetService(task).CreateVirtualIP()
+	netCfg, err := foreman.Cluster().GetNetworkConfig(task)
+	if err != nil {
+		return err
+	}
+	// If complexity == Normal or Large, creates a VIP for Kubernetes attached to masters
+	if foreman.Cluster().GetIdentity(task).Complexity != complexity.Small {
+		vip, err := foreman.Cluster().GetService(task).CreateVIP(netCfg.NetworkID, clusterName+"-ControlPlaneVIP")
 		if err != nil {
 			return err
 		}
 		defer func() {
 			if err != nil {
-				derr := foreman.Cluster().GetService(task).DeleteVirtualIP(task, vip)
+				derr := foreman.Cluster().GetService(task).DeleteVIP(vip)
 				if derr != nil {
 					logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
 				}
 			}
 		}()
+
+		for _, id := range foreman.Cluster().ListMasterIDs(task) {
+			h, err := foreman.Cluster().GetService(task).InspectHost(id)
+			if err != nil {
+				return err
+			}
+			err = foreman.Cluster().GetService(task).BindHostToVIP(vip, h)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = foreman.Cluster().GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+			controlPlaneV1 := clonable.(*clusterpropsv1.ControlPlane)
+			controlPlaneV1.VirtualIP = vip
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		controlplaneEndpointIP = vip.PrivateIP
+	} else {
+		list := foreman.Cluster().ListMasterIPs(task)
+		controlplaneEndpointIP = list[0]
+	}
 
 		for _, id := range foreman.Cluster().ListMasterIPs(task) {
 			err = vip.BindHost(task, id)
@@ -188,9 +216,34 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 
 func unconfigureCluster(task concurrency.Task, foreman control.Foreman) error {
 	clusterName := foreman.Cluster().GetIdentity(task).Name
-	logrus.Println(fmt.Sprintf("[cluster %s] removing virtual IP...", clusterName))
+	logrus.Println(fmt.Sprintf("[cluster %s] removing control plane virtual IP...", clusterName))
 
-	// FIXME: find a way to store VIP in cluster metadata
+	err := foreman.Cluster().GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+		controlPlaneV1, ok := clonable.(*clusterpropsv1.ControlPlane)
+		if !ok {
+			return scerr.InconsistentError("property ControlPlaneV1 doesn't contain valid data")
+		}
+		if controlPlaneV1.VirtualIP != nil {
+			for _, id := range foreman.Cluster().ListMasterIDs(task) {
+				h, inErr := foreman.Cluster().GetService(task).InspectHost(id)
+				if inErr != nil {
+					return inErr
+				}
+				inErr = foreman.Cluster().GetService(task).UnbindHostFromVIP(controlPlaneV1.VirtualIP, h)
+				if inErr != nil {
+					return inErr
+				}
+			}
+			inErr := foreman.Cluster().GetService(task).DeleteVIP(controlPlaneV1.VirtualIP)
+			if inErr != nil {
+				return inErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	logrus.Println(fmt.Sprintf("[cluster %s] virtual IP is not deleted, not implemented", clusterName))
 	return nil
 }
