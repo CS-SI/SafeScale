@@ -50,7 +50,10 @@ all: begin ground getdevdeps ensure generate lib cli err vet
 
 common: begin ground getdevdeps ensure generate
 
-begin:
+versioncut:
+	@(($(GO) version | grep go1.12) || ($(GO) version | grep go1.13) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
+
+begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
 
 libvirt:
