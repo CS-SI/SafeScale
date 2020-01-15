@@ -187,7 +187,8 @@ feature:
                             sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                # pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                pace: sysconf,syshardening,common-tools,ca,keepalived,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
                 steps:
                     sysconf:
                         targets:
@@ -377,6 +378,93 @@ feature:
                             sfReverseProxyReload
                             sfExit
 
+                    keepalived:
+                        targets:
+                            masters: all
+                        run: |
+                            case $(sfGetFact "linux_kind") in
+                                ubuntu|debian)
+                                    sfApt update && sfApt -y install keepalived || sfFail 202
+                                    ;;
+
+                                redhat|centos)
+                                    yum install -q -y keepalived || sfFail 202
+                                    ;;
+                                *)
+                                    sfFail 203 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
+                                    ;;
+                            esac
+
+                            NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
+                            IDX={{ .Hostname }}
+                            IDX=${IDX##*-}
+                            cat >/etc/keepalived/keepalived.conf <<-EOF
+                            vrrp_instance vrrp_group_controlplane {
+                                state BACKUP
+                                interface $(sfInterfaceWithIP {{ .HostIP }})
+                                virtual_router_id 1
+                                priority ${IDX}
+                                nopreempt
+                                advert_int 2
+                                authentication {
+                                    auth_type PASS
+                                    auth_pass {{ .ClusterAdminPassword }}
+                                }
+                                # Unicast specific option, this is the IP of the interface keepalived listens on
+                                unicast_src_ip {{ .HostIP }}
+                                # Unicast specific option, this is the IP of the peer instance
+                                unicast_peer {
+                                  {{- range .ClusterMasterIPs }}
+                                    {{ if ne . $.HostIP }}{{ . }}{{ end }}
+                                  {{- end }}
+                                }
+                                virtual_ipaddress {
+                                    {{ .ControlplaneVirtualIP }}/${NETMASK}
+                                }
+                            }
+
+                            virtual_server {{ .ControlplaneEndpointIP }} 6443 {
+                                delay_loop 5
+                                lb_algo wrr
+                                lb_kind DR
+                                protocol TCP
+                                ha_suspend
+
+                                {{- range .ClusterMasterIPs }}
+                                real_server {{ . }} 6443 {
+                                    weight 1
+                                    TCP_CHECK {
+                                        connect_timeout 3
+                                        connect_port 6443
+                                    }
+                                }
+                                {{- end }}
+                            }
+                            EOF
+
+                            if [ "$(sfGetFact "use_systemd")" = "1" ]; then
+                                # Use systemd to ensure keepalived is restarted if network is restarted
+                                # (otherwise, keepalived is in undetermined state)
+                                mkdir -p /etc/systemd/system/keepalived.service.d
+                                if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+                                    cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+                            [Unit]
+                            Requires=network.service
+                            PartOf=network.service
+                            EOF
+                                else
+                                    cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+                            [Unit]
+                            Requires=systemd-networkd.service
+                            PartOf=systemd-networkd.service
+                            EOF
+                                fi
+                                systemctl daemon-reload
+                            fi
+
+                            sfService enable keepalived && sfService restart keepalived || sfFail 204
+                            sfExit
+
                     ca:
                         targets:
                             masters: one
@@ -388,6 +476,7 @@ feature:
                                 cp ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem /etc/kubernetes/pki/ca.crt
                                 cp ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem /etc/kubernetes/pki/ca.key
                             fi
+                            chown -R root:{{ .ClusterAdminUsername }} /etc/kubernetes/pki
                             sfExit
 
                     cp1-init:
@@ -891,9 +980,9 @@ feature:
                             mv helm.cert.pem helm.key.pem ${SF_ETCDIR}/helm/pki
                             mv tiller.cert.pem tiller.key.pem ${SF_ETCDIR}/helm/pki
 
-                            chown -R root:{{ .ClusterAdminUsername }} /etc/kubernetes/pki
-                            chmod -R u+rwx,g+r-wx,o-rwx /etc/kubernetes/pki
-                            find /etc/kubernetes/pki -type d -exec chmod ug+x {} \;
+                            chown -R root:{{ .ClusterAdminUsername }} ${SF_ETCDIR}/helm/pki
+                            chmod -R u+rwx,g+r-wx,o-rwx ${SF_ETCDIR}/helm/pki
+                            find ${SF_ETCDIR}/helm/pki -type d -exec chmod ug+x {} \;
 
                             ## Clean directory
                             rm -f ca.srl csr.conf helm.csr.pem tiller.csr.pem
