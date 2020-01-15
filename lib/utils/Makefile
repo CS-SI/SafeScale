@@ -7,7 +7,7 @@ all: retry
 retry:
 	@(cd retry && $(MAKE) all)
 
-generate:
+generate: clean
 	@$(GO) generate -run stringer ./...
 
 vet:

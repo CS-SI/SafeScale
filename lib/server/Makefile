@@ -4,7 +4,7 @@ include ../../common.mk
 
 all:	lib/server/iaas lib/server/cluster lib/server/handlers lib/server/install
 
-generate:
+generate: clean
 	@(cd iaas && $(MAKE) $@)
 	@(cd cluster && $(MAKE) $@)
 	@(cd install && $(MAKE) $@)

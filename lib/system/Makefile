@@ -13,7 +13,7 @@ vet:
 nfs:
 	@(cd nfs && $(MAKE) all)
 
-generate: gensrc
+generate: clean gensrc
 	@(cd nfs && $(MAKE) $(@))
 	@(go generate .)
 

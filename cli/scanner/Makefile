@@ -23,7 +23,7 @@ vet:
 clean:
 	@($(RM) $(EXEC) || true)
 
-generate: gensrc
+generate: clean gensrc
 
 gensrc:
 	@($(RM) -f $(VERSIONFILE) || true)
