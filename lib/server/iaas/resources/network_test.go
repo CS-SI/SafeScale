@@ -1,0 +1,32 @@
+package resources
+
+import (
+	"github.com/magiconair/properties/assert"
+	"reflect"
+	"testing"
+)
+
+func TestVirtualIP_Clone(t *testing.T) {
+	ho := NewHost()
+	ho.Name = "Whatever"
+
+	vip := NewVirtualIP()
+	vip.Hosts = append(vip.Hosts, ho)
+
+	vipclone, _ := vip.Clone().(*VirtualIP)
+	assert.Equal(t, vip, vipclone)
+
+	vipclone.Hosts[0].Name = "Sleep"
+	areEqual := reflect.DeepEqual(vip, vipclone)
+
+	if areEqual {
+		t.Error("It's a shallow clone, a modification in cloned instance changed the original")
+		t.Fail()
+	}
+
+	areEqual = vip.Hosts[0].Name == vipclone.Hosts[0].Name
+	if areEqual {
+		t.Error("It's a shallow clone, a modification in cloned instance changed the original")
+		t.Fail()
+	}
+}
