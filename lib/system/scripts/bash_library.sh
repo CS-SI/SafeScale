@@ -161,6 +161,11 @@ sfCidr2iprange() {
 }
 export -f sfCidr2iprange
 
+sfInterfaceWithIP() {
+    ifconfig | grep -B1 "172.26.128.17" | grep -o "^\w*"
+}
+export -f sfInterfaceWithIP
+
 # sfAsyncStart <what> <duration> <command>...
 sfAsyncStart() {
     local pid=${1}_PID
