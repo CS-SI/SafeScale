@@ -9,7 +9,7 @@ all:
 vet:
 	@$(GO) vet ./...
 
-generate:
+generate: clean
 	@(cd gateway/client && $(MAKE) all)
 	@(cd gateway/daemon && $(MAKE) all)
 

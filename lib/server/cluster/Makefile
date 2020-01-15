@@ -12,7 +12,7 @@ vet:
 flavors: generate
 	@(cd flavors && $(MAKE) all)
 
-generate:
+generate: clean
 	@(cd enums && $(MAKE) $(@))
 	@(cd flavors && $(MAKE) $(@))
 

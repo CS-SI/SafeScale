@@ -4,7 +4,7 @@ GO?=go
 
 all:    generate
 
-generate:
+generate: clean
 	@(cd enums && $(MAKE) $(@))
 
 vet:

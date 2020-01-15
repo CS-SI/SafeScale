@@ -2,7 +2,7 @@ GO?=go
 
 .PHONY:	clean generate vet
 
-generate:
+generate: clean
 	@(cd cloudferro && $(MAKE) $(@))
 	@(cd cloudwatt && $(MAKE) $(@))
 	@(cd flexibleengine && $(MAKE) $(@))

@@ -5,7 +5,7 @@ GO?=go
 
 all: generate
 
-generate:
+generate: clean
 	@$(GO) generate -run rice
 
 vet:

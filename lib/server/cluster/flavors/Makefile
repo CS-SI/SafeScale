@@ -4,7 +4,7 @@ GO?=go
 
 all: boh dcos k8s ohpc swarm
 
-generate:
+generate: clean
 	@(cd boh && $(MAKE) $@)
 	@(cd dcos && $(MAKE) $@)
 	@(cd k8s && $(MAKE) $@)
