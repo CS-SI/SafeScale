@@ -57,7 +57,8 @@ func (d *Defaults) Clone() data.Clonable {
 // Replace ...
 // satisfies interface data.Clonable
 func (d *Defaults) Replace(p data.Clonable) data.Clonable {
-	*d = *p.(*Defaults)
+	src := p.(*Defaults)
+	*d = *src
 	return d
 }
 
