@@ -188,7 +188,7 @@ feature:
 
             add:
                 # pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
-                pace: sysconf,syshardening,common-tools,ca,keepalived,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                pace: sysconf,syshardening,common-tools,ca,keepalived,cp1-init,cni,cpx-init,join-gws,join-nodes,final
                 steps:
                     sysconf:
                         targets:
@@ -408,7 +408,7 @@ feature:
                                 advert_int 2
                                 authentication {
                                     auth_type PASS
-                                    auth_pass {{ .ClusterAdminPassword }}
+                                    auth_pass "{{ .ClusterAdminPassword }}"
                                 }
                                 # Unicast specific option, this is the IP of the interface keepalived listens on
                                 unicast_src_ip {{ .HostIP }}
@@ -419,11 +419,11 @@ feature:
                                   {{- end }}
                                 }
                                 virtual_ipaddress {
-                                    {{ .ControlplaneVirtualIP }}/${NETMASK}
+                                    {{ .ControlplaneEndpointIP }}/${NETMASK}
                                 }
                             }
 
-                            virtual_server {{ .ControlplaneEndpointIP }} 6443 {
+                            virtual_server {{ .ControlplaneEndpointIP }} 6444 {
                                 delay_loop 5
                                 lb_algo wrr
                                 lb_kind DR
@@ -441,6 +441,15 @@ feature:
                                 {{- end }}
                             }
                             EOF
+                            chown -R root:root /etc/keepalived
+                            chmod -R u+rw,g+r-w,o-rwx /etc/keepalived
+                            chmod ug+x /etc/keepalived
+
+                            cat >/etc/sysctl.d/22-keepalived.conf <<-EOF
+                            net.ipv4.ip_forward=1
+                            net.ipv4.ip_nonlocal_bind=1
+                            EOF
+                            sysctl -p
 
                             if [ "$(sfGetFact "use_systemd")" = "1" ]; then
                                 # Use systemd to ensure keepalived is restarted if network is restarted
@@ -497,7 +506,7 @@ feature:
                             ---
                             apiVersion: kubeadm.k8s.io/v1beta1
                             kind: ClusterConfiguration
-                            controlPlaneEndpoint: "{{.ControlplaneEndpointIP}}:6443"
+                            controlPlaneEndpoint: "{{.ControlplaneEndpointIP}}:6444"
                             kubernetesVersion: ${KUBE_VERSION}
                             etcd:
                                 local:
@@ -900,211 +909,6 @@ feature:
                             eval $NODE_JOIN_CMD || sfFail 234
 
                             touch /etc/kubernetes/.joined
-                            sfExit
-
-                    helm-certs:
-                        targets:
-                            masters: any
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            mkdir -p ${SF_ETCDIR}/helm/pki
-                            cd ${SF_TMPDIR}
-
-                            # ## Generate Certificate Authority
-                            # openssl genrsa -out ca.key.pem 4096
-                            # openssl req -key ca.key.pem -new -x509 \
-                            #     -days 10000 -sha256 -out ca.cert.pem \
-                            #     -extensions v3_ca -subj "/C=FR/ST=Toulouse/L=Toulouse/O=CSSI/OU=Space/CN={{ .Hostname }}"
-
-                            ## Generate keys
-                            openssl genrsa -out tiller.key.pem 4096
-                            openssl genrsa -out helm.key.pem 4096
-
-                            ## Create a config file for generating a Certificate Signing Request (CSR)
-                            cat >csr.conf <<-EOF
-                            [ req ]
-                            default_bits = 2048
-                            prompt = no
-                            default_md = sha256
-                            req_extensions = req_ext
-                            distinguished_name = dn
-
-                            [ dn ]
-                            C=FR
-                            ST=FR
-                            L=Toulouse
-                            O=CSSI
-                            OU=Space
-                            CN={{ .Hostname }}
-
-                            [ req_ext ]
-                            subjectAltName = @alt_names
-
-                            [ alt_names ]
-                            DNS.1 = helm
-                            DNS.2 = helm.{{ .HelmDefaultNamespace }}
-                            DNS.3 = helm.{{ .HelmDefaultNamespace }}.svc
-                            DNS.4 = helm.{{ .HelmDefaultNamespace }}.svc.cluster
-                            DNS.5 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local
-                            DNS.6 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local.com
-                            IP = {{ .HostIP }}
-
-                            [ v3_ext ]
-                            authorityKeyIdentifier=keyid,issuer:always
-                            basicConstraints=CA:FALSE
-                            keyUsage=keyEncipherment,dataEncipherment
-                            extendedKeyUsage=serverAuth,clientAuth
-                            subjectAltName=@alt_names
-                            EOF
-
-                            # Generate the certificates signing request based on the config file
-                            openssl req -new -key tiller.key.pem -out tiller.csr.pem -config csr.conf
-                            openssl req -new -key helm.key.pem -out helm.csr.pem -config csr.conf
-
-                            ## Generate certificates using the ca-chain.key.pem, ca-chain.cert.pem and xxxx.csr.pem
-                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
-                                              -CAcreateserial \
-                                              -in tiller.csr.pem -out tiller.cert.pem -days 375 -extfile csr.conf
-
-                            #openssl x509 -req -in helm.csr.pem -CA ca.cert.pem -CAkey ca.key.pem \
-                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
-                                              -CAcreateserial \
-                                              -in helm.csr.pem -out helm.cert.pem -days 375 -extfile csr.conf
-
-                            ## Backup certificate and private key
-                            mkdir -p ${SF_ETCDIR}/helm/pki
-                            # mv ca.cert.pem ca.key.pem ${SF_ETCDIR}/helm/ca
-                            mv helm.cert.pem helm.key.pem ${SF_ETCDIR}/helm/pki
-                            mv tiller.cert.pem tiller.key.pem ${SF_ETCDIR}/helm/pki
-
-                            chown -R root:{{ .ClusterAdminUsername }} ${SF_ETCDIR}/helm/pki
-                            chmod -R u+rwx,g+r-wx,o-rwx ${SF_ETCDIR}/helm/pki
-                            find ${SF_ETCDIR}/helm/pki -type d -exec chmod ug+x {} \;
-
-                            ## Clean directory
-                            rm -f ca.srl csr.conf helm.csr.pem tiller.csr.pem
-                            sfExit
-
-                    helm-binary:
-                        targets:
-                            masters: all
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            # Install Helm
-                            cd ${SF_TMPDIR}
-                            wget https://get.helm.sh/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 236
-
-                            tar -zxvf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz -C ${SF_TMPDIR} || sfFail 237
-
-                            mv ${SF_TMPDIR}/linux-amd64/helm /usr/local/bin && \
-                            mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/bin && \
-                            chmod a+rx /usr/local/bin/helm && \
-                            chmod a+rx /usr/local/bin/tiller && \
-                            rm -drf ${SF_TMPDIR}/linux-amd64 && \
-                            rm -rf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 238
-                            sfExit
-
-                    helm-account:
-                        targets:
-                            masters: one
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            ## Create serviceaccount
-                            sfKubectl create serviceaccount tiller -n kube-system || sfFail 239
-                            sfExit
-
-                    helm-rbac-files:
-                        targets:
-                            masters: all
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            mkdir -p ${SF_ETCDIR}/helm
-
-                            cat > ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml <<EOF
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            kind: ClusterRoleBinding
-                            metadata:
-                                name: tiller-clusterrolebinding-admin
-                            roleRef:
-                                apiGroup: rbac.authorization.k8s.io
-                                kind: ClusterRole
-                                name: cluster-admin
-                            subjects:
-                                - kind: ServiceAccount
-                                  name: tiller
-                                  namespace: kube-system
-                            EOF
-                            sfExit
-
-                            sfExit
-
-                    helm-rbac-apply:
-                        targets:
-                            masters: one
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            ## Apply RBAC policy
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 240
-                            sfExit
-
-                    helm-init:
-                        targets:
-                            masters: one
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            ## Install Helm as {{ .ClusterAdminUsername }} (the user that runs kubectl) client with TLS authentication with Tiller
-                            sudo -u {{ .ClusterAdminUsername }} -i helm init \
-                                --tiller-tls \
-                                --tiller-tls-hostname {{ .Hostname }} \
-                                --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
-                                --tiller-tls-key ${SF_ETCDIR}/helm/pki/tiller.key.pem \
-                                --tiller-tls-verify \
-                                --tls-ca-cert ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                --service-account tiller \
-                                --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' \
-                                || sfFail 247
-
-                            mkdir -p /home/{{.ClusterAdminUsername}}/.helm
-                            # cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
-                            cp ${SF_ETCDIR}/helm/pki/helm.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/cert.pem
-                            cp ${SF_ETCDIR}/helm/pki/helm.key.pem /home/{{ .ClusterAdminUsername }}/.helm/key.pem
-
-                            chown -R {{ .ClusterAdminUsername }}:{{ .ClusterAdminUsername }} /home/{{ .ClusterAdminUsername }}/.helm
-                            chmod -R 0770 /home/{{ .ClusterAdminUsername }}/.helm
-
-                            # Push .helm configuration to all the other masters
-                            # Creates an archive of the .helm directory
-                            cd /home/{{ .ClusterAdminUsername }} && \
-                            tar -zcvf ${SF_TMPDIR}/helm_config.tar.gz .helm || sfFail 248
-
-                            # Push the archive in the dropzone and synchronize
-                            sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 249
-                            for ip in {{ range .ClusterMasterIPs }}{{ . }} {{ end }}; do
-                                sfDropzoneSync $ip || sfFail 250
-                            done
-                            rm -f ${SF_TMPDIR}/helm_config.tar.gz
-                            sfExit
-
-                    helm-sync:
-                        targets:
-                            masters: all
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 251
-                            sfDropzoneClean
-
-                            [ -f ${SF_TMPDIR}/helm_config.tar.gz ] || sfFail 252
-                            tar -zxvf ${SF_TMPDIR}/helm_config.tar.gz -C /home/{{ .ClusterAdminUsername }} || sfFail 253
-                            rm -f ${SF_TMPDIR}/helm_config.tar.gz
                             sfExit
 
                     final:
