@@ -130,16 +130,12 @@ type VirtualIP struct {
 
 // NewVirtualIP ...
 func NewVirtualIP() *VirtualIP {
-	return &VirtualIP{
-		Hosts: []*Host{},
-	}
+	return &VirtualIP{}
 }
 
 // Reset ...
 func (vip *VirtualIP) Reset() {
-	*vip = VirtualIP{
-		Hosts: []*Host{},
-	}
+	*vip = VirtualIP{}
 }
 
 // Content ...
@@ -161,11 +157,9 @@ func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
 		src := p.(*VirtualIP)
 		*vip = *src
 		vip.Hosts = make([]*Host, len(src.Hosts))
-		copy(vip.Hosts, src.Hosts)
-		//FIXME: is it better to do this ?
-		//for _, v := range src.Hosts {
-		//	vip.Hosts = append(vip.Hosts, v.Clone.(*Host))
-		//}
+		for k, v := range src.Hosts {
+			vip.Hosts[k] = v.Clone().(*Host)
+		}
 	}
 	return vip
 }
