@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        cluster: all
+        cluster: swarm
 
     requirements:
         features:
@@ -355,7 +355,6 @@ feature:
                             EOF
                             # FIXME: forbid access on port 8080 from all but localhost
                             sfExit
-
 
                     start:
                         targets:
