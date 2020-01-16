@@ -10,7 +10,6 @@ MAKE_TRACE=$(shell printf '    %.0s' {1..$(MAKE_LEVEL)})
 endif
 export MAKE_LEVEL
 
-
 ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
@@ -27,6 +26,7 @@ GOFMT?=gofmt
 CP?=cp
 RM?=rm
 BROWSER?=firefox
+BUILDTOOL?=dep
 
 ifeq ($(OS),Windows_NT)
 HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
