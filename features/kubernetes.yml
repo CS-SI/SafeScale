@@ -188,7 +188,7 @@ feature:
 
             add:
                 # pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
-                pace: sysconf,syshardening,common-tools,ca,keepalived,cp1-init,cni,cpx-init,join-gws,join-nodes,final
+                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
                 steps:
                     sysconf:
                         targets:
@@ -378,17 +378,16 @@ feature:
                             sfReverseProxyReload
                             sfExit
 
-                    keepalived:
+                    halb:
                         targets:
                             masters: all
                         run: |
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
-                                    sfApt update && sfApt -y install keepalived || sfFail 202
+                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 202
                                     ;;
-
                                 redhat|centos)
-                                    yum install -q -y keepalived || sfFail 202
+                                    yum install -q -y keepalived haproxy || sfFail 202
                                     ;;
                                 *)
                                     sfFail 203 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
@@ -422,24 +421,6 @@ feature:
                                     {{ .ControlplaneEndpointIP }}/${NETMASK}
                                 }
                             }
-
-                            virtual_server {{ .ControlplaneEndpointIP }} 6444 {
-                                delay_loop 5
-                                lb_algo wrr
-                                lb_kind DR
-                                protocol TCP
-                                ha_suspend
-
-                                {{- range .ClusterMasterIPs }}
-                                real_server {{ . }} 6443 {
-                                    weight 1
-                                    TCP_CHECK {
-                                        connect_timeout 3
-                                        connect_port 6443
-                                    }
-                                }
-                                {{- end }}
-                            }
                             EOF
                             chown -R root:root /etc/keepalived
                             chmod -R u+rw,g+r-w,o-rwx /etc/keepalived
@@ -449,7 +430,7 @@ feature:
                             net.ipv4.ip_forward=1
                             net.ipv4.ip_nonlocal_bind=1
                             EOF
-                            sysctl -p
+                            sysctl --system
 
                             if [ "$(sfGetFact "use_systemd")" = "1" ]; then
                                 # Use systemd to ensure keepalived is restarted if network is restarted
@@ -472,6 +453,70 @@ feature:
                             fi
 
                             sfService enable keepalived && sfService restart keepalived || sfFail 204
+
+                            ## Configure haproxy as TCP load-balancer for kubernetes Control Plane
+                            cat >/etc/haproxy/haproxy.cfg <<-EOF
+                            global
+                                log /dev/log    local0
+                                log /dev/log    local1 notice
+                                chroot /var/lib/haproxy
+                                stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+                                stats timeout 30s
+                                user haproxy
+                                group haproxy
+                                pidfile     /var/run/haproxy.pid
+                                maxconn     4000
+                                daemon
+
+                                # Default SSL material locations
+                                ca-base /etc/ssl/certs
+                                crt-base /etc/ssl/private
+
+                                # Default ciphers to use on SSL-enabled listening sockets.
+                                # For more information, see ciphers(1SSL). This list is from:
+                                #  https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
+                                # An alternative list with additional directives can be obtained from
+                                #  https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy
+                                ssl-default-bind-ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS
+                                ssl-default-bind-options no-sslv3
+
+                            defaults
+                                mode tcp
+                                log global
+                                option httplog
+                                option dontlognull
+                                option http-server-close
+                                option redispatch
+                                retries 3
+                                timeout http-request    10s
+                                timeout queue           1m
+                                timeout connect         10s
+                                timeout client          1m
+                                timeout server          1m
+                                timeout http-keep-alive 10s
+                                timeout check           10s
+                                maxconn                 3000
+                                errorfile 400 /etc/haproxy/errors/400.http
+                                errorfile 403 /etc/haproxy/errors/403.http
+                                errorfile 408 /etc/haproxy/errors/408.http
+                                errorfile 500 /etc/haproxy/errors/500.http
+                                errorfile 502 /etc/haproxy/errors/502.http
+                                errorfile 503 /etc/haproxy/errors/503.http
+                                errorfile 504 /etc/haproxy/errors/504.http
+
+                            listen kube_controlplane
+                                bind {{ .ControlplaneEndpointIP }}:6444
+                                mode tcp
+                                option tcplog
+                                timeout client 10m
+                                timeout server 10m
+                                balance leastconn
+                                {{- range $i, $ip := .ClusterMasterIPs }}
+                                server cp{{ $i }} {{.}}:6443
+                                {{- end }}
+                            EOF
+                            sfService enable haproxy && sfService restart haproxy || sfFail 205
+
                             sfExit
 
                     ca:
