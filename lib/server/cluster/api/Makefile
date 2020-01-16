@@ -11,5 +11,6 @@ vet:
 generate: clean
 	@$(GO) generate ./...
 
-clean: ;
+clean:
+	@$(RM) */enum_string.go || true
 

@@ -1,6 +1,6 @@
 GO?=go
 
-.PHONY:	clean test
+.PHONY:	test clean
 
 all: generate
 
@@ -12,3 +12,5 @@ vet:
 
 test:
 	@$(GO) test
+
+clean: ;
