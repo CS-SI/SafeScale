@@ -27,7 +27,7 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type Composite struct {
-	// Array of tenants hosting a multu-tenant cluster (multi starting from 1)
+	// Array of tenants hosting a multi-tenant cluster (multi starting from 1)
 	Tenants []string `json:"tenants"`
 }
 
