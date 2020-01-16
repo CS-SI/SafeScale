@@ -37,25 +37,25 @@ func newControlPlane() *ControlPlane {
 
 // Content ...
 // satisfies interface data.Clonable
-func (n *ControlPlane) Content() data.Clonable {
-	return n
+func (cp *ControlPlane) Content() data.Clonable {
+	return cp
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (n *ControlPlane) Clone() data.Clonable {
-	return newControlPlane().Replace(n)
+func (cp *ControlPlane) Clone() data.Clonable {
+	return newControlPlane().Replace(cp)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (n *ControlPlane) Replace(p data.Clonable) data.Clonable {
+func (cp *ControlPlane) Replace(p data.Clonable) data.Clonable {
 	src := p.(*ControlPlane)
-	*n = *src
+	*cp = *src
 	if src.VirtualIP != nil {
-		n.VirtualIP = src.VirtualIP.Clone().(*resources.VirtualIP)
+		cp.VirtualIP = src.VirtualIP.Clone().(*resources.VirtualIP)
 	}
-	return n
+	return cp
 }
 
 func init() {
