@@ -4,12 +4,15 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.51.0 // indirect
+	github.com/Bowery/prompt v0.0.0-20190916142128-fa8279994f75 // indirect
 	github.com/GeertJohan/go.rice v1.0.0
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
 	github.com/aws/aws-sdk-go v1.28.2 // indirect
 	github.com/coreos/go-oidc v2.0.0+incompatible
+	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/daaku/go.zipexe v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
+	github.com/dchest/safefile v0.0.0-20151022103144-855e8d98f185 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/denisenkom/go-mssqldb v0.0.0-20191128021309-1d7a30a10f73 // indirect
 	github.com/dlespiau/covertool v0.0.0-20180314162135-b0c4c6d0583a
@@ -24,8 +27,10 @@ require (
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
 	github.com/golangci/golangci-lint v1.22.2 // indirect
 	github.com/golangci/revgrep v0.0.0-20180812185044-276a5c0a1039 // indirect
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/gax-go v1.0.3 // indirect
 	github.com/gophercloud/gophercloud v0.0.0-20190509032623-7892efa714f1
+	github.com/gopherjs/gopherjs v0.0.0-20191106031601-ce3c9ade29de // indirect
 	github.com/gorilla/websocket v1.4.0
 	github.com/gostaticanalysis/analysisutil v0.0.3 // indirect
 	github.com/graymeta/stow v0.2.3
@@ -35,6 +40,7 @@ require (
 	github.com/jinzhu/gorm v1.9.1
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.1 // indirect
+	github.com/kardianos/govendor v1.0.9 // indirect
 	github.com/klauspost/cpuid v1.2.2 // indirect
 	github.com/klauspost/reedsolomon v1.9.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
@@ -51,22 +57,23 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
-	github.com/securego/gosec v0.0.0-20200106085552-9cb83e10afad // indirect
+	github.com/securego/gosec v0.0.0-20200116080623-3d5c97b418f4 // indirect
 	github.com/sethvargo/go-password v0.1.1
 	github.com/sirupsen/logrus v1.4.2
+	github.com/smartystreets/assertions v1.0.1 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.4.0
 	github.com/tebeka/go2xunit v1.4.10 // indirect
-	github.com/urfave/cli v1.20.0
+	github.com/urfave/cli v1.22.2
 	github.com/valyala/fasttemplate v1.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
-	golang.org/x/sys v0.0.0-20200113162924-86b910548bc1
-	golang.org/x/tools v0.0.0-20200115230748-a7dab0268b5f // indirect
+	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
+	golang.org/x/tools v0.0.0-20200116062425-473961ec044c // indirect
 	gomodules.xyz/stow v0.2.4 // indirect
 	google.golang.org/api v0.15.0
 	google.golang.org/grpc v1.26.0
