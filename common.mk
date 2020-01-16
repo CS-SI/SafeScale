@@ -10,10 +10,11 @@ MAKE_TRACE=$(shell printf '    %.0s' {1..$(MAKE_LEVEL)})
 endif
 export MAKE_LEVEL
 
-
 ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
+
+MAKEFLAGS += -s
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)

@@ -2,6 +2,8 @@ GO?=go
 
 .PHONY:	clean generate test vet
 
+all: generate
+
 generate: clean
 	@$(GO) generate ./...
 

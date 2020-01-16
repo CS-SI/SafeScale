@@ -14,7 +14,7 @@ include ./common.mk
 EXECS=cli/safescale/safescale cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover cli/perform/perform cli/perform/perform-cover cli/scanner/scanner
 
 # List of files
-PKG_FILES := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -type f -name '*.go' -print | grep -v version.go)
+PKG_FILES := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -type f -name '*.go' -print | grep -v version.go | grep -v gomock_reflect_ )
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v /vendor/)
 # List of packages to test
@@ -32,14 +32,13 @@ CONVEY := github.com/smartystreets/goconvey
 MOCKGEN := github.com/golang/mock/gomock github.com/golang/mock/mockgen
 COVER := golang.org/x/tools/cmd/cover
 LINTER := golang.org/x/lint/golint
-DEP := github.com/golang/dep/cmd/dep
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
 GOLANGCI := github.com/golangci/golangci-lint/cmd/golangci-lint
 
-DEVDEPSLIST := $(RICE) $(PROTOBUF) $(DEP) $(COVER) $(XUNIT) $(COVERTOOL)  $(GOVENDOR)
+DEVDEPSLIST := $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(COVERTOOL)  $(GOVENDOR)
 NEWDEVDEPSLIST := $(STRINGER) $(GOLANGCI) $(MOCKGEN) $(LINTER) $(CONVEY) $(ERRCHECK)
 
 BUILD_TAGS = ""
@@ -79,56 +78,32 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice protoc-gen-go go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
-    	$(GO) get -u $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(DEP) $(GOVENDOR) $(COVERTOOL); \
+	@which rice protoc-gen-go go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
+    	$(GO) get -u $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(GOVENDOR) $(COVERTOOL) &>/dev/null || true; \
     fi
 	@which mockgen > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading mockgen...\n" && $(GO) get -u  $(MOCKGEN) || true); \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading mockgen...\n" && $(GO) get -u  $(MOCKGEN) &>/dev/null || true; \
 	fi
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u  $(ERRCHECK) || true); \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u  $(ERRCHECK) &>/dev/null || true; \
 	fi
 	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u  $(CONVEY) || true); \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u  $(CONVEY) &>/dev/null || true; \
 	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get -u  $(LINTER) || true); \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get -u  $(LINTER) &>/dev/null || true; \
 	fi
 	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) || true); \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) &>/dev/null || true; \
 	fi
 	@which gonangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || ($(GO) get -u  $(GOLANGCI) || true); \
+		$(GO) get -u  $(GOLANGCI) &>/dev/null || true; \
 	fi
 
 ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@if [ ! -d ./vendor ]; then printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; else printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating vendor dir..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi;
-	@while [ 1 -ne 0 ] ; do \
-		$$(dep ensure) && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing protobuf... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating gophercloud... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@while [ 1 -ne 0 ] ; do \
-		$$(dep ensure -update "github.com/gophercloud/gophercloud") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating stow... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@while [ 1 -ne 0 ] ; do \
-		$$(dep ensure -update "github.com/graymeta/stow") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running build steps specifics to version... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@while [ 1 -ne 0 ] ; do \
-		$$($(GO) version | grep 1.10 > /dev/null) && break || true; \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating golang tools... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-		$$(dep ensure -update "golang.org/x/tools") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished golang tools update... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Running steps for version 1.10 ... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" || true;
-	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Building for go 1.10 takes more time..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" || true;
-	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which stringer` && rm -rf ./vendor/golang.org/x/tools/cmd && govendor fetch golang.org/x/tools/cmd/stringer@release-branch.go1.10 && cd vendor/golang.org/x/tools/cmd/stringer && $(GO) build && mv ./stringer $(GOPATH)/bin || true
-	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which errcheck` && rm -rf ./vendor/github.com/kisielk && govendor fetch github.com/kisielk/errcheck@v1.0.1 && cd vendor/github.com/kisielk/errcheck && $(GO) build && mv ./errcheck $(GOPATH)/bin || true
-
+	@(govendor get github.com/golang/protobuf &>/dev/null)
+	
 sdk:
 	@(cd lib && $(MAKE) $(@))
 
@@ -166,37 +141,11 @@ convey:
 devdeps:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dev dependencies, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) get -u $(DEVDEPSLIST))
-	@$(GO) version | grep 1.10 > /dev/null || $(GO) get -u $(NEWDEVDEPSLIST)
+	@($(GO) get -u $(NEWDEVDEPSLIST))
 
 depclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@if [ -f ./Gopkg.lock ]; then rm ./Gopkg.lock; fi;
-	@rm -rf ./vendor
-	@if [ ! -d ./vendor ]; then printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; else printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating vendor dir..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi;
-	@while [ 1 -ne 0 ] ; do \
-		$$(dep ensure) && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing protobuf... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating gophercloud... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@while [ 1 -ne 0 ] ; do \
-		$$(dep ensure -update "github.com/gophercloud/gophercloud") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating stow... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@while [ 1 -ne 0 ] ; do \
-		$$(dep ensure -update "github.com/graymeta/stow") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running build steps specifics to version... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@while [ 1 -ne 0 ] ; do \
-		$$($(GO) version | grep 1.10 > /dev/null) && break || true; \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating golang tools... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-		$$(dep ensure -update "golang.org/x/tools") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished golang tools update... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
-	done
-	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Running steps for version 1.10 ... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" || true;
-	@$(GO) version | grep 1.10 > /dev/null && printf "%b" "$(OK_COLOR)$(INFO_STRING) Building for go 1.10 takes more time..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" || true;
-	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which stringer` && rm -rf ./vendor/golang.org/x/tools/cmd && govendor fetch golang.org/x/tools/cmd/stringer@release-branch.go1.10 && cd vendor/golang.org/x/tools/cmd/stringer && $(GO) build && mv ./stringer $(GOPATH)/bin || true
-	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which errcheck` && rm -rf ./vendor/github.com/kisielk && govendor fetch github.com/kisielk/errcheck@v1.0.1 && cd vendor/github.com/kisielk/errcheck && $(GO) build && mv ./errcheck $(GOPATH)/bin || true
+	@($(GO) mod download)
 
 generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
