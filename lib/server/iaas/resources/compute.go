@@ -209,6 +209,30 @@ func (h *Host) GetPrivateIP() string {
 	return ip
 }
 
+// Content ...
+// satisfies interface data.Clonable
+func (h *Host) Content() data.Clonable {
+	return h
+}
+
+// Clone ...
+// satisfies interface data.Clonable
+func (h *Host) Clone() data.Clonable {
+	return NewHost().Replace(h)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (h *Host) Replace(p data.Clonable) data.Clonable {
+	if p != nil {
+		src := p.(*Host)
+		*h = *src
+		// FIXME: h.Properties have to be cloned also... but this will move outside this Host struct very soon (WIP on this subject...)
+		//        Is it worth it?
+	}
+	return h
+}
+
 // Serialize serializes Host instance into bytes (output json code)
 func (h *Host) Serialize() ([]byte, error) {
 	return serialize.ToJSON(h)
