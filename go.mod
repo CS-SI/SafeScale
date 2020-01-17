@@ -65,7 +65,7 @@ require (
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/spf13/viper v1.6.1
+	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.4.0
 	github.com/tebeka/go2xunit v1.4.10 // indirect
 	github.com/urfave/cli v1.22.2
@@ -74,7 +74,7 @@ require (
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
-	golang.org/x/tools v0.0.0-20200116062425-473961ec044c // indirect
+	golang.org/x/tools v0.0.0-20200117065230-39095c1d176c // indirect
 	gomodules.xyz/stow v0.2.4 // indirect
 	google.golang.org/api v0.15.0
 	google.golang.org/grpc v1.26.0
