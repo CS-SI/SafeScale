@@ -181,7 +181,6 @@ feature:
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
                                 [ $(sfKubectl get nodes | wc -l) -gt 1 ] || sfFail 194
-                                [ -f /usr/local/sbin/helm || sfFail 195
                                 sfExit
                             fi
                             sfFail 196
@@ -512,7 +511,7 @@ feature:
                                 timeout server 10m
                                 balance leastconn
                                 {{- range $i, $ip := .ClusterMasterIPs }}
-                                server cp{{ $i }} {{.}}:6443
+                                server cp{{ $i }} {{.}}:6443 check fall 3 rise 2
                                 {{- end }}
                             EOF
                             sfService enable haproxy && sfService restart haproxy || sfFail 205
@@ -524,11 +523,11 @@ feature:
                             masters: one
                         run: |
                             mkdir -p /etc/kubernetes/pki
-                            if [ -f ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem ]; then
+                            if [ -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
                                 [ -f /etc/kubernetes/pki/ca.crt ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.crt.notused
                                 [ -f /etc/kubernetes/pki/ca.key ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.key.notused
-                                cp ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem /etc/kubernetes/pki/ca.crt
-                                cp ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem /etc/kubernetes/pki/ca.key
+                                cp ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem /etc/kubernetes/pki/ca.crt
+                                cp ${SF_ETCDIR}/pki/ca/private/rootca.key.pem /etc/kubernetes/pki/ca.key
                             fi
                             chown -R root:{{ .ClusterAdminUsername }} /etc/kubernetes/pki
                             sfExit
@@ -604,7 +603,7 @@ feature:
                             oidc-issuer-url: "https://{{ .ExternalLoadBalancerHostname }}/realms/{{ .OIDCRealm }}"
                                 {{ else }}
                             oidc-issuer-url: "https://{{ .EndpointIP }}/realms/{{ .OIDCRealm }}"
-                            # oidc-ca-file: "/opt/safescale/etc/pki/ca/signca/certs/ca-chain.cert.pem"
+                            # oidc-ca-file: "/opt/safescale/etc/pki/ca/certs/rootca.cert.pem"
                                 {{ end }}
                             oidc-client-id: "{{ .OIDCClientName }}"
                             oidc-username-claim: "{{ .OIDCUserName }}"
@@ -982,42 +981,9 @@ feature:
                             sfExit
 
             remove:
-                pace: helm-namespace,helm-cleanup,node,reset,reverseproxy,clean
+#                pace: node,reset,reverseproxy,clean
+                pace: node,reset,clean
                 steps:
-                    helm-namespace:
-                        targets:
-                            masters: one
-                        run: |
-                            # Delete deployment
-                            if sfKubectl -n kube-system get deployment tiller-deploy &>/dev/null; then
-                                sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
-                            fi
-                            ## Delete service
-                            if sfKubectl get service -n kube-system tiller-deploy &>/dev/null; then
-                                sfKubectl delete service -n kube-system tiller-deploy || sfFail 193
-                            fi
-                            ## Delete account
-                            if sfKubectl get serviceaccount tiller -n kube-system &>/dev/null; then
-                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 194
-                            fi
-                            ## Delete secret
-                            if sfKubectl get secret -n kube-system tiller-secret &>/dev/null; then
-                                sfKubectl delete secret -n kube-system tiller-secret || sfFail 195
-                            fi
-                            ## Delete RBAC policy
-                            if sfKubectl get role tiller-rolebinding-secret -n kube-system &>/dev/null; then
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 196
-                            fi
-                            sfExit
-
-                    helm-cleanup:
-                        targets:
-                            masters: all
-                        run: |
-                            rm -f /usr/local/bin/helm
-                            rm -f /usr/local/bin/tiller
-                            rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm
-                            sfExit
 
                     node:
                         targets:
@@ -1058,7 +1024,7 @@ feature:
                                     yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
                                     ;;
                             esac
-                            sfFirewallReload || sfFail 200 "Firewall problem"
+                            sfFirewallReload || sfFail 225 "Firewall problem"
                             rm -f /etc/kubernetes/.joined
                             sfExit
 
