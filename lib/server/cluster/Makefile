@@ -25,4 +25,4 @@ clean:
 	@(cd tests && $(MAKE) $@)
 	@(cd enums && $(MAKE) $@)
 	@($(RM) ./mocks/*.go || true)
-	@(rmdir ./mocks || true)
+	@(rmdir mocks 2>/dev/null || true)
