@@ -181,13 +181,13 @@ feature:
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
                                 [ $(sfKubectl get nodes | wc -l) -gt 1 ] || sfFail 194
-                                [ -f /usr/local/sbin/helm || sfFail 195
                                 sfExit
                             fi
                             sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                # pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
+                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
                 steps:
                     sysconf:
                         targets:
@@ -377,17 +377,159 @@ feature:
                             sfReverseProxyReload
                             sfExit
 
+                    halb:
+                        targets:
+                            masters: all
+                        run: |
+                            case $(sfGetFact "linux_kind") in
+                                ubuntu|debian)
+                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 202
+                                    ;;
+                                redhat|centos)
+                                    yum install -q -y keepalived haproxy || sfFail 202
+                                    ;;
+                                *)
+                                    sfFail 203 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
+                                    ;;
+                            esac
+
+                            NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
+                            IDX={{ .Hostname }}
+                            IDX=${IDX##*-}
+                            cat >/etc/keepalived/keepalived.conf <<-EOF
+                            vrrp_instance vrrp_group_controlplane {
+                                state BACKUP
+                                interface $(sfInterfaceWithIP {{ .HostIP }})
+                                virtual_router_id 1
+                                priority ${IDX}
+                                nopreempt
+                                advert_int 2
+                                authentication {
+                                    auth_type PASS
+                                    auth_pass "{{ .ClusterAdminPassword }}"
+                                }
+                                # Unicast specific option, this is the IP of the interface keepalived listens on
+                                unicast_src_ip {{ .HostIP }}
+                                # Unicast specific option, this is the IP of the peer instance
+                                unicast_peer {
+                                  {{- range .ClusterMasterIPs }}
+                                    {{ if ne . $.HostIP }}{{ . }}{{ end }}
+                                  {{- end }}
+                                }
+                                virtual_ipaddress {
+                                    {{ .ControlplaneEndpointIP }}/${NETMASK}
+                                }
+                            }
+                            EOF
+                            chown -R root:root /etc/keepalived
+                            chmod -R u+rw,g+r-w,o-rwx /etc/keepalived
+                            chmod ug+x /etc/keepalived
+
+                            cat >/etc/sysctl.d/22-keepalived.conf <<-EOF
+                            net.ipv4.ip_forward=1
+                            net.ipv4.ip_nonlocal_bind=1
+                            EOF
+                            sysctl --system
+
+                            if [ "$(sfGetFact "use_systemd")" = "1" ]; then
+                                # Use systemd to ensure keepalived is restarted if network is restarted
+                                # (otherwise, keepalived is in undetermined state)
+                                mkdir -p /etc/systemd/system/keepalived.service.d
+                                if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+                                    cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+                            [Unit]
+                            Requires=network.service
+                            PartOf=network.service
+                            EOF
+                                else
+                                    cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+                            [Unit]
+                            Requires=systemd-networkd.service
+                            PartOf=systemd-networkd.service
+                            EOF
+                                fi
+                                systemctl daemon-reload
+                            fi
+
+                            sfService enable keepalived && sfService restart keepalived || sfFail 204
+
+                            ## Configure haproxy as TCP load-balancer for kubernetes Control Plane
+                            cat >/etc/haproxy/haproxy.cfg <<-EOF
+                            global
+                                log /dev/log    local0
+                                log /dev/log    local1 notice
+                                chroot /var/lib/haproxy
+                                stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+                                stats timeout 30s
+                                user haproxy
+                                group haproxy
+                                pidfile     /var/run/haproxy.pid
+                                maxconn     4000
+                                daemon
+
+                                # Default SSL material locations
+                                ca-base /etc/ssl/certs
+                                crt-base /etc/ssl/private
+
+                                # Default ciphers to use on SSL-enabled listening sockets.
+                                # For more information, see ciphers(1SSL). This list is from:
+                                #  https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
+                                # An alternative list with additional directives can be obtained from
+                                #  https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy
+                                ssl-default-bind-ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS
+                                ssl-default-bind-options no-sslv3
+
+                            defaults
+                                mode tcp
+                                log global
+                                option httplog
+                                option dontlognull
+                                option http-server-close
+                                option redispatch
+                                retries 3
+                                timeout http-request    10s
+                                timeout queue           1m
+                                timeout connect         10s
+                                timeout client          1m
+                                timeout server          1m
+                                timeout http-keep-alive 10s
+                                timeout check           10s
+                                maxconn                 3000
+                                errorfile 400 /etc/haproxy/errors/400.http
+                                errorfile 403 /etc/haproxy/errors/403.http
+                                errorfile 408 /etc/haproxy/errors/408.http
+                                errorfile 500 /etc/haproxy/errors/500.http
+                                errorfile 502 /etc/haproxy/errors/502.http
+                                errorfile 503 /etc/haproxy/errors/503.http
+                                errorfile 504 /etc/haproxy/errors/504.http
+
+                            listen kube_controlplane
+                                bind {{ .ControlplaneEndpointIP }}:6444
+                                mode tcp
+                                option tcplog
+                                timeout client 10m
+                                timeout server 10m
+                                balance leastconn
+                                {{- range $i, $ip := .ClusterMasterIPs }}
+                                server cp{{ $i }} {{.}}:6443 check fall 3 rise 2
+                                {{- end }}
+                            EOF
+                            sfService enable haproxy && sfService restart haproxy || sfFail 205
+
+                            sfExit
+
                     ca:
                         targets:
                             masters: one
                         run: |
                             mkdir -p /etc/kubernetes/pki
-                            if [ -f ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem ]; then
+                            if [ -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
                                 [ -f /etc/kubernetes/pki/ca.crt ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.crt.notused
                                 [ -f /etc/kubernetes/pki/ca.key ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.key.notused
-                                cp ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem /etc/kubernetes/pki/ca.crt
-                                cp ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem /etc/kubernetes/pki/ca.key
+                                cp ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem /etc/kubernetes/pki/ca.crt
+                                cp ${SF_ETCDIR}/pki/ca/private/rootca.key.pem /etc/kubernetes/pki/ca.key
                             fi
+                            chown -R root:{{ .ClusterAdminUsername }} /etc/kubernetes/pki
                             sfExit
 
                     cp1-init:
@@ -408,7 +550,7 @@ feature:
                             ---
                             apiVersion: kubeadm.k8s.io/v1beta1
                             kind: ClusterConfiguration
-                            controlPlaneEndpoint: "{{.ControlplaneEndpointIP}}:6443"
+                            controlPlaneEndpoint: "{{.ControlplaneEndpointIP}}:6444"
                             kubernetesVersion: ${KUBE_VERSION}
                             etcd:
                                 local:
@@ -461,7 +603,7 @@ feature:
                             oidc-issuer-url: "https://{{ .ExternalLoadBalancerHostname }}/realms/{{ .OIDCRealm }}"
                                 {{ else }}
                             oidc-issuer-url: "https://{{ .EndpointIP }}/realms/{{ .OIDCRealm }}"
-                            # oidc-ca-file: "/opt/safescale/etc/pki/ca/signca/certs/ca-chain.cert.pem"
+                            # oidc-ca-file: "/opt/safescale/etc/pki/ca/certs/rootca.cert.pem"
                                 {{ end }}
                             oidc-client-id: "{{ .OIDCClientName }}"
                             oidc-username-claim: "{{ .OIDCUserName }}"
@@ -813,211 +955,6 @@ feature:
                             touch /etc/kubernetes/.joined
                             sfExit
 
-                    helm-certs:
-                        targets:
-                            masters: any
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            mkdir -p ${SF_ETCDIR}/helm/pki
-                            cd ${SF_TMPDIR}
-
-                            # ## Generate Certificate Authority
-                            # openssl genrsa -out ca.key.pem 4096
-                            # openssl req -key ca.key.pem -new -x509 \
-                            #     -days 10000 -sha256 -out ca.cert.pem \
-                            #     -extensions v3_ca -subj "/C=FR/ST=Toulouse/L=Toulouse/O=CSSI/OU=Space/CN={{ .Hostname }}"
-
-                            ## Generate keys
-                            openssl genrsa -out tiller.key.pem 4096
-                            openssl genrsa -out helm.key.pem 4096
-
-                            ## Create a config file for generating a Certificate Signing Request (CSR)
-                            cat >csr.conf <<-EOF
-                            [ req ]
-                            default_bits = 2048
-                            prompt = no
-                            default_md = sha256
-                            req_extensions = req_ext
-                            distinguished_name = dn
-
-                            [ dn ]
-                            C=FR
-                            ST=FR
-                            L=Toulouse
-                            O=CSSI
-                            OU=Space
-                            CN={{ .Hostname }}
-
-                            [ req_ext ]
-                            subjectAltName = @alt_names
-
-                            [ alt_names ]
-                            DNS.1 = helm
-                            DNS.2 = helm.{{ .HelmDefaultNamespace }}
-                            DNS.3 = helm.{{ .HelmDefaultNamespace }}.svc
-                            DNS.4 = helm.{{ .HelmDefaultNamespace }}.svc.cluster
-                            DNS.5 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local
-                            DNS.6 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local.com
-                            IP = {{ .HostIP }}
-
-                            [ v3_ext ]
-                            authorityKeyIdentifier=keyid,issuer:always
-                            basicConstraints=CA:FALSE
-                            keyUsage=keyEncipherment,dataEncipherment
-                            extendedKeyUsage=serverAuth,clientAuth
-                            subjectAltName=@alt_names
-                            EOF
-
-                            # Generate the certificates signing request based on the config file
-                            openssl req -new -key tiller.key.pem -out tiller.csr.pem -config csr.conf
-                            openssl req -new -key helm.key.pem -out helm.csr.pem -config csr.conf
-
-                            ## Generate certificates using the ca-chain.key.pem, ca-chain.cert.pem and xxxx.csr.pem
-                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
-                                              -CAcreateserial \
-                                              -in tiller.csr.pem -out tiller.cert.pem -days 375 -extfile csr.conf
-
-                            #openssl x509 -req -in helm.csr.pem -CA ca.cert.pem -CAkey ca.key.pem \
-                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
-                                              -CAcreateserial \
-                                              -in helm.csr.pem -out helm.cert.pem -days 375 -extfile csr.conf
-
-                            ## Backup certificate and private key
-                            mkdir -p ${SF_ETCDIR}/helm/pki
-                            # mv ca.cert.pem ca.key.pem ${SF_ETCDIR}/helm/ca
-                            mv helm.cert.pem helm.key.pem ${SF_ETCDIR}/helm/pki
-                            mv tiller.cert.pem tiller.key.pem ${SF_ETCDIR}/helm/pki
-
-                            chown -R root:{{ .ClusterAdminUsername }} /etc/kubernetes/pki
-                            chmod -R u+rwx,g+r-wx,o-rwx /etc/kubernetes/pki
-                            find /etc/kubernetes/pki -type d -exec chmod ug+x {} \;
-
-                            ## Clean directory
-                            rm -f ca.srl csr.conf helm.csr.pem tiller.csr.pem
-                            sfExit
-
-                    helm-binary:
-                        targets:
-                            masters: all
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            # Install Helm
-                            cd ${SF_TMPDIR}
-                            wget https://get.helm.sh/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 236
-
-                            tar -zxvf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz -C ${SF_TMPDIR} || sfFail 237
-
-                            mv ${SF_TMPDIR}/linux-amd64/helm /usr/local/bin && \
-                            mv ${SF_TMPDIR}/linux-amd64/tiller /usr/local/bin && \
-                            chmod a+rx /usr/local/bin/helm && \
-                            chmod a+rx /usr/local/bin/tiller && \
-                            rm -drf ${SF_TMPDIR}/linux-amd64 && \
-                            rm -rf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 238
-                            sfExit
-
-                    helm-account:
-                        targets:
-                            masters: one
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            ## Create serviceaccount
-                            sfKubectl create serviceaccount tiller -n kube-system || sfFail 239
-                            sfExit
-
-                    helm-rbac-files:
-                        targets:
-                            masters: all
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            mkdir -p ${SF_ETCDIR}/helm
-
-                            cat > ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml <<EOF
-                            apiVersion: rbac.authorization.k8s.io/v1
-                            kind: ClusterRoleBinding
-                            metadata:
-                                name: tiller-clusterrolebinding-admin
-                            roleRef:
-                                apiGroup: rbac.authorization.k8s.io
-                                kind: ClusterRole
-                                name: cluster-admin
-                            subjects:
-                                - kind: ServiceAccount
-                                  name: tiller
-                                  namespace: kube-system
-                            EOF
-                            sfExit
-
-                            sfExit
-
-                    helm-rbac-apply:
-                        targets:
-                            masters: one
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            ## Apply RBAC policy
-                            sfKubectl apply -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 240
-                            sfExit
-
-                    helm-init:
-                        targets:
-                            masters: one
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            ## Install Helm as {{ .ClusterAdminUsername }} (the user that runs kubectl) client with TLS authentication with Tiller
-                            sudo -u {{ .ClusterAdminUsername }} -i helm init \
-                                --tiller-tls \
-                                --tiller-tls-hostname {{ .Hostname }} \
-                                --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
-                                --tiller-tls-key ${SF_ETCDIR}/helm/pki/tiller.key.pem \
-                                --tiller-tls-verify \
-                                --tls-ca-cert ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                --service-account tiller \
-                                --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' \
-                                || sfFail 247
-
-                            mkdir -p /home/{{.ClusterAdminUsername}}/.helm
-                            # cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
-                            cp ${SF_ETCDIR}/helm/pki/helm.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/cert.pem
-                            cp ${SF_ETCDIR}/helm/pki/helm.key.pem /home/{{ .ClusterAdminUsername }}/.helm/key.pem
-
-                            chown -R {{ .ClusterAdminUsername }}:{{ .ClusterAdminUsername }} /home/{{ .ClusterAdminUsername }}/.helm
-                            chmod -R 0770 /home/{{ .ClusterAdminUsername }}/.helm
-
-                            # Push .helm configuration to all the other masters
-                            # Creates an archive of the .helm directory
-                            cd /home/{{ .ClusterAdminUsername }} && \
-                            tar -zcvf ${SF_TMPDIR}/helm_config.tar.gz .helm || sfFail 248
-
-                            # Push the archive in the dropzone and synchronize
-                            sfDropzonePush ${SF_TMPDIR}/helm_config.tar.gz || sfFail 249
-                            for ip in {{ range .ClusterMasterIPs }}{{ . }} {{ end }}; do
-                                sfDropzoneSync $ip || sfFail 250
-                            done
-                            rm -f ${SF_TMPDIR}/helm_config.tar.gz
-                            sfExit
-
-                    helm-sync:
-                        targets:
-                            masters: all
-                        run: |
-                            [ "{{ .DisableHelm }}" = "true" ] && sfExit
-
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 251
-                            sfDropzoneClean
-
-                            [ -f ${SF_TMPDIR}/helm_config.tar.gz ] || sfFail 252
-                            tar -zxvf ${SF_TMPDIR}/helm_config.tar.gz -C /home/{{ .ClusterAdminUsername }} || sfFail 253
-                            rm -f ${SF_TMPDIR}/helm_config.tar.gz
-                            sfExit
-
                     final:
                         targets:
                             masters: one
@@ -1044,42 +981,9 @@ feature:
                             sfExit
 
             remove:
-                pace: helm-namespace,helm-cleanup,node,reset,reverseproxy,clean
+#                pace: node,reset,reverseproxy,clean
+                pace: node,reset,clean
                 steps:
-                    helm-namespace:
-                        targets:
-                            masters: one
-                        run: |
-                            # Delete deployment
-                            if sfKubectl -n kube-system get deployment tiller-deploy &>/dev/null; then
-                                sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
-                            fi
-                            ## Delete service
-                            if sfKubectl get service -n kube-system tiller-deploy &>/dev/null; then
-                                sfKubectl delete service -n kube-system tiller-deploy || sfFail 193
-                            fi
-                            ## Delete account
-                            if sfKubectl get serviceaccount tiller -n kube-system &>/dev/null; then
-                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 194
-                            fi
-                            ## Delete secret
-                            if sfKubectl get secret -n kube-system tiller-secret &>/dev/null; then
-                                sfKubectl delete secret -n kube-system tiller-secret || sfFail 195
-                            fi
-                            ## Delete RBAC policy
-                            if sfKubectl get role tiller-rolebinding-secret -n kube-system &>/dev/null; then
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 196
-                            fi
-                            sfExit
-
-                    helm-cleanup:
-                        targets:
-                            masters: all
-                        run: |
-                            rm -f /usr/local/bin/helm
-                            rm -f /usr/local/bin/tiller
-                            rm -drf ${SF_ETCDIR}/helm /home/{{ .ClusterAdminUsername }}/.helm
-                            sfExit
 
                     node:
                         targets:
@@ -1120,7 +1024,7 @@ feature:
                                     yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
                                     ;;
                             esac
-                            sfFirewallReload || sfFail 200 "Firewall problem"
+                            sfFirewallReload || sfFail 225 "Firewall problem"
                             rm -f /etc/kubernetes/.joined
                             sfExit
 

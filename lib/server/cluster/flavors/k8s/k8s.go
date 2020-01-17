@@ -113,7 +113,8 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 }
 
 func configureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
-	clusterName := foreman.Cluster().GetIdentity(task).Name
+	cluster := foreman.Cluster()
+	clusterName := cluster.GetIdentity(task).Name
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
 	target, err := install.NewClusterTarget(task, foreman.Cluster())
@@ -133,65 +134,51 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	_, ok := req.DisabledDefaultFeatures["hardening"]
 	v["Hardening"] = strconv.FormatBool(!ok)
 
-	var controlplaneEndpointIP string
-	netCfg, err := foreman.Cluster().GetNetworkConfig(task)
+	netCfg, err := cluster.GetNetworkConfig(task)
 	if err != nil {
 		return err
 	}
-	// If complexity == Normal or Large, creates a VIP for Kubernetes attached to masters
-	if foreman.Cluster().GetIdentity(task).Complexity != complexity.Small {
-		vip, err := foreman.Cluster().GetService(task).CreateVIP(netCfg.NetworkID, clusterName+"-ControlPlaneVIP")
+	svc := cluster.GetService(task)
+	vip, err := svc.CreateVIP(netCfg.NetworkID, clusterName+"-ControlPlaneVIP")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			derr := svc.DeleteVIP(vip)
+			if derr != nil {
+				logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+			}
+		}
+	}()
+
+	for _, id := range cluster.ListMasterIDs(task) {
+		h, err := svc.InspectHost(id)
 		if err != nil {
 			return err
 		}
-		defer func() {
-			if err != nil {
-				derr := foreman.Cluster().GetService(task).DeleteVIP(vip)
-				if derr != nil {
-					logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
-				}
-			}
-		}()
-
-		for _, id := range foreman.Cluster().ListMasterIDs(task) {
-			h, err := foreman.Cluster().GetService(task).InspectHost(id)
-			if err != nil {
-				return err
-			}
-			err = foreman.Cluster().GetService(task).BindHostToVIP(vip, h)
-			if err != nil {
-				return err
-			}
-		}
-
-		err = foreman.Cluster().GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
-			controlPlaneV1 := clonable.(*clusterpropsv1.ControlPlane)
-			controlPlaneV1.VirtualIP = vip
-			return nil
-		})
+		err = svc.BindHostToVIP(vip, h)
 		if err != nil {
 			return err
 		}
-		controlplaneEndpointIP = vip.PrivateIP
-	} else {
-		list := foreman.Cluster().ListMasterIPs(task)
-		controlplaneEndpointIP = list[0]
+	}
+
+	err = cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+		controlPlaneV1 := clonable.(*clusterpropsv1.ControlPlane)
+		controlPlaneV1.VirtualIP = vip
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// Disable dashboard if requested
 	_, ok = req.DisabledDefaultFeatures["dashboard"]
 	v["Dashboard"] = strconv.FormatBool(!ok)
-
-	// If helm installation is disabled, set the appropriate parameter of the kubernetes feature
-	_, ok = req.DisabledDefaultFeatures["helm"]
-	v["DisableHelm"] = strconv.FormatBool(ok)
+	v["ControlplaneEndpointIP"] = vip.PrivateIP
 
 	// Installs kubernetes feature
-	results, err := feature.Add(
-		target,
-		install.Variables{"ControlplaneEndpointIP": controlplaneEndpointIP},
-		install.Settings{},
-	)
+	results, err := feature.Add(target, v, install.Settings{})
 	if err != nil {
 		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
 		return err
@@ -202,6 +189,31 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 		return err
 	}
 	logrus.Println(fmt.Sprintf("[cluster %s] feature 'kubernetes' addition successful.", clusterName))
+
+	// If helm is not disabled, installs it
+	if _, ok = req.DisabledDefaultFeatures["helm"]; !ok {
+		logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'k8s.helm2'...", clusterName))
+
+		feature, err = install.NewFeature(task, "k8s.helm2")
+		if err != nil {
+			logrus.Errorf("[cluster %s] failed to instantiate feature 'k8s.helm2': %v", clusterName, err)
+			return fmt.Errorf("failed to prepare feature 'k8s.helm2': %s", err.Error())
+		}
+
+		// Installs kubernetes feature
+		results, err = feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			logrus.Errorf("[cluster %s] failed to add feature 'k8s.helm2': %s", clusterName, err.Error())
+			return err
+		}
+		if !results.Successful() {
+			err = fmt.Errorf(results.AllErrorMessages())
+			logrus.Errorf("[cluster %s] failed to add feature 'k8s.helm2': %s", clusterName, err.Error())
+			return err
+		}
+		logrus.Println(fmt.Sprintf("[cluster %s] feature 'k8s.helm2' addition successful.", clusterName))
+	}
+
 	return nil
 }
 
