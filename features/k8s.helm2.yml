@@ -93,14 +93,14 @@ feature:
                             openssl req -new -key tiller.key.pem -out tiller.csr.pem -config csr.conf
                             openssl req -new -key helm.key.pem -out helm.csr.pem -config csr.conf
 
-                            ## Generate certificates using the ca-chain.key.pem, ca-chain.cert.pem and xxxx.csr.pem
-                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
+                            ## Generate certificates using the kubernetes CA
+                            openssl x509 -req -CA /etc/kubernetes/pki/ca.crt \
+                                              -CAkey /etc/kubernetes/pki/ca.key \
                                               -CAcreateserial \
                                               -in tiller.csr.pem -out tiller.cert.pem -days 375 -extfile csr.conf
 
-                            openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
-                                              -CAkey ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
+                            openssl x509 -req -CA /etc/kubernetes/pki/ca.crt \
+                                              -CAkey /etc/kubernetes/pki/ca.key \
                                               -CAcreateserial \
                                               -in helm.csr.pem -out helm.cert.pem -days 375 -extfile csr.conf
 
@@ -132,7 +132,7 @@ feature:
                             chmod a+rx /usr/local/bin/helm && \
                             chmod a+rx /usr/local/bin/tiller && \
                             rm -drf ${SF_TMPDIR}/linux-amd64 && \
-                            rm -rf ${SF_TMPDIR}/helm-v{{.HelmVersion}}-linux-amd64.tar.gz || sfFail 238
+                            rm -rf ${SF_TMPDIR}/helm-v{{.Version}}-linux-amd64.tar.gz || sfFail 238
                             sfExit
 
                     account:
@@ -186,13 +186,12 @@ feature:
                                 --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
                                 --tiller-tls-key ${SF_ETCDIR}/helm/pki/tiller.key.pem \
                                 --tiller-tls-verify \
-                                --tls-ca-cert ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem \
+                                --tls-ca-cert /etc/kubernetes/pki/ca.crt \
                                 --service-account tiller \
                                 --override 'spec.template.spec.containers[0].command'='{/tiller,--storage=secret}' \
                                 || sfFail 247
 
                             mkdir -p /home/{{.ClusterAdminUsername}}/.helm
-                            # cp ${SF_ETCDIR}/helm/ca/ca.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/ca.pem
                             cp ${SF_ETCDIR}/helm/pki/helm.cert.pem /home/{{ .ClusterAdminUsername }}/.helm/cert.pem
                             cp ${SF_ETCDIR}/helm/pki/helm.key.pem /home/{{ .ClusterAdminUsername }}/.helm/key.pem
 
