@@ -13,6 +13,7 @@ flavors: generate
 	@(cd flavors && $(MAKE) all)
 
 generate: clean
+	@(mkdir -p mocks || true)
 	@(cd enums && $(MAKE) $(@))
 	@(cd flavors && $(MAKE) $(@))
 
@@ -24,3 +25,4 @@ clean:
 	@(cd tests && $(MAKE) $@)
 	@(cd enums && $(MAKE) $@)
 	@($(RM) ./mocks/*.go || true)
+	@(rmdir ./mocks || true)
