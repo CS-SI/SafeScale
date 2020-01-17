@@ -58,10 +58,10 @@ func (f *Features) Clone() data.Clonable {
 func (f *Features) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Features)
 	f.Installed = make(map[string]string, len(src.Installed))
-	f.Disabled = make(map[string]struct{}, len(src.Installed))
 	for k, v := range src.Installed {
 		f.Installed[k] = v
 	}
+	f.Disabled = make(map[string]struct{}, len(src.Installed))
 	for k, v := range src.Disabled {
 		f.Disabled[k] = v
 	}

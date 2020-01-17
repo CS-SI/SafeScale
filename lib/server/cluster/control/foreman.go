@@ -784,7 +784,12 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 
 	// configure what has to be done cluster-wide
 	if b.makers.ConfigureCluster != nil {
-		return b.makers.ConfigureCluster(task, b, req)
+		err = b.cluster.UpdateMetadata(task, func() error {
+			return b.makers.ConfigureCluster(task, b, req)
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	// Installs remotedesktop feature on cluster (all masters)
@@ -2114,37 +2119,24 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
-		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["reverseproxy"]
-		// if !disabled {
-		// 	_, disabled = clonable.(*clusterpropsv1.Features).Disabled["reverseproxy"]
-		// }
-		return nil
-	})
+	logrus.Debugf("[cluster %s] adding feature 'edgeproxy4network'", clusterName)
+	feat, err := install.NewEmbeddedFeature(task, "edgeproxy4network")
 	if err != nil {
 		return err
 	}
-	if !disabled {
-		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4network'", clusterName)
-		feat, err := install.NewEmbeddedFeature(task, "edgeproxy4network")
-		if err != nil {
-			return err
-		}
-		target, err := install.NewClusterTarget(task, b.cluster)
-		if err != nil {
-			return err
-		}
-		results, err := feat.Add(target, install.Variables{}, install.Settings{})
-		if err != nil {
-			return err
-		}
-		if !results.Successful() {
-			msg := results.AllErrorMessages()
-			return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
-		}
-		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
+	target, err := install.NewClusterTarget(task, b.cluster)
+	if err != nil {
+		return err
 	}
+	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	if err != nil {
+		return err
+	}
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
+		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+	}
+	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	return nil
 }
 
@@ -2157,44 +2149,31 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
-		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["remotedesktop"]
-		// if !disabled {
-		// 	_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
-		// }
-		return nil
-	})
+	logrus.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
+
+	adminPassword := identity.AdminPassword
+	target, err := install.NewClusterTarget(task, b.cluster)
 	if err != nil {
 		return err
 	}
-	if !disabled {
-		logrus.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
 
-		adminPassword := identity.AdminPassword
-		target, err := install.NewClusterTarget(task, b.cluster)
-		if err != nil {
-			return err
-		}
-
-		// Adds remotedesktop feature on master
-		feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
-		if err != nil {
-			return err
-		}
-		results, err := feat.Add(target, install.Variables{
-			"Username": "cladm",
-			"Password": adminPassword,
-		}, install.Settings{})
-		if err != nil {
-			return err
-		}
-		if !results.Successful() {
-			msg := results.AllErrorMessages()
-			return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
-		}
-		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
+	// Adds remotedesktop feature on master
+	feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
+	if err != nil {
+		return err
 	}
+	results, err := feat.Add(target, install.Variables{
+		"Username": "cladm",
+		"Password": adminPassword,
+	}, install.Settings{})
+	if err != nil {
+		return err
+	}
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
+		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+	}
+	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	return nil
 }
 

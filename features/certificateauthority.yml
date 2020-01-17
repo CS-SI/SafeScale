@@ -29,45 +29,40 @@ feature:
     install:
         bash:
             check:
-                pace: chainca
+                pace: cert
                 steps:
-                    chainca:
+                    cert:
                         targets:
                             hosts: yes
                             masters: all
                         run: |
-                            [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/chain-ca.cert.pem ] && sfFail 193
+                            [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfFail 192
                             sfExit
 
             add:
-                pace: config,rootca,signca,chainca,spread-on-masters,spread-on-others,register
+                pace: config,rootca,spread,register
                 steps:
                     config:
                         targets:
                             hosts: yes
                             masters: one
                         run: |
-                            mkdir -p ${SF_ETCDIR}/pki/ca/rootca/{certs,crl,newcerts,private}
-                            mkdir -p ${SF_ETCDIR}/pki/ca/signca/{certs,crl,csr,newcerts,private}
+                            mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,newcerts,private}
+                            mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,csr,newcerts,private}
 
-                            chmod 0700 ${SF_ETCDIR}/pki/ca/rootca/private
-                            touch ${SF_ETCDIR}/pki/ca/rootca/index.txt
-                            touch ${SF_ETCDIR}/pki/ca/rootca/index.txt.attr
-                            echo 1000 >${SF_ETCDIR}/pki/ca/rootca/serial
+                            chmod 0700 ${SF_ETCDIR}/pki/ca/private
+                            touch ${SF_ETCDIR}/pki/ca/index.txt
+                            touch ${SF_ETCDIR}/pki/ca/index.txt.attr
+                            echo 1000 >${SF_ETCDIR}/pki/ca/serial
+                            echo 1000 >${SF_ETCDIR}/pki/ca/crlnumber
 
-                            chmod 0700 ${SF_ETCDIR}/pki/ca/signca/private
-                            touch ${SF_ETCDIR}/pki/ca/signca/index.txt
-                            touch ${SF_ETCDIR}/pki/ca/signca/index.txt.attr
-                            echo 1000 >${SF_ETCDIR}/pki/ca/signca/serial
-                            echo 1000 >${SF_ETCDIR}/pki/ca/signca/crlnumber
-
-                            cat >${SF_ETCDIR}/pki/ca/rootca/openssl.cnf <<-EOF
+                            cat >${SF_ETCDIR}/pki/ca/openssl.cnf <<-EOF
                             [ ca ]
                             default_ca = CA_default
 
                             [ CA_default ]
                             # Directory and file locations.
-                            dir               = ${SF_ETCDIR}/pki/ca/rootca
+                            dir               = ${SF_ETCDIR}/pki/ca
                             certs             = \$dir/certs
                             crl_dir           = \$dir/crl
                             new_certs_dir     = \$dir/newcerts
@@ -92,20 +87,9 @@ feature:
                             cert_opt          = ca_default
                             default_days      = 375
                             preserve          = no
-                            policy            = policy_strict
+                            policy            = policy_default
 
-                            [ policy_strict ]
-                            # The root CA should only sign signca certificates that match.
-                            # See the POLICY FORMAT section of 'man ca'.
-                            countryName             = match
-                            stateOrProvinceName     = match
-                            organizationName        = match
-                            organizationalUnitName  = optional
-                            commonName              = supplied
-                            emailAddress            = optional
-
-                            [ policy_loose ]
-                            # Allow the signca CA to sign a more diverse range of certificates.
+                            [ policy_default ]
                             # See the POLICY FORMAT section of the 'ca' man page.
                             countryName             = optional
                             stateOrProvinceName     = optional
@@ -152,13 +136,6 @@ feature:
                             basicConstraints = critical, CA:true
                             keyUsage = critical, digitalSignature, cRLSign, keyCertSign
 
-                            [ v3_signca_ca ]
-                            # Extensions for a typical signca CA (man x509v3_config).
-                            subjectKeyIdentifier = hash
-                            authorityKeyIdentifier = keyid:always,issuer
-                            basicConstraints = critical, CA:true, pathlen:0
-                            keyUsage = critical, digitalSignature, cRLSign, keyCertSign
-
                             [ usr_cert ]
                             # Extensions for client certificates (man x509v3_config).
                             basicConstraints = CA:FALSE
@@ -192,14 +169,6 @@ feature:
                             extendedKeyUsage = critical, OCSPSigning
                             EOF
 
-                            cp ${SF_ETCDIR}/pki/ca/rootca/openssl.cnf ${SF_ETCDIR}/pki/ca/signca
-
-                            sed -E -i 's|^(dir\s+= \$\{SF_ETCDIR\}/pki/ca/)+.*$|\1signca|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
-                            sed -E -i 's|^(private_key\s+= \$dir/private/)+.*$|\1signca.key.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
-                            sed -E -i 's|^(certificate\s+= \$dir/certs/)+.*$|\1signca.cert.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
-                            sed -E -i 's|^(crl\s+= \$dir/crl/)+.*$|\1signca.crl.pem|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
-                            sed -E -i 's|^(policy\s+= policy_)+.*$|\1_loose|' ${SF_ETCDIR}/pki/ca/signca/openssl.cnf || sfFail 193 "Failure patching openssl.cnf"
-
                             sfExit
 
                     rootca:
@@ -207,8 +176,8 @@ feature:
                             hosts: yes
                             masters: one
                         run: |
-                            openssl genrsa -out ${SF_ETCDIR}/pki/ca/rootca/private/rootca.key.pem 4096 || sfFail 193
-                            chmod 0400 ${SF_ETCDIR}/pki/ca/rootca/private/rootca.key.pem || sfFail 194
+                            openssl genrsa -out ${SF_ETCDIR}/pki/ca/private/rootca.key.pem 4096 || sfFail 193
+                            chmod 0400 ${SF_ETCDIR}/pki/ca/private/rootca.key.pem || sfFail 194
 
                             SUBJ=
                             {{ if .CountryName            }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
@@ -218,118 +187,49 @@ feature:
                             {{ if .OrganizationalUnitName }} SUBJ="${SUBJ}/OU={{.OrganizationalUnitName}}" {{ end }}
                             {{ if .EmailAddress           }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
                             {{ if .ClusterFlavor }}
-                            SUBJ="${SUBJ}/CN={{ .ClusterName }}-rootCA"
+                            CACN="{{ .ClusterName }}-CA.crt"
                             {{ else }}
-                            SUBJ="${SUBJ}/CN={{ .Hostname }}-rootCA"
+                            CACN="{{ .Hostname }}-CA.crt"
                             {{ end }}
-                            openssl req -config ${SF_ETCDIR}/pki/ca/rootca/openssl.cnf \
-                                        -key ${SF_ETCDIR}/pki/ca/rootca/private/rootca.key.pem \
+                            SUBJ="${SUBJ}/CN=${CACN}"
+                            openssl req -config ${SF_ETCDIR}/pki/ca/openssl.cnf \
+                                        -key ${SF_ETCDIR}/pki/ca/private/rootca.key.pem \
                                         -new -x509 -days 10000 -sha256 \
-                                        -out ${SF_ETCDIR}/pki/ca/rootca/certs/rootca.cert.pem \
+                                        -out ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem \
                                         -extensions v3_ca \
                                         -subj "$SUBJ" || sfFail 195
-                            chmod 0444 ${SF_ETCDIR}/pki/ca/rootca/certs/rootca.cert.pem || sfFail 196
-                            sfExit
-
-                    signca:
-                        targets:
-                            hosts: yes
-                            masters: one
-                        run: |
-                            openssl genrsa -out ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem 4096 || sfFail 197
-                            chmod 400 ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem
-
-                            SUBJ=
-                            {{ if .CountryName            }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
-                            {{ if .StateOrProvinceName    }} SUBJ="${SUBJ}/ST={{.StateOrProvinceName}}" {{ end }}
-                            {{ if .LocalityName           }} SUBJ="${SUBJ}/L={{.LocalityName}}" {{ end }}
-                            {{ if .OrganizationName       }} SUBJ="${SUBJ}/O={{.OrganizationName}}" {{ end }}
-                            {{ if .OrganizationalUnitName }} SUBJ="${SUBJ}/OU={{.OrganizationalUnitName}}" {{ end }}
-                            {{ if .EmailAddress           }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
-                            {{ if .ClusterFlavor          }}
-                            SUBJ="${SUBJ}/CN={{ .ClusterName }}-signCA"
-                            {{ else }}
-                            SUBJ="${SUBJ}/CN={{ .Hostname }}-signCA"
-                            {{ end }}
-                            openssl req -config ${SF_ETCDIR}/pki/ca/signca/openssl.cnf \
-                                        -key ${SF_ETCDIR}/pki/ca/signca/private/signca.key.pem \
-                                        -new -sha256 \
-                                        -out ${SF_ETCDIR}/pki/ca/signca/csr/signca.csr.pem \
-                                        -subj "$SUBJ" || sfFail 198
-
-                            openssl ca -batch -config ${SF_ETCDIR}/pki/ca/rootca/openssl.cnf -extensions v3_signca_ca \
-                                       -days 3650 -notext -md sha256 \
-                                       -in ${SF_ETCDIR}/pki/ca/signca/csr/signca.csr.pem \
-                                       -out ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem || sfFail 199
-                            chmod 444 ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem
-                            sfExit
-
-                    chainca:
-                        targets:
-                            hosts: yes
-                            masters: one
-                        run: |
-                            cat ${SF_ETCDIR}/pki/ca/signca/certs/signca.cert.pem \
-                                ${SF_ETCDIR}/pki/ca/rootca/certs/rootca.cert.pem >${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem
-                            chmod 444 ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem
+                            chmod 0444 ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem || sfFail 195
 
                             {{ if .ClusterFlavor }}
-                            tar zcvf ${SF_TMPDIR}/safescale-signca.tar.gz ${SF_ETCDIR}/pki/ca/signca && \
-                            sfDropzonePush ${SF_TMPDIR}/safescale-signca.tar.gz && rm -f ${SF_TMPDIR}/safescale-signca.tar.gz || sfFail 200
-
+                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca && \
+                            sfDropzonePush ${SF_TMPDIR}/safescale-rootca.tar.gz && rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 196
                             sfDropzoneSync {{ .PrimaryGatewayIP }}
                             {{ if .SecondaryGatewayIP }} sfDropzoneSync {{ .SecondaryGatewayIP }} {{ end }}
                             for i in {{ range .ClusterNodeIPs }}{{ . }} {{ end }}; do
                                 sfDropzoneSync $i
                             done
-
-                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca/rootca && \
-                            sfDropzonePush ${SF_TMPDIR}/safescale-rootca.tar.gz && rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 201
                             for i in {{ range .ClusterMasterIPs }}{{ . }} {{ end }}; do
                                 sfDropzoneSync $i
                             done
                             {{ end }}
+
                             sfExit
 
-                    spread-on-masters:
+                    spread:
                         targets:
                             hosts: no
-                            gateways: no
+                            gateways: all
                             masters: all
-                            nodes: no
+                            nodes: all
                         run: |
-                            # Recover rootca and chain-ca from Dropzone
+                            # Recover rootca from Dropzone
                             sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
 
                             tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C /
                             retcode=$?
                             rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz
-                            [ $retcode -ne 0 ] && sfFail 201
-
-                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C /
-                            retcode=$?
-                            rm -f ${SF_TMPDIR}/safescale-signca.tar.gz
-                            [ $retcode -ne 0 ] && sfFail 202
-
-                            sfExit
-
-                    spread-on-others:
-                        targets:
-                            hosts: yes
-                            gateways: all
-                            masters: no
-                            nodes: all
-                        run: |
-                            {{ if .ClusterFlavor }}
-                            # Recover chain-ca from Dropzone
-                            sfDropzonePop ${SF_TMPDIR}
-                            sfDropzoneClean
-                            tar zxvf ${SF_TMPDIR}/safescale-signca.tar.gz -C /
-                            retcode=$?
-                            rm -f ${SF_TMPDIR}/safescale-signca.tar.gz
-                            [ $retcode -ne 0 ] && sfFail 203
-                            {{ end }}
+                            [ $retcode -ne 0 ] && sfFail 197
                             sfExit
 
                     register:
@@ -340,15 +240,15 @@ feature:
                             nodes: all
                         run: |
                             {{ if .ClusterFlavor }}
-                            CANAME="{{ .ClusterName }}-CA.crt"
+                            CACN="{{ .ClusterName }}-CA.crt"
                             {{ else }}
-                            CANAME="{{ .Hostname }}-CA.crt"
+                            CACN="{{ .Hostname }}-CA.crt"
                             {{ end }}
                             # Add the new CA in system CAs
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
-                                    ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem /usr/local/share/ca-certificates/$CANAME
-                                    update-ca-certificates || sfFail 204
+                                    ln -s ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem /usr/local/share/ca-certificates/$CACN
+                                    update-ca-certificates || sfFail 198
                                     ;;
                                 redhat|centos)
                                     if [ $(sfGetFact "linux_version") = 6 ]; then
@@ -356,11 +256,11 @@ feature:
                                     else
                                         TARGET=/etc/pki/ca-trust/source/anchors
                                     fi
-                                    ln -s ${SF_ETCDIR}/pki/ca/signca/certs/ca-chain.cert.pem "$TARGET/$CANAME"
-                                    /bin/update-ca-trust || sfFail 205
+                                    ln -s ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem "$TARGET/$CACN"
+                                    /bin/update-ca-trust || sfFail 198
                                     ;;
                                 *)
-                                    sfFail 206 "'register' step not implemented for ($sfGetFact "linux_kind")"
+                                    sfFail 199 "'register' step not implemented for ($sfGetFact "linux_kind")"
                                     ;;
                             esac
 
