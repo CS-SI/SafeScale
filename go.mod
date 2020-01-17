@@ -73,7 +73,7 @@ require (
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
-	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
+	golang.org/x/sys v0.0.0-20200117145432-59e60aa80a0c
 	golang.org/x/tools v0.0.0-20200117065230-39095c1d176c // indirect
 	gomodules.xyz/stow v0.2.4 // indirect
 	google.golang.org/api v0.15.0
