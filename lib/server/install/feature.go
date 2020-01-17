@@ -26,9 +26,12 @@ import (
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/lib"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -539,6 +542,14 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 			if _, ok := v["CIDR"]; !ok {
 				v["CIDR"] = networkCfg.CIDR
 			}
+		}
+		var controlPlaneV1 *clusterpropsv1.ControlPlane
+		err = cluster.GetProperties(f.task).LockForRead(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+			controlPlaneV1 = clonable.(*clusterpropsv1.ControlPlane)
+			return nil
+		})
+		if err == nil && controlPlaneV1.VirtualIP != nil {
+			v["ControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 		}
 		v["ClusterMasters"] = cluster.ListMasters(f.task)
 		v["ClusterMasterNames"] = cluster.ListMasterNames(f.task)
