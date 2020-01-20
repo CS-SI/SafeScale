@@ -328,10 +328,8 @@ func ToPBVirtualIP(src resources.VirtualIP) pb.VirtualIp {
 		NetworkId: src.NetworkID,
 		PrivateIp: src.PrivateIP,
 		PublicIp:  src.PublicIP,
-		Hosts:     []*pb.Host{},
 	}
-	for _, i := range src.Hosts {
-		dest.Hosts = append(dest.Hosts, ToPBHost(i))
-	}
+	dest.Hosts = make([]string, len(src.Hosts))
+	copy(dest.Hosts, src.Hosts)
 	return dest
 }
