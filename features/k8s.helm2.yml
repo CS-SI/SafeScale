@@ -35,7 +35,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            [ -f /usr/local/sbin/helm || sfFail 192
+                            [ -f /usr/local/bin/helm || sfFail 192
                             sfExit
 
             add:
