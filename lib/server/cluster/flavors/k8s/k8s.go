@@ -246,7 +246,6 @@ func unconfigureCluster(task concurrency.Task, foreman control.Foreman) error {
 	if err != nil {
 		return err
 	}
-	logrus.Println(fmt.Sprintf("[cluster %s] virtual IP is not deleted, not implemented", clusterName))
 	return nil
 }
 
