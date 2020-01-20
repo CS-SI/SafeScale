@@ -572,7 +572,7 @@ func (s *Stack) deleteSubnet(id string) error {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					log.Debugf("network still owns host(s), retrying in %s...", temporal.GetDefaultDelay())
+					log.Debugf("network still owns hosts and/or IP addresses, retrying in %s...", temporal.GetDefaultDelay())
 				default:
 					log.Debugf("error submitting network deletion (status=%s), retrying in %s...", t.Err.Error(), temporal.GetDefaultDelay())
 				}

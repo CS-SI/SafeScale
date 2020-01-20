@@ -130,12 +130,12 @@ func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 }
 
 // BindHostToVIP stub
-func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
 
 // UnbindHostFromVIP stub
-func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
 

@@ -68,9 +68,9 @@ type Stack interface {
 	// AddPublicIPToVIP adds a public IP to VIP
 	AddPublicIPToVIP(*resources.VirtualIP) error
 	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-	BindHostToVIP(*resources.VirtualIP, *resources.Host) error
+	BindHostToVIP(*resources.VirtualIP, string) error
 	// UnbindHostFromVIP removes the bind between the VIP and a host
-	UnbindHostFromVIP(*resources.VirtualIP, *resources.Host) error
+	UnbindHostFromVIP(*resources.VirtualIP, string) error
 	// DeleteVIP deletes the port corresponding to the VIP
 	DeleteVIP(*resources.VirtualIP) error
 

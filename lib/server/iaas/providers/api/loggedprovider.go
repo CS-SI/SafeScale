@@ -180,15 +180,15 @@ func (w LoggedProvider) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w LoggedProvider) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (w LoggedProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	defer w.prepare(w.trace("BindHostToVIP"))
-	return w.InnerProvider.BindHostToVIP(vip, host)
+	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (w LoggedProvider) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (w LoggedProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	defer w.prepare(w.trace("UnbindHostFromVIP"))
-	return w.InnerProvider.UnbindHostFromVIP(vip, host)
+	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
 // DeleteVIP deletes the port corresponding to the VIP

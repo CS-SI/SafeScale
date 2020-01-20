@@ -716,7 +716,7 @@ func (handler *HostHandler) Create(
 		retrieveForensicsData(ctx, sshHandler, host)
 
 		// Setting err will trigger defers
-		err = fmt.Errorf("failed to finalize host installation: stdout[%s], stderr[%s]", stdout, stderr)
+		err = fmt.Errorf("failed to finalize host '%s' installation: stdout[%s], stderr[%s]", hostname, stdout, stderr)
 		if client.IsProvisioningError(err) {
 			logrus.Error(err)
 		}

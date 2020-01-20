@@ -810,15 +810,15 @@ func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
 		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
-	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
@@ -826,7 +826,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) er
 		return err
 	}
 	hostPorts, err := s.listPorts(ports.ListOpts{
-		DeviceID:  host.ID,
+		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
 	if err != nil {
@@ -847,15 +847,15 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) er
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
 		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
-	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
@@ -863,7 +863,7 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host
 		return err
 	}
 	hostPorts, err := s.listPorts(ports.ListOpts{
-		DeviceID:  host.ID,
+		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
 	if err != nil {

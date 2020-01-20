@@ -254,23 +254,23 @@ func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VirtualIP) (err erro
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
+func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:BindHostToVIP", w.Name))
-	return w.InnerProvider.BindHostToVIP(vip, host)
+	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
+func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:UnbindHostFromVIP", w.Name))
-	return w.InnerProvider.UnbindHostFromVIP(vip, host)
+	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
