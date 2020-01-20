@@ -38,6 +38,7 @@ import (
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -623,6 +624,137 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	return nil
 }
 
+// destruct destroys a cluster meticulously
+func (b *foreman) destruct(task concurrency.Task) (err error) {
+	cluster := b.cluster
+
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	// Updates metadata
+	err = cluster.UpdateMetadata(task, func() error {
+		return cluster.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+			clonable.(*clusterpropsv1.State).State = clusterstate.Removed
+			return nil
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	// Unconfigure cluster
+	if b.makers.UnconfigureCluster != nil {
+		err = b.makers.UnconfigureCluster(task, b)
+		if err != nil {
+			return err
+		}
+	}
+
+	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		funcErr := cluster.DeleteSpecificNode(t, params.(string), "")
+		return nil, funcErr
+	}
+	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		funcErr := cluster.deleteMaster(t, params.(string))
+		return nil, funcErr
+	}
+
+	var cleaningErrors []error
+
+	// Deletes the nodes
+	list := cluster.ListNodeIDs(task)
+	length := len(list)
+	if length > 0 {
+		var subtasks []concurrency.Task
+		for i := 0; i < length; i++ {
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+			subtask, err = subtask.Start(deleteNodeFunc, list[i])
+			if err != nil {
+				return err
+			}
+			subtasks = append(subtasks, subtask)
+		}
+		for _, s := range subtasks {
+			_, subErr := s.Wait()
+			if subErr != nil {
+				cleaningErrors = append(cleaningErrors, subErr)
+			}
+		}
+	}
+
+	// Delete the Masters
+	list = cluster.ListMasterIDs(task)
+	length = len(list)
+	if len(list) > 0 {
+		var subtasks []concurrency.Task
+		for i := 0; i < length; i++ {
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+
+			subtask, err = subtask.Start(deleteMasterFunc, list[i])
+			if err != nil {
+				return err
+			}
+			subtasks = append(subtasks, subtask)
+		}
+		for _, s := range subtasks {
+			_, subErr := s.Wait()
+			if subErr != nil {
+				cleaningErrors = append(cleaningErrors, subErr)
+			}
+		}
+	}
+
+	// get access to metadata
+	cluster.RLock(task)
+	networkID := ""
+	if cluster.Properties.Lookup(property.NetworkV2) {
+		err = cluster.Properties.LockForRead(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
+			networkID = clonable.(*clusterpropsv2.Network).NetworkID
+			return nil
+		})
+	} else {
+		err = cluster.Properties.LockForRead(property.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			networkID = clonable.(*clusterpropsv1.Network).NetworkID
+			return nil
+		})
+	}
+	cluster.RUnlock(task)
+	if err != nil {
+		cleaningErrors = append(cleaningErrors, err)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	// Deletes the network
+	clientNetwork := client.New().Network
+	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
+		func() error {
+			return clientNetwork.Delete([]string{networkID}, temporal.GetExecutionTimeout())
+		},
+		temporal.GetHostTimeout(),
+	)
+	if retryErr != nil {
+		cleaningErrors = append(cleaningErrors, retryErr)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	// Deletes the metadata
+	err = cluster.DeleteMetadata(task)
+	if err != nil {
+		cleaningErrors = append(cleaningErrors, err)
+		return scerr.ErrListError(cleaningErrors)
+	}
+	cluster.service = nil
+
+	return scerr.ErrListError(cleaningErrors)
+}
+
 // complementHostDefinition complements req with default values if needed
 func complementHostDefinition(req *pb.HostDefinition, def pb.HostDefinition) *pb.HostDefinition {
 	var finalDef pb.HostDefinition
@@ -630,51 +762,54 @@ func complementHostDefinition(req *pb.HostDefinition, def pb.HostDefinition) *pb
 		finalDef = def
 	} else {
 		finalDef = *req
-		finalDef.Sizing = &pb.HostSizing{}
-		*finalDef.Sizing = *req.Sizing
+		if finalDef.Sizing == nil {
+			*finalDef.Sizing = *def.Sizing
+		} else {
+			finalDef.Sizing = &pb.HostSizing{}
+			*finalDef.Sizing = *req.Sizing
 
-		if def.Sizing.MinCpuCount > 0 && finalDef.Sizing.MinCpuCount == 0 {
-			finalDef.Sizing.MinCpuCount = def.Sizing.MinCpuCount
-		}
-		if def.Sizing.MaxCpuCount > 0 && finalDef.Sizing.MaxCpuCount == 0 {
-			finalDef.Sizing.MaxCpuCount = def.Sizing.MaxCpuCount
-		}
-		if def.Sizing.MinRamSize > 0.0 && finalDef.Sizing.MinRamSize == 0.0 {
-			finalDef.Sizing.MinRamSize = def.Sizing.MinRamSize
-		}
-		if def.Sizing.MaxRamSize > 0.0 && finalDef.Sizing.MaxRamSize == 0.0 {
-			finalDef.Sizing.MaxRamSize = def.Sizing.MaxRamSize
-		}
-		if def.Sizing.MinDiskSize > 0 && finalDef.Sizing.MinDiskSize == 0 {
-			finalDef.Sizing.MinDiskSize = def.Sizing.MinDiskSize
-		}
-		if finalDef.Sizing.GpuCount <= 0 && def.Sizing.GpuCount > 0 {
-			finalDef.Sizing.GpuCount = def.Sizing.GpuCount
-		}
-		if finalDef.Sizing.MinCpuFreq == 0 && def.Sizing.MinCpuFreq > 0 {
-			finalDef.Sizing.MinCpuFreq = def.Sizing.MinCpuFreq
-		}
-		if finalDef.ImageId == "" {
-			finalDef.ImageId = def.ImageId
-		}
+			if def.Sizing.MinCpuCount > 0 && finalDef.Sizing.MinCpuCount == 0 {
+				finalDef.Sizing.MinCpuCount = def.Sizing.MinCpuCount
+			}
+			if def.Sizing.MaxCpuCount > 0 && finalDef.Sizing.MaxCpuCount == 0 {
+				finalDef.Sizing.MaxCpuCount = def.Sizing.MaxCpuCount
+			}
+			if def.Sizing.MinRamSize > 0.0 && finalDef.Sizing.MinRamSize == 0.0 {
+				finalDef.Sizing.MinRamSize = def.Sizing.MinRamSize
+			}
+			if def.Sizing.MaxRamSize > 0.0 && finalDef.Sizing.MaxRamSize == 0.0 {
+				finalDef.Sizing.MaxRamSize = def.Sizing.MaxRamSize
+			}
+			if def.Sizing.MinDiskSize > 0 && finalDef.Sizing.MinDiskSize == 0 {
+				finalDef.Sizing.MinDiskSize = def.Sizing.MinDiskSize
+			}
+			if finalDef.Sizing.GpuCount <= 0 && def.Sizing.GpuCount > 0 {
+				finalDef.Sizing.GpuCount = def.Sizing.GpuCount
+			}
+			if finalDef.Sizing.MinCpuFreq == 0 && def.Sizing.MinCpuFreq > 0 {
+				finalDef.Sizing.MinCpuFreq = def.Sizing.MinCpuFreq
+			}
+			if finalDef.ImageId == "" {
+				finalDef.ImageId = def.ImageId
+			}
 
-		if finalDef.Sizing.MinCpuCount <= 0 {
-			finalDef.Sizing.MinCpuCount = 2
-		}
-		if finalDef.Sizing.MaxCpuCount <= 0 {
-			finalDef.Sizing.MaxCpuCount = 4
-		}
-		if finalDef.Sizing.MinRamSize <= 0.0 {
-			finalDef.Sizing.MinRamSize = 7.0
-		}
-		if finalDef.Sizing.MaxRamSize <= 0.0 {
-			finalDef.Sizing.MaxRamSize = 16.0
-		}
-		if finalDef.Sizing.MinDiskSize <= 0 {
-			finalDef.Sizing.MinDiskSize = 50
+			if finalDef.Sizing.MinCpuCount <= 0 {
+				finalDef.Sizing.MinCpuCount = 2
+			}
+			if finalDef.Sizing.MaxCpuCount <= 0 {
+				finalDef.Sizing.MaxCpuCount = 4
+			}
+			if finalDef.Sizing.MinRamSize <= 0.0 {
+				finalDef.Sizing.MinRamSize = 7.0
+			}
+			if finalDef.Sizing.MaxRamSize <= 0.0 {
+				finalDef.Sizing.MaxRamSize = 16.0
+			}
+			if finalDef.Sizing.MinDiskSize <= 0 {
+				finalDef.Sizing.MinDiskSize = 50
+			}
 		}
 	}
-
 	return &finalDef
 }
 
@@ -757,9 +892,12 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 		return scerr.InvalidParameterError("params[Request]", "missing or not of type 'Request'")
 	}
 
-	err = b.createSwarm(task, params)
-	if err != nil {
-		return err
+	// Configure docker Swarm except if flavor is K8S (Kubernetes)
+	if req.Flavor != flavor.K8S {
+		err = b.createSwarm(task, params)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Installs ntp server feature on cluster (masters)
