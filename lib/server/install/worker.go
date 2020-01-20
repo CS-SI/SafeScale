@@ -255,6 +255,9 @@ func (w *worker) identifyAllRunningMasters() ([]*pb.Host, error) {
 				return nil, err
 			}
 			state, err := safescale.Status(i, temporal.GetExecutionTimeout())
+			if err != nil {
+				return nil, err
+			}
 			if state.Status == hoststate.STARTED.String() {
 				w.allMasters = append(w.allMasters, host)
 			}
@@ -300,6 +303,9 @@ func (w *worker) identifyAllRunningNodes() ([]*pb.Host, error) {
 				return nil, err
 			}
 			state, err := hostClt.Status(i, temporal.GetExecutionTimeout())
+			if err != nil {
+				return nil, err
+			}
 			if state.Status == hoststate.STARTED.String() {
 				allHosts = append(allHosts, host)
 			}
