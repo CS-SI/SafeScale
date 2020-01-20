@@ -8,7 +8,8 @@ import (
 
 func TestHostDescription_Filler(t *testing.T) {
 	var f HostDescription
-	faker.FakeData(&f)
+	err := faker.FakeData(&f)
 
+	assert.Nil(t, err)
 	assert.NotEmpty(t, f.Tenant)
 }
