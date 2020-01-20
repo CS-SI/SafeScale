@@ -180,7 +180,7 @@ feature:
                             masters: all
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
-                                [ $(sfKubectl get nodes | wc -l) -gt 1 ] || sfFail 194
+                                [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194
                                 sfExit
                             fi
                             sfFail 196
@@ -302,6 +302,11 @@ feature:
                             -w /usr/bin/runc -p awx -k docker_runc
                             EOF
                             sfService restart auditd
+
+                            # Disable docker swarm
+                            cat /etc/docker/daemon.json | jq '. + { "swarm-default-advertise-addr": "" }' >/etc/docker/daemon.json.new && \
+                            mv /etc/docker/daemon.json.new /etc/docker/daemon.json && \
+                            sfService restart docker || sfFail 198 "failed to disable docker swarm"
                             {{ end }}
                             sfExit
 
@@ -381,6 +386,7 @@ feature:
                         targets:
                             masters: all
                         run: |
+                            {{ if .ControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
                                     sfApt update && sfApt -y install keepalived haproxy || sfFail 202
@@ -504,18 +510,18 @@ feature:
                                 errorfile 504 /etc/haproxy/errors/504.http
 
                             listen kube_controlplane
-                                bind {{ .ControlplaneEndpointIP }}:6444
+                                bind {{ .ControlplaneEndpointIP }}:6443
                                 mode tcp
                                 option tcplog
                                 timeout client 10m
                                 timeout server 10m
                                 balance leastconn
                                 {{- range $i, $ip := .ClusterMasterIPs }}
-                                server cp{{ $i }} {{.}}:6443 check fall 3 rise 2
+                                server cp{{ $i }} {{.}}:6444 check fall 3 rise 2
                                 {{- end }}
                             EOF
                             sfService enable haproxy && sfService restart haproxy || sfFail 205
-
+                            {{ end }}
                             sfExit
 
                     ca:
@@ -546,11 +552,19 @@ feature:
                             KUBE_VERSION=stable
                             {{ end }}
 
+                            {{ if eq .ControlplaneUsesVIP "true" }}
+                            LOCAL_PORT=6444
+                            CP_ENDPOINT_IP={{ .ControlplaneEndpointIP}}
+                            {{ else }}
+                            LOCAL_PORT=6443
+                            CP_ENDPOINT_IP={{ .HostIP }}
+                            {{ end }}
+
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
                             apiVersion: kubeadm.k8s.io/v1beta1
                             kind: ClusterConfiguration
-                            controlPlaneEndpoint: "{{.ControlplaneEndpointIP}}:6444"
+                            controlPlaneEndpoint: "${CP_ENDPOINT_IP}:6443"
                             kubernetesVersion: ${KUBE_VERSION}
                             etcd:
                                 local:
@@ -592,6 +606,11 @@ feature:
                                     feature-gates: RotateKubeletServerCertificate=true
                                     cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
                                     cluster-signing-key-file: /etc/kubernetes/pki/ca.key
+                            ---
+                            apiVersion: kubeadm.k8s.io/v1beta1
+                            kind: InitConfiguration
+                            localAPIEndpoint:
+                                bindPort: ${LOCAL_PORT}
                             {{ end }}
                             certificatesDir: /etc/kubernetes/pki
                             clusterName: kubernetes
@@ -634,8 +653,7 @@ feature:
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
-                            echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
-                            cat ${SF_TMPDIR}/cp_join_cmd.sh
+                            echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key --apiserver-bind-port $LOCAL_PORT" >${SF_TMPDIR}/cp_join_cmd.sh
                             sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 207
                             sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 208
                             for ip in {{range .ClusterMasterIPs}}{{.}} {{end}}; do
