@@ -59,7 +59,10 @@ type KongController struct {
 }
 
 // NewKongController ...
-// func NewKongController(host *pb.Host) (*KongController, error) {
+// returns:
+//    *KongController, nil if successful
+//    nil, scerr.ErrNotFound if reverseproxy is not installed
+//    nil, scerr.ErrNotAvailable if cannot check if reverseproxy is installed
 func NewKongController(svc iaas.Service, network *resources.Network, addressPrimaryGateway bool) (*KongController, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
@@ -69,7 +72,6 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 	}
 
 	// Check if reverseproxy feature is installed on host
-
 	voidtask, err := concurrency.VoidTask()
 	if err != nil {
 		return nil, err
@@ -122,10 +124,10 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 			}
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
-				return false, fmt.Errorf("failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s", err.Error(), addressedGateway.Name)
+				return false, scerr.NotAvailableError(fmt.Sprintf("failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s", err.Error(), addressedGateway.Name))
 			}
 			if !results.Successful() {
-				return false, fmt.Errorf("feature 'edgeproxy4network' isn't installed on gateway '%s'", addressedGateway.Name)
+				return false, scerr.NotFoundError(fmt.Sprintf("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.Name))
 			}
 
 			return true, nil
@@ -136,7 +138,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		present = true
 	}
 	if !present {
-		return nil, fmt.Errorf("'edgeproxy4network' feature isn't installed on gateway '%s'", addressedGateway.Name)
+		return nil, scerr.NotFoundError(fmt.Sprintf("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.Name))
 	}
 
 	ctrl := KongController{

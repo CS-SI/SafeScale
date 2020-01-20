@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -183,7 +185,7 @@ func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
 		return []*pb.Host{}, nil
 	}
 	if w.concernedMasters == nil {
-		hosts, err := w.identifyAllMasters()
+		hosts, err := w.identifyAllRunningMasters()
 		if err != nil {
 			return nil, err
 		}
@@ -238,9 +240,9 @@ func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) 
 	return concernedHosts, nil
 }
 
-// identifyAllMasters returns a list of all the hosts acting as masters and keep this list
+// identifyAllRunningMasters returns a list of all the running hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
+func (w *worker) identifyAllRunningMasters() ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
@@ -252,7 +254,10 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 			if err != nil {
 				return nil, err
 			}
-			w.allMasters = append(w.allMasters, host)
+			state, err := safescale.Status(i, temporal.GetExecutionTimeout())
+			if state.Status == hoststate.STARTED.String() {
+				w.allMasters = append(w.allMasters, host)
+			}
 		}
 	}
 	return w.allMasters, nil
@@ -266,7 +271,7 @@ func (w *worker) identifyConcernedNodes() ([]*pb.Host, error) {
 	}
 
 	if w.concernedNodes == nil {
-		hosts, err := w.identifyAllNodes()
+		hosts, err := w.identifyAllRunningNodes()
 		if err != nil {
 			return nil, err
 		}
@@ -279,9 +284,9 @@ func (w *worker) identifyConcernedNodes() ([]*pb.Host, error) {
 	return w.concernedNodes, nil
 }
 
-// identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
+// identifyAllRunningNodes returns a list of all the running hosts acting as nodes and keep this list
 // during all the install session
-func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
+func (w *worker) identifyAllRunningNodes() ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
@@ -294,7 +299,10 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 			if err != nil {
 				return nil, err
 			}
-			allHosts = append(allHosts, host)
+			state, err := hostClt.Status(i, temporal.GetExecutionTimeout())
+			if state.Status == hoststate.STARTED.String() {
+				allHosts = append(allHosts, host)
+			}
 		}
 		w.allNodes = allHosts
 	}
@@ -344,7 +352,7 @@ func (w *worker) identifyConcernedGateways() ([]*pb.Host, error) {
 	return w.concernedGateways, nil
 }
 
-// identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
+// identifyAllGateways returns a list of all running hosts acting as gateways and keep this list
 // during all the install session
 func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	if w.allGateways != nil {
@@ -360,12 +368,11 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	gw, err := client.New().Host.Inspect(netCfg.GatewayID, temporal.GetExecutionTimeout())
+	hostClt := client.New().Host
+	gw, err := hostClt.Inspect(netCfg.GatewayID, temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
-
-	results = append(results, w.allGateways...)
 	results = append(results, gw)
 
 	if netCfg.SecondaryGatewayID != "" {
@@ -784,13 +791,23 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
-		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+		switch err.(type) {
+		case *scerr.ErrNotFound:
+			return nil
+		default:
+			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+		}
 	}
 	var secondaryKongController *KongController
 	if network.SecondaryGatewayID != "" {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
-			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+			switch err.(type) {
+			case *scerr.ErrNotFound:
+				return scerr.InconsistentError("reverseproxy found on primary gateway but not on secondary gateway")
+			default:
+				return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+			}
 		}
 	}
 
@@ -916,7 +933,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		if w.action == action.Add {
 			all, err = w.identifyConcernedMasters()
 		} else {
-			all, err = w.identifyAllMasters()
+			all, err = w.identifyAllRunningMasters()
 		}
 		if err != nil {
 			return nil, err
@@ -935,7 +952,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		if w.action == action.Add {
 			all, err = w.identifyConcernedNodes()
 		} else {
-			all, err = w.identifyAllNodes()
+			all, err = w.identifyAllRunningNodes()
 		}
 		if err != nil {
 			return nil, err
