@@ -118,10 +118,10 @@ func (provider *provider) CreateVIP(networkID string, description string) (*reso
 func (provider *provider) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (provider *provider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (provider *provider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteVIP(vip *resources.VirtualIP) error {

@@ -482,12 +482,12 @@ func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	return scerr.NotImplementedError("BindHostToVIP() not implemented yet")
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet")
 }
 

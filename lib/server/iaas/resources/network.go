@@ -125,7 +125,7 @@ type VirtualIP struct {
 	NetworkID string
 	PrivateIP string
 	PublicIP  string
-	Hosts     []*Host
+	Hosts     []string
 }
 
 // NewVirtualIP ...
@@ -156,10 +156,8 @@ func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
 	if p != nil {
 		src := p.(*VirtualIP)
 		*vip = *src
-		vip.Hosts = make([]*Host, len(src.Hosts))
-		for k, v := range src.Hosts {
-			vip.Hosts[k] = v.Clone().(*Host)
-		}
+		vip.Hosts = make([]string, len(src.Hosts))
+		copy(vip.Hosts, src.Hosts)
 	}
 	return vip
 }

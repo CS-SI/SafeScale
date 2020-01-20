@@ -559,7 +559,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 
 	// Binds gateway to VIP
 	if request.Network.VIP != nil {
-		err = handler.service.BindHostToVIP(request.Network.VIP, gw)
+		err = handler.service.BindHostToVIP(request.Network.VIP, gw.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -745,7 +745,7 @@ func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) (err e
 }
 
 func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
-	err = handler.service.UnbindHostFromVIP(vip, host)
+	err = handler.service.UnbindHostFromVIP(vip, host.ID)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound, scerr.ErrTimeout:
@@ -871,7 +871,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 				if merr != nil {
 					return merr
 				}
-				err = handler.service.UnbindHostFromVIP(network.VIP, mhm)
+				err = handler.service.UnbindHostFromVIP(network.VIP, mhm.ID)
 				if err != nil {
 					logrus.Errorf("failed to unbind primary gateway from VIP: %v", err)
 				}
@@ -901,12 +901,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 			logrus.Error(err)
 		} else {
 			if network.VIP != nil {
-				mhm, merr := mh.Get()
-				if merr != nil {
-					return merr
-				}
-
-				err = handler.service.UnbindHostFromVIP(network.VIP, mhm)
+				err = handler.service.UnbindHostFromVIP(network.VIP, network.SecondaryGatewayID)
 				if err != nil {
 					logrus.Errorf("failed to unbind secondary gateway from VIP: %v", err)
 				}
