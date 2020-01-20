@@ -549,6 +549,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 			return nil
 		})
 		if err == nil && controlPlaneV1.VirtualIP != nil {
+			v["ControlplaneUsesVIP"] = "true"
 			v["ControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 		}
 		v["ClusterMasters"] = cluster.ListMasters(f.task)
