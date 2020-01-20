@@ -238,7 +238,7 @@ sfFirewall() {
         fi
     fi
     # sudo may be superfluous if executed as root, but won't harm
-    sudo firewall-cmd "$@"
+    sfRetry 3m 5 sudo firewall-cmd "$@"
 }
 export -f sfFirewall
 
