@@ -54,7 +54,7 @@ type Controller struct {
 
 	lastStateCollection time.Time
 
-	concurrency.TaskedLock `json:"-"`
+	concurrency.TaskedLock
 }
 
 // NewController ...
@@ -1100,11 +1100,124 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
-	if c.foreman == nil {
-		return scerr.InvalidInstanceContentError("c.foreman", "cannot be nil")
+
+	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	// Updates metadata
+	err = c.UpdateMetadata(task, func() error {
+		return c.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+			clonable.(*clusterpropsv1.State).State = clusterstate.Removed
+			return nil
+		})
+	})
+	if err != nil {
+		return err
 	}
 
-	return c.foreman.destruct(task)
+	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		funcErr := c.DeleteSpecificNode(t, params.(string), "")
+		return nil, funcErr
+	}
+	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		funcErr := c.deleteMaster(t, params.(string))
+		return nil, funcErr
+	}
+
+	var cleaningErrors []error
+
+	// Deletes the nodes
+	list := c.ListNodeIDs(task)
+	length := len(list)
+	if length > 0 {
+		var subtasks []concurrency.Task
+		for i := 0; i < length; i++ {
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+			subtask, err = subtask.Start(deleteNodeFunc, list[i])
+			if err != nil {
+				return err
+			}
+			subtasks = append(subtasks, subtask)
+		}
+		for _, s := range subtasks {
+			_, subErr := s.Wait()
+			if subErr != nil {
+				cleaningErrors = append(cleaningErrors, subErr)
+			}
+		}
+	}
+
+	// Delete the Masters
+	list = c.ListMasterIDs(task)
+	length = len(list)
+	if len(list) > 0 {
+		var subtasks []concurrency.Task
+		for i := 0; i < length; i++ {
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+
+			subtask, err = subtask.Start(deleteMasterFunc, list[i])
+			if err != nil {
+				return err
+			}
+			subtasks = append(subtasks, subtask)
+		}
+		for _, s := range subtasks {
+			_, subErr := s.Wait()
+			if subErr != nil {
+				cleaningErrors = append(cleaningErrors, subErr)
+			}
+		}
+	}
+
+	// get access to metadata
+	c.RLock(task)
+	networkID := ""
+	if c.Properties.Lookup(property.NetworkV2) {
+		err = c.Properties.LockForRead(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
+			networkID = clonable.(*clusterpropsv2.Network).NetworkID
+			return nil
+		})
+	} else {
+		err = c.Properties.LockForRead(property.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			networkID = clonable.(*clusterpropsv1.Network).NetworkID
+			return nil
+		})
+	}
+	c.RUnlock(task)
+	if err != nil {
+		cleaningErrors = append(cleaningErrors, err)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	// Deletes the network
+	clientNetwork := client.New().Network
+	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
+		func() error {
+			return clientNetwork.Delete([]string{networkID}, temporal.GetExecutionTimeout())
+		},
+		temporal.GetHostTimeout(),
+	)
+	if retryErr != nil {
+		cleaningErrors = append(cleaningErrors, retryErr)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	// Deletes the metadata
+	err = c.DeleteMetadata(task)
+	if err != nil {
+		cleaningErrors = append(cleaningErrors, err)
+		return scerr.ErrListError(cleaningErrors)
+	}
+	c.service = nil
+
+	return scerr.ErrListError(cleaningErrors)
 }
 
 // Stop stops the Cluster is its current state is compatible
