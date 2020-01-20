@@ -904,7 +904,7 @@ var clusterDcosCommand = cli.Command{
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		return executeCommand(cmdStr, nil)
+		return executeCommand(cmdStr, nil, outputs.DISPLAY)
 	},
 }
 
@@ -999,7 +999,7 @@ var clusterKubectlCommand = cli.Command{
 		if len(filteredArgs) > 0 {
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
-		return executeCommand(cmdStr, valuesOnRemote)
+		return executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -1092,7 +1092,7 @@ var clusterHelmCommand = cli.Command{
 			}
 		}
 		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
-		return executeCommand(cmdStr, valuesOnRemote)
+		return executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -1119,7 +1119,7 @@ var clusterRunCommand = cli.Command{
 	},
 }
 
-func executeCommand(command string, files *RemoteFilesHandler) error {
+func executeCommand(command string, files *RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 	master, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 	if err != nil {
@@ -1138,7 +1138,7 @@ func executeCommand(command string, files *RemoteFilesHandler) error {
 	}
 
 	safescalessh := client.New().SSH
-	retcode, stdout, stderr, err := safescalessh.Run(master, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescalessh.Run(master, command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master, err.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1495,17 +1495,6 @@ var clusterNodeDeleteCommand = cli.Command{
 	Name:    "delete",
 	Aliases: []string{"destroy", "remove", "rm"},
 
-	// 	Help: &cli.HelpContent{
-	// 		Usage: `
-	// Usage: deploy [options] cluster <clustername> node <nodename> delete|destroy|remove|rm [-y]`,
-	// 		Options: []string{`
-	// options:
-	//   -y,--assume-yes  Don't ask for confirmation`,
-	// 		},
-	// 		Description: `
-	// Delete the node <nodename> from the cluster <clustername>.`,
-	// 	},
-
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "yes, assume-yes, y",
@@ -1538,11 +1527,7 @@ var clusterNodeDeleteCommand = cli.Command{
 			logrus.Println("'-f,--force' does nothing yet")
 		}
 
-		err = clusterInstance.Delete(concurrency.RootTask())
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-		}
-		return clitools.SuccessResponse(nil)
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
 	},
 }
 
