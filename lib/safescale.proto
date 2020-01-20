@@ -85,7 +85,7 @@ message VirtualIp {
     string network_id = 3;
     string private_ip = 4;
     string public_ip = 5;
-    repeated Host hosts = 6;
+    repeated string hosts = 6;
 }
 
 message NetworkDefinition{
