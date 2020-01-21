@@ -922,9 +922,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 
 	// configure what has to be done cluster-wide
 	if b.makers.ConfigureCluster != nil {
-		err = b.cluster.UpdateMetadata(task, func() error {
-			return b.makers.ConfigureCluster(task, b, req)
-		})
+		err = b.makers.ConfigureCluster(task, b, req)
 		if err != nil {
 			return err
 		}
