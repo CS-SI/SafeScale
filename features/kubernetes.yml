@@ -552,7 +552,7 @@ feature:
                             KUBE_VERSION=stable
                             {{ end }}
 
-                            {{ if eq .ControlplaneUsesVIP "true" }}
+                            {{ if .ControlplaneUsesVIP }}
                             LOCAL_PORT=6444
                             CP_ENDPOINT_IP={{ .ControlplaneEndpointIP}}
                             {{ else }}
