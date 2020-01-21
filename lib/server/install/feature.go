@@ -523,34 +523,44 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
 		v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
 		networkCfg, err := cluster.GetNetworkConfig(f.task)
-		if err == nil {
-			// if networkCfg.VIP != nil {
-			// 	v["GatewayIP"] = networkCfg.VIP.PrivateIP // VPL: Should be replaced by the next entry
-			// 	v["DefaultRouteIP"] = networkCfg.VIP.PrivateIP
-			// 	v["PublicIP"] = networkCfg.VIP.PublicIP // VPL: Should be replaced by the next entry
-			// 	v["EndpointIP"] = networkCfg.VIP.PublicIP
-			v["PrimaryGatewayIP"] = networkCfg.GatewayIP
-			v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
-			v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
-			v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
-			if networkCfg.SecondaryGatewayIP != "" {
-				v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-			}
-			v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
-			v["EndpointIP"] = networkCfg.EndpointIP
-			v["PublicIP"] = v["EndpointIP"] // legacy ...
-			if _, ok := v["CIDR"]; !ok {
-				v["CIDR"] = networkCfg.CIDR
-			}
+		if err != nil {
+			return err
+		}
+		v["PrimaryGatewayIP"] = networkCfg.GatewayIP
+		v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
+		v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
+		v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
+		if networkCfg.SecondaryGatewayIP != "" {
+			v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+		}
+		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
+		v["EndpointIP"] = networkCfg.EndpointIP
+		v["PublicIP"] = v["EndpointIP"] // legacy ...
+		if _, ok := v["CIDR"]; !ok {
+			v["CIDR"] = networkCfg.CIDR
 		}
 		var controlPlaneV1 *clusterpropsv1.ControlPlane
 		err = cluster.GetProperties(f.task).LockForRead(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
 			controlPlaneV1 = clonable.(*clusterpropsv1.ControlPlane)
 			return nil
 		})
-		if err == nil && controlPlaneV1.VirtualIP != nil {
-			v["ControlplaneUsesVIP"] = "true"
+		if err != nil {
+			return err
+		}
+		if controlPlaneV1.VirtualIP != nil {
+			v["ControlplaneUsesVIP"] = true
 			v["ControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
+		} else {
+			// Don't set ControlplaneUsesVIP if there is no VIP...
+			master, err := cluster.FindAvailableMaster(f.task)
+			if err != nil {
+				return err
+			}
+			host, err := cluster.GetService(f.task).InspectHost(master)
+			if err != nil {
+				return err
+			}
+			v["ControlplaneEndpointIP"] = host.GetPrivateIP()
 		}
 		v["ClusterMasters"] = cluster.ListMasters(f.task)
 		v["ClusterMasterNames"] = cluster.ListMasterNames(f.task)

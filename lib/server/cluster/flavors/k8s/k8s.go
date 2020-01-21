@@ -113,7 +113,7 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 }
 
 func configureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
-	cluster := foreman.Cluster()
+	cluster := foreman.Cluster().(*control.Controller)
 	identity := cluster.GetIdentity(task)
 	clusterName := identity.Name
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
@@ -170,26 +170,28 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 			}(id)
 		}
 
-		err = cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
-			controlPlaneV1 := clonable.(*clusterpropsv1.ControlPlane)
-			controlPlaneV1.VirtualIP = vip
-			controlPlaneV1.VirtualIP.Hosts = cluster.ListMasterIDs(task)
-			return nil
+		err = cluster.UpdateMetadata(task, func() error {
+			return cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+				controlPlaneV1 := clonable.(*clusterpropsv1.ControlPlane)
+				controlPlaneV1.VirtualIP = vip
+				controlPlaneV1.VirtualIP.Hosts = cluster.ListMasterIDs(task)
+				return nil
+			})
 		})
 		if err != nil {
 			return err
 		}
-		v["ControlplaneEndpointIP"] = vip.PrivateIP
-	} else {
-		master, err := cluster.FindAvailableMaster(task)
-		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("failed to configure cluster '%s'", clusterName))
-		}
-		host, err := svc.InspectHost(master)
-		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("failed to configure cluster '%s'", clusterName))
-		}
-		v["ControlplaneEndpointIP"] = host.GetPrivateIP()
+		// v["ControlplaneEndpointIP"] = vip.PrivateIP
+		// } else {
+		// 	master, err := cluster.FindAvailableMaster(task)
+		// 	if err != nil {
+		// 		return scerr.Wrap(err, fmt.Sprintf("failed to configure cluster '%s'", clusterName))
+		// 	}
+		// 	host, err := svc.InspectHost(master)
+		// 	if err != nil {
+		// 		return scerr.Wrap(err, fmt.Sprintf("failed to configure cluster '%s'", clusterName))
+		// 	}
+		// 	v["ControlplaneEndpointIP"] = host.GetPrivateIP()
 	}
 
 	// Disable dashboard if requested
