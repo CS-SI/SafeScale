@@ -948,7 +948,7 @@ func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) 
 	return 0, 0, 0
 }
 
-// configureCluster configures cluster
+// createSwarm configures Swarm
 func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (err error) {
 	if params == nil {
 		return scerr.InvalidParameterError("params", "cannot be nil")
