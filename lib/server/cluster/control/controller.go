@@ -664,11 +664,11 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.RLock(task)
-	nodeDef := complementHostDefinition(req, pb.HostDefinition{})
 	var hostImage string
 
 	properties := c.GetProperties(concurrency.RootTask())
 	if !properties.Lookup(property.DefaultsV2) {
+		// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
 		err := properties.LockForRead(property.DefaultsV1).ThenUse(func(clonable data.Clonable) error {
 			defaultsV1 := clonable.(*clusterpropsv1.Defaults)
 			return c.UpdateMetadata(task, func() error {
@@ -683,6 +683,8 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 			return nil, err
 		}
 	}
+
+	nodeDef := &pb.HostDefinition{}
 	err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
 		defaultsV2 := clonable.(*clusterpropsv2.Defaults)
 		sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
@@ -694,7 +696,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	if err != nil {
 		return nil, err
 	}
-
+	nodeDef = complementHostDefinition(req, *nodeDef)
 	if nodeDef.ImageId == "" {
 		nodeDef.ImageId = hostImage
 	}
