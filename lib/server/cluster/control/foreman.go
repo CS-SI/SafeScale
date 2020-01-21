@@ -1286,11 +1286,13 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 			}
 		}
 
-		// Docker Swarm is always installed, even if the cluster type is not SWARM (for now, may evolve in the future)
-		// So removing a Node implies removing also from Swarm
-		err = b.leaveNodeFromSwarm(task, pbHost, selectedMaster)
-		if err != nil {
-			return err
+		if b.cluster.GetIdentity(task).Flavor != flavor.K8S {
+			// Docker Swarm is always installed, even if the cluster type is not SWARM (for now, may evolve in the future)
+			// So removing a Node implies removing also from Swarm
+			err = b.leaveNodeFromSwarm(task, pbHost, selectedMaster)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
