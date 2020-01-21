@@ -186,7 +186,6 @@ feature:
                             sfFail 196
 
             add:
-                # pace: sysconf,syshardening,common-tools,reverseproxy,ca,cp1-init,cni,cpx-init,join-gws,join-nodes,helm-certs,helm-binary,helm-account,helm-rbac-files,helm-rbac-apply,helm-init,helm-sync,final
                 pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
                 steps:
                     sysconf:
@@ -271,11 +270,11 @@ feature:
                             {{ if eq .Hardening "true" }}
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
-                                    sfApt update && sfApt install -y auditd quota quotatool || sfFail 195
+                                    sfApt update && sfRetry 3m 3 sfApt install -y auditd quota quotatool || sfFail 195
                                     ;;
 
                                 centos|redhat)
-                                    yum -y install audit audit-libs quota || sfFail 196
+                                    sfRetry 3m 3 yum -y install audit audit-libs quota || sfFail 196
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
@@ -355,31 +354,6 @@ feature:
                             esac
                             sfService enable kubelet && sfService start kubelet
 
-                            sfExit
-
-                    reverseproxy:
-                        targets:
-                            gateways: all
-                        run: |
-                            if [ -d ${SF_ETCDIR}/edgeproxy4network ]; then
-                                TARGET_DIR=${SF_ETCDIR}/edgeproxy4network
-                            elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
-                                TARGET_DIR=${SF_ETCDIR}/kong4gateway
-                            fi
-                            [ -z "${TARGET_DIR+x}" ] && sfFail 201
-
-                            cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
-                            upstream kubernetes-api-cluster {
-                                {{range .ClusterMasterIPs}}server {{.}}:6443;
-                                {{end}}
-                            }
-
-                            server {
-                                listen 6443;
-                                proxy_pass kubernetes-api-cluster;
-                            }
-                            EOF
-                            sfReverseProxyReload
                             sfExit
 
                     halb:
@@ -999,24 +973,14 @@ feature:
                             sfExit
 
             remove:
-#                pace: node,reset,reverseproxy,clean
                 pace: node,reset,clean
                 steps:
-
                     node:
                         targets:
                             masters: one
                         run: |
                             sfKubectl drain {{.Hostname}} --delete-local-data --force --ignore-daemonsets
                             sfKubectl delete node {{.Hostname}}
-                            sfExit
-
-                    reverseproxy:
-                        targets:
-                            gateways: all
-                        run: |
-                            rm -f ${SF_ETCDIR}/kong4gateway/includes/kubernetes.conf
-                            sfReverseProxyReload
                             sfExit
 
                     reset:
