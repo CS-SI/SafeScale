@@ -621,6 +621,28 @@ func InconsistentError(msg string) ErrInconsistent {
 	}
 }
 
+// ErrSyntax is used when a syntax error is encountered
+type ErrSyntax struct {
+	ErrCore
+}
+
+// AddConsequence adds an error 'err' to the list of consequences
+func (e ErrSyntax) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// SyntaxError creates a ErrSyntax
+func SyntaxError(msg string) ErrSyntax {
+	return ErrSyntax{
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
 func getPartToRemove() string {
 	if anon := removePart.Load(); anon != nil {
 		return anon.(string)
