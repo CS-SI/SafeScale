@@ -573,7 +573,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}
 
-	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
+	// Step 4: configure masters (if masters created successfully and gateway configured successfully)
 	mt, err := task.New()
 	if err != nil {
 		return err

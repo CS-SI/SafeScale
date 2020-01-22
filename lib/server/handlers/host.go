@@ -704,7 +704,7 @@ func (handler *HostHandler) Create(
 		temporal.GetHostTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostname)
+				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.Name)
 			}
 		},
 	)
@@ -716,7 +716,7 @@ func (handler *HostHandler) Create(
 		retrieveForensicsData(ctx, sshHandler, host)
 
 		// Setting err will trigger defers
-		err = fmt.Errorf("failed to finalize host '%s' installation: stdout[%s], stderr[%s]", hostname, stdout, stderr)
+		err = fmt.Errorf("failed to finalize host '%s' installation: stdout[%s], stderr[%s]", host.Name, stdout, stderr)
 		if client.IsProvisioningError(err) {
 			logrus.Error(err)
 		}
