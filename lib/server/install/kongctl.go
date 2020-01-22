@@ -78,7 +78,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 	}
 	rp, err := NewEmbeddedFeature(voidtask, "edgeproxy4network")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find a feature called 'edgeproxy4network'")
+		return nil, err
 	}
 	var (
 		addressedGateway *resources.Host
