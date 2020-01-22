@@ -798,10 +798,10 @@ func (w *worker) setReverseProxy() (err error) {
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrNotFound:
+		case scerr.ErrNotFound:
 			return nil
 		default:
-			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+			return scerr.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
 		}
 	}
 	var secondaryKongController *KongController
@@ -809,10 +809,10 @@ func (w *worker) setReverseProxy() (err error) {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
 			switch err.(type) {
-			case *scerr.ErrNotFound:
+			case scerr.ErrNotFound:
 				return scerr.InconsistentError("reverseproxy found on primary gateway but not on secondary gateway")
 			default:
-				return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+				return scerr.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
 			}
 		}
 	}
@@ -849,14 +849,14 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 		hosts, err := w.identifyHosts(targets)
 		if err != nil {
-			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
+			return scerr.InvalidRequestError(fmt.Sprintf("failed to apply proxy rules: %s", err.Error()))
 		}
 
 		for _, h := range hosts {
 			tP, _ := w.feature.task.New() // FIXME Later
 			primaryGatewayVariables["HostIP"] = h.PrivateIp
 			primaryGatewayVariables["Hostname"] = h.Name
-			_, _ = tP.Start(asyncApplyProxyRule, data.Map{ // FIXME Later
+			_, _ = tP.Start(taskApplyProxyRule, data.Map{ // FIXME Later
 				"ctrl": primaryKongController,
 				"rule": rule,
 				"vars": &primaryGatewayVariables,
@@ -867,7 +867,7 @@ func (w *worker) setReverseProxy() (err error) {
 				tS, _ := w.feature.task.New() // FIXME Later
 				secondaryGatewayVariables["HostIP"] = h.PrivateIp
 				secondaryGatewayVariables["Hostname"] = h.Name
-				_, _ = tS.Start(asyncApplyProxyRule, data.Map{ // FIXME Later
+				_, _ = tS.Start(taskApplyProxyRule, data.Map{ // FIXME Later
 					"ctrl": secondaryKongController,
 					"rule": rule,
 					"vars": &secondaryGatewayVariables,
@@ -887,7 +887,7 @@ func (w *worker) setReverseProxy() (err error) {
 	return nil
 }
 
-func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	ctrl := params.(data.Map)["ctrl"].(*KongController)
 	rule := params.(data.Map)["rule"].(map[interface{}]interface{})
 	vars := params.(data.Map)["vars"].(*Variables)

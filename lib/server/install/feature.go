@@ -152,6 +152,9 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
+// error contains :
+//    - *scerr.ErrNotFound if no feature is found by its name
+//    - *scerr.ErrSyntax if feature found contains syntax error
 func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
@@ -180,13 +183,13 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 			err = nil
 			var ok bool
 			if _, ok = allEmbeddedMap[name]; !ok {
-				err = fmt.Errorf("failed to find a feature named '%s'", name)
+				err = scerr.NotFoundError(fmt.Sprintf("failed to find a feature named '%s'", name))
 			} else {
 				feat = *allEmbeddedMap[name]
 				feat.task = task
 			}
 		default:
-			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
+			err = scerr.SyntaxError(fmt.Sprintf("failed to read the specification file of feature called '%s': %s", name, err.Error()))
 		}
 	} else if v.IsSet("feature") {
 		feat = Feature{
@@ -215,7 +218,7 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err err
 
 	var feat Feature
 	if _, ok := allEmbeddedMap[name]; !ok {
-		err = fmt.Errorf("failed to find a feature named '%s'", name)
+		err = scerr.NotFoundError(fmt.Sprintf("failed to find a feature named '%s'", name))
 	} else {
 		feat = *allEmbeddedMap[name]
 		feat.task = task
