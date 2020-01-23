@@ -24,7 +24,7 @@ install_common_requirements() {
     groupadd -r -f docker &>/dev/null
     usermod -aG docker safescale
     usermod -aG docker {{.ClusterAdminUsername}}
-    echo -e "{{ .{{.ClusterAdminUsername}}Password }}\n{{ .{{.ClusterAdminUsername}}Password }}" | passwd {{.ClusterAdminUsername}}
+    echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
     mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
     echo "{{ .SSHPublicKey }}" >~{{.ClusterAdminUsername}}/.ssh/authorized_keys
     echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
