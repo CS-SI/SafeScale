@@ -419,21 +419,25 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	var host *resources.Host
 	switch hostParam := hostParam.(type) {
 	case string:
-		host := resources.NewHost()
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+		}
+		host = resources.NewHost()
 		host.ID = hostParam
 	case *resources.Host:
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
 		host = hostParam
-	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 	hostRef := host.Name
 	if hostRef == "" {
