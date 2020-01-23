@@ -362,17 +362,19 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 				}
 				return innerErr
 			}
-
 			return nil
 		},
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
-			return nil, scerr.Cause(retryErr)
+		switch err := retryErr.(type) {
+		case retry.ErrStopRetry:
+			return nil, err.Cause()
+		case scerr.ErrTimeout:
+			return nil, err
+		default:
+			return nil, scerr.Cause(err)
 		}
-		return nil, retryErr
 	}
 
 	return mv, nil

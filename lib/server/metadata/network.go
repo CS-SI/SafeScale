@@ -513,7 +513,14 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		return nil, retryErr
+		switch realErr := retryErr.(type) {
+		case retry.ErrStopRetry:
+			return nil, realErr.Cause()
+		case scerr.ErrTimeout:
+			return nil, realErr
+		default:
+			return nil, scerr.Cause(realErr)
+		}
 	}
 
 	return mn, nil
@@ -732,11 +739,14 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
-			return nil, scerr.Cause(retryErr)
+		switch realErr := retryErr.(type) {
+		case retry.ErrStopRetry:
+			return nil, realErr.Cause()
+		case scerr.ErrTimeout:
+			return nil, realErr
+		default:
+			return nil, scerr.Cause(realErr)
 		}
-		return nil, retryErr
 	}
 
 	return mg, nil

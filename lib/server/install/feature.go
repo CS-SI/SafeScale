@@ -550,7 +550,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		if err != nil {
 			return err
 		}
-		if controlPlaneV1.VirtualIP != nil {
+		if controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != "" {
 			v["ControlplaneUsesVIP"] = true
 			v["ControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 		} else {

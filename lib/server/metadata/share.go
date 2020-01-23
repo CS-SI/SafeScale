@@ -435,11 +435,14 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	)
 	// If retry timed out, log it and return error ErrNotFound
 	if retryErr != nil {
-		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
-			return "", scerr.Cause(retryErr)
+		switch realErr := retryErr.(type) {
+		case retry.ErrStopRetry:
+			return "", realErr.Cause()
+		case scerr.ErrTimeout:
+			return "", realErr
+		default:
+			return "", scerr.Cause(realErr)
 		}
-		return "", retryErr
 	}
 
 	return ms.Get()
