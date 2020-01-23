@@ -1049,7 +1049,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		if hostParam == "" {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
-		host := resources.NewHost()
+		host = resources.NewHost()
 		host.ID = hostParam
 	case *resources.Host:
 		if hostParam == nil {
