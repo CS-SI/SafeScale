@@ -864,6 +864,7 @@ feature:
                     cpx-init:
                         targets:
                             masters: all
+                        serialized: false
                         run: |
                             # Don't try to init a kubernetes cluster already running
                             [ -f /etc/kubernetes/.joined ] && sfExit
