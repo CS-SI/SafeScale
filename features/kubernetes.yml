@@ -270,15 +270,16 @@ feature:
                             {{ if eq .Hardening "true" }}
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
-                                    sfApt update && sfRetry 3m 3 sfApt install -y auditd quota quotatool || sfFail 195
+                                    sfApt update
+                                    sfRetry 5m 10 sfApt install -y auditd quota quotatool || sfFail 195
                                     ;;
 
                                 centos|redhat)
-                                    sfRetry 3m 3 yum -y install audit audit-libs quota || sfFail 196
+                                    sfRetry 5m 10 yum -y install audit audit-libs quota || sfFail 195
                                     ;;
 
-                                *) echo "unsupported linux distribution ''"
-                                   sfFail 197
+                                *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
+                                   sfFail 196
                                    ;;
                             esac
 
