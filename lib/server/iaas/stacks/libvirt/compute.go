@@ -1044,15 +1044,20 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
-		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+		}
+		host := resources.NewHost()
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
-	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
+		host = hostParam
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	newHost, _, err := s.getHostAndDomainFromRef(host.ID)
