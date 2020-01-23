@@ -508,7 +508,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 		break
 	}
 	if !found {
-		return "", fmt.Errorf("failed to find available master: %v", lastError)
+		return "", scerr.NotAvailableError(fmt.Sprintf("failed to find available master: %v", lastError))
 	}
 	return masterID, nil
 }

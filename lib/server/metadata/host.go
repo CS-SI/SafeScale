@@ -353,10 +353,10 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 		func() error {
 			innerErr := mh.ReadByReference(ref)
 			if innerErr != nil {
+				// If error is ErrNotFound, instructs retry to stop without delay
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.StopRetryError("no metadata found", innerErr)
 				}
-
 				return innerErr
 			}
 			return nil
@@ -364,12 +364,14 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(scerr.ErrTimeout); !ok {
-			return nil, scerr.Cause(retryErr)
+		switch realErr := retryErr.(type) {
+		case retry.ErrStopRetry:
+			return nil, realErr.Cause()
+		case scerr.ErrTimeout:
+			return nil, realErr
+		default:
+			return nil, scerr.Cause(realErr)
 		}
-
-		return nil, retryErr
 	}
 
 	return mh, nil
