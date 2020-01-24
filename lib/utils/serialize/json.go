@@ -67,7 +67,7 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err erro
 		return scerr.InvalidParameterError("apply", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
 	defer sp.unlock()
