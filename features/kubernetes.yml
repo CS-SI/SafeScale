@@ -162,9 +162,9 @@ feature:
 
         bash:
             check:
-                pace: masters,others
+                pace: nodes,kube
                 steps:
-                    others:
+                    nodes:
                         targets:
                             gateways: all
                             nodes: all
@@ -175,9 +175,9 @@ feature:
                             fi
                             sfFail 193
 
-                    masters:
+                    kube:
                         targets:
-                            masters: all
+                            masters: one
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
                                 [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194
@@ -267,6 +267,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
                             {{ if eq .Hardening "true" }}
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
@@ -361,6 +363,8 @@ feature:
                         targets:
                             masters: all
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
                             {{ if .ControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
@@ -499,6 +503,8 @@ feature:
                         targets:
                             masters: one
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
                             mkdir -p /etc/kubernetes/pki
                             if [ -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
                                 [ -f /etc/kubernetes/pki/ca.crt ] && mv /etc/kubernetes/pki/ca.crt /etc/kubernetes/pki/ca.crt.notused
@@ -624,7 +630,10 @@ feature:
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
-                            echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key --apiserver-bind-port $LOCAL_PORT" >${SF_TMPDIR}/cp_join_cmd.sh
+                            cat >${SF_TMPDIR}/cp_join_cmd.sh <<-EOF
+                            kubeadm reset --force
+                            $cp_join_cmd --experimental-control-plane --certificate-key $cert_key --apiserver-bind-port $LOCAL_PORT
+                            EOF
                             sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 207
                             sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 208
                             for ip in {{range .ClusterMasterIPs}}{{.}} {{end}}; do
@@ -781,6 +790,8 @@ feature:
                         targets:
                             masters: one
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
                             case {{ .CNI }} in
                                 flannel) # To be removed
                                     sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 215
@@ -874,7 +885,8 @@ feature:
                             sfDropzoneClean
 
                             [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 227
-                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 228
+                            # sometimes, etcd cluster appears to be unhealthy when calling this... So retries!
+                            sfRetry 10m 30 bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 228
                             [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 229
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 230
 
@@ -949,6 +961,8 @@ feature:
                         targets:
                             masters: one
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
                             if [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ]; then
                                 sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
