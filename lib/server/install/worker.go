@@ -195,6 +195,7 @@ func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
 		}
 		w.concernedMasters = concernedHosts
 	}
+	logrus.Debugf("Found %d concerned masters", len(w.concernedMasters))
 	return w.concernedMasters, nil
 }
 
@@ -284,6 +285,7 @@ func (w *worker) identifyConcernedNodes() ([]*pb.Host, error) {
 		}
 		w.concernedNodes = concernedHosts
 	}
+	logrus.Debugf("Found %d concerned nodes", len(w.concernedNodes))
 	return w.concernedNodes, nil
 }
 
