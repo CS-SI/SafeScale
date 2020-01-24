@@ -275,7 +275,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
 				t.status = ABORTED
-				t.err = scerr.AbortedError()
+				t.err = scerr.AbortedError("", nil)
 				t.lock.Unlock()
 				finish = true
 			case <-time.After(timeout):
@@ -305,7 +305,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
 				t.status = ABORTED
-				t.err = scerr.AbortedError()
+				t.err = scerr.AbortedError("", nil)
 				t.lock.Unlock()
 				finish = true
 			}

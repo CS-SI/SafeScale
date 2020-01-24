@@ -159,7 +159,7 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 		return tg.result, tg.task.err
 	}
 	if taskStatus == ABORTED {
-		return nil, scerr.AbortedError()
+		return nil, scerr.AbortedError("", nil)
 	}
 	if taskStatus != RUNNING {
 		return nil, fmt.Errorf("cannot wait task group '%s': not running", tid)

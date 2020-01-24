@@ -503,7 +503,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 			innerErr := mn.ReadByReference(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("no metadata found", innerErr)
+					return retry.AbortedError("no metadata found", innerErr)
 				}
 				return innerErr
 			}
@@ -514,7 +514,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
-		case retry.ErrStopRetry:
+		case retry.ErrAborted:
 			return nil, realErr.Cause()
 		case scerr.ErrTimeout:
 			return nil, realErr
@@ -730,7 +730,7 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 			innerErr := mg.Read()
 			if innerErr != nil {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("", innerErr)
+					return retry.AbortedError("", innerErr)
 				}
 				return innerErr
 			}
@@ -740,7 +740,7 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
-		case retry.ErrStopRetry:
+		case retry.ErrAborted:
 			return nil, realErr.Cause()
 		case scerr.ErrTimeout:
 			return nil, realErr

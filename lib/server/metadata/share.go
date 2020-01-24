@@ -424,7 +424,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 			innerErr := ms.ReadByReference(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("no metadata found", innerErr)
+					return retry.AbortedError("no metadata found", innerErr)
 				}
 				return innerErr
 			}
@@ -436,7 +436,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	// If retry timed out, log it and return error ErrNotFound
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
-		case retry.ErrStopRetry:
+		case retry.ErrAborted:
 			return "", realErr.Cause()
 		case scerr.ErrTimeout:
 			return "", realErr

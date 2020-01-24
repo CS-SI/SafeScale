@@ -358,7 +358,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 			innerErr := mv.ReadByReference(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("no metadata found", innerErr)
+					return retry.AbortedError("no metadata found", innerErr)
 				}
 				return innerErr
 			}
@@ -368,7 +368,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	)
 	if retryErr != nil {
 		switch err := retryErr.(type) {
-		case retry.ErrStopRetry:
+		case retry.ErrAborted:
 			return nil, err.Cause()
 		case scerr.ErrTimeout:
 			return nil, err
