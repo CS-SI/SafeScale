@@ -646,7 +646,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if ok {
 		value, ok := anon.(string)
 		if ok {
-			if strings.ToLower(value) == "yes" || strings.ToLower(value) != "true" {
+			if strings.ToLower(value) == "yes" || strings.ToLower(value) == "true" {
 				serial = true
 			}
 		}
