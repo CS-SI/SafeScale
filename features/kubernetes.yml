@@ -779,11 +779,7 @@ feature:
                             sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 213
                             sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 214
 
-                            touch /etc/kubernetes/.joined
                             echo "cp1 init done"
-
-                            touch /etc/kubernetes/.joined
-                            echo "init done"
                             sfExit
 
                     cni:
@@ -871,6 +867,8 @@ feature:
                                     sfFirewallReload || sfFail 225 "Firewall problem"
                                     ;;
                             esac
+
+                            touch /etc/kubernetes/.joined
                             sfExit 0
 
                     cpx-init:
