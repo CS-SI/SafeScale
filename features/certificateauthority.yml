@@ -47,6 +47,8 @@ feature:
                             hosts: yes
                             masters: one
                         run: |
+                            [ -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfExit
+
                             mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,newcerts,private}
                             mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,csr,newcerts,private}
 
@@ -176,29 +178,31 @@ feature:
                             hosts: yes
                             masters: one
                         run: |
-                            openssl genrsa -out ${SF_ETCDIR}/pki/ca/private/rootca.key.pem 4096 || sfFail 193
-                            chmod 0400 ${SF_ETCDIR}/pki/ca/private/rootca.key.pem || sfFail 194
+                            if [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ]; then
+                                openssl genrsa -out ${SF_ETCDIR}/pki/ca/private/rootca.key.pem 4096 || sfFail 193
+                                chmod 0400 ${SF_ETCDIR}/pki/ca/private/rootca.key.pem || sfFail 194
 
-                            SUBJ=
-                            {{ if .CountryName            }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
-                            {{ if .StateOrProvinceName    }} SUBJ="${SUBJ}/ST={{.StateOrProvinceName}}" {{ end }}
-                            {{ if .LocalityName           }} SUBJ="${SUBJ}/L={{.LocalityName}}" {{ end }}
-                            {{ if .OrganizationName       }} SUBJ="${SUBJ}/O={{.OrganizationName}}" {{ end }}
-                            {{ if .OrganizationalUnitName }} SUBJ="${SUBJ}/OU={{.OrganizationalUnitName}}" {{ end }}
-                            {{ if .EmailAddress           }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
-                            {{ if .ClusterFlavor }}
-                            CACN="{{ .ClusterName }}-CA.crt"
-                            {{ else }}
-                            CACN="{{ .Hostname }}-CA.crt"
-                            {{ end }}
-                            SUBJ="${SUBJ}/CN=${CACN}"
-                            openssl req -config ${SF_ETCDIR}/pki/ca/openssl.cnf \
-                                        -key ${SF_ETCDIR}/pki/ca/private/rootca.key.pem \
-                                        -new -x509 -days 10000 -sha256 \
-                                        -out ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem \
-                                        -extensions v3_ca \
-                                        -subj "$SUBJ" || sfFail 195
-                            chmod 0444 ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem || sfFail 195
+                                SUBJ=
+                                {{ if .CountryName            }} SUBJ="${SUBJ}/C={{.CountryName}}" {{ end }}
+                                {{ if .StateOrProvinceName    }} SUBJ="${SUBJ}/ST={{.StateOrProvinceName}}" {{ end }}
+                                {{ if .LocalityName           }} SUBJ="${SUBJ}/L={{.LocalityName}}" {{ end }}
+                                {{ if .OrganizationName       }} SUBJ="${SUBJ}/O={{.OrganizationName}}" {{ end }}
+                                {{ if .OrganizationalUnitName }} SUBJ="${SUBJ}/OU={{.OrganizationalUnitName}}" {{ end }}
+                                {{ if .EmailAddress           }} SUBJ="${SUBJ}/emailAddress={{.EmailAddress}}" {{ end }}
+                                {{ if .ClusterFlavor }}
+                                CACN="{{ .ClusterName }}-CA.crt"
+                                {{ else }}
+                                CACN="{{ .Hostname }}-CA.crt"
+                                {{ end }}
+                                SUBJ="${SUBJ}/CN=${CACN}"
+                                openssl req -config ${SF_ETCDIR}/pki/ca/openssl.cnf \
+                                            -key ${SF_ETCDIR}/pki/ca/private/rootca.key.pem \
+                                            -new -x509 -days 10000 -sha256 \
+                                            -out ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem \
+                                            -extensions v3_ca \
+                                            -subj "$SUBJ" || sfFail 195
+                                chmod 0444 ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem || sfFail 195
+                            fi
 
                             {{ if .ClusterFlavor }}
                             tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca && \
@@ -226,10 +230,14 @@ feature:
                             sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
 
-                            tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C /
-                            retcode=$?
-                            rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz
-                            [ $retcode -ne 0 ] && sfFail 197
+                            if [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ]; then
+                                tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C /
+                                retcode=$?
+                                rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz
+                                [ $retcode -ne 0 ] && sfFail 197
+                            else
+                                rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz
+                            fi
                             sfExit
 
                     register:
