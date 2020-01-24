@@ -164,7 +164,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 			if innerErr != nil {
 				// If error is ErrNotFound, instructs retry to stop without delay
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("not found", innerErr)
+					return retry.AbortedError("not found", innerErr)
 				}
 				return innerErr
 			}
@@ -174,7 +174,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
-		case retry.ErrStopRetry:
+		case retry.ErrAborted:
 			return realErr.Cause()
 		case scerr.ErrTimeout:
 			return realErr

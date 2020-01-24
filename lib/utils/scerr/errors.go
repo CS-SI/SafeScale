@@ -382,11 +382,14 @@ func (e ErrAborted) AddConsequence(err error) error {
 }
 
 // AbortedError creates a ErrAborted error
-func AbortedError() ErrAborted {
+func AbortedError(msg string, err error) ErrAborted {
+	if msg == "" {
+		msg = "aborted"
+	}
 	return ErrAborted{
 		ErrCore: ErrCore{
-			Message:      "aborted",
-			cause:        nil,
+			Message:      msg,
+			cause:        err,
 			consequences: []error{},
 		},
 	}
@@ -395,6 +398,7 @@ func AbortedError() ErrAborted {
 // ErrOverflow ...
 type ErrOverflow struct {
 	ErrCore
+	limit uint
 }
 
 // AddConsequence adds an error 'err' to the list of consequences
@@ -404,14 +408,23 @@ func (e ErrOverflow) AddConsequence(err error) error {
 }
 
 // OverflowError creates a ErrOverflow error
-func OverflowError(msg string) ErrOverflow {
+func OverflowError(msg string, limit uint, err error) ErrOverflow {
+	if limit > 0 {
+		limitMsg := fmt.Sprintf("(limit reached: %d)", limit)
+		if msg != "" {
+			msg += " "
+		}
+		msg += limitMsg
+	}
 	return ErrOverflow{
 		ErrCore: ErrCore{
 			Message:      msg,
-			cause:        nil,
+			cause:        err,
 			consequences: []error{},
 		},
+		limit: limit,
 	}
+
 }
 
 // ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occured in a given time).

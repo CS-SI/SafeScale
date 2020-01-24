@@ -355,7 +355,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 			if innerErr != nil {
 				// If error is ErrNotFound, instructs retry to stop without delay
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
-					return retry.StopRetryError("no metadata found", innerErr)
+					return retry.AbortedError("no metadata found", innerErr)
 				}
 				return innerErr
 			}
@@ -365,7 +365,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
-		case retry.ErrStopRetry:
+		case retry.ErrAborted:
 			return nil, realErr.Cause()
 		case scerr.ErrTimeout:
 			return nil, realErr
