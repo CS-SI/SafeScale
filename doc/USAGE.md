@@ -3,21 +3,22 @@
 
 ## Content
 
-- [safescaled](#safescaled)
-    - [Configuration](#safescaled_conf)
-    - [Usage](#safescaled_usage)
-- [safescale](#safescale)
-    - [Global options](#safescale_globals)
-    - [Commands](#safescale_cmds)
-        - [tenant](#safescale_tenant)
-        - [network](#safescale_network)
-        - [host](#safescale_host)
-        - [volume](#safescale_volume)
-        - [share](#safescale_share)
-        - [data](#safecale_data)
-        - [bucket](#safescale_bucket)
-        - [ssh](#safescale_ssh)
-        - [cluster](#cluster)
+- [SafeScale usage](#safescale-usage)
+  - [Content](#content)
+  - [<a name="safescaled"></a>safescaled](#safescaled)
+      - [<a name="safescaled_conf"></a>Configuration](#configuration)
+      - [<a name="safescaled_usage"></a>Usage](#usage)
+  - [<a name="safescale"></a>safescale](#safescale)
+      - [<a name="safescale_globals"></a>Global options](#global-options)
+      - [<a name="safescale_cmds"></a>Commands](#commands)
+      - [<a name="safescale_tenant"></a>tenant](#tenant)
+      - [<a name="safescale_network"></a>network](#network)
+      - [<a name="safescale_host"></a>host](#host)
+      - [<a name="safescale_volume"></a>volume](#volume)
+      - [<a name="safescale_share"></a>share](#share)
+      - [<a name="safescale_bucket"></a>bucket](#bucket)
+      - [<a name="safescale_ssh"></a>ssh](#ssh)
+      - [<a name="safescale_cluster"></a>cluster](#cluster)
 
 ___
 
@@ -43,12 +44,13 @@ To dialog with the different providers, the daemon needs authentication paramete
 
 The content of this configuration file is explained in [TENANTS.md](TENANTS.md).
 
-Each section `tenants` contains specific authentication parameters for each Cloud Provider.
+Each `tenants` section contains specific authentication parameters for each Cloud Provider.
 > - `client` can be one of the available provider's drivers in
->    - cloudwatt
 >    - cloudferro
->    - local (unstable, not compiled by default, cf this [documentation](LIBVIRT_PROVIDER.md))
 >    - flexibleengine
+>    - gcp
+>    - local (unstable, not compiled by default, cf this [documentation](LIBVIRT_PROVIDER.md))
+>    - openstack (pure OpenStack support)
 >    - opentelekom
 >    - ovh
 > - `name` is a logical name representing the tenant
@@ -138,12 +140,12 @@ Here is an example of a tenant file:
     SecretKey = "your_S3_password"
 ```
 
-A detail description of the content of the file tenants.toml can be found in [TENANTS.md](TENANTS.md).
+A detailed description of the content of the file tenants.toml can be found in [TENANTS.md](TENANTS.md).
 <br>
 
 #### <a name="safescaled_usage"></a>Usage
 
-If you built SafeScale from source, make install will have installed the binaries in $GOPATH/bin.
+If you built SafeScale from source, ```make install``` will have installed the binaries in $GOPATH/bin.
 To launch the SafeScale daemon, simply execute the following command (from a regular user, no need to be root):
 
 ```bash
@@ -157,19 +159,22 @@ Safescaled version: 19.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (201
 Ready to serve :-)
 ```
 
-By default, safescaled displays only warnings and errors messages. To have more information, you can use -v to increase verbosity, and -d to use debug mode.
+By default, ```safescaled``` displays only warnings and errors messages. To have more information, you can use ```-v``` to increase verbosity, and ```-d``` to use debug mode (```-d -v``` will produce A LOT of messages, it's for debug purposes).
 <br><br>
 
 ## <a name="safescale"></a>safescale
 
 `safescale` is the client part of SafeScale. It consists of a CLI to interact with the safescale daemon to manage cloud infrastructures.
 
-The different available commands can be obtained via the **`--help`** option on each command and are reminded hereafter. _Note that, despite of our efforts, the help got by the CLI might be more accurate and up-to-date than the following descriptions._
+The different available commands can be obtained via the **`--help`** option on each command and are listed hereafter. _Note that, despite of our efforts, the help got by the CLI might be more accurate and up-to-date than the following descriptions._
 
 Each command returns its results on the standard output in 2 forms according to the expected result type:
 
 - no result is expected: a simple comment about the execution of the command
 - a result is expected: the result is formatted in **JSON** (or null if no result is produced); for eye-candy formatting, you can use `| jq` at the end of the command.
+- outputs are expected: the outputs are displayed in sync with the work done on the remote side (for example, ```safescale platform kubectl``` command)
+
+Each command has an exit status which is 0 if it succeeded, and !=0 if failed. If the command displays a result in JSON format, the JSON code contains the same exit code.
 
 The commands are presented in logical order as if the user wanted to create some servers with a shared storage space.
 <br>
@@ -228,14 +233,14 @@ The following actions are proposed:
 
 action | description
 --- | ---
-`safescale [global_options] host create <host_name> [command_options] `|Creates a new host. This host will be attached on the given network. Note that by default this host is created with a private IP address.<br>`command_options`:<ul><li>`--net <network_name>` specifies the network to connect the host to. Can't be used with `--public`.<li>`--cpu value` Number of CPU for the host (default: 1)</li><li>`--cpu-freq value` CPU frequence (default :0)  -----  [scanner](SCANNER.md) needed</li><li>`--ram value` RAM for the host (default: 1 Go)</li><li>`--disk value` Disk space for the host (default: 100 Mo)</li><li>`--gpu value` Number of GPU for the host (default :0)  ----- [scanner](SCANNER.md) needed</li><li>`--os value` Image name for the host (default: "Ubuntu 18.04")</li><li>`--public` creates the host with public IP; cannot be used with `--net`.</li></ul>ex: `safescale host create --net example_network example_host`<br><br>success response: `{"ID":"a93ae865-357d-4e40-9834-95dacab38065","Name":"example_host","CPU":4,"RAM":15,"Disk":100,"IP":"192.168.0.6","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","GatewayID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0"}`<br><br>responses failure:`Failed to create host 'example_host': name is already used`
+`safescale [global_options] host create <host_name> [command_options] `|Creates a new host. This host will be attached on the given network. Note that by default this host is created with a private IP address.<br>`command_options`:<ul><li>`--net <network_name>` specifies the network to connect the host to. Can't be used with `--public`.</li><li>`--public` creates the host with public IP; cannot be used with `--net`.</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of host in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq`, `gpu`, `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value> - <upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--os value` Image name for the host (default: "Ubuntu 18.04")</li></ul>DEPRECATED:<ul><li>`--cpu value` Number of CPU for the host (default: 1)</li><li>`--cpu-freq value` CPU frequence (default :0)  -----  [scanner](SCANNER.md) needed</li><li>`--ram value` RAM for the host (default: 1 Go)</li><li>`--disk value` Disk space for the host (default: 100 Mo)</li><li>`--gpu value` Number of GPU for the host (default :0)  ----- [scanner](SCANNER.md) needed</li></ul>ex: `safescale host create --net example_network example_host`<br>response on success:<br>`{"ID":"a93ae865-357d-4e40-9834-95dacab38065","Name":"example_host","CPU":4,"RAM":15,"Disk":100,"IP":"192.168.0.6","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","GatewayID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0"`<br>response on failure:<br>`{"error":{"exitcode":1,"message":"Failed to create host 'example_host': name is already used","result":null,"status":"failure"}`
 `safescale host list [options]` | List hosts created by SafeScale<br>`command_options`:<ul><li>`--all` List all existing hosts on the current tenant (not only those created by SafeScale)</li></ul>ex: `[{"ID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0","Name":"gw_example_network","CPU":4,"RAM":15,"Disk":100,"IP":"abc.def.ghi.jkl","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n"},{"ID":"a93ae865-357d-4e40-9834-95dacab38065","Name":"example_host","CPU":4,"RAM":15,"Disk":100,"IP":"192.168.0.6","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","GatewayID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0"}]`<br><br>ex (all): `{"ID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0","Name":"gw_example_network","CPU":4,"RAM":15,"Disk":100,"IP":"abc.def.ghi.jkl","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n"},{"ID":"a93ae865-357d-4e40-9834-95dacab38065","Name":"example_host","CPU":4,"RAM":15,"Disk":100,"IP":"192.168.0.6","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","GatewayID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0"},{"ID":"961843ac-1675-465e-893d-81d090b2bf7f","Name":"other_host","CPU":4,"RAM":15,"Disk":100,"IP":"mno.pqr.stu.vwx","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n"}]`
-`safescale host inspect <host_name_or_id>`|Get info about a host<br><br>success response: `{"ID":"2ab6786a-64e8-430a-94a7-e4404a91e7ae","Name":"example_host","CPU":4,"RAM":15,"Disk":100,"IP":"192.168.0.5","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","GatewayID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0"}`<br><br>failure response: `Can't inspect host: failed to find host 'example_host'`
-`safescale host ssh <host_name_or_id>`|Get ssh config to connect to host<br><br>success response:`{"User":"safescale","Host":"192.168.0.5","PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","Port":22,"gateway":{[...]}}`<br><br>response error:`Could not get ssh config for host 'fake_host': rpc error: code = Unknown desc = host 'fake_host' does not exist`
-`safescale host delete <host_name_or_id> [...]`| Delete host(s)<br><br>success response: `Host 'example_host' deleted`<br><br>failure response: `failed to find host 'example_host'`
-`safescale host check-feature <host_name_or_id> <feature_name> [command_options]`|Check if a feature is present on the host<br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>ex: `safescale host check-feature myhost docker`<br><br>success response:`Feature 'docker' found on host 'myhost'`<br><br>failure response:`Feature 'docker' not found on host 'myhost'`
-`safescale [global_options] host add-feature <host_name_or_id> <feature_name> [command_options]`| Adds the feature to the host<br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li><li>`--skip-proxy` disables the application of (optional) reverse proxy rules inside the feature</ul>ex: `safescale host add-feature myhost remotedesktop -p Username=<username> -p Password=<password>`<br><br>success response: `Feature 'remotedesktop' installed successfully on host 'myhost'`
-`safescale host delete-feature <host_name_or_id> <feature_name> [command_options]`| Adds the feature to the host<br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>ex: `safescale host delete-feature myhost remotedesktop -p Username=<username> -p Password=<password>`<br><br>success response: `Feature 'remotedesktop' deleted successfully from host 'myhost'`<br><br>failure response may vary
+`safescale host inspect <host_name_or_id>`|Get info about a host<br><br>response on success:<br>`{"ID":"2ab6786a-64e8-430a-94a7-e4404a91e7ae","Name":"example_host","CPU":4,"RAM":15,"Disk":100,"IP":"192.168.0.5","State":2,"PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","GatewayID":"e2d336e7-3cbc-48bc-a5c2-efd5d4ece5c0"}`<br>response on failure:<br>`{"error":{"exitcode":1,"message":"cannot inspect host: failed to find host 'example_host'","result":null,"status":"failure"}`
+`safescale host ssh <host_name_or_id>`|Get ssh config to connect to host<br><br>response on success:<br>`{"User":"safescale","Host":"192.168.0.5","PrivateKey":"-----BEGIN RSA PRIVATE KEY-----\n[...]-----END RSA PRIVATE KEY-----\n","Port":22,"gateway":{[...]}}`<br>response on failure:<br>`Could not get ssh config for host 'fake_host': rpc error: code = Unknown desc = host 'fake_host' does not exist`
+`safescale host delete <host_name_or_id> [...]`| Delete host(s)<br><br>response on success:<br>`Host 'example_host' deleted`<br>response on failure :<br>`failed to find host 'example_host'`
+`safescale host check-feature <host_name_or_id> <feature_name> [command_options]`|Check if a feature is present on the host<br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>ex: `safescale host check-feature myhost docker`<br><br>response on success:<br>`Feature 'docker' found on host 'myhost'`<br>response on failure:`Feature 'docker' not found on host 'myhost'`
+`safescale [global_options] host add-feature <host_name_or_id> <feature_name> [command_options]`| Adds the feature to the host<br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li><li>`--skip-proxy` disables the application of (optional) reverse proxy rules defined in the feature</ul>ex: `safescale host add-feature myhost remotedesktop -p Username=<username> -p Password=<password>`<br><br>response on success:<br> `Feature 'remotedesktop' installed successfully on host 'myhost'`
+`safescale host delete-feature <host_name_or_id> <feature_name> [command_options]`| Adds the feature to the host<br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>ex: `safescale host delete-feature myhost remotedesktop -p Username=<username> -p Password=<password>`<br><br>response on success:<br>`Feature 'remotedesktop' deleted successfully from host 'myhost'`<br>response on failure may vary.
 
 <br><br>
 
@@ -269,7 +274,7 @@ action | description
 
 <br><br>
 
-#### <a name="safescale_data"></a>data
+<!-- #### <a name="safescale_data"></a>data
 This command familly aims to push data on object storage on a secured way with data encryption (AES-256/RSA-2048) and & data replication(erasure coding/ several object storage).<br>
 As we want to push datas on several object storage we fist have to set [tenantStorage](#safescale_tenant)<br>
 All the files are crypted with a key stored on $HOME/.safescale/rsa.key (if the key didn't exists, pushing a file will generate one)<br>
@@ -281,6 +286,7 @@ action | description
 `safescale [global_options] data get [command-options] <file_name>`| Get a file pushed by 'safescale data push'<br>`command_options`:<ul><li>`--storage-path value` File where the datas will be stored</li></ul>
 `safescale [global_options] data delete <file_name>`| Delete a files pushed by 'safescale data push'
 `safescale [global_options] data list`| List all files pushed by 'safescale data push'
+-->
 
 #### <a name="safescale_bucket"></a>bucket
 This command familly deals with object storage management: creation, list, mounting as filesystem, deleting...
