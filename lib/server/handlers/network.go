@@ -116,7 +116,7 @@ func (handler *NetworkHandler) Create(
 		return nil, fmt.Errorf("failed to determine if CIDR is not routable: %v", err)
 	}
 	if routable {
-		return nil, fmt.Errorf("cannot create such a network, CIDR must be not routable; please choose an appropriate CIDR (RFC1918)")
+		return nil, fmt.Errorf("cannot create such a network, CIDR must be not routable; please provide an appropriate CIDR (RFC1918)")
 	}
 
 	// Create the network

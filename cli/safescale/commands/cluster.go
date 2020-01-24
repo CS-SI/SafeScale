@@ -760,20 +760,22 @@ var clusterExpandCommand = cli.Command{
 		los := c.String("os")
 
 		var nodesDef *pb.HostDefinition
-		if c.IsSet("node-sizing") {
-			nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
-			if err != nil {
-				return err
-			}
+		//		if c.IsSet("node-sizing") {
+		nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+		if err != nil {
+			return err
 		}
+		//		}
 
 		if nodesDef == nil {
 			cpu := int32(c.Uint("cpu"))
 			ram := float32(c.Float64("ram"))
 			disk := int32(c.Uint("disk"))
 			gpu := int32(c.Uint("gpu"))
-
-			if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
+			if gpu == 0 {
+				gpu = -1
+			}
+			if cpu > 0 || ram > 0.0 || disk > 0 || gpu >= 1 || los != "" {
 				nodesDef = &pb.HostDefinition{
 					ImageId: los,
 					Sizing: &pb.HostSizing{

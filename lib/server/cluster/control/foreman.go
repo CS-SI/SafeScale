@@ -763,10 +763,10 @@ func complementHostDefinition(req *pb.HostDefinition, def pb.HostDefinition) *pb
 	} else {
 		finalDef = *req
 		if finalDef.Sizing == nil {
-			*finalDef.Sizing = *def.Sizing
+			*finalDef.Sizing = *(def.Sizing)
 		} else {
-			finalDef.Sizing = &pb.HostSizing{}
-			*finalDef.Sizing = *req.Sizing
+			finalDef.Sizing = &pb.HostSizing{GpuCount: -1}
+			*finalDef.Sizing = *(req.Sizing)
 
 			if def.Sizing.MinCpuCount > 0 && finalDef.Sizing.MinCpuCount == 0 {
 				finalDef.Sizing.MinCpuCount = def.Sizing.MinCpuCount
