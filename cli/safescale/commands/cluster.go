@@ -401,15 +401,15 @@ var clusterCreateCommand = cli.Command{
 		},
 		cli.UintFlag{
 			Name:  "cpu",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the number of cpu of masters and nodes in the cluster",
+			Usage: "DEPRECATED! use --sizing and friends instead! Defines the number of cpu of masters and nodes in the cluster",
 		},
 		cli.Float64Flag{
 			Name:  "ram",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+			Usage: "DEPRECATED! use --sizing and friends instead! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
 		cli.UintFlag{
 			Name:  "disk",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of system disk of masters and nodes (in GB)",
+			Usage: "DEPRECATED! use --sizing and friends instead! Defines the size of system disk of masters and nodes (in GB)",
 		},
 	},
 
