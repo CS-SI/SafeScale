@@ -165,7 +165,7 @@ var networkCreate = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "failover",
-			Usage: "creates 2 gateways for the network with a VIP used a internal default route",
+			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
 		},
 		cli.StringFlag{
 			Name: "S, sizing",
