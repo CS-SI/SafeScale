@@ -17,7 +17,7 @@
 package client
 
 import (
-	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -72,18 +72,18 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	}
 
 	var (
-		wg   sync.WaitGroup
-		errs int
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
 	)
 
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
 		_, err := service.Delete(ctx, &pb.Bucket{Name: aname})
 		if err != nil {
-			fmt.Printf("%v\n", DecorateError(err, "deletion of share", true))
-			errs++
-		} else {
-			fmt.Printf("Share '%s' deleted\n", aname)
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
 		}
 	}
 
@@ -93,8 +93,8 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	}
 	wg.Wait()
 
-	if errs > 0 {
-		return clitools.ExitOnRPC("")
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 }
