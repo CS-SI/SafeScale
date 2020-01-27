@@ -183,7 +183,7 @@ feature:
             remove:
                 pace: cleanup
                 steps:
-                    docker-ce:
+                    cleanup:
                         targets:
                             gateways: all
                             hosts: yes
