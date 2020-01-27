@@ -33,9 +33,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -252,6 +254,15 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	_, err = metadata.LoadVolume(handler.service, name)
+	if err != nil {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
+			return nil, err
+		}
+	} else {
+		return nil, scerr.DuplicateError(fmt.Sprintf("volume '%s' already exists", name))
+	}
+
 	volume, err = handler.service.CreateVolume(resources.VolumeRequest{
 		Name:  name,
 		Size:  size,
@@ -451,10 +462,10 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						}
 						return nil
 					},
-					temporal.GetContextTimeout(),
+					temporal.GetExecutionTimeout(),
 				)
 				if retryErr != nil {
-					return fmt.Errorf("failed to confirm the disk attachment after %s", temporal.GetContextTimeout())
+					return fmt.Errorf("failed to confirm the disk attachment after %s", temporal.GetExecutionTimeout())
 				}
 
 				// Recovers real device name from the system
@@ -616,17 +627,39 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 
 	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)()
 
+	sshHandler := NewSSHHandler(handler.service)
+
+	// retrieve ssh config to perform some commands
+	ssh, err := sshHandler.GetConfig(ctx, host.ID)
+	if err != nil {
+		return nil, err
+	}
+	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
+	sshCmd, err := ssh.Command(cmd)
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		retcode        int
 		stdout, stderr string
 	)
-	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
-	sshHandler := NewSSHHandler(handler.service)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			retcode, stdout, stderr, err = sshHandler.Run(ctx, host.ID, cmd)
-			if err != nil {
-				return err
+			retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
+				func() error {
+					retcode, stdout, stderr, err = sshCmd.RunWithTimeout(nil, outputs.COLLECT, temporal.GetHostTimeout())
+					return err
+				},
+				temporal.GetHostTimeout(),
+				func(t retry.Try, v verdict.Enum) {
+					if v == verdict.Retry {
+						logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.Name)
+					}
+				},
+			)
+			if retryErr != nil {
+				return retryErr
 			}
 			if retcode != 0 {
 				if retcode == 255 {
