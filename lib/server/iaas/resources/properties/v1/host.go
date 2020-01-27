@@ -325,7 +325,8 @@ func (hv *HostVolumes) Replace(p data.Clonable) data.Clonable {
 	src := p.(*HostVolumes)
 	hv.VolumesByID = make(map[string]*HostVolume, len(src.VolumesByID))
 	for k, v := range src.VolumesByID {
-		hv.VolumesByID[k] = v
+		newV := *v
+		hv.VolumesByID[k] = &newV
 	}
 	hv.VolumesByName = make(map[string]string, len(src.VolumesByName))
 	for k, v := range src.VolumesByName {
@@ -441,7 +442,8 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 	}
 	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
 	for k, v := range src.LocalMountsByPath {
-		hm.LocalMountsByPath[k] = v
+		newV := *v
+		hm.LocalMountsByPath[k] = &newV
 	}
 	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
 	for k, v := range src.RemoteMountsByShareID {
@@ -453,7 +455,8 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 	}
 	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.LocalMountsByDevice))
 	for k, v := range src.RemoteMountsByPath {
-		hm.RemoteMountsByPath[k] = v
+		newV := *v
+		hm.RemoteMountsByPath[k] = &newV
 	}
 	return hm
 }

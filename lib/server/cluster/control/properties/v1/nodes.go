@@ -72,11 +72,20 @@ func (n *Nodes) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Nodes)
 	*n = *src
 	n.Masters = make([]*Node, len(src.Masters))
-	copy(n.Masters, src.Masters)
+	for k, v := range src.Masters {
+		newV := *v
+		n.Masters[k] = &newV
+	}
 	n.PublicNodes = make([]*Node, len(src.PublicNodes))
-	copy(n.PublicNodes, src.PublicNodes)
+	for k, v := range src.PublicNodes {
+		newV := *v
+		n.PublicNodes[k] = &newV
+	}
 	n.PrivateNodes = make([]*Node, len(src.PrivateNodes))
-	copy(n.PrivateNodes, src.PrivateNodes)
+	for k, v := range src.PrivateNodes {
+		newV := *v
+		n.PrivateNodes[k] = &newV
+	}
 	return n
 }
 
