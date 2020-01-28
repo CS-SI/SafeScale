@@ -85,7 +85,7 @@ SafeScale is currently under active development and does not yet offer all the f
       - Kubernetes cluster
       - Swarm cluster
       - BOH = Bunch Of Hosts (without any cluster management layer)
-  - Install default services (everything being ):
+  - Install default services (everything being deactivable):
     - remote desktop based on Guacamole (available from Web browser)
     - reverse proxy to control Internet access
     - ntp servers and clients
