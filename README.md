@@ -54,9 +54,13 @@ SafeScale Security ensures that no unapproved external access is granted:
   - UDP Log plugin to connect the Log management system, Logstash
 - On service level, SafeScale Security proposes an optional use of Keycloak, an Open Source Identity and Access Management (IAM), that can provide access control by itself or using third-party directories.
 
+The hosts acting as gateways are secured using firewalld with a default rule being "DENY EVERYTHING" from Internet. Only SSH access are allowed by default, and HTTPS port (443) if Kong is not disabled. At the time being, there is no firewall rule for the hosts inside the subnet of the platform,but firewalld is installed, just in case.
+
 The design of a SafeScale Security gateway can be depicted as below:
 
 ![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
+
+Note: the log part is not yet available...
 
 ## Currently available features
 
@@ -92,6 +96,11 @@ SafeScale is currently under active development and does not yet offer all the f
   - Add / Remove "features" on host and clusters
   - Expand/Shrink the "size" of the cluster (number of workers)
 
+- SafeScale Security:
+  - Secured gateways using Kong
+  - IAM using Keycloak (optional)
+  - Kubernetes Hardening (by default but deactivable)
+  - firewalld everywhere (regardless of the chosen Linux distribution)
 
 ## Contributing
 
