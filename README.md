@@ -47,15 +47,19 @@ It is also important to precise that platforms are not static, they can be scale
 
 ### SafeScale Security
 
-SafeScale Security is a Web API and a Web Portal to create on-demand security gateways to protect Web services along 5 axes: Encryption, Authentication, Authorization, Auditability and Intrusion detection.
-SafeScale Security relies on Kong, an open source generic proxy to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. To build a SafeScale Security gateway 3 plugins are used:
-- Dynamic SSL plugin to encrypt traffic between the user and the service protected
-- Open ID plugin to connect the Identity and Access Management server, KeyCloak
-- UDP Log plugin to connect the Log management system, Logstash
-The design of a SafeScale Security gateway can be depicted as bellow:
+SafeScale Security ensures that no unapproved external access is granted:
+- On network level, SafeScale Security relies on Kong, an open source generic proxy, to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. In the current state, SafeScale Security proxy relies on 3 Kong plugins:
+  - Dynamic SSL plugin to encrypt traffic between the user and the protected service
+  - Open ID plugin to connect the Identity and Access Management server, KeyCloak
+  - UDP Log plugin to connect the Log management system, Logstash
+- On service level, SafeScale Security proposes an optional use of Keycloak, an Open Source Identity and Access Management (IAM), that can provide access control by itself or using third-party directories.
+
+The design of a SafeScale Security gateway can be depicted as below:
+
 ![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
 ## Currently available features
+
 SafeScale is currently under active development and does not yet offer all the features planned. However, we are already publishing it with the following features:
 
 - SafeScale Infra:
@@ -85,7 +89,6 @@ SafeScale is currently under active development and does not yet offer all the f
     - remote desktop based on Guacamole (available from Web browser)
     - reverse proxy to control Internet access
     - ntp servers and clients
-    -
   - Add / Remove "features" on host and clusters
   - Expand/Shrink the "size" of the cluster (number of workers)
 
