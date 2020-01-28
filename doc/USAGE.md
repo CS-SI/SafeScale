@@ -83,21 +83,6 @@ Here is an example of a tenant file:
     AuthURL = "https://auth.cloud.ovh.net/v2.0"
 
 [[tenants]]
-  name = "logical_name_for_this_cloudwatt_tenant"
-  client = "cloudwatt"
-
-  [tenants.identity]
-    Username = "your_login"
-    Password = "your_password"
-
-  [tenants.compute]
-    Region = "your_region"
-    TenantName = "your_tenant_name_or_id"
-
-  [tenants.objectstorage]
-    Type = "swift"
-
-[[tenants]]
   client = "flexibleengine"
   name = "logical_name_for_this_flexibleengine_tenant"
 
