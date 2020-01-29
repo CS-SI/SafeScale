@@ -135,63 +135,64 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	_, ok := req.DisabledDefaultFeatures["hardening"]
 	v["Hardening"] = strconv.FormatBool(!ok)
 
-	// If cluster complexity is not small or cloud provider provides support for VIP, creates such a VIP
+	// If cluster complexity is not small or cloud provider provides support for VIP, creates such a VIP if not already done
+	var controlPlaneV1 *clusterpropsv1.ControlPlane
 	svc := cluster.GetService(task)
 	if identity.Complexity != complexity.Small && cluster.GetService(task).GetCapabilities().PrivateVirtualIP {
-		netCfg, err := cluster.GetNetworkConfig(task)
-		if err != nil {
-			return err
-		}
-		vip, err := svc.CreateVIP(netCfg.NetworkID, clusterName+"-ControlPlaneVIP")
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err != nil {
-				derr := svc.DeleteVIP(vip)
-				if derr != nil {
-					logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
-				}
-			}
-		}()
-
-		for _, id := range cluster.ListMasterIDs(task) {
-			err = svc.BindHostToVIP(vip, id)
-			if err != nil {
-				return err
-			}
-			defer func(i string) {
-				if err != nil {
-					derr := svc.UnbindHostFromVIP(vip, i)
-					if derr != nil {
-						logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
-					}
-				}
-			}(id)
-		}
-
-		err = cluster.UpdateMetadata(task, func() error {
-			return cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
-				controlPlaneV1 := clonable.(*clusterpropsv1.ControlPlane)
-				controlPlaneV1.VirtualIP = vip
-				controlPlaneV1.VirtualIP.Hosts = cluster.ListMasterIDs(task)
-				return nil
-			})
+		err = cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+			controlPlaneV1 = clonable.(*clusterpropsv1.ControlPlane)
+			return nil
 		})
 		if err != nil {
 			return err
 		}
-		// v["ControlplaneEndpointIP"] = vip.PrivateIP
-		// } else {
-		// 	master, err := cluster.FindAvailableMaster(task)
-		// 	if err != nil {
-		// 		return scerr.Wrap(err, fmt.Sprintf("failed to configure cluster '%s'", clusterName))
-		// 	}
-		// 	host, err := svc.InspectHost(master)
-		// 	if err != nil {
-		// 		return scerr.Wrap(err, fmt.Sprintf("failed to configure cluster '%s'", clusterName))
-		// 	}
-		// 	v["ControlplaneEndpointIP"] = host.GetPrivateIP()
+
+		if controlPlaneV1.VirtualIP == nil {
+			netCfg, err := cluster.GetNetworkConfig(task)
+			if err != nil {
+				return err
+			}
+
+			vip, err := svc.CreateVIP(netCfg.NetworkID, clusterName+"-ControlPlaneVIP")
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if err != nil {
+					derr := svc.DeleteVIP(vip)
+					if derr != nil {
+						logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+					}
+				}
+			}()
+
+			for _, id := range cluster.ListMasterIDs(task) {
+				err = svc.BindHostToVIP(vip, id)
+				if err != nil {
+					return err
+				}
+				defer func(i string) {
+					if err != nil {
+						derr := svc.UnbindHostFromVIP(vip, i)
+						if derr != nil {
+							logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+						}
+					}
+				}(id)
+			}
+
+			err = cluster.UpdateMetadata(task, func() error {
+				return cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+					controlPlaneV1 = clonable.(*clusterpropsv1.ControlPlane)
+					controlPlaneV1.VirtualIP = vip
+					controlPlaneV1.VirtualIP.Hosts = cluster.ListMasterIDs(task)
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// Disable dashboard if requested
