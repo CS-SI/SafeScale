@@ -74,11 +74,11 @@ feature:
 
                             [ alt_names ]
                             DNS.1 = helm
-                            DNS.2 = helm.{{ .HelmDefaultNamespace }}
-                            DNS.3 = helm.{{ .HelmDefaultNamespace }}.svc
-                            DNS.4 = helm.{{ .HelmDefaultNamespace }}.svc.cluster
-                            DNS.5 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local
-                            DNS.6 = helm.{{ .HelmDefaultNamespace }}.svc.cluster.local.com
+                            DNS.2 = helm.{{ .DefaultNamespace }}
+                            DNS.3 = helm.{{ .DefaultNamespace }}.svc
+                            DNS.4 = helm.{{ .DefaultNamespace }}.svc.cluster
+                            DNS.5 = helm.{{ .DefaultNamespace }}.svc.cluster.local
+                            DNS.6 = helm.{{ .DefaultNamespace }}.svc.cluster.local.com
                             IP = {{ .HostIP }}
 
                             [ v3_ext ]
