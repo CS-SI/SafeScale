@@ -136,7 +136,7 @@ func (t *Tracer) GoingOut() *Tracer {
 
 // TraceMessage returns a string containing a trace message
 func (t *Tracer) TraceMessage(format string, a ...interface{}) string {
-	return "---%s: " + t.inOutMessage + ":" + fmt.Sprintf(format, a...)
+	return "---" + t.inOutMessage + ":" + fmt.Sprintf(format, a...)
 }
 
 // Trace traces a message
