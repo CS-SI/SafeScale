@@ -37,14 +37,14 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ntpdate &>/dev/null || sfFail 1
+                                    dpkg -l | grep ntpdate &>/dev/null || sfFail 192
                                     ;;
                                 centos|rhel)
-                                    rpm -qa | grep ntpdate &>/dev/null || sfFail 1
+                                    rpm -qa | grep ntpdate &>/dev/null || sfFail 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 1
+                                    sfFail 193
                                     ;;
                             esac
 
