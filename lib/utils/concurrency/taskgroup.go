@@ -104,7 +104,7 @@ func (tg *taskGroup) GetStatus() (TaskStatus, error) {
 }
 
 // GetContext returns the current task status
-func (tg *taskGroup) GetContext() (context.Context, error) {
+func (tg *taskGroup) GetContext() (context.Context, context.CancelFunc, error) {
 	tg.task.mu.Lock()
 	defer tg.task.mu.Unlock()
 
@@ -163,7 +163,7 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 }
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
-func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
+func (tg *taskGroup) WaitGroup() (TaskGroupResult, error) {
 	tid, err := tg.GetID()
 	if err != nil {
 		return nil, err
@@ -232,7 +232,7 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
 }
 
 // TryWaitGroup tries to wait on a task; if done returns the error and true, if not returns nil and false
-func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
+func (tg *taskGroup) TryWaitGroup() (bool, TaskGroupResult, error) {
 	tid, err := tg.GetID()
 	if err != nil {
 		return false, nil, err
@@ -262,13 +262,13 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
 // satisfies interface concurrency.Task
-func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
+func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskGroupResult, error) {
 	return tg.WaitGroupFor(duration)
 }
 
 // WaitGroupFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
-func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]TaskResult, error) {
+func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult, error) {
 	tid, err := tg.GetID()
 	if err != nil {
 		return false, nil, err
