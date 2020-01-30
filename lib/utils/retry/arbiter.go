@@ -27,6 +27,9 @@ import (
 // Arbiter sleeps or selects any amount of time for each attempt.
 type Arbiter func(Try) (verdict.Enum, error)
 
+// DefaultArbiter allows 10 retries, with a maximum duration of 30 seconds
+var DefaultArbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
+
 // PrevailRetry aggregates verdicts from Arbiters for a try :
 // - Returns Abort and the error as soon as an arbiter decides for an Abort.
 // - If at least one arbiter returns Retry without any Abort from others, returns Retry with nil error.
@@ -36,7 +39,9 @@ func PrevailRetry(arbiters ...Arbiter) Arbiter {
 		final := verdict.Done
 		for _, a := range arbiters {
 			v, err := a(t)
-
+			if err != nil {
+				return 0, err
+			}
 			switch v {
 			case verdict.Retry:
 				final = verdict.Retry
@@ -57,7 +62,9 @@ func PrevailDone(arbiters ...Arbiter) Arbiter {
 		final := verdict.Retry
 		for _, a := range arbiters {
 			v, err := a(t)
-
+			if err != nil {
+				return 0, err
+			}
 			switch v {
 			case verdict.Done:
 				final = verdict.Done
@@ -74,7 +81,7 @@ func PrevailDone(arbiters ...Arbiter) Arbiter {
 func Unsuccessful() Arbiter {
 	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrAborted); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 

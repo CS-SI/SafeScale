@@ -319,7 +319,7 @@ func (a action) loop() error {
 		start   = time.Now()
 	)
 	if arbiter == nil {
-		arbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
+		arbiter = DefaultArbiter
 	}
 
 	if a.First != nil {
@@ -385,7 +385,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 		start   = time.Now()
 	)
 	if arbiter == nil {
-		arbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
+		arbiter = DefaultArbiter
 	}
 
 	if a.First != nil {
