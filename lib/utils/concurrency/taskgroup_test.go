@@ -18,12 +18,13 @@ package concurrency
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/gophercloud/gophercloud/acceptance/tools"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/gophercloud/gophercloud/acceptance/tools"
+	"github.com/stretchr/testify/require"
 )
 
 // FIXME The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go

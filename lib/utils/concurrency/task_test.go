@@ -157,10 +157,10 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	err = nil
 	for {
 		time.Sleep(time.Duration(80) * time.Millisecond)
-		ctx, err := single.GetContext()
+		ctx, cancel, err := single.GetContext()
 		require.Nil(t, err)
 
-		if singleReplacement, err := NewTaskWithContext(ctx, single); err == nil {
+		if singleReplacement, err := NewTaskWithContext(ctx, cancel); err == nil {
 			single = singleReplacement
 			break
 		}

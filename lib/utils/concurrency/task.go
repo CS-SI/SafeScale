@@ -23,10 +23,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // TaskStatus ...
@@ -65,7 +65,7 @@ type Task interface {
 	GetID() (string, error)
 	GetSignature() (string, error)
 	GetStatus() (TaskStatus, error)
-	GetContext() (context.Context, error)
+	GetContext() (context.Context, context.CancelFunc, error)
 	Reset() error
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	RunInSubTask(TaskAction, TaskParameters) (TaskResult, error)
@@ -259,11 +259,11 @@ func (t *task) GetStatus() (TaskStatus, error) {
 }
 
 // GetContext returns the context associated to the task
-func (t *task) GetContext() (context.Context, error) {
+func (t *task) GetContext() (context.Context, context.CancelFunc, error) {
 	if t == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
-	return t.context, nil
+	return t.context, t.cancel, nil
 }
 
 // ForceID allows to specify task ID. The unicity of the ID through all the tasks
@@ -288,11 +288,11 @@ func (t *task) ForceID(id string) error {
 
 // Start runs in goroutine the function with parameters
 func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
-	return t.StartWithTimeout(action, params, 0)
-}
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+	return t.StartWithTimeout(action, params, 0)
+}
 
 // StartWithTimeout runs in goroutine the TasAction with TaskParameters, and stops after timeout (if > 0)
 // If timeout happens, error returned will be ErrTimeout
@@ -321,10 +321,6 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 		go t.controller(action, params, timeout)
 	}
 	return t, nil
-}
-
-func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
-	return t.StartWithTimeout(action, params, 0)
 }
 
 // StartInSubTask runs in a subtask goroutine the function with parameters
@@ -596,7 +592,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 }
 
 // Deprecated: Reset resets the task for reuse. Deprecated due to data race problems.
-func (t *task) Reset() (Task, error) {
+func (t *task) Reset() error {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}
