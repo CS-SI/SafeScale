@@ -46,7 +46,9 @@ lib/utils:
 	@(cd utils && $(MAKE) all)
 
 sdk:
-	@protoc -I. -I$(GOINCLUDEPATH)/src --go_out=plugins=grpc:. safescale.proto
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building using $(GOINCLUDEPATH)/pkg/mod, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@ln -s $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf@v1.3.2 $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf &> /dev/null || true
+	@protoc -I. -I$(GOINCLUDEPATH)/pkg/mod --go_out=plugins=grpc:. safescale.proto
 
 has_python:
 	@which python3 > /dev/null; if [ $$? -ne 0 ]; then echo "No python installed !"; exit 1; fi
@@ -62,9 +64,9 @@ sdk_python: has_python sdk
 	@pipenv update
 	@cp safescale.proto safescale.proto.backup
 	@sed -i 's/github.com\/golang\/protobuf\/ptypes\/empty\/empty.proto/google\/protobuf\/empty.proto/g' safescale.proto
-	@pipenv run python3 -m grpc_tools.protoc -I. -I$(GOINCLUDEPATH)/src --python_out=python3/ --grpc_python_out=python3/ safescale.proto
+	@pipenv run python3 -m grpc_tools.protoc -I. -I$(GOINCLUDEPATH)/src -I$(GOINCLUDEPATH)/pkg/mod --python_out=python3/ --grpc_python_out=python3/ safescale.proto
 	@mv safescale.proto.backup safescale.proto
-	@protoc -I. -I$(GOINCLUDEPATH)/src --go_out=plugins=grpc:. safescale.proto
+	@protoc -I. -I$(GOINCLUDEPATH)/src -I$(GOINCLUDEPATH)/pkg/mod --go_out=plugins=grpc:. safescale.proto
 
 force_sdk_python: prepare_python sdk_python
 
