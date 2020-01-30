@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -145,8 +145,8 @@ func TestDeferredWrappedConsequence(t *testing.T) {
 func TestVerifyErrorType(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(*scerr.ErrTimeout); !ok {
-			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(*ErrTimeout); !ok {
+			t.Errorf("It should be a '*ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
@@ -156,13 +156,13 @@ func TestVerifyErrorType(t *testing.T) {
 
 	recovered = CreateComplexErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(*scerr.ErrTimeout); !ok {
-			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(*ErrTimeout); !ok {
+			t.Errorf("It should be a '*ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
 			if _, ok := cause.(*scerr.ErrNotFound); !ok {
-				t.Errorf("It should be a ErrNotFound, but it's [%s]", reflect.TypeOf(recovered).String())
+				t.Errorf("It should be a '*scerr.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 			}
 		}
 	}
@@ -171,15 +171,15 @@ func TestVerifyErrorType(t *testing.T) {
 func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
 	if recovered != nil {
-		if _, ok := recovered.(*scerr.ErrTimeout); ok {
-			t.Errorf("It should NOT be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(*ErrTimeout); ok {
+			t.Errorf("It should NOT be a '*ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
 			if _, ok := cause.(*scerr.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
-				t.Errorf("This should be a NotFound error...")
+				t.Errorf("This should be a '*scerr.ErrNotFound', it's instead a '%s'", reflect.TypeOf(cause).String())
 			}
 		}
 	}
@@ -318,7 +318,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 			if err != nil {
 				if tt.wantTOErr {
 					if _, ok := err.(*ErrTimeout); !ok {
-						t.Errorf("Timeout error not received...")
+						t.Errorf("'*ErrTimeout' not received...")
 					}
 				}
 			}
@@ -396,24 +396,24 @@ func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
 
 	if _, ok := nerr.(*scerr.ErrNotFound); !ok {
-		t.Errorf("Is not a resourceNotFound")
+		t.Errorf("Is not a '*ErrNotFound', it's instead a '%s'", reflect.TypeOf(toe).String())
 	}
 }
 
 func TestKeepType(t *testing.T) {
 	toe := genTimeout()
-	if _, ok := toe.(*scerr.ErrTimeout); !ok {
-		t.Errorf("Is not a timeout")
+	if _, ok := toe.(*ErrTimeout); !ok {
+		t.Errorf("Is not a '*ErrTimeout', it's instead a '%s'", reflect.TypeOf(toe).String())
 	}
 
 	leo := genLimit()
-	if _, ok := leo.(*scerr.ErrOverflow); !ok {
-		t.Errorf("Is not a limit error")
+	if _, ok := leo.(*ErrOverflow); !ok {
+		t.Errorf("Is not a '*ErrOverflow', it's instead a '%s'", reflect.TypeOf(leo).String())
 	}
 
 	abo := genAbort()
-	if _, ok := abo.(*scerr.ErrAborted); !ok {
-		t.Errorf("Is not a aborted")
+	if _, ok := abo.(*ErrAborted); !ok {
+		t.Errorf("Is not a '*ErrAborted', it's instead a '%s'", reflect.TypeOf(abo).String())
 	}
 }
 
