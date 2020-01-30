@@ -14,11 +14,11 @@ include ./common.mk
 EXECS=cli/safescale/safescale cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover cli/perform/perform cli/perform/perform-cover cli/scanner/scanner
 
 # List of files
-PKG_FILES := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -type f -name '*.go' -print | grep -v version.go | grep -v gomock_reflect_ )
+PKG_FILES := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -type f -name '*.go' -print | grep -v version.go | grep -v gomock_reflect_ | grep -v cluster/mocks )
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v /vendor/)
 # List of packages alt
-PKG_LIST_ALT := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -type f -name '*.go' -print | grep -v version.go | grep -v gomock_reflect_ | xargs dirname | uniq )
+PKG_LIST_ALT := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -type f -name '*.go' -print | grep -v version.go | grep -v gomock_reflect_ | grep -v cluster/mocks | grep -v stacks/mocks | xargs dirname | uniq )
 # List of packages to test
 TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v lib/security/ | grep -v sandbox)
 
@@ -80,9 +80,12 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which rice protoc-gen-go go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
-    	$(GO) get -u $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(GOVENDOR) $(COVERTOOL) &>/dev/null || true; \
+	@which rice go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
+    	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(GOVENDOR) $(COVERTOOL) &>/dev/null || true; \
     fi
+	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
+	fi
 	@which mockgen > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading mockgen...\n" && $(GO) get -u  $(MOCKGEN) &>/dev/null || true; \
 	fi
@@ -98,13 +101,12 @@ getdevdeps: begin
 	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) &>/dev/null || true; \
 	fi
-	@which gonangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) get -u  $(GOLANGCI) &>/dev/null || true; \
 	fi
 
 ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(govendor get github.com/golang/protobuf &>/dev/null)
 	
 sdk:
 	@(cd lib && $(MAKE) $(@))
