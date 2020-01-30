@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
@@ -105,21 +105,21 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			log.SetLevel(log.TraceLevel)
+			logrus.SetLevel(logrus.TraceLevel)
 			utils.Verbose = true
 		} else {
-			log.SetLevel(log.WarnLevel)
+			logrus.SetLevel(logrus.WarnLevel)
 		}
 
 		if c.GlobalBool("verbose") {
-			log.SetLevel(log.InfoLevel)
+			logrus.SetLevel(logrus.InfoLevel)
 			utils.Verbose = true
 		}
 		if c.GlobalBool("debug") {
 			if c.GlobalBool("verbose") {
-				log.SetLevel(log.TraceLevel)
+				logrus.SetLevel(logrus.TraceLevel)
 			} else {
-				log.SetLevel(log.DebugLevel)
+				logrus.SetLevel(logrus.DebugLevel)
 			}
 			utils.Debug = true
 		}
@@ -159,6 +159,9 @@ func main() {
 
 	app.Commands = append(app.Commands, commands.ClusterCommand)
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
+
+	// app.Commands = append(app.Commands, commands.PerformCommand)
+	// sort.Sort(cli.CommandsByName(commands.PerformCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 

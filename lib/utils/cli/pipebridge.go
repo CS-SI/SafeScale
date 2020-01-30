@@ -49,7 +49,7 @@ func NewStdoutBridge(pipe io.ReadCloser) (*StdoutBridge, error) {
 
 // Print outputs the string to stdout
 func (outp *StdoutBridge) Print(data interface{}) {
-	io.WriteString(os.Stdout, data.(string))
+	_, _ = io.WriteString(os.Stdout, data.(string))
 }
 
 // StderrBridge is a OutputPipe outputting on stderr
@@ -72,7 +72,7 @@ func NewStderrBridge(pipe io.ReadCloser) (*StderrBridge, error) {
 
 // Print outputs the string to stderr
 func (errp *StderrBridge) Print(data interface{}) {
-	io.WriteString(os.Stderr, data.(string))
+	_, _ = io.WriteString(os.Stderr, data.(string))
 }
 
 // PipeBridgeController is the controller of the bridges of pipe
@@ -91,7 +91,7 @@ func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, erro
 		return nil, scerr.InvalidParameterError("pipes", "cannot be nil")
 	}
 
-	validatedBridges := []PipeBridge{}
+	var validatedBridges []PipeBridge
 	for _, v := range bridges {
 		if v != nil {
 			validatedBridges = append(validatedBridges, v)
@@ -127,7 +127,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) error {
 	var err error
 
 	// First starts the "displayer" routine...
-	pbc.displayTask, err = concurrency.NewTaskWithParent(task)
+	pbc.displayTask, err = concurrency.NewTask(task)
 	if err != nil {
 		return err
 	}
@@ -172,6 +172,10 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	}
 
 	params, ok := p.(data.Map)
+	if !ok {
+		return nil, scerr.InvalidParameterError("p", "must be a 'data.Map'")
+	}
+
 	var (
 		bridge    PipeBridge
 		displayCh chan outputItem
@@ -187,7 +191,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	}
 
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()
+	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	// bufio.Scanner.Scan() may panic...
 	defer scerr.OnPanic(&err)()

@@ -29,7 +29,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -216,8 +216,8 @@ func (handler *SSHHandler) Run(hostName, cmd string) (retCode int, stdOut string
 			return err
 		},
 		temporal.GetHostTimeout(),
-		func(t retry.Try, v Verdict.Enum) {
-			if v == Verdict.Retry {
+		func(t retry.Try, v verdict.Enum) {
+			if v == verdict.Retry {
 				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostName)
 			}
 		},
@@ -242,7 +242,7 @@ func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.RunWithTimeout(handler.job.Task(), Outputs.DISPLAY, duration)
+	return sshCmd.RunWithTimeout(handler.job.Task(), outputs.DISPLAY, duration)
 }
 
 func extracthostName(in string) (string, error) {

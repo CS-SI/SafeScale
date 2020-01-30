@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package template
 import (
 	"reflect"
 	txttmpl "text/template"
+
+	"github.com/Masterminds/sprig"
 )
 
 // FuncMap defines the custom functions to be used in templates
@@ -58,19 +60,22 @@ func empty(param interface{}) bool {
 // MergeFuncs merges the template functions passed as parameter with FuncMap content
 // If overwrite is true, will overwrite any existing entry
 func MergeFuncs(funcs map[string]interface{}, overwrite bool) map[string]interface{} {
+	out := sprig.FuncMap()
+	for k, v := range FuncMap {
+		out[k] = v
+	}
 	if funcs != nil {
-		targetMap := make(map[string]interface{})
+		// targetMap := make(map[string]interface{})
 		for k, v := range funcs {
-			targetMap[k] = v
+			out[k] = v
 		}
 
 		for k, v := range FuncMap {
-			_, ok := targetMap[k]
+			_, ok := out[k]
 			if !ok || overwrite {
-				targetMap[k] = v
+				out[k] = v
 			}
 		}
-		return targetMap
 	}
-	return FuncMap
+	return out
 }

@@ -843,7 +843,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count uint, req *pb.HostDef
 	}
 
 	var (
-		// nodeType    NodeType.Enum
+		// nodeType    nodetype.Enum
 		nodeTypeStr string
 		errors      []string
 	)

@@ -30,7 +30,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -136,7 +136,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 
 	k, uperr := sshconfig.Command(task, "which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(task, Outputs.COLLECT, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -147,7 +147,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 
 	k, uperr = sshconfig.SudoCommand("which scp", false)
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(task, Outputs.COLLECT, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {

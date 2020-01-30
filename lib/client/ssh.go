@@ -18,12 +18,13 @@ package client
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
 
@@ -31,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -46,7 +47,7 @@ type ssh struct {
 }
 
 // Run ...
-func (s *ssh) Run(task concurrency.Task, hostName, command string, outputs Outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Run(task concurrency.Task, hostName, command string, outputs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	var (
 		retcode        int
 		stdout, stderr string

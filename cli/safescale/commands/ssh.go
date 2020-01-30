@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -85,7 +86,7 @@ var sshRun = cli.Command{
 		} else {
 			timeout = temporal.GetHostTimeout()
 		}
-		retcode, _, _, err := client.New().SSH.Run(task, c.Args().Get(0), c.String("c"), Outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := client.New().SSH.Run(task, c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))

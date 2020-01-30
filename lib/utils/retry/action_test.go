@@ -407,13 +407,13 @@ func TestKeepType(t *testing.T) {
 	}
 
 	leo := genLimit()
-	if _, ok := leo.(*ErrOverflow); !ok {
-		t.Errorf("Is not a '*ErrOverflow', it's instead a '%s'", reflect.TypeOf(leo).String())
+	if _, ok := leo.(*ErrLimit); !ok {
+		t.Errorf("Is not a '*ErrLimit', it's instead a '%s'", reflect.TypeOf(leo).String())
 	}
 
 	abo := genAbort()
-	if _, ok := abo.(*ErrAborted); !ok {
-		t.Errorf("Is not a '*ErrAborted', it's instead a '%s'", reflect.TypeOf(abo).String())
+	if _, ok := abo.(*ErrStopRetry); !ok {
+		t.Errorf("Is not a '*ErrStopRetry', it's instead a '%s'", reflect.TypeOf(abo).String())
 	}
 }
 

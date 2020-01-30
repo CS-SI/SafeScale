@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@
 package retry
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Arbiter sleeps or selects any amount of time for each attempt.
@@ -85,7 +86,7 @@ func Unsuccessful() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrAborted); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -108,11 +109,11 @@ func Unsuccessful() Arbiter {
 func UnsuccessfulWhereRetcode255() Arbiter {
 	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrAborted); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrAborted); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -137,11 +138,11 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (verdict.Enum, error) {
 		if t.Err == nil {
-			if _, ok := t.Err.(ErrAborted); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrAborted); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -163,11 +164,11 @@ func Successful() Arbiter {
 func Timeout(limit time.Duration) Arbiter {
 	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrAborted); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrAborted); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -192,11 +193,11 @@ func Timeout(limit time.Duration) Arbiter {
 func Max(limit uint) Arbiter {
 	return func(t Try) (verdict.Enum, error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrAborted); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrAborted); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
