@@ -21,7 +21,7 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/cli/perform/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 )
 
 // ClusterProbeFeatureCommand ...

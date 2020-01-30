@@ -28,7 +28,7 @@ clean:
 	@$(RM) $(EXEC-COVER) || true
 	@(cd enums && $(MAKE) $(@))
 
-generate: clean
+generate: gensrc
 	@(cd enums && $(MAKE) $(@))
 
 gensrc:

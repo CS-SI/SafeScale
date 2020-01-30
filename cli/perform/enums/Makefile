@@ -7,7 +7,7 @@ all:	generate
 vet:
 	@($(GO) vet ./...)
 
-generate: clean
+generate:
 	@$(GO) generate -run stringer ./...
 
 clean:

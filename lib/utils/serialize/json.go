@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,14 @@ package serialize
 import (
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-	Data interface{}
+	Data data.Clonable
 	sync.RWMutex
 	module, key string
 }
@@ -55,7 +55,7 @@ type SyncedJSONProperty struct {
 // on 'apply' success.
 // If the extension is locked for read, no change will be encoded into the extension.
 // The lock applied on the extension is automatically released on exit.
-func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error) {
+func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err error) {
 	if sp == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -66,20 +66,19 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) (err error)
 		return scerr.InvalidParameterError("apply", "cannot be nil")
 	}
 
-	defer scerr.OnExitTraceError(concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Json")).TraceMessage(""), &err)()
-	// To capture panics that may occur
-	defer scerr.OnPanic(&err)()
+	tracer := concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
+	defer sp.unlock()
 
-	defer sp.unlock() // May panic
-
-	if data, ok := sp.jsonProperty.Data.(Property); ok {
+	if data, ok := sp.jsonProperty.Data; ok {
 		clone := data.Clone()
-		err := apply(clone.Content())
+		err := apply(clone)
 		if err != nil {
 			return err
 		}
 		if !sp.readLock {
-			sp.jsonProperty.Data.(Property).Replace(clone)
+			sp.jsonProperty.Data.Replace(clone)
 		}
 	}
 

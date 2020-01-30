@@ -387,11 +387,11 @@ func getState(task concurrency.Task, foreman control.Foreman) (clusterstate.Enum
 	if err != nil {
 		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to get valid context : %s", err.Error()))
 	}
-	retcode, _, stderr, err = safescaleClt.SSH.Run(task, master.ID, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, stderr, err = safescaleClt.SSH.Run(task, master.ID, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to run remote command to get cluster state: %v\n%s", err, stderr))
 	}
-	retcode, _, stderr, err = safescaleClt.SSH.Run(task, master.ID, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, stderr, err = safescaleClt.SSH.Run(task, master.ID, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return clusterstate.Error, scerr.Wrap(err, fmt.Sprintf("failed to run remote command to get cluster state: %v\n%s", err, stderr))
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,9 @@ package concurrency
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
@@ -30,6 +31,8 @@ type TaskedLock interface {
 	RUnlock(Task) error
 	Lock(Task) error
 	Unlock(Task) error
+	IsRLocked(Task) (bool, error)
+	IsLocked(Task) (bool, error)
 }
 
 // taskedLock ...
@@ -66,27 +69,23 @@ func (tm *taskedLock) RLock(task Task) error {
 		return err
 	}
 
-	// logrus.Warnf("Calling rlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.RLock()
-		}
-	}()
 
 	if _, ok := tm.readLocks[tid]; ok {
 		tm.readLocks[tid]++
+		tm.lock.Unlock()
 		return nil
 	}
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
 		tracer.Trace("really RLocking...")
-		access = true
+		tm.lock.Unlock()
+		tm.rwmutex.RLock()
 		return nil
 	}
 	tracer.Trace("using running write lock...")
+
+	tm.lock.Unlock()
 	return nil
 }
 
@@ -105,15 +104,8 @@ func (tm *taskedLock) RUnlock(task Task) error {
 		return err
 	}
 
-	// logrus.Warnf("Calling runlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.RUnlock()
-		}
-	}()
+	defer tm.lock.Unlock()
 
 	if _, ok := tm.readLocks[tid]; !ok {
 		tracer.Trace("Can't RUnlock, not RLocked")
@@ -127,7 +119,7 @@ func (tm *taskedLock) RUnlock(task Task) error {
 			tracer.Trace("in running write lock, doing nothing")
 		} else {
 			tracer.Trace("really RUnlocking...")
-			access = true
+			tm.rwmutex.RUnlock()
 		}
 	}
 
@@ -150,17 +142,11 @@ func (tm *taskedLock) Lock(task Task) error {
 
 	// logrus.Warnf("Calling lock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.Lock()
-		}
-	}()
 
 	// If already locked for write, increments counter for the task
 	if _, ok := tm.writeLocks[tid]; ok {
 		tm.writeLocks[tid]++
+		tm.lock.Unlock()
 		return nil
 	}
 	// If already lock for read, returns an error
@@ -171,7 +157,8 @@ func (tm *taskedLock) Lock(task Task) error {
 	}
 	// registers lock for read for the task and actively lock the RWMutex
 	tm.writeLocks[tid] = 1
-	access = true
+	tm.lock.Unlock()
+	tm.rwmutex.Lock()
 	return nil
 }
 
@@ -189,15 +176,8 @@ func (tm *taskedLock) Unlock(task Task) error {
 		return err
 	}
 
-	// logrus.Warnf("Calling unlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.Unlock()
-		}
-	}()
+	defer tm.lock.Unlock()
 
 	// a TaskedLock can be Locked then RLocked without problem,
 	// but RUnlocks must have been done before Unlock.
@@ -212,7 +192,46 @@ func (tm *taskedLock) Unlock(task Task) error {
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {
 		delete(tm.writeLocks, tid)
-		access = true
+		tm.rwmutex.Unlock()
 	}
 	return nil
+}
+
+// IsRLocked tells if the task is owning a read lock
+func (tm *taskedLock) IsRLocked(task Task) (bool, error) {
+	if tm == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return false, scerr.InvalidParameterError("task", "cannot be nil!")
+	}
+
+	tid, err := task.GetID()
+	if err != nil {
+		return false, err
+	}
+	tm.rwmutex.RLock()
+	defer tm.rwmutex.RUnlock()
+	_, ok := tm.readLocks[tid]
+	return ok, nil
+}
+
+// IsLocked tells if the task is owning a write lock
+func (tm *taskedLock) IsLocked(task Task) (bool, error) {
+	if tm == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return false, scerr.InvalidParameterError("task", "cannot be nil!")
+	}
+
+	tid, err := task.GetID()
+	if err != nil {
+		return false, err
+	}
+
+	tm.rwmutex.RLock()
+	defer tm.rwmutex.RUnlock()
+	_, ok := tm.writeLocks[tid]
+	return ok, nil
 }

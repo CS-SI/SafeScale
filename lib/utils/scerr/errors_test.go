@@ -2,11 +2,13 @@ package scerr
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/sirupsen/logrus"
 )
@@ -17,7 +19,9 @@ func lazyDevs() error {
 
 func TestNotImplementedError(t *testing.T) {
 	what := lazyDevs()
-	assert.NotNil(t, what)
+	if what == nil {
+		t.Fatalf("unexpected nil error")
+	}
 	whatContent := what.Error()
 	if !strings.Contains(whatContent, "scerr.lazyDevs") {
 		t.Errorf("Expected 'utils.lazyDevs' in error content but found: %s", whatContent)
@@ -135,9 +139,8 @@ func TestEnrichedError(t *testing.T) {
 	errct := x.Error()
 	assert.NotNil(t, errct)
 	if !strings.Contains(errct, "europe1") {
-		t.Errorf("Information loss : %s", errct)
+		t.Errorf("Information loss: %s", errct)
 	}
-
 	if !strings.Contains(errct, "connection") {
 		t.Errorf("Information loss : %s", errct)
 	}
@@ -194,17 +197,17 @@ func getNotFoundError() error {
 func TestKeepErrorType(t *testing.T) {
 	mzb := getNotFoundError()
 	if cae, ok := mzb.(*ErrNotFound); !ok {
-		t.Errorf("Error type was lost in translation !!: %T", cae)
+		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 
 	mzb = getNotFoundErrorWithFields()
 	if cae, ok := mzb.(*ErrNotFound); !ok {
-		t.Errorf("Error type was lost in translation !!: %T", cae)
+		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 
 	mzb = getNotFoundErrorWithFieldsAndConsequences()
 	if cae, ok := mzb.(*ErrNotFound); !ok {
-		t.Errorf("Error type was lost in translation !!: %T", cae)
+		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 }
 

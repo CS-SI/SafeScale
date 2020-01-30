@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import (
 	"strconv"
 
 	"github.com/denisbrodbeck/machineid"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -76,7 +76,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 		}
 		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
 	}
-	retcode, _, _, err = SSHClient.Run(task, hostname, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, err = SSHClient.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 func (rfc RemoteFileItem) RemoveRemote(task concurrency.Task, hostname string) error {
 	SSHClient := client.New().SSH
 	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, err := SSHClient.Run(task, hostname, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, err := SSHClient.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to remove file '%s:%s'", hostname, rfc.Remote)
 	}

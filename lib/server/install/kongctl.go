@@ -23,10 +23,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
 	"github.com/sirupsen/logrus"
 
 	safescale "github.com/CS-SI/SafeScale/lib/client"
@@ -35,8 +31,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -369,7 +368,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 	if err != nil {
 		return nil, "", err
 	}
-	retcode, stdout, _, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, _, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -391,7 +390,7 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 		return nil, "", err
 	}
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -419,7 +418,7 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 		return nil, "", err
 	}
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -447,7 +446,7 @@ func (k *KongController) patch(name, url, data string, v *Variables, propagate b
 		return nil, "", err
 	}
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}

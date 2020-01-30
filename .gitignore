@@ -105,3 +105,4 @@ lib/system/version.go
 cli/safescaled/__debug_bin
 lib/security/gateway/client/safe-security
 lib/server/iaas/resources/userdata/version.go
+go.sum

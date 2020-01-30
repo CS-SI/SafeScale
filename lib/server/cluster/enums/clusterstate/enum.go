@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package ClusterState is an enumeration of the possible states of a Cluster
+// Package clusterstate is an enumeration of the possible states of a Cluster
 package clusterstate
 
 //go:generate stringer -type=Enum

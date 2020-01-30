@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,6 +122,7 @@ var networkInspect = cli.Command{
 		pgwID := network.GetGatewayId()
 		sgwID := network.GetSecondaryGatewayId()
 
+
 		// Added operation status
 		opState := network.GetState()
 		mapped["state"] = opState.String()
@@ -178,7 +179,7 @@ var networkCreate = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "failover",
-			Usage: "creates 2 gateways for the network with a VIP used a internal default route",
+			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
 		},
 		cli.StringFlag{
 			Name: "S, sizing",

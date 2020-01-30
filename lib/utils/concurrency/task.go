@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -189,6 +189,9 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 		doneCh:   make(chan bool, 1),
 		finishCh: make(chan struct{}, 1),
 	}
+	close(t.abortCh)
+	close(t.doneCh)
+	close(t.finishCh)
 
 	u, err := uuid.NewV4()
 	if err != nil {
@@ -506,6 +509,9 @@ func (t *task) Wait() (TaskResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	close(t.finishCh)
+	close(t.abortCh)
+	close(t.doneCh)
 	return t.result, t.err
 }
 
@@ -574,20 +580,18 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
 	}
 
-	var result TaskResult
-
-	c := make(chan struct{})
-	go func() {
-		result, err = t.Wait()
-		c <- struct{}{} // done
-		close(c)
-	}()
-
-	select {
-	case <-time.After(duration):
-		return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
-	case <-c:
-		return true, result, err
+	for {
+		select {
+		case <-time.After(duration):
+			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
+		default:
+			ok, result, err := t.TryWait()
+			if ok {
+				return ok, result, err
+			}
+			// Waits 1 ms between checks...
+			time.Sleep(time.Millisecond)
+		}
 	}
 }
 

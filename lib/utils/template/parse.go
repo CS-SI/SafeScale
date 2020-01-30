@@ -14,12 +14,21 @@
  * limitations under the License.
  */
 
-package data
+package template
 
-//go:generate mockgen -destination=../mocks/mock_identifyable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Identifyable
+import (
+	txttmpl "text/template"
 
-// Identifyable ...
-type Identifyable interface {
-	GetName() string
-	GetID() string
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+)
+
+// Parse returns a text template with default funcs declared
+func Parse(title, content string, funcMap map[string]interface{}) (*txttmpl.Template, error) {
+	if title == "" {
+		return nil, scerr.InvalidParameterError("title", "cannot be empty string")
+	}
+	if content == "" {
+		return nil, scerr.InvalidParameterError("content", "cannot be empty string")
+	}
+	return txttmpl.New(title).Funcs(MergeFuncs(funcMap, false)).Parse(content)
 }

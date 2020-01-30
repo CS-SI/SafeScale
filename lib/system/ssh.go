@@ -40,7 +40,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -413,7 +413,7 @@ func (sc *SSHCommand) Display() string {
 // type *ExitError. Other error types may be returned for other situations.
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
-func (sc *SSHCommand) Run(t concurrency.Task, outputs Outputs.Enum) (int, string, string, error) {
+func (sc *SSHCommand) Run(t concurrency.Task, outputs outputs.Enum) (int, string, string, error) {
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outputs.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -421,7 +421,7 @@ func (sc *SSHCommand) Run(t concurrency.Task, outputs Outputs.Enum) (int, string
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs Outputs.Enum, timeout time.Duration) (int, string, string, error) {
+func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs outputs.Enum, timeout time.Duration) (int, string, string, error) {
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outputs.String(), timeout), true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
@@ -492,7 +492,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs Outputs.Enum
 	_, err = subtask.StartWithTimeout(sc.taskExecute, data.Map{
 		"stdout":          stdoutPipe,
 		"stderr":          stderrPipe,
-		"collect_outputs": outputs != Outputs.DISPLAY,
+		"collect_outputs": outputs != outputs.DISPLAY,
 	}, timeout)
 	if err != nil {
 		return -1, "", "", err
@@ -828,7 +828,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 				return err
 			}
 
-			retcode, stdout, stderr, err = cmd.RunWithTimeout(task, Outputs.COLLECT, timeout)
+			retcode, stdout, stderr, err = cmd.RunWithTimeout(task, outputs.COLLECT, timeout)
 			if err != nil {
 				return err
 			}
@@ -915,7 +915,7 @@ func (ssh *SSHConfig) copy(
 		keyFile: identityfile,
 	}
 
-	return sshCommand.RunWithTimeout(task, Outputs.COLLECT, timeout)
+	return sshCommand.RunWithTimeout(task, outputs.COLLECT, timeout)
 }
 
 // Enter Enter to interactive shell
