@@ -388,17 +388,25 @@ export -f sfKubectl
 
 sfHelm() {
     # analyzes parameters...
-    local use_tls=
+    local use_tls=--tls
+    local stop=0
     for p in "$@"; do
         case "$p" in
-            "search"|"repo") ;;
-            "init") echo "sfHelm init is forbidden" && return 1
-                  ;;
-            *) use_tls=--tls
-               ;;
+            "--*")
+                ;;
+            "search"|"repo")
+                stop=1
+                use_tls=
+                ;;
+            "init")
+                echo "sfHelm init is forbidden" && return 1
+                ;;
+            *)
+                stop=1
+                ;;
         esac
+        [ $stop -eq 1 ] && break
     done
-
     sudo -u cladm -i helm "$@" $use_tls
 }
 export -f sfHelm
