@@ -22,7 +22,7 @@ require (
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/gobwas/glob v0.2.3
 	github.com/gogo/protobuf v1.3.1 // indirect
-	github.com/golang/mock v1.3.1
+	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.3.2
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
 	github.com/golangci/golangci-lint v1.23.1 // indirect
@@ -74,10 +74,10 @@ require (
 	github.com/valyala/fasttemplate v1.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	golang.org/x/lint v0.0.0-20200130185559-910be7a94367 // indirect
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/sys v0.0.0-20200124204421-9fbb57f87de9
-	golang.org/x/tools v0.0.0-20200130002326-2f3ba24bd6e7 // indirect
 	gomodules.xyz/stow v0.2.4 // indirect
 	google.golang.org/api v0.15.0
 	google.golang.org/grpc v1.26.0
