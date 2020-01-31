@@ -4,7 +4,7 @@
 # Create working directory
 # ----------------------
 echo "Create working directory"
-WRKDIR=/opt
+export WRKDIR=/opt
 mkdir -p ${WRKDIR}
 cd ${WRKDIR}
 rm -rf SafeScale
@@ -28,10 +28,14 @@ echo "Get dev deps"
 make getdevdeps
 
 echo "Ensure"
-make ensure &>/dev/null
+make ensure >/dev/null 2>&1
+make ensure
 
 echo "All"
 make all
 
 echo "Install"
 make install
+
+echo "Export"
+CIBIN=/export make installci
