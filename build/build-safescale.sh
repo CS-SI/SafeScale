@@ -28,22 +28,10 @@ echo "Get dev deps"
 make getdevdeps
 
 echo "Ensure"
-make ensure
+make ensure &>/dev/null
 
 echo "All"
 make all
 
 echo "Install"
 make install
-
-# ----------------------
-# Copy produced binaries to export directory
-# ----------------------
-EXPDIR=/usr/local/safescale/bin
-echo "Copy produced binaries to export directory '${EXPDIR}'"
-mkdir -p ${EXPDIR}
-
-cp ${GOPATH}/bin/safescale ${EXPDIR}
-cp ${GOPATH}/bin/safescaled ${EXPDIR}
-cp ${GOPATH}/bin/deploy ${EXPDIR}
-cp ${GOPATH}/bin/perform ${EXPDIR}
