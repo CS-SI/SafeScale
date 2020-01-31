@@ -49,3 +49,7 @@ ENV GOPATH /go
 COPY build-safescale.sh /opt/build-safescale.sh
 
 CMD sleep 5
+
+COPY marker /dev/null
+
+RUN cd /opt && ./build-safescale.sh
