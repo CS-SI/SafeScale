@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@
 package resources
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"github.com/sirupsen/logrus"
 )
 
 // KeyPair represents a SSH key pair
@@ -201,8 +203,8 @@ func (h *Host) GetPublicIP() (pubIP string) {
 		}
 	}()
 
-	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(value interface{}) error {
-		hostNetworkV1 := value.(*propsv1.HostNetwork)
+	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		ip = hostNetworkV1.PublicIPv4
 		if ip == "" {
 			ip = hostNetworkV1.PublicIPv6
@@ -226,8 +228,8 @@ func (h *Host) GetPrivateIP() (privateIP string) {
 		}
 	}()
 
-	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err := h.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		if len(hostNetworkV1.IPv4Addresses) > 0 {
 			ip = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
 			if ip == "" {
@@ -240,6 +242,30 @@ func (h *Host) GetPrivateIP() (privateIP string) {
 		return ""
 	}
 	return ip
+}
+
+// Content ...
+// satisfies interface data.Clonable
+func (h *Host) Content() data.Clonable {
+	return h
+}
+
+// Clone ...
+// satisfies interface data.Clonable
+func (h *Host) Clone() data.Clonable {
+	return NewHost().Replace(h)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (h *Host) Replace(p data.Clonable) data.Clonable {
+	if p != nil {
+		src := p.(*Host)
+		*h = *src
+		// FIXME: h.Properties have to be cloned also... but this will move outside this Host struct very soon (WIP on this subject...)
+		//        Is it worth it?
+	}
+	return h
 }
 
 // Serialize serializes Host instance into bytes (output json code)

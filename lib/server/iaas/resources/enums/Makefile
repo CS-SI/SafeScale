@@ -9,7 +9,7 @@ vet:
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
-generate: clean
+generate:
 	@$(GO) generate ./...
 
 clean:

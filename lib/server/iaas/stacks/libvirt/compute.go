@@ -518,7 +518,7 @@ func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connec
 	return volumeDescriptions, nil
 }
 
-//stateConvert convert libvirt.DomainState to a HostState.Enum
+//stateConvert convert libvirt.DomainState to a hoststate.Enum
 func stateConvert(stateLibvirt libvirt.DomainState) hoststate.Enum {
 	switch stateLibvirt {
 	case 1:
@@ -674,7 +674,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update HostProperty.DescriptionV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update hostproperty.DescriptionV1 : %s", err.Error())
 	}
 
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
@@ -686,7 +686,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
 
 	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
@@ -698,7 +698,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
 	return host, nil
@@ -759,7 +759,7 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
@@ -778,7 +778,7 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
+		return fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
 
 	return nil
@@ -1051,7 +1051,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil
 	})
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return nil, userData, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
@@ -1067,7 +1067,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil
 	})
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
+		return nil, userData, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
 
 	return host, userData, nil
@@ -1079,15 +1079,20 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+		}
 		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
-	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
+		host = hostParam
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	newHost, _, err := s.getHostAndDomainFromRef(host.ID)

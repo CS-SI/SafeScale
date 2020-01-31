@@ -1,45 +1,40 @@
 package api
 
 import (
+	"time"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 // ValidatedProvider ...
 type ValidatedProvider WrappedProvider
 
-func (w ValidatedProvider) CreateVIP(netID string, name string) (*resources.VIP, error) {
-	// FIXME Add OK method to vip, then check return value
+func (w ValidatedProvider) CreateVIP(netID string, name string) (*resources.VirtualIP, error) {
+	// FIXME: Add OK method to vip, then check return value
 	return w.InnerProvider.CreateVIP(netID, name)
 }
 
-func (w ValidatedProvider) AddPublicIPToVIP(vip *resources.VIP) error {
-	// FIXME Add OK method to vip
+func (w ValidatedProvider) AddPublicIPToVIP(vip *resources.VirtualIP) error {
+	// FIXME: Add OK method to vip
 	return w.InnerProvider.AddPublicIPToVIP(vip)
 }
 
-func (w ValidatedProvider) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
-	// FIXME Add OK method to vip
-	if !host.OK() {
-		logrus.Warnf("Invalid host: %v", host)
-	}
-	return w.InnerProvider.BindHostToVIP(vip, host)
+func (w ValidatedProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
+	// FIXME: Add OK method to vip
+	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
-	// FIXME Add OK method to vip
-	if !host.OK() {
-		logrus.Warnf("Invalid host: %v", host)
-	}
-	return w.InnerProvider.UnbindHostFromVIP(vip, host)
+func (w ValidatedProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
+	// FIXME:  Add OK method to vip
+	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) DeleteVIP(vip *resources.VIP) error {
-	// FIXME Add OK method to vip
+func (w ValidatedProvider) DeleteVIP(vip *resources.VirtualIP) error {
+	// FIXME: Add OK method to vip
 	return w.InnerProvider.DeleteVIP(vip)
 }
 

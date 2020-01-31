@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,15 +29,15 @@ type Enum int
 const (
 	_ Enum = iota
 	// DCOS managed cluster
-	DCOS
+	DCOS = 1
 	// K8S for a pure Kubernetes cluster
-	K8S
+	K8S = 2
 	// SWARM for a pure docker swarm cluster
-	SWARM
+	SWARM = 3
 	// BOH for a "Bunch Of Hosts", without cluster management
-	BOH
+	BOH = 4
 	// OHPC for a OpenHPC cluster
-	OHPC
+	OHPC = 5
 )
 
 var (

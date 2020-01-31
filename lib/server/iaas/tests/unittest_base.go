@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialize tenant gcp
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialize tenant local
@@ -61,16 +61,11 @@ type ServiceTester struct {
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	var stack api.Stack
 
-	stack = &libvirt.Stack{}
-	_ = stack
+	stack = &libvirt.Stack{}     // nolint
+	stack = &huaweicloud.Stack{} // nolint
+	stack = &openstack.Stack{}   // nolint
+	stack = &gcp.Stack{}         // nolint
 
-	stack = &huaweicloud.Stack{}
-	_ = stack
-
-	stack = &openstack.Stack{}
-	_ = stack
-
-	stack = &gcp.Stack{}
 	_ = stack
 }
 
@@ -177,10 +172,10 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 	assert.EqualValues(t, nbKP+2, len(lst))
 	for _, kpe := range lst {
 		var kpr resources.KeyPair
-		switch {
-		case kpe.ID == kp.ID:
+		switch kpe.ID {
+		case kp.ID:
 			kpr = *kp
-		case kpe.ID == kp2.ID:
+		case kp2.ID:
 			kpr = *kp2
 		default:
 			continue
@@ -480,7 +475,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		//assert.Equal(t, host.State, HostState.STOPPED)
+		//assert.Equal(t, host.State, hoststate.STOPPED)
 	}
 	{
 		err := tester.Service.StartHost(host.ID)
@@ -536,12 +531,12 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, nbVolumes+2, len(lst))
 	for _, vl := range lst {
-		switch {
-		case vl.ID == v1.ID:
+		switch vl.ID {
+		case v1.ID:
 			assert.Equal(t, v1.Name, vl.Name)
 			assert.Equal(t, v1.Size, vl.Size)
 			assert.Equal(t, v1.Speed, vl.Speed)
-		case vl.ID == v2.ID:
+		case v2.ID:
 			assert.Equal(t, v2.Name, vl.Name)
 			assert.Equal(t, v2.Size, vl.Size)
 			assert.Equal(t, v2.Speed, vl.Speed)
@@ -549,7 +544,6 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 			t.Fail()
 		}
 	}
-
 }
 
 //VolumeAttachment test
@@ -630,14 +624,14 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(lst))
 	for _, val := range lst {
-		switch {
-		case val.ID == va1ID:
+		switch val.ID {
+		case va1ID:
 			assert.Equal(t, va1ID, val.ID)
 			assert.Equal(t, va1.Name, val.Name)
 			assert.Equal(t, va1.Device, val.Device)
 			assert.Equal(t, va1.ServerID, val.ServerID)
 			assert.Equal(t, va1.VolumeID, val.VolumeID)
-		case val.ID == va2ID:
+		case va2ID:
 			assert.Equal(t, va2ID, val.ID)
 			assert.Equal(t, va2.Name, val.Name)
 			assert.Equal(t, va2.Device, val.Device)

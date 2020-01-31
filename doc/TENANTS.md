@@ -136,11 +136,9 @@ When SafeScale commands are invoked, they search for a tenant configuration file
 
 Thanks to [viper](https://github.com/spf13/viper), the file can be named ``tenants.toml`` (encoded in TOML), ``tenants.json`` (encoded in JSON) or ``tenants.yaml`` (encoded in YAML), allowing you to use the format you are the most comfortable with.
 
-__Note__: If you are not familiar with all the supported encoding formats, you can use the tool [remarshal](https://github.com/dbohdan/remarshal) which
-allows to convert between them. You should be able to invest yourself in learning the TOML format and would be able nevertheless to generate in other formats if necessary.
+__Note__: If you are not familiar with all the supported encoding formats, you can use the tool [remarshal](https://github.com/dbohdan/remarshal) which allows to convert between them. You should be able to invest yourself in learning the TOML format (or not) and would be able nevertheless to generate in other formats if necessary.
 
 ## Structure of TOML file
-
 
 A TOML configuration file must contains at least one `[[tenants]]` entry. There can be multiple entries.<br>
 Each entry defines a tenant, using the field `name` to identify it, and the field `client` to define the driver.
@@ -155,10 +153,10 @@ Inside a `[[tenants]]` item, you can have these sections :
 
 In the description of sections hereafter, each keyword is annotated with these tags:
 
-- MANDATORY: this means the keyword must be present and must be in the section
-- INHERIT: this means the keyword can inherit from another section
-- OPTIONAL: this means the keyword is optional
-- CLIENT: this means the keyword presence depends on driver used
+- `MANDATORY`: this means the keyword must be present and must be in the section
+- `INHERIT`: this means the keyword can inherit from another section
+- `OPTIONAL`: this means the keyword is optional
+- `CLIENT`: this means the keyword presence depends on driver used
 
 Combinations are possible :
 
@@ -269,67 +267,75 @@ It defines the "driver" to communicate with the provider. Valid values are:
 
 > | Providers |
 > | --- |
-> | `"cloudwatt"` |
 > | `"cloudferro"` |
 > | `"flexibleengine"` |
+> | `"local"` |
+> | `"openstack"` |
 > | `"opentelekom"` |
 > | `"ovh"` |
 > | `"gcp"` |
 
-### <a name="kw_AccessKey"></a> `AccessKey`: alias, see [`Username`](#kw_Username)
+### AccessKey: alias, see [`Username`](#Username)
 
-### <a name="kw_AlternateApiApplicationKey"></a> `AlternateApiApplicationKey`
+### `AlternateApiApplicationKey`
 
-Only available on OVH.<br>
-Contains OVH api application key (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
+Only available on `OVH`.<br>
+Contains OVH API application key (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
 
-### <a name="kw_AlternateApiApplicationSecret"></a> `AlternateApiApplicationSecret`
+### `AlternateApiApplicationSecret`
 
-Only available on OVH.<br>
+Only available on `OVH`.<br>
 Contains OVH api application secret (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
 
-### <a name="kw_AlternateApiConsumerKey"></a> `AlternateApiConsumerKey`
+### `AlternateApiConsumerKey`
 
-Only available on OVH.<br>
+Only available on `OVH`.<br>
 Contains OVH api consumer key, who have to be previously validated (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
 
 ### `ApplicationKey`
 
-### <a name="kw_AuthURL"></a> `AuthURL`
+### `AuthURL`
 
 Contains the URL used to authenticate.<br>
 May be used in sections `tenants.objectstorage` and `tenants.metadata`, especially when `Type` == `"swift"`.
 
-### <a name="kw_Domain"></a> `Domain`
+### `AvailabilityZone`
+
+Contains the zone to connect to. Values depend on provider.<br>
+Is mandatory in `tenants.compute`
+May be used in `tenants.objectstorage` and `tenants.metadata`.
+If the AvailabilityZone is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory)
+
+### `Domain`
 
 Contains the Domain name wanted by the provider.<br>
 May be used in every section.
 
-### <a name="kw_DomainName"></a> `DomainName`: alias, see [`Domain`](#kw_Domain)
+### `DomainName`: alias, see [`Domain`](#Domain)
 
-### <a name="kw_Endpoint"></a> `Endpoint`
+### `Endpoint`
 
 Contains the URL of the Object Storage backend to use.<br>
 May be used in sections `tenants.objectstorage` and `tenants.metadata`, especially when `Type` == `"s3"`.
 
-### <a name="kw_OpenStackID"></a> `OpenstackID`: alias, see [`Username`](#kw_Username)
+### `OpenstackID`: alias, see [`Username`](#Username)
 
-### <a name="kw_OperatorUsername"></a> `OperatorUsername`
+### `OperatorUsername`
 
 Contains the username that will be used to create the default user (safescale if unset).
 
-### <a name="kw_OpenstackPassword"></a> `OpenstackPassword`: alias, see [`Password`](#kw_Password)
+### `OpenstackPassword`: alias, see [`Password`](#Password)
 
-### <a name="kw_Password"></a> `Password`
+### `Password`
 
 Contains the password for the authentication necessary to connect to the provider.<br>
 May be used in sections `tenants.identity`, `tenants.objectstorage` and `tenants.metadata`.
 
-### <a name="kw_ProjectID"></a> `ProjectID`
+### `ProjectID`
 
-### <a name="kw_ProjectName"></a> `ProjectName`
+### `ProjectName`
 
-### <a nale="kw_ProviderNetwork"></a> `ProviderNetwork`
+### `ProviderNetwork`
 
 Contains the name of the provider network connected host resources to public network.<br>
 Is meaningful for some providers:
@@ -337,37 +343,29 @@ Is meaningful for some providers:
 > | |
 > | --- |
 > | `ovh` |
-> | --- |
 >
-### <a name="kw_Region"></a> `Region`
+### `Region`
 
 Contains the region to connect to. Values depend on provider.<br>
 Is mandatory in `tenants.compute`
 May be used in `tenants.objectstorage` and `tenants.metadata`.
 If the Region is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory)
 
-### <a name="kw_AvailabilityZone"></a> `AvailabilityZone`
+### `Scannable`
 
-Contains the zone to connect to. Values depend on provider.<br>
-Is mandatory in `tenants.compute`
-May be used in `tenants.objectstorage` and `tenants.metadata`.
-If the AvailabilityZone is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory)
+If set to true, allow the scanner to scan the tenant ([cf. SCANNER](SCANNER.md))
 
-### <a name="kw_Scannable"></a> `Scannable`
+### `SecretKey`: alias, see [Password](#Password)
 
-If set to true, allow the scanner to scan the tennant ([cf. SCANNER](SCANNER.md))
-
-### <a name="k<_SecretKey"></a> `SecretKey`: alias, see [`Password`](#kw_Password)
-
-### <a name="kw_Username"></a>`Username`
+### `Username`
 
 Contains the username for the authentication necessary to connect to the provider.
 
 It (or one of its aliases) must be present in section `tenants.identity`, and may be present in sections `tenants.objectstorage` and `tenants.metadata`.
 
-### <a name="kw_Tenant"></a> `Tenant`
+### `Tenant`
 
-### <a name="kw_Type"></a> `Type`
+### `Type`
 
 Allows to specify the type of Object Storage protocol.<br>
 Valid values are:
@@ -377,9 +375,9 @@ Valid values are:
 > | `"s3"` | S3 protocol as proposed by AWS or tools like minio |
 > | `"swift"` | SwiftKS protocol proposed by OpenStack Cloud implementations |
 > | `"azure"` | Azure protocol (not tested) |
-> | `"gce"` | Google GCE protocol (not tested) |
+> | `"gce"` | Google GCE protocol |
 
-### <a name="kw_VPCCIDR"></a> `VPCCIDR`
+### `VPCCIDR`
 
 Contains the name of the VPC where networks will be created. If the VPC doesn't exist, will be created.<br>
 Is meaningful for some drivers only:
@@ -389,7 +387,7 @@ Is meaningful for some drivers only:
 > | `flexibleengine` |
 > | `opentelekom` |
 
-### <a name="kw_VPCName"></a> `VPCName`
+### `VPCName`
 
 Contains the CIDR of the VPC where networks will be created.<br>
 Is meaningful for some drivers only:
@@ -400,7 +398,7 @@ Is meaningful for some drivers only:
 > | `opentelekom` |
 
 
-### GCP
+### GCP-specific
 
 Get project number from project settings:
 https://console.cloud.google.com/iam-admin/settings/project?project=<your-project-here>
@@ -425,7 +423,7 @@ The file retrieved from there has the following format:
 }
 ```
 
-For now (this will change in the future to be more consistent with the other drivers), the tenants.toml file contains the same fields as the service account json file AND the project number from the project settings page:
+For now (this will change in the future to be more consistent with the other drivers), the `tenants.toml` file contains the same fields as the service account json file AND the project number from the project settings page:
 
 ```yaml
 [[tenants]]

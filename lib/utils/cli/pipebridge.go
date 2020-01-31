@@ -127,7 +127,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) error {
 	var err error
 
 	// First starts the "displayer" routine...
-	pbc.displayTask, err = concurrency.NewTask(task)
+	pbc.displayTask, err = concurrency.NewTask()
 	if err != nil {
 		return err
 	}

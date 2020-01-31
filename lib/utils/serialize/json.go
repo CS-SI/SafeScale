@@ -19,9 +19,9 @@ package serialize
 import (
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
@@ -71,7 +71,7 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err erro
 	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
 	defer sp.unlock()
 
-	if data, ok := sp.jsonProperty.Data; ok {
+	if data := sp.jsonProperty.Data; data != nil {
 		clone := data.Clone()
 		err := apply(clone)
 		if err != nil {

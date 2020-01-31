@@ -45,7 +45,7 @@ export -f sfExit
 sfFinishPreviousInstall() {
     local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
     if [[ "$unfinished" == 0 ]]; then
-        echo "no unfinished packages"
+        echo "good"
     else
         echo "there are unconfigured packages !"
         sudo dpkg --configure -a --force-all
@@ -391,15 +391,24 @@ export -f sfKubectl
 
 sfHelm() {
     # analyzes parameters...
-    local use_tls=
+    local use_tls=--tls
+    local stop=0
     for p in "$@"; do
         case "$p" in
-            "search"|"repo") ;;
-            "init") echo "sfHelm init is forbidden" && return 1
-                  ;;
-            *) use_tls=--tls
-               ;;
+            "--*")
+                ;;
+            "search"|"repo")
+                stop=1
+                use_tls=
+                ;;
+            "init")
+                echo "sfHelm init is forbidden" && return 1
+                ;;
+            *)
+                stop=1
+                ;;
         esac
+        [ $stop -eq 1 ] && break
     done
 
     sudo -u cladm -i helm "$@" $use_tls
@@ -552,7 +561,7 @@ sfPgsqlUpdatePassword() {
     docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "ALTER USER $username WITH PASSWORD '$password'"
     retcode=$?
     if [ $retcode -eq 0 ]; then
-        for i in {{ range .MasterIPs }}{{.}} {{end}}; do
+        for i in {{ range .ClusterMasterIPs }}{{.}} {{end}}; do
             id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_pooler | cut -d: -f2)
             retcode=$?
             if [ $retcode -eq 0 -a ! -z "$id" ]; then
@@ -810,8 +819,10 @@ sfIsPodRunning() {
     local pod=${1%@*}
     local domain=${1#*@}
     [ -z ${domain+x} ] && domain=default
-    local retcode=-1
-    sudo -u cladm -i kubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null && retcode=$? || true
+    set +o pipefail
+    ( sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null)
+    retcode=$?
+    set -o pipefail
     [ $retcode = 0 ] && return 0 || return 1
 }
 export -f sfIsPodRunning
@@ -851,47 +862,47 @@ trap factsCleanup exit
 # --------
 
 sfDetectFacts() {
-	if [ -f /etc/os-release ]; then
-		. /etc/os-release
-		FACTS["linux_kind"]=$ID
-		LINUX_KIND=${ID,,}
-		FACTS["linux_version"]=$VERSION_ID
-		VERSION_ID=$VERSION_ID
-		[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
-	else
-		if command -v lsb_release &>/dev/null; then
-			LINUX_KIND=$(lsb_release -is)
-			LINUX_KIND=${LINUX_KIND,,}
-			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
-		else
-			[ -f /etc/redhat-release ] && {
-				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
-				LINUX_KIND=${LINUX_KIND,,}
-				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
-			}
-		fi
-		FACTS["linux_kind"]=${LINUX_KIND,,}
-		FACTS["linux_version"]=$VERSION_ID
-	fi
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        FACTS["linux_kind"]=$ID
+        LINUX_KIND=${ID,,}
+        FACTS["linux_version"]=$VERSION_ID
+        VERSION_ID=$VERSION_ID
+        [ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
+    else
+        if which lsb_release &>/dev/null; then
+            LINUX_KIND=$(lsb_release -is)
+            LINUX_KIND=${LINUX_KIND,,}
+            VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+        else
+            [ -f /etc/redhat-release ] && {
+                LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
+                LINUX_KIND=${LINUX_KIND,,}
+                VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+            }
+        fi
+        FACTS["linux_kind"]=${LINUX_KIND,,}
+        FACTS["linux_version"]=$VERSION_ID
+    fi
 
-	# Some facts about system
-	case ${FACTS["linux_kind"]} in
-		redhat|centos)
-			FACTS["redhat_like"]=1
-			FACTS["debian_like"]=0
-			FACTS["docker_version"]=$(yum info docker-ce || true)
-			;;
-		debian|ubuntu)
-			FACTS["redhat_like"]=0
-			FACTS["debian_like"]=1
-			FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f3 | cut -d~ -f1 || true)
-			;;
-	esac
-	if systemctl | grep '\-.mount' &>/dev/null; then
-		FACTS["use_systemd"]=1
-	else
-		FACTS["use_systemd"]=0
-	fi
+    # Some facts about system
+    case ${FACTS["linux_kind"]} in
+        redhat|centos)
+            FACTS["redhat_like"]=1
+            FACTS["debian_like"]=0
+			      FACTS["docker_version"]=$(yum info docker-ce || true)
+            ;;
+        debian|ubuntu)
+            FACTS["redhat_like"]=0
+            FACTS["debian_like"]=1
+            FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f3 | cut -d~ -f1 || true)
+            ;;
+    esac
+    if systemctl | grep '\-.mount' &>/dev/null; then
+        FACTS["use_systemd"]=1
+    else
+        FACTS["use_systemd"]=0
+    fi
 
     # Some facts about hardware
     val=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
@@ -935,10 +946,9 @@ sfDetectFacts() {
 export -f sfDetectFacts
 
 sfGetFact() {
-	[ $# -eq 0 ] && return
-	# shellcheck source=.
-	source "$SERIALIZED_FACTS"
-	[ ${FACTS[$1]+isset} ] && echo -n ${FACTS[$1]}
+    [ $# -eq 0 ] && return
+    source "$SERIALIZED_FACTS"
+    [ ${FACTS[$1]+x} ] && echo -n ${FACTS[$1]}
 }
 export -f sfGetFact
 

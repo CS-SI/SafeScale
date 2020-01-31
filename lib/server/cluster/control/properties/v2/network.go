@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,44 +18,47 @@ package propertiesv2
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkstate"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Network ...
-// NOT FROZEN YET
+// Network replace propertiesv1.Network
+// FIXME: make sure there is code to migrate propertiesv1.Network to propertiesv2.Network when needed
+// !!! FROZEN !!!
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with updated/additional fields
 type Network struct {
-	NetworkID          string            `json:"network_id"`           // contains the ID of the network
-	CIDR               string            `json:"cidr"`                 // the network CIDR
-	GatewayID          string            `json:"gateway_id"`           // contains the ID of the primary gateway
-	GatewayIP          string            `json:"gateway_ip"`           // contains the private IP address of the primary gateway
-	SecondaryGatewayID string            `json:"secondary_gateway_id"` // contains the ID of the secondary gateway
-	SecondaryGatewayIP string            `json:"secondary_gateway_ip"` // contains the private IP of the secondary gateway
-	DefaultRouteIP     string            `json:"default_route_ip"`     // contains the IP of the default route
-	PrimaryPublicIP    string            `json:"primary_public_ip"`    // contains the public IP of the primary gateway
-	SecondaryPublicIP  string            `json:"secondary_public_ip"`  // contains the public IP of the secondary gateway
-	EndpointIP         string            `json:"endpoint_ip"`          // contains the IP of the external Endpoint
-	NetworkState       networkstate.Enum `json:"status"`
+	NetworkID          string `json:"network_id"`           // contains the ID of the network
+	CIDR               string `json:"cidr"`                 // the network CIDR
+	GatewayID          string `json:"gateway_id"`           // contains the ID of the primary gateway
+	GatewayIP          string `json:"gateway_ip"`           // contains the private IP address of the primary gateway
+	SecondaryGatewayID string `json:"secondary_gateway_id"` // contains the ID of the secondary gateway
+	SecondaryGatewayIP string `json:"secondary_gateway_ip"` // contains the private IP of the secondary gateway
+	DefaultRouteIP     string `json:"default_route_ip"`     // contains the IP of the default route
+	PrimaryPublicIP    string `json:"primary_public_ip"`    // contains the public IP of the primary gateway
+	SecondaryPublicIP  string `json:"secondary_public_ip"`  // contains the public IP of the secondary gateway
+	EndpointIP         string `json:"endpoint_ip"`          // contains the IP of the external Endpoint
 }
 
 func newNetwork() *Network {
-	return &Network{
-		NetworkState: networkstate.UNKNOWNSTATE,
-	}
+	return &Network{}
 }
 
-// Content ... (serialize.Property interface)
-func (n *Network) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (n *Network) Content() data.Clonable {
 	return n
 }
 
-// Clone ... (serialize.Property interface)
-func (n *Network) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (n *Network) Clone() data.Clonable {
 	return newNetwork().Replace(n)
 }
 
-// Replace ... (serialize.Property interface)
-func (n *Network) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (n *Network) Replace(p data.Clonable) data.Clonable {
 	*n = *p.(*Network)
 	return n
 }

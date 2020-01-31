@@ -25,6 +25,5 @@ gensrc:
 	@echo ")" >> $(VERSIONFILE)
 
 clean:
-	@(cd firewall && $(MAKE) $(@))
 	@(cd nfs && $(MAKE) $(@))
 	@$(RM) rice-box.go || true

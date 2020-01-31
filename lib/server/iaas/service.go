@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -249,10 +249,10 @@ func (svc *service) SelectTemplateByName(name string) (*resources.HostTemplate, 
 func (svc *service) reduceTemplates(tpls []resources.HostTemplate) []resources.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if svc.whitelistTemplateRE != nil {
-		finalFilter = templatefilters.NewFilter(filterWhitelistedTemplates(svc.whitelistTemplateRE))
+		finalFilter = templatefilters.NewFilter(filterTemplatesByRegex(svc.whitelistTemplateRE))
 	}
 	if svc.blacklistTemplateRE != nil {
-		blackFilter := templatefilters.NewFilter(filterWhitelistedTemplates(svc.blacklistTemplateRE))
+		blackFilter := templatefilters.NewFilter(filterTemplatesByRegex(svc.blacklistTemplateRE))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
 		} else {
@@ -265,13 +265,7 @@ func (svc *service) reduceTemplates(tpls []resources.HostTemplate) []resources.H
 	return tpls
 }
 
-func filterWhitelistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
-	return func(tpl resources.HostTemplate) bool {
-		return re.Match([]byte(tpl.Name))
-	}
-}
-
-func filterBlacklistedTemplates(re *regexp.Regexp) templatefilters.Predicate { // nolint
+func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
 	return func(tpl resources.HostTemplate) bool {
 		return re.Match([]byte(tpl.Name))
 	}
@@ -498,10 +492,10 @@ func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 func (svc *service) reduceImages(imgs []resources.Image) []resources.Image {
 	var finalFilter *imagefilters.Filter
 	if svc.whitelistImageRE != nil {
-		finalFilter = imagefilters.NewFilter(filterWhitelistedImages(svc.whitelistImageRE))
+		finalFilter = imagefilters.NewFilter(filterImagesByRegex(svc.whitelistImageRE))
 	}
 	if svc.blacklistImageRE != nil {
-		blackFilter := imagefilters.NewFilter(filterWhitelistedImages(svc.blacklistImageRE))
+		blackFilter := imagefilters.NewFilter(filterImagesByRegex(svc.blacklistImageRE))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
 		} else {
@@ -515,13 +509,7 @@ func (svc *service) reduceImages(imgs []resources.Image) []resources.Image {
 	return imgs
 }
 
-func filterWhitelistedImages(re *regexp.Regexp) imagefilters.Predicate {
-	return func(img resources.Image) bool {
-		return re.Match([]byte(img.Name))
-	}
-}
-
-func filterBlacklistedImages(re *regexp.Regexp) imagefilters.Predicate { // nolint
+func filterImagesByRegex(re *regexp.Regexp) imagefilters.Predicate {
 	return func(img resources.Image) bool {
 		return re.Match([]byte(img.Name))
 	}

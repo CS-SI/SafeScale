@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -110,7 +110,8 @@ func (s *Session) Disconnect() {
 	}
 }
 
-// DecorateError changes the error to something more comprehensible
+// DecorateError changes the error to something more comprehensible when
+// timeout occurred
 func DecorateError(err error, action string, maySucceed bool) error {
 	if IsTimeoutError(err) {
 		msg := "%s took too long (> %v) to respond"
@@ -119,17 +120,16 @@ func DecorateError(err error, action string, maySucceed bool) error {
 		}
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
 	}
+	msg := err.Error()
+	if strings.Contains(msg, "desc = ") {
+		pos := strings.Index(msg, "desc = ") + 7
+		msg = msg[pos:]
 
-	// msg := err.Error()
-	// if strings.Contains(msg, "desc = ") {
-	// 	pos := strings.Index(msg, "desc = ") + 7
-	// 	msg = msg[pos:]
-
-	// 	if strings.Index(msg, " :") == 0 {
-	// 		msg = msg[2:]
-	// 	}
-	// 	return fmt.Errorf(msg)
-	// }
+		if strings.Index(msg, " :") == 0 {
+			msg = msg[2:]
+		}
+		return fmt.Errorf(msg)
+	}
 	return err
 }
 

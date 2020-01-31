@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ package userdata
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/system"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -29,11 +28,11 @@ import (
 	"text/template"
 
 	"github.com/sirupsen/logrus"
-
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
@@ -216,7 +215,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 				problems = problems || (err != nil)
 
 				if !problems {
-					provider = suffixCandidate
+					provider = fmt.Sprintf(".%s", suffixCandidate)
 				}
 			}
 

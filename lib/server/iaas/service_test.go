@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	//"github.com/CS-SI/SafeScale/lib/server/iaas/providers/aws"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"
@@ -49,7 +48,6 @@ func TestGetService(t *testing.T) {
 	//	provider.Register("aws", &aws.Client{})
 	iaas.Register("ovh", ovh.New())
 	iaas.Register("cloudferro", cloudferro.New())
-	iaas.Register("cloudwatt", cloudwatt.New())
 	iaas.Register("flexibleEngine", flexibleengine.New())
 	iaas.Register("opentelekom", opentelekom.New())
 	ovhService, err := iaas.UseService("TestOvh")
@@ -64,10 +62,6 @@ func TestGetService(t *testing.T) {
 	require.Nil(t, err)
 	// _, err := iaas.UseService("TestAws")
 	// require.Nil(t, err)
-	_, err = iaas.UseService("TestCloudwatt")
-	if err != nil {
-		t.Skip(err)
-	}
 	require.Nil(t, err)
 	_, err = iaas.UseService("TestFlexibleEngine")
 	if err != nil {
@@ -82,14 +76,11 @@ func TestGetService(t *testing.T) {
 	imgs, err := ovhService.ListImages(true)
 	require.Nil(t, err)
 	require.True(t, len(imgs) > 3)
-	//_, err = providers.GetService("TestCloudwatt")
-	//require.Nil(t, err)
 }
 func TestGetServiceErr(t *testing.T) {
 	createTenantFile()
 	defer deleteTenantFile()
 	iaas.Register("ovh", ovh.New())
-	iaas.Register("cloudwatt", cloudwatt.New())
 	_, err := iaas.UseService("TestOhvehache")
 	if err != nil {
 		t.Skip(err)

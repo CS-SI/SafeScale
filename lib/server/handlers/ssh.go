@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -169,7 +169,7 @@ func (handler *SSHHandler) WaitServerReady(hostParam interface{}, timeout time.D
 
 	// select {
 	// case <-ctx.Done():
-	// 	return retry.AbortedError("operation aborted by user", nil)
+	// 	return retry.StopRetryError("operation aborted by user", nil)
 	// case withErr := <-echan:
 	// 	return withErr
 	// }
@@ -210,7 +210,7 @@ func (handler *SSHHandler) Run(hostName, cmd string) (retCode int, stdOut string
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			if handler.job.Aborted() {
-				return retry.AbortedError("operation aborted by user", nil)
+				return retry.StopRetryError("operation aborted by user", nil)
 			}
 			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
 			return err
