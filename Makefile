@@ -46,10 +46,10 @@ NEWDEVDEPSLIST := $(STRINGER) $(GOLANGCI) $(MOCKGEN) $(LINTER) $(CONVEY) $(ERRCH
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps generate sdk lib cli err vet
+all: begin ground getdevdeps sdk generate lib cli err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
-common: begin ground getdevdeps generate sdk
+common: begin ground getdevdeps sdk generate
 
 versioncut:
 	@(($(GO) version | grep go1.12) || ($(GO) version | grep go1.13) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
@@ -108,7 +108,7 @@ getdevdeps: begin ground
 ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	
-sdk:
+sdk: getdevdeps
 	@(cd lib && $(MAKE) $(@))
 
 lib: common
@@ -155,7 +155,7 @@ depclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) mod download)
 
-generate: begin # Run generation
+generate: sdk
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@rm -f ./generation_results.log || true
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
