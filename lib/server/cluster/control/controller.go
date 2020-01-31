@@ -498,8 +498,8 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 		}
 		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
+			lastError = err
 			if _, ok := err.(retry.ErrTimeout); ok {
-				lastError = err
 				continue
 			}
 			return "", err
@@ -526,6 +526,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 	hostID := ""
 	found := false
 	clientHost := client.New().Host
+	var lastError error
 	list := c.ListNodeIDs(task)
 	for _, hostID = range list {
 		sshCfg, err := clientHost.SSHConfig(hostID)
@@ -535,6 +536,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 		}
 		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
+			lastError = err
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
@@ -544,7 +546,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 		break
 	}
 	if !found {
-		return "", fmt.Errorf("failed to find available node")
+		return "", scerr.NotAvailableError(fmt.Sprintf("failed to find available node: %v", lastError))
 	}
 	return hostID, nil
 }
