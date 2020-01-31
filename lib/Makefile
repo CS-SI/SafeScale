@@ -47,7 +47,7 @@ lib/utils:
 
 sdk:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building using $(GOINCLUDEPATH)/pkg/mod, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@ln -s $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf@v1.3.2 $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf &> /dev/null || true
+	@ln -f -s $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf@v1.3.2 $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf 2> /dev/null || true
 	@protoc -I. -I$(GOINCLUDEPATH)/pkg/mod --go_out=plugins=grpc:. safescale.proto
 
 has_python:
