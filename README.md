@@ -40,7 +40,6 @@ SafeScale Infra provides a complete abstraction overlay over underlying IaaS API
 ### SafeScale Platform
 
 The concept of SafeScale Platform revolves around the offer of an API to create on-demand computing platforms. These platforms are built to be highly versatile providing all necessary building blocks to create a cutting-edge, production grade, scalable and highly available services: Micro service orchestration, Big Data and HPC computing frameworks, large scale data management, AI training and inference frameworks.
-![SafeScale Platform](doc/img/SafeScale_Perform.png "SafeScale Platform")
 
 The innovative aspects of the platforms lies in their capacity to offer a combined usage of a large variety of frameworks and technologies without having to manage resources allocation (Node, RAM, CPU, and GPU), and allows the combined usage of various computing and service management frameworks which greatly simplifies the porting of in-house applications to the Cloud.
 It is also important to precise that platforms are not static, they can be scaled up and down on-demand or automatically to adapt to load fluctuations and thus to optimize IT costs.
