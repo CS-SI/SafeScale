@@ -4,7 +4,7 @@
 # Create working directory
 # ----------------------
 echo "Create working directory"
-WRKDIR=${GOPATH=/go}/src/github.com/CS-SI
+WRKDIR=/opt
 mkdir -p ${WRKDIR}
 cd ${WRKDIR}
 rm -rf SafeScale
@@ -24,7 +24,13 @@ cd SafeScale
 # ----------------------
 # Compile
 # ----------------------
-echo "Compile"
+echo "Get dev deps"
+make getdevdeps
+
+echo "Ensure"
+make ensure
+
+echo "All"
 make all
 
 echo "Install"
