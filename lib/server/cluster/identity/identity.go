@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // Identity contains the bare minimum information about a cluster
@@ -40,18 +40,21 @@ func NewIdentity() *Identity {
 	return &Identity{}
 }
 
-// Content ... (serialize.Property interface)
-func (i *Identity) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (i *Identity) Content() data.Clonable {
 	return i
 }
 
-// Clone ... (serialize.Property interface)
-func (i *Identity) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (i *Identity) Clone() data.Clonable {
 	return NewIdentity().Replace(i)
 }
 
-// Replace ... (serialize.Property interface)
-func (i *Identity) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (i *Identity) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Identity)
 	*i = *src
 	i.Keypair = &resources.KeyPair{}
@@ -59,6 +62,7 @@ func (i *Identity) Replace(p serialize.Property) serialize.Property {
 	return i
 }
 
+// OK ...
 func (i *Identity) OK() bool {
 	if i == nil {
 		return false

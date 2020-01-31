@@ -144,10 +144,6 @@ func main() {
 	app.Commands = append(app.Commands, commands.BucketCmd)
 	sort.Sort(cli.CommandsByName(commands.BucketCmd.Subcommands))
 
-	//VPL: data disabled, not ready
-	// app.Commands = append(app.Commands, commands.DataCmd)
-	// sort.Sort(cli.CommandsByName(commands.DataCmd.Subcommands))
-
 	app.Commands = append(app.Commands, commands.ShareCmd)
 	sort.Sort(cli.CommandsByName(commands.ShareCmd.Subcommands))
 
@@ -159,9 +155,6 @@ func main() {
 
 	app.Commands = append(app.Commands, commands.ClusterCommand)
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
-
-	// app.Commands = append(app.Commands, commands.PerformCommand)
-	// sort.Sort(cli.CommandsByName(commands.PerformCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 

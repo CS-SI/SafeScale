@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ func (handler *VolumeHandler) List(all bool) (volumes []resources.Volume, err er
 		}
 		err = mv.Browse(func(volume *resources.Volume) error {
 			if handler.job.Aborted() {
-				return retry.AbortedError("aborted", nil)
+				return retry.StopRetryError("aborted", nil)
 			}
 			volumes = append(volumes, *volume)
 			return nil

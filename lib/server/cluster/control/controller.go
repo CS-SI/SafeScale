@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -139,14 +139,11 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
+	if task == nil {
+		task = concurrency.RootTask()
+	}
 	if f == nil {
 		return scerr.InvalidParameterError("f", "cannot be nil")
-	}
-	if task == nil {
-		task, err = concurrency.NewTask()
-		if err != nil {
-			return err
-		}
 	}
 
 	tracer := concurrency.NewTracer(task, "", true).GoingIn()
@@ -164,8 +161,8 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 	}
 
 	// VPL: For now, always disable addition of feature proxycache-client
-	err = c.Properties.LockForWrite(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		v.(*clusterpropsv1.Features).Disabled["proxycache"] = struct{}{}
+	err = c.Properties.LockForWrite(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		clonable.(*clusterpropsv1.Features).Disabled["proxycache"] = struct{}{}
 		return nil
 	})
 	if err != nil {
@@ -603,8 +600,8 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (_ *clusterprops
 
 		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
+			lastError = err
 			if _, ok := err.(*retry.ErrTimeout); ok {
-				lastError = err
 				continue
 			}
 			return nil, err
@@ -637,7 +634,10 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2
 	}
 
 	found := false
-	var node *clusterpropsv2.Node
+	var (
+		node      *clusterpropsv2.Node
+		lastError error
+	)
 	for _, node = range list {
 		sshCfg, err := clientHost.SSHConfig(node.ID)
 		if err != nil {
@@ -647,6 +647,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2
 
 		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
+			lastError = err
 			if _, ok := err.(*retry.ErrTimeout); ok {
 				continue
 			}
@@ -656,7 +657,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (_ *clusterpropsv2
 		break
 	}
 	if !found {
-		return nil, fmt.Errorf("failed to find available node")
+		return nil, fmt.Errorf("failed to find available node: %v", lastError)
 	}
 	return node, nil
 }

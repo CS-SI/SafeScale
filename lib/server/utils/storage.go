@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sethvargo/go-password/password"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 //
@@ -105,7 +105,7 @@ func loadRsaPrivateKey(keyFilePath string) (*rsa.PrivateKey, error) {
 func Hash(reader io.Reader) string {
 	h := sha256.New()
 	if _, err := io.Copy(h, reader); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -423,21 +424,25 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	var host *resources.Host
 	switch hostParam := hostParam.(type) {
 	case string:
-		host := resources.NewHost()
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+		}
+		host = resources.NewHost()
 		host.ID = hostParam
 	case *resources.Host:
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
 		host = hostParam
-	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 	hostRef := host.Name
 	if hostRef == "" {
@@ -608,8 +613,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 	}
 
 	// Updates Host Property propsv1.HostDescription
-	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
-		hpDescriptionV1 := v.(*propsv1.HostDescription)
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
+		hpDescriptionV1 := clonable.(*propsv1.HostDescription)
 		hpDescriptionV1.Created = server.Created
 		hpDescriptionV1.Updated = server.Updated
 		return nil
@@ -619,8 +624,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 	}
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hpSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hpSizingV1 := clonable.(*propsv1.HostSizing)
 		if hpSizingV1.AllocatedSize == nil {
 			hpSizingV1.AllocatedSize = s.toHostSize(server.Flavor)
 		}
@@ -631,17 +636,15 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 	}
 
 	// Updates Host Property propsv1.HostNetwork
-	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		var errors []error
-
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4
 		}
 		if hostNetworkV1.PublicIPv6 == "" {
 			hostNetworkV1.PublicIPv6 = ipv6
 		}
-		// networks contains network names, but HostProperty.NetworkV1.IPxAddresses has to be
+		// networks contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
 		// indexed on network ID. Tries to convert if possible, if we already have correspondance
 		// between network ID and network Name in Host definition
 		if len(hostNetworkV1.NetworksByID) > 0 {
@@ -881,8 +884,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		hostNetworkV1.DefaultNetworkID = defaultNetworkID
 		hostNetworkV1.DefaultGatewayID = defaultGatewayID
 		hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
@@ -894,8 +897,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	// Adds Host property SizingV1
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		hostSizingV1.Template = request.TemplateID
 		hostSizingV1.AllocatedSize = converters.ModelHostTemplateToPropertyHostSize(template)
@@ -1008,8 +1011,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			return nil, userData, scerr.Wrap(err, msg)
 		}
 
-		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-			hostNetworkV1 := v.(*propsv1.HostNetwork)
+		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 			if ipversion.IPv4.Is(ip.IP) {
 				hostNetworkV1.PublicIPv4 = ip.IP
 			} else if ipversion.IPv6.Is(ip.IP) {
@@ -1131,7 +1134,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 		return hoststate.ERROR, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {

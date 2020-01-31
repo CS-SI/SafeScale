@@ -7,7 +7,7 @@ all: generate
 vet:
 	@$(GO) vet ./...
 
-generate: clean
+generate:
 	@(cd enums && $(MAKE) $(@))
 	@$(GO) generate -run rice
 

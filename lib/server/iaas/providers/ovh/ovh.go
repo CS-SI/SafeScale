@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,31 @@ type gpuCfg struct {
 	GPUNumber int
 	GPUType   string
 }
+
+var gpuMap = map[string]gpuCfg{
+	"g2-15": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1070",
+	},
+	"g2-30": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1070",
+	},
+	"g3-120": gpuCfg{
+		GPUNumber: 3,
+		GPUType:   "NVIDIA 1080 TI",
+	},
+	"g3-30": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1080 TI",
+	},
+}
+
+var (
+	identityEndpoint = "https://auth.cloud.ovh.net/v2.0"
+	externalNetwork  = "Ext-Net"
+	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
+)
 
 // OVH api credentials
 var (
@@ -98,7 +123,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	}
 
 	authOptions := stacks.AuthenticationOptions{
-		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
+		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
 		Password:         openstackPassword,
 		TenantID:         applicationKey,
@@ -124,11 +149,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		ProviderNetwork:           "Ext-Net",
+		ProviderNetwork:           externalNetwork,
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
 		AutoHostNetworkInterfaces: false,
-		DNSList:                   []string{"213.186.33.99", "1.1.1.1"},
+		DNSList:                   dnsServers,
 		VolumeSpeeds: map[string]volumespeed.Enum{
 			"classic":    volumespeed.COLD,
 			"high-speed": volumespeed.HDD,

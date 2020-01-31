@@ -1,5 +1,5 @@
 /*
-* Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+* Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 			innerErr := m.Read(task, m.name)
 			if innerErr != nil {
 				if _, ok := innerErr.(*scerr.ErrNotFound); ok {
-					return retry.AbortedError("not found", innerErr)
+					return retry.StopRetryError("not found", innerErr)
 				}
 				return innerErr
 			}

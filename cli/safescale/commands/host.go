@@ -427,7 +427,7 @@ var hostAddFeatureCommand = cli.Command{
 
 		task, err := concurrency.NewTask()
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		feature, err := install.NewFeature(task, featureName)
 		if err != nil {
@@ -535,7 +535,7 @@ var hostCheckFeatureCommand = cli.Command{
 
 		task, err := concurrency.NewTask()
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		feature, err := install.NewFeature(task, featureName)
 		if err != nil {
@@ -613,7 +613,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 		task, err := concurrency.NewTask()
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {

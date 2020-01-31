@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@
 package resources
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"github.com/sirupsen/logrus"
 )
 
 // GatewayRequest to create a Gateway into a network
@@ -58,7 +60,7 @@ type Network struct {
 	CIDR               string                    `json:"mask,omitempty"`                 // network in CIDR notation
 	GatewayID          string                    `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
 	SecondaryGatewayID string                    `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
-	VIP                *VIP                      `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
+	VIP                *VirtualIP                `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
 	IPVersion          ipversion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
 	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
 	NetworkState       networkstate.Enum         `json:"status,omitempty"`
@@ -122,12 +124,46 @@ func (n *Network) Deserialize(buf []byte) (err error) {
 	return nil
 }
 
-// VIP is a structure containing information needed to manage VIP (virtual IP)
-type VIP struct {
+// VirtualIP is a structure containing information needed to manage VIP (virtual IP)
+type VirtualIP struct {
 	ID        string
 	Name      string
 	NetworkID string
 	PrivateIP string
 	PublicIP  string
-	Hosts     []*Host
+	Hosts     []string
+}
+
+// NewVirtualIP ...
+func NewVirtualIP() *VirtualIP {
+	return &VirtualIP{}
+}
+
+// Reset ...
+func (vip *VirtualIP) Reset() {
+	*vip = VirtualIP{}
+}
+
+// Content ...
+// satisfies interface data.Clonable
+func (vip *VirtualIP) Content() data.Clonable {
+	return vip
+}
+
+// Clone ...
+// satisfies interface data.Clonable
+func (vip *VirtualIP) Clone() data.Clonable {
+	return NewVirtualIP().Replace(vip)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
+	if p != nil {
+		src := p.(*VirtualIP)
+		*vip = *src
+		vip.Hosts = make([]string, len(src.Hosts))
+		copy(vip.Hosts, src.Hosts)
+	}
+	return vip
 }

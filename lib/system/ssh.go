@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -284,6 +284,21 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		return nil, err
 	}
 
+	/*
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			if cmdString != "" {
+				logrus.Debugf("[TRACE] %s", cmdString)
+			}
+			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
+			partials := strings.Split(f.Name(), "/")
+			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1]))
+			err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
+			if err != nil {
+				logrus.Warnf("[TRACE] Failure storing key in %s", dumpName)
+			}
+		}
+	*/
+
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -368,7 +383,7 @@ func (sc *SSHCommand) Output() ([]byte, error) {
 	content, err := sc.cmd.Output()
 	nerr := sc.cleanup()
 	if err != nil {
-		return content, err
+		return nil, err
 	}
 	if nerr != nil {
 		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
@@ -382,7 +397,7 @@ func (sc *SSHCommand) CombinedOutput() ([]byte, error) {
 	content, err := sc.cmd.CombinedOutput()
 	nerr := sc.cleanup()
 	if err != nil {
-		return content, err
+		return nil, err
 	}
 	if nerr != nil {
 		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
@@ -413,16 +428,16 @@ func (sc *SSHCommand) Display() string {
 // type *ExitError. Other error types may be returned for other situations.
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
-func (sc *SSHCommand) Run(t concurrency.Task, outputs outputs.Enum) (int, string, string, error) {
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outputs.String()), true).WithStopwatch().GoingIn()
+func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, string, error) {
+	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outs.String()), false).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	return sc.RunWithTimeout(t, outputs, 0)
+	return sc.RunWithTimeout(t, outs, 0)
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs outputs.Enum, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outputs.String(), timeout), true).WithStopwatch().GoingIn()
+func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, error) {
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outs.String(), timeout), false).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 	// Set up the outputs (std and err)
@@ -492,7 +507,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outputs outputs.Enum
 	_, err = subtask.StartWithTimeout(sc.taskExecute, data.Map{
 		"stdout":          stdoutPipe,
 		"stderr":          stderrPipe,
-		"collect_outputs": outputs != outputs.DISPLAY,
+		"collect_outputs": outs != outputs.DISPLAY,
 	}, timeout)
 	if err != nil {
 		return -1, "", "", err
@@ -600,8 +615,8 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 	if err == nil {
 		result["retcode"] = 0
 		if collectOutputs {
-			result["stdout"] = string(msgOut[:])
-			result["stderr"] = string(msgErr[:])
+			result["stdout"] = string(msgOut)
+			result["stderr"] = string(msgErr)
 		}
 	} else {
 		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
@@ -627,8 +642,8 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		}
 		result["retcode"] = retCode
 		if collectOutputs {
-			result["stdout"] = string(msgOut[:])
-			result["stderr"] = fmt.Sprint(string(msgErr[:]), msgError)
+			result["stdout"] = string(msgOut)
+			result["stderr"] = fmt.Sprint(string(msgErr), msgError)
 		} else {
 			result["stderr"] = msgError
 		}
@@ -734,7 +749,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString, username, shell string, withT
 	}
 
 	if cmd != "" {
-		sshCmdString = sshCmdString + " " + cmd + " " + shell
+		sshCmdString += " " + cmd + " " + shell
 	}
 
 	if cmdString != "" {
@@ -754,14 +769,14 @@ func (ssh *SSHConfig) SudoCommand(task concurrency.Task, cmdString string) (*SSH
 	return ssh.command(task, cmdString, false, true)
 }
 
-func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withSudo bool) (*SSHCommand, error) {
+func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, withSudo bool) (*SSHCommand, error) {
 	if ssh == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
-	ctx, err := task.GetContext()
+	ctx, _, err := task.GetContext()
 	if err != nil {
 		return nil, err
 	}
@@ -820,7 +835,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			if task.Aborted() {
-				return retry.AbortedError("operation aborted by user", nil)
+				return retry.StopRetryError("operation aborted by user", nil)
 			}
 
 			cmd, err := ssh.Command(task, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
@@ -845,8 +860,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 	if retryErr != nil {
 		return stdout, retryErr
 	}
-
-	logrus.Debugf("host [%s] phase [%s] creation successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
+	logrus.Debugf("host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", ssh.Host, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 

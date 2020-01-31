@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ package cluster
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
@@ -29,13 +27,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 // Load ...
@@ -81,16 +78,10 @@ func Load(task concurrency.Task, name string) (api.Cluster, error) {
 func setForeman(task concurrency.Task, controller *control.Controller) error {
 	f := controller.GetIdentity(task).Flavor
 	switch f {
-	case flavor.DCOS:
-		return controller.Restore(task, control.NewForeman(controller, dcos.Makers))
 	case flavor.BOH:
 		return controller.Restore(task, control.NewForeman(controller, boh.Makers))
-	// case Flavor.OHPC:
-	// 	controller.Restore(task, control.NewForeman(controller, ohpc.Makers))
 	case flavor.K8S:
 		return controller.Restore(task, control.NewForeman(controller, k8s.Makers))
-	case flavor.SWARM:
-		return controller.Restore(task, control.NewForeman(controller, swarm.Makers))
 	default:
 		return scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", f.String()))
 	}
@@ -110,7 +101,7 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 		return nil, scerr.InvalidParameterError("req.CIDR", "cannot be empty!")
 	}
 
-	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
+	logrus.Infof("Creating infrastructure for cluster '%s'", req.Name)
 
 	tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 	if err != nil {
@@ -132,23 +123,8 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 		if err != nil {
 			return nil, err
 		}
-	case flavor.DCOS:
-		err = controller.Create(task, req, control.NewForeman(controller, dcos.Makers))
-		if err != nil {
-			return nil, err
-		}
 	case flavor.K8S:
 		err = controller.Create(task, req, control.NewForeman(controller, k8s.Makers))
-		if err != nil {
-			return nil, err
-		}
-	// case Flavor.OHPC:
-	// 	err = control.Create(task, req, control.NewForema(controller, ohpc.Makers))
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	case flavor.SWARM:
-		err = controller.Create(task, req, control.NewForeman(controller, swarm.Makers))
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +132,7 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 		return nil, scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", req.Flavor.String()))
 	}
 
-	log.Infof("Cluster '%s' created and initialized successfully", req.Name)
+	logrus.Infof("Cluster '%s' created and initialized successfully", req.Name)
 	return controller, nil
 }
 

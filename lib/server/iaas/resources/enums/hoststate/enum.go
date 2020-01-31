@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package hoststate
 
 //go:generate stringer -type=Enum
 
-//Enum represents the state of an host
+// Enum represents the state of an host
 type Enum int
 
 const (
@@ -30,9 +30,8 @@ const (
 	STARTED
 	// STOPPING when host is stopping
 	STOPPING
-	// ERROR when host is in error state*/
+	// ERROR when host is in error state
 	ERROR
-
-	// Unknown
+	// UNKNOWN when host state is not determinable
 	UNKNOWN
 )

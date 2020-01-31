@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,9 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"regexp"
 
 	log "github.com/sirupsen/logrus"
-
 	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -31,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 var (
@@ -65,19 +64,19 @@ func GetTenants() ([]interface{}, error) {
 	return tenants, err
 }
 
-// UseStorages return the storageService build around storages referenced in tenantNames
-func UseStorages(tenantNames []string) (*StorageServices, error) {
-	storageServices := NewStorageService()
+// // UseStorages return the storageService build around storages referenced in tenantNames
+// func UseStorages(tenantNames []string) (*StorageServices, error) {
+// 	storageServices := NewStorageService()
 
-	for _, tenantName := range tenantNames {
-		err := storageServices.RegisterStorage(tenantName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register storage tenant %s : %s", tenantName, err.Error())
-		}
-	}
+// 	for _, tenantName := range tenantNames {
+// 		err := storageServices.RegisterStorage(tenantName)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to register storage tenant %s : %s", tenantName, err.Error())
+// 		}
+// 	}
 
-	return &storageServices, nil
-}
+// 	return &storageServices, nil
+// }
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
