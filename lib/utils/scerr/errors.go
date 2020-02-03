@@ -36,7 +36,7 @@ import (
 
 var removePart atomic.Value
 
-// FIXME Add json formatter
+// FIXME: Add json formatter
 
 // Error defines the interface of a SafeScale error
 type Error interface {

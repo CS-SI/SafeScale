@@ -352,6 +352,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 				continue
 			}
 			results[k] = result.(stepResult)
+			s.Close()
 
 			if !results[k].Successful() {
 				if is.Worker.action == action.Check { // Checks can fail and it's ok

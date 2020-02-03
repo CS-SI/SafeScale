@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
@@ -203,11 +204,11 @@ func upgradePropertyNodesIfNeeded(t concurrency.Task, c *control.Controller) err
 	if !properties.Lookup(property.NodesV2) {
 		// Replace NodesV1 by NodesV2 properties
 		return c.UpdateMetadata(t, func() error {
-			return properties.LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
-				nodesV2 := v.(*clusterpropsv2.Nodes)
+			return properties.LockForWrite(property.NodesV2).ThenUse(func(clonable data.Clonable) error {
+				nodesV2 := clonable.(*clusterpropsv2.Nodes)
 
-				return properties.LockForWrite(property.NodesV1).ThenUse(func(v interface{}) error {
-					nodesV1, ok := v.(*clusterpropsv1.Nodes)
+				return properties.LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
+					nodesV1, ok := clonable.(*clusterpropsv1.Nodes)
 					if !ok {
 						return fmt.Errorf("invalid metadata")
 					}

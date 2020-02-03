@@ -22,12 +22,9 @@ import (
 	"os/user"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
@@ -50,7 +47,7 @@ func Test_Command(t *testing.T) {
 		Port:       22,
 		PrivateKey: string(content),
 	}
-	cmd, err := sshConf.Command("whoami")
+	cmd, err := sshConf.Command(concurrency.RootTask(), "whoami")
 	assert.Nil(t, err)
 	out, err := cmd.Output() // FIXME Correct this test
 	if err != nil {
@@ -62,7 +59,7 @@ func Test_Command(t *testing.T) {
 
 	if !utils.IsEmpty(gateway) {
 		sshConf.GatewayConfig = &gateway
-		cmd, err := sshConf.Command("bash -c whoami")
+		cmd, err := sshConf.Command(concurrency.RootTask(), "bash -c whoami")
 		assert.Nil(t, err)
 		out, err := cmd.Output()
 		assert.Nil(t, err)
@@ -72,7 +69,7 @@ func Test_Command(t *testing.T) {
 	if !utils.IsEmpty(gateway) {
 		gw := gateway
 		sshConf.GatewayConfig.GatewayConfig = &gw
-		cmd, err := sshConf.Command("bash -c whoami")
+		cmd, err := sshConf.Command(concurrency.RootTask(), "bash -c whoami")
 		assert.Nil(t, err)
 		out, err := cmd.Output()
 		assert.Nil(t, err)

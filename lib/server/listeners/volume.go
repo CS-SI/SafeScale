@@ -140,7 +140,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := VolumeHandler(job)
-	vol, err := handler.Create(name, int(size), VolumeSpeed.Enum(speed))
+	vol, err := handler.Create(name, int(size), volumespeed.Enum(speed))
 	if err != nil {
 		return nil, err
 	}

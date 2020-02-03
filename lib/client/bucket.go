@@ -17,7 +17,7 @@
 package client
 
 import (
-	"fmt"
+	"strings"
 	"sync"
 	"time"
 

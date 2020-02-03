@@ -665,36 +665,36 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 	host.PrivateKey = "Impossible to fetch them from the domain, the private key is unknown by the domain"
 	host.LastState = stateConvert(state)
 
-	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
 		hostDescriptionV1, err := getDescriptionV1FromDomain(domain, s.LibvirtService)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("failed to get domain description : %s", err.Error()))
 		}
-		v.(*propsv1.HostDescription).Replace(hostDescriptionV1)
+		clonable.(*propsv1.HostDescription).Replace(hostDescriptionV1)
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to update hostproperty.DescriptionV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
 		hostSizingV1, err := getSizingV1FromDomain(domain, s.LibvirtService)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("failed to get domain sizing : %s", err.Error()))
 		}
-		v.(*propsv1.HostSizing).Replace(hostSizingV1)
+		clonable.(*propsv1.HostSizing).Replace(hostSizingV1)
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
 		hostNetworkV1, err := s.getNetworkV1FromDomain(domain)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("failed to get domain network : %s", err.Error()))
 		}
-		v.(*propsv1.HostNetwork).Replace(hostNetworkV1)
+		clonable.(*propsv1.HostNetwork).Replace(hostNetworkV1)
 		return nil
 	})
 	if err != nil {
@@ -742,16 +742,16 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 	}
 	host.LastState = newHost.LastState
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
 		newHostNetworkV1 := propsv1.NewHostNetwork()
-		readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-			newHostNetworkV1 = v.(*propsv1.HostNetwork)
+		readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			newHostNetworkV1 = clonable.(*propsv1.HostNetwork)
 			return nil
 		})
 		if readlockErr != nil {
 			return readlockErr
 		}
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
 		hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
 		hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
@@ -762,16 +762,16 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 		return fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
 		newHostSizingV1 := propsv1.NewHostSizing()
-		readLockErr := newHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-			newHostSizingV1 = v.(*propsv1.HostSizing)
+		readLockErr := newHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			newHostSizingV1 = clonable.(*propsv1.HostSizing)
 			return nil
 		})
 		if readLockErr != nil {
 			return readLockErr
 		}
-		hostSizingV1 := v.(*propsv1.HostSizing)
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 		hostSizingV1.AllocatedSize.Cores = newHostSizingV1.AllocatedSize.Cores
 		hostSizingV1.AllocatedSize.RAMSize = newHostSizingV1.AllocatedSize.RAMSize
 		hostSizingV1.AllocatedSize.DiskSize = newHostSizingV1.AllocatedSize.DiskSize
@@ -1023,8 +1023,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = keyPair.PrivateKey
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 
 		if bridgedVMs {
 			var vmInfo VMInfo
@@ -1054,8 +1054,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 
 		hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
 		hostSizingV1.RequestedSize.Cores = template.Cores

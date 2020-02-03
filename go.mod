@@ -10,8 +10,9 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
-	github.com/aws/aws-sdk-go v1.28.2 // indirect
+	github.com/aws/aws-sdk-go v1.28.2
 	github.com/bxcodec/faker/v3 v3.2.0
+	github.com/coreos/etcd v3.3.10+incompatible
 	github.com/coreos/go-oidc v2.0.0+incompatible
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/daaku/go.zipexe v1.0.1 // indirect
@@ -54,6 +55,7 @@ require (
 	github.com/lib/pq v1.3.0 // indirect
 	github.com/libvirt/libvirt-go v4.8.0+incompatible
 	github.com/libvirt/libvirt-go-xml v4.8.0+incompatible
+	github.com/magiconair/properties v1.8.1
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
@@ -87,6 +89,7 @@ require (
 	golang.org/x/sys v0.0.0-20200124204421-9fbb57f87de9
 	gomodules.xyz/stow v0.2.4 // indirect
 	google.golang.org/api v0.15.0
+	google.golang.org/appengine v1.6.5
 	google.golang.org/grpc v1.26.0
 	gopkg.in/ini.v1 v1.51.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.4.1 // indirect

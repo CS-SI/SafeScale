@@ -31,7 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
-	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
+
+	// templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 )

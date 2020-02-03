@@ -41,6 +41,8 @@ const (
 	DefaultsV2 = "9"
 	// NetworkV2 contains optional additional info about network of the cluster (vip)
 	NetworkV2 = "10"
+	// ControlPlaneV1 contains optional additional info about Control Plane of the cluster
+	ControlPlaneV1 = "11"
 	// NodesV2 contains optional additional info describing Nodes inside the cluster
-	NodesV2 = "11"
+	NodesV2 = "12"
 )

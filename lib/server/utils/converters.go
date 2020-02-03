@@ -340,7 +340,7 @@ func ToPBVirtualIP(src resources.VirtualIP) pb.VirtualIp {
 	}
 	dest.Hosts = make([]string, len(src.Hosts))
 	for _, h := range src.Hosts {
-		dest.Hosts = append(dest.Hosts, h.ID)
+		dest.Hosts = append(dest.Hosts, h)
 	}
 	return dest
 }

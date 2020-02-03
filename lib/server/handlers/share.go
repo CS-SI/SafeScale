@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -116,8 +117,8 @@ func (handler *ShareHandler) Create(
 	}
 
 	// Check if the path to share isn't a remote mount or contains a remote mount
-	err = server.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
-		serverMountsV1 := v.(*propsv1.HostMounts)
+	err = server.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
+		serverMountsV1 := clonable.(*propsv1.HostMounts)
 		if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
 			return fmt.Errorf("path to export '%s' is a mounted share", sharePath)
 		}
@@ -144,8 +145,8 @@ func (handler *ShareHandler) Create(
 		return nil, err
 	}
 
-	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		serverSharesV1 := v.(*propsv1.HostShares)
+	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		serverSharesV1 := clonable.(*propsv1.HostShares)
 		if len(serverSharesV1.ByID) == 0 {
 			// Host doesn't have shares yet, so install NFS
 			err = nfsServer.Install(handler.job.Task())
@@ -173,8 +174,8 @@ func (handler *ShareHandler) Create(
 	}()
 
 	// Updates Host Property propsv1.HostShares
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		serverSharesV1 := v.(*propsv1.HostShares)
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		serverSharesV1 := clonable.(*propsv1.HostShares)
 
 		share = propsv1.NewHostShare()
 		share.Name = shareName
@@ -207,8 +208,8 @@ func (handler *ShareHandler) Create(
 
 	defer func() {
 		if err != nil {
-			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-				serverSharesV1 := v.(*propsv1.HostShares)
+			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+				serverSharesV1 := clonable.(*propsv1.HostShares)
 				delete(serverSharesV1.ByID, newShare.ID)
 				delete(serverSharesV1.ByName, newShare.Name)
 				return nil
@@ -278,8 +279,8 @@ func (handler *ShareHandler) Delete(name string) (err error) {
 		return fmt.Errorf("delete share: unable to found share of host '%s'", name)
 	}
 
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		serverSharesV1 := v.(*propsv1.HostShares)
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		serverSharesV1 := clonable.(*propsv1.HostShares)
 		if len(share.ClientsByName) > 0 {
 			var list []string
 			for k := range share.ClientsByName {
@@ -379,8 +380,8 @@ func (handler *ShareHandler) List() (props map[string]map[string]*propsv1.HostSh
 			return nil, err
 		}
 
-		err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-			hostSharesV1 := v.(*propsv1.HostShares)
+		err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+			hostSharesV1 := clonable.(*propsv1.HostShares)
 			shares[serverID] = hostSharesV1.ByID
 			return nil
 		})
@@ -445,8 +446,8 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 
 	// Check if share is already mounted
 	// Check if there is already volume mounted in the path (or in subpath)
-	err = target.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
-		targetMountsV1 := v.(*propsv1.HostMounts)
+	err = target.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
+		targetMountsV1 := clonable.(*propsv1.HostMounts)
 		if s, ok := targetMountsV1.RemoteMountsByShareID[share.ID]; ok {
 			return fmt.Errorf("already mounted in '%s:%s'", target.Name, targetMountsV1.RemoteMountsByPath[s].Path)
 		}
@@ -470,8 +471,8 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 	}
 
 	export := ""
-	err = target.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		if v.(*propsv1.HostNetwork).DefaultGatewayPrivateIP == server.GetPrivateIP() {
+	err = target.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		if clonable.(*propsv1.HostNetwork).DefaultGatewayPrivateIP == server.GetPrivateIP() {
 			export = server.GetPrivateIP() + ":" + share.Path
 		} else {
 			export = server.GetAccessIP() + ":" + share.Path
@@ -489,8 +490,8 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 	}
 
 	// Mount the share on host
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		serverSharesV1 := v.(*propsv1.HostShares)
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		serverSharesV1 := clonable.(*propsv1.HostShares)
 		_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
 		if !found {
 			return fmt.Errorf("failed to find metadata about share '%s'", shareName)
@@ -547,8 +548,8 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 		}
 	}()
 
-	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
-		targetMountsV1 := v.(*propsv1.HostMounts)
+	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
+		targetMountsV1 := clonable.(*propsv1.HostMounts)
 		// Make sure the HostMounts is correctly init if there are no mount yet
 		if !target.Properties.Lookup(hostproperty.MountsV1) {
 			targetMountsV1.Reset()
@@ -573,8 +574,8 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 	}
 	defer func() {
 		if err != nil {
-			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-				serverSharesV1 := v.(*propsv1.HostShares)
+			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+				serverSharesV1 := clonable.(*propsv1.HostShares)
 				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByName, target.Name)
 				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByID, target.ID)
 				return nil
@@ -601,8 +602,8 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 	newMount := mount
 	defer func() {
 		if err != nil {
-			err2 := target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
-				targetMountsV1 := v.(*propsv1.HostMounts)
+			err2 := target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
+				targetMountsV1 := clonable.(*propsv1.HostMounts)
 				delete(targetMountsV1.RemoteMountsByShareID, newMount.ShareID)
 				delete(targetMountsV1.RemoteMountsByPath, newMount.Path)
 				delete(targetMountsV1.RemoteMountsByExport, newMount.Export)
@@ -654,8 +655,8 @@ func (handler *ShareHandler) Unmount(shareName, hostName string) (err error) {
 	}
 
 	var shareID string
-	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		serverSharesV1 := v.(*propsv1.HostShares)
+	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		serverSharesV1 := clonable.(*propsv1.HostShares)
 		var found bool
 		shareID, found = serverSharesV1.ByName[shareName]
 		if !found {
@@ -681,8 +682,8 @@ func (handler *ShareHandler) Unmount(shareName, hostName string) (err error) {
 	}
 
 	var mountPath string
-	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
-		targetMountsV1 := v.(*propsv1.HostMounts)
+	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
+		targetMountsV1 := clonable.(*propsv1.HostMounts)
 		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
 		if !found {
 			return fmt.Errorf("not mounted on host '%s'", target.Name)
@@ -714,8 +715,8 @@ func (handler *ShareHandler) Unmount(shareName, hostName string) (err error) {
 	}
 
 	// Remove host from client lists of the share
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		serverSharesV1 := v.(*propsv1.HostShares)
+	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		serverSharesV1 := clonable.(*propsv1.HostShares)
 		delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
 		delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
 		return nil
@@ -808,8 +809,8 @@ func (handler *ShareHandler) Inspect(shareName string) (host *resources.Host, sh
 	var (
 		shareID string
 	)
-	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(v interface{}) error {
-		serverSharesV1 := v.(*propsv1.HostShares)
+	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
+		serverSharesV1 := clonable.(*propsv1.HostShares)
 		var found bool
 		shareID, found = serverSharesV1.ByName[shareName]
 		if !found {
@@ -837,8 +838,8 @@ func (handler *ShareHandler) Inspect(shareName string) (host *resources.Host, sh
 			continue
 		}
 
-		err = client.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(v interface{}) error {
-			clientMountsV1 := v.(*propsv1.HostMounts)
+		err = client.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
+			clientMountsV1 := clonable.(*propsv1.HostMounts)
 			mountPath, ok := clientMountsV1.RemoteMountsByShareID[shareID]
 			if ok {
 				mount := clientMountsV1.RemoteMountsByPath[mountPath]

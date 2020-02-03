@@ -3,14 +3,16 @@ include ../common.mk
 .PHONY:	sdk client server utils system clean vet
 
 # Handling multiple gopath: use $(HOME)/go by default
-ifeq ($(findstring :,$(GOPATH)),:)
-GOINCLUDEPATH=$(HOME)/go
-else
-GOINCLUDEPATH=$(GOPATH)
-endif
+#ifeq ($(findstring :,$(GOPATH)),:)
+#GOINCLUDEPATH=$(HOME)/go
+#else
+#GOINCLUDEPATH=$(GOPATH)
+#endif
 
 ifeq ($(strip $(GOPATH)),)
 GOINCLUDEPATH=$(HOME)/go
+else
+GOINCLUDEPATH=$(word 1,$(subst :, ,$(GOPATH)))
 endif
 
 ifneq ($(OS),Windows_NT)
@@ -47,7 +49,7 @@ lib/utils:
 
 sdk:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building using $(GOINCLUDEPATH)/pkg/mod, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@ln -s $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf@v1.3.2 $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf &> /dev/null || true
+	@ln -sf $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf@v1.3.2 $(GOINCLUDEPATH)/pkg/mod/github.com/golang/protobuf &> /dev/null || true
 	@protoc -I. -I$(GOINCLUDEPATH)/pkg/mod --go_out=plugins=grpc:. safescale.proto
 
 has_python:
