@@ -55,13 +55,15 @@ endif
 
 # Handling multiple gopath: use $(HOME)/go by default
 ifeq ($(findstring :,$(GOPATH)),:)
-GOINCLUDEPATH=$(HOME)/go
+ifeq (, $(GOMODPATH))
+$(error "Having a GOPATH with several directories is not recommended, when you have such a GOPATH: [$(GOPATH)], you must specify where your go modules are installed; by default the build looks for modules in 'GOMODPATH/pkg/mod' directory, so you must export the GOMODPATH variable before running the build")
+endif
 else
-GOINCLUDEPATH=$(GOPATH)
+GOMODPATH?=$(GOPATH)
 endif
 
 ifeq ($(strip $(GOPATH)),)
-GOINCLUDEPATH=$(HOME)/go
+GOMODPATH?=$(HOME)/go
 endif
 
 ifneq ($(OS),Windows_NT)
