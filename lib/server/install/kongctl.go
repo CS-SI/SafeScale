@@ -305,7 +305,7 @@ func (k *KongController) createUpstream(name string, options data.Map, v *data.M
 	return nil
 }
 
-func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *Variables) error {
+func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *data.Map) error {
 	if sourceControl == nil {
 		return nil
 	}
@@ -386,7 +386,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 }
 
 // post creates a rule
-func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) post(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
@@ -414,7 +414,7 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 }
 
 // put updates or creates a rule
-func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) put(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
@@ -442,7 +442,7 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 }
 
 // patch updates an existing rule
-func (k *KongController) patch(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) patch(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err

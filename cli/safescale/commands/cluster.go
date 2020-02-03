@@ -1142,7 +1142,7 @@ var clusterAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
-		values := install.Variables{}
+		values := data.Map{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")
@@ -1209,7 +1209,7 @@ var clusterCheckFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
-		values := install.Variables{}
+		values := data.Map{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")

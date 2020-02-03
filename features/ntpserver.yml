@@ -85,7 +85,7 @@ feature:
                             sfService start dbus
                             # then firewalld  itself
                             sfService restart firewalld
-                            sfFirewallAdd --zone=public --add-port=123/udp --permanent
+                            #sfFirewallAdd --zone=trusted --add-port=123/udp --permanent
                             sfFirewallReload || sfFail 194 "Firewall problem"
 
                     ready:

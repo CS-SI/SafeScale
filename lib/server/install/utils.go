@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -339,7 +340,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 }
 
 // realizeVariables replaces in every variable any template
-func realizeVariables(variables Variables) (Variables, error) {
+func realizeVariables(variables data.Map) (data.Map, error) {
 	cloneV := variables.Clone()
 
 	for k, v := range cloneV {
@@ -360,7 +361,7 @@ func realizeVariables(variables Variables) (Variables, error) {
 	return cloneV, nil
 }
 
-func replaceVariablesInString(text string, v Variables) (string, error) {
+func replaceVariablesInString(text string, v data.Map) (string, error) {
 	tmpl, err := template.New("text").Parse(text)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse: %s", err.Error())
@@ -402,7 +403,7 @@ func determineContext(t Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarg
 }
 
 // Check if required parameters defined in specification file have been set in 'v'
-func checkParameters(f *Feature, v Variables) error {
+func checkParameters(f *Feature, v data.Map) error {
 	if f.specs.IsSet("feature.parameters") {
 		params := f.specs.GetStringSlice("feature.parameters")
 		for _, k := range params {
