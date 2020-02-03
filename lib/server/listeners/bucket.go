@@ -22,6 +22,7 @@ import (
 
 	"github.com/asaskevich/govalidator"
 
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
@@ -43,7 +44,7 @@ import (
 type BucketListener struct{}
 
 // List available buckets
-func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (bl *pb.BucketList, err error) {
+func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *pb.BucketList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list buckets").ToGRPCStatus()
@@ -74,7 +75,7 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (b
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := BucketHandler(job)
+	handler := handlers.NewBucketHandler(job)
 	buckets, err := handler.List()
 	if err != nil {
 		return nil, err
@@ -120,7 +121,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := BucketHandler(job)
+	handler := handlers.NewBucketHandler(job)
 	err = handler.Create(bucketName)
 	if err != nil {
 		return empty, err
@@ -166,7 +167,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := BucketHandler(job)
+	handler := handlers.NewBucketHandler(job)
 	err = handler.Delete(bucketName)
 	if err != nil {
 		return empty, err
@@ -211,7 +212,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := BucketHandler(job)
+	handler := handlers.NewBucketHandler(job)
 	resp, err := handler.Inspect(bucketName)
 	if err != nil {
 		return nil, err
@@ -261,7 +262,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := BucketHandler(job)
+	handler := handlers.NewBucketHandler(job)
 	err = handler.Mount(bucketName, hostName, in.GetPath())
 	if err != nil {
 		return empty, err
@@ -307,7 +308,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := BucketHandler(job)
+	handler := handlers.NewBucketHandler(job)
 	err = handler.Unmount(bucketName, hostName)
 	if err != nil {
 		return empty, err

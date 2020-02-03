@@ -23,6 +23,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -107,14 +108,14 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		gwName = in.GetGateway().GetName()
 	}
 
-	handler := NetworkHandler(job)
+	handler := handlers.NewNetworkHandler(job)
 	r, err := job.Task().Run(
 		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
 			tracer.Trace("calling handler.Create()...")
 			return handler.Create(
 				networkName,
 				in.GetCidr(),
-				IPVersion.IPv4,
+				ipversion.IPv4,
 				*sizing,
 				gwImageID,
 				gwName,
@@ -167,7 +168,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := NetworkHandler(job)
+	handler := handlers.NewNetworkHandler(job)
 	networks, err := handler.List(in.GetAll())
 	if err != nil {
 		return nil, err
@@ -222,7 +223,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := NetworkHandler(job)
+	handler := handlers.NewNetworkHandler(job)
 	network, err := handler.Inspect(ref)
 	if err != nil {
 		return nil, err
@@ -276,7 +277,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := NetworkHandler(job)
+	handler := handlers.NewNetworkHandler(job)
 	_, err = job.Task().Run(
 		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
 			return nil, handler.Delete(ref)

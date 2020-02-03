@@ -335,8 +335,8 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Equal(t, gw1.Name, "gw-"+network1.Name)
 	assert.NotEmpty(t, gw1.GetPublicIP)
 	gw1NetworkV1 := propsv1.NewHostNetwork()
-	err = gw1.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-		gw1NetworkV1 = v.(*propsv1.HostNetwork)
+	err = gw1.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		gw1NetworkV1 = clonable.(*propsv1.HostNetwork)
 		return nil
 	})
 	assert.Nil(t, err)

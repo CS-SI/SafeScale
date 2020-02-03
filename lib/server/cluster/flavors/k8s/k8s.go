@@ -19,12 +19,9 @@ package k8s
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
-
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
-	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
@@ -32,12 +29,16 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 //go:generate rice embed-go
@@ -63,12 +64,13 @@ var (
 )
 
 func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (uint, uint, uint) {
-	c := foreman.Cluster().GetIdentity(task).Complexity
-	var masterCount uint
-	var privateNodeCount uint
-	var publicNodeCount uint
+	var (
+		masterCount      uint
+		privateNodeCount uint
+		publicNodeCount  uint
+	)
 
-	switch c {
+	switch foreman.Cluster().GetIdentity(task).Complexity {
 	case complexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
@@ -113,7 +115,9 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 }
 
 func configureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
-	clusterName := foreman.Cluster().GetIdentity(task).Name
+	cluster := foreman.Cluster()
+	identity := cluster.GetIdentity(task)
+	clusterName := identity.Name
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
 	target, err := install.NewClusterTarget(task, foreman.Cluster())
@@ -122,7 +126,8 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	}
 	feature, err := install.NewFeature(task, "kubernetes")
 	if err != nil {
-		return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error())
+		logrus.Errorf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err)
+		return fmt.Errorf("failed to prepare feature 'kubernetes': %s", err.Error())
 	}
 
 	// Initializes variables
@@ -130,40 +135,85 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 
 	// If hardening is disabled, set the appropriate variable for the kubernetes feature
 	_, ok := req.DisabledDefaultFeatures["hardening"]
-	v["Hardening"] = !ok
+	v["Hardening"] = strconv.FormatBool(!ok)
 
-	// If complexity == Normal or Large, creates a VIP for Kubernetes attached to masters
-	// FIXME: find a way to store VIP in cluster metadata
-	var controlplaneEndointIP string
-	vip, err := foreman.Cluster().GetService().CreateVirtualIP()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			derr := foreman.Cluster().GetService().DeleteVirtualIP(task, vip)
-			if derr != nil {
-				logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
-			}
-		}
-	}()
-
-	for _, id := range foreman.Cluster().ListMasterIPs(task) {
-		err = vip.BindHost(task, id)
+	// If cluster complexity is not small or cloud provider provides support for VIP, creates such a VIP if not already done
+	var controlPlaneV1 *clusterpropsv1.ControlPlane
+	svc := cluster.GetService(task)
+	if identity.Complexity != complexity.Small && cluster.GetService(task).GetCapabilities().PrivateVirtualIP {
+		err = cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+			controlPlaneV1 = clonable.(*clusterpropsv1.ControlPlane)
+			return nil
+		})
 		if err != nil {
 			return err
 		}
+
+		if controlPlaneV1.VirtualIP == nil {
+			netCfg, err := cluster.GetNetworkConfig(task)
+			if err != nil {
+				return err
+			}
+
+			vip, err := svc.CreateVIP(netCfg.NetworkID, clusterName+"-ControlPlaneVIP")
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if err != nil {
+					derr := svc.DeleteVIP(vip)
+					if derr != nil {
+						logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+					}
+				}
+			}()
+
+			list, err := cluster.ListMasterIDs(task)
+			if err != nil {
+				return err
+			}
+			for _, id := range list {
+				err = svc.BindHostToVIP(vip, id)
+				if err != nil {
+					return err
+				}
+				defer func(i string) {
+					if err != nil {
+						derr := svc.UnbindHostFromVIP(vip, i)
+						if derr != nil {
+							logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+						}
+					}
+				}(id)
+			}
+
+			err = cluster.(*control.Controller).UpdateMetadata(task, func() error {
+				return cluster.GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+					controlPlaneV1 = clonable.(*clusterpropsv1.ControlPlane)
+					controlPlaneV1.VirtualIP = vip
+					list, err := cluster.ListMasterIDs(task)
+					if err != nil {
+						return err
+					}
+					controlPlaneV1.VirtualIP.Hosts = list.Values()
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
-	controlplaneEndpointIP = vip.GetPrivateIP(task)
+
+	// Disable dashboard if requested
+	_, ok = req.DisabledDefaultFeatures["dashboard"]
+	v["Dashboard"] = strconv.FormatBool(!ok)
 
 	// Installs kubernetes feature
-	results, err := feature.Add(
-		target,
-		install.Variables{"ControlplaneEndpointIP": controlplaneEndpointIP},
-		install.Settings{},
-	)
+	results, err := feature.Add(target, v, install.Settings{})
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error()))
+		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
+		return err
 	}
 	if !results.Successful() {
 		err = fmt.Errorf(results.AllErrorMessages())
@@ -171,21 +221,60 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 		return err
 	}
 	logrus.Println(fmt.Sprintf("[cluster %s] feature 'kubernetes' addition successful.", clusterName))
+
+	// If helm is not disabled, installs it
+	if _, ok = req.DisabledDefaultFeatures["helm"]; !ok {
+		logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'k8s.helm2'...", clusterName))
+
+		feature, err = install.NewFeature(task, "k8s.helm2")
+		if err != nil {
+			logrus.Errorf("[cluster %s] failed to instantiate feature 'k8s.helm2': %v", clusterName, err)
+			return fmt.Errorf("failed to prepare feature 'k8s.helm2': %s", err.Error())
+		}
+
+		// Installs kubernetes feature
+		results, err = feature.Add(target, data.Map{}, install.Settings{})
+		if err != nil {
+			logrus.Errorf("[cluster %s] failed to add feature 'k8s.helm2': %s", clusterName, err.Error())
+			return err
+		}
+		if !results.Successful() {
+			err = fmt.Errorf(results.AllErrorMessages())
+			logrus.Errorf("[cluster %s] failed to add feature 'k8s.helm2': %s", clusterName, err.Error())
+			return err
+		}
+		logrus.Println(fmt.Sprintf("[cluster %s] feature 'k8s.helm2' addition successful.", clusterName))
+	}
+
 	return nil
 }
 
-func unconfigureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
+func unconfigureCluster(task concurrency.Task, foreman control.Foreman) error {
 	clusterName := foreman.Cluster().GetIdentity(task).Name
-	logrus.Println(fmt.Sprintf("[cluster %s] removing virtual IP...", clusterName))
+	logrus.Infof("[cluster %s] removing virtual IP...", clusterName)
 
-	// FIXME: find a way to store VIP in cluster metadata
-	logrus.Println(fmt.Sprintf("[cluster %s] virtual IP is not deleted, not implemented")
+	err := foreman.Cluster().GetProperties(task).LockForWrite(property.ControlPlaneV1).ThenUse(func(clonable data.Clonable) error {
+		controlPlaneV1, ok := clonable.(*clusterpropsv1.ControlPlane)
+		if !ok {
+			return scerr.InconsistentError("property ControlPlaneV1 doesn't contain valid data")
+		}
+		if controlPlaneV1.VirtualIP != nil {
+			inErr := foreman.Cluster().GetService(task).DeleteVIP(controlPlaneV1.VirtualIP)
+			if inErr != nil {
+				return inErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
-	data := map[string]interface{}{}
+	theData := map[string]interface{}{}
 
 	switch nodeType {
 	case nodetype.Gateway:
@@ -194,7 +283,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, n
 	case nodetype.Node:
 		script = "k8s_install_node.sh"
 	}
-	return script, data
+	return script, theData
 }
 
 func getTemplateBox() (*rice.Box, error) {
@@ -234,7 +323,8 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
+		// tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(nil, false)).Parse(tmplString)
+		tmplPrepared, err := template.Parse("install_requirements", tmplString, nil)
 		if err != nil {
 			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
@@ -256,9 +346,10 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 	return anon.(string), nil
 }
 
-func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.Host, selectedMasterID string) error {
+func leaveNodeFromCluster(task concurrency.Task, f control.Foreman, pbHost *pb.Host, selectedMasterID string) error {
 	if selectedMasterID == "" {
-		selectedMaster, err := b.Cluster().FindAvailableMaster(task)
+		var err error
+		selectedMaster, err := f.Cluster().FindAvailableMaster(task)
 		if err != nil {
 			return err
 		}

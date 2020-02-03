@@ -287,8 +287,8 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 		return nil, err
 	}
 	// mn := NewNetwork(svc)
-	// err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-	// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
+	// err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+	// 	hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 	// 	for netID := range hostNetworkV1.NetworksByID {
 	// 		err := mn.ReadByID(netID)
 	// 		if err != nil {

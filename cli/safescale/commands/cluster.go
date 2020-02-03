@@ -76,7 +76,6 @@ var ClusterCommand = cli.Command{
 		clusterStopCommand,
 		clusterExpandCommand,
 		clusterShrinkCommand,
-		clusterDcosCommand,
 		clusterKubectlCommand,
 		clusterHelmCommand,
 		clusterListFeaturesCommand,
@@ -402,12 +401,20 @@ var clusterCreateCommand = cli.Command{
 			Usage: `Describe gateway sizing in format "<component><operator><value>[,...] (cf. --sizing for details)`,
 		},
 		cli.StringFlag{
-			Name:  "master-sizing",
-			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
+			Name: "master-sizing",
+			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for common details).
+			<component> accept a supplemental value: "count" to define the count of masters wanted. Only '=' is accepted as <operator> and <value> cannot be less than 1.
+			if --complexity|-C is used and <value> is less than the count implied by the complexity, count will be ignored.
+			example:
+			--master-sizing "count=4, cpu <= 4, ram <= 10, disk = 100"`,
 		},
 		cli.StringFlag{
-			Name:  "node-sizing",
-			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
+			Name: "node-sizing",
+			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for common details).
+			<component> accept a supplemental value: "count" to define the count of masters wanted. Only '=' is accepted as <operator> and <value> cannot be less than 1.
+			if --complexity|-C is used and <value> is less than the count implied by the complexity, count will be ignored.
+			example:
+			--node-sizing "count=10, cpu <= 4, ram <= 10, disk = 100"`,
 		},
 		cli.UintFlag{
 			Name:  "cpu",
@@ -455,10 +462,6 @@ var clusterCreateCommand = cli.Command{
 		}
 
 		los := c.String("os")
-		if fla == flavor.DCOS {
-			// DCOS forces to use RHEL/CentOS/CoreOS, and we've chosen to use CentOS, so ignore --os option
-			los = ""
-		}
 
 		var (
 			gatewaysDef *pb.HostDefinition
@@ -466,7 +469,7 @@ var clusterCreateCommand = cli.Command{
 			nodesDef    *pb.HostDefinition
 		)
 		if c.IsSet("sizing") {
-			nodesDef, err = constructPBHostDefinitionFromCLI(c, "sizing")
+			nodesDef, _, err = constructPBHostDefinitionFromCLI(c, "sizing")
 			if err != nil {
 				return err
 			}
@@ -474,19 +477,21 @@ var clusterCreateCommand = cli.Command{
 			mastersDef = nodesDef
 		}
 		if c.IsSet("gw-sizing") {
-			gatewaysDef, err = constructPBHostDefinitionFromCLI(c, "gw-sizing")
+			gatewaysDef, _, err = constructPBHostDefinitionFromCLI(c, "gw-sizing")
 			if err != nil {
 				return err
 			}
 		}
+		var mastersCount uint
 		if c.IsSet("master-sizing") {
-			mastersDef, err = constructPBHostDefinitionFromCLI(c, "master-sizing")
+			mastersDef, mastersCount, err = constructPBHostDefinitionFromCLI(c, "master-sizing")
 			if err != nil {
 				return err
 			}
 		}
+		var nodesCount uint
 		if c.IsSet("node-sizing") {
-			nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+			nodesDef, nodesCount, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
 			if err != nil {
 				return err
 			}
@@ -515,6 +520,7 @@ var clusterCreateCommand = cli.Command{
 				mastersDef = gatewaysDef         // ... nor for masters
 			}
 		}
+
 		clusterInstance, err := cluster.Create(concurrency.RootTask(), control.Request{
 			Name:                    clusterName,
 			Complexity:              comp,
@@ -523,6 +529,8 @@ var clusterCreateCommand = cli.Command{
 			KeepOnFailure:           keep,
 			GatewaysDef:             gatewaysDef,
 			MastersDef:              mastersDef,
+			MastersCount:            mastersCount,
+			NodesCount:              nodesCount,
 			NodesDef:                nodesDef,
 			DisabledDefaultFeatures: disableFeatures,
 		})
@@ -716,19 +724,23 @@ var clusterExpandCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		count := int(c.Uint("count"))
+		count := c.Uint("count")
 		if count == 0 {
 			count = 1
 		}
 		los := c.String("os")
 
-		var nodesDef *pb.HostDefinition
-		//		if c.IsSet("node-sizing") {
-		nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+		var (
+			nodesDef   *pb.HostDefinition
+			nodesCount uint
+		)
+		nodesDef, nodesCount, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
 		if err != nil {
 			return err
 		}
-		//		}
+		if nodesCount > count {
+			count = nodesCount
+		}
 
 		if nodesDef == nil {
 			cpu := int32(c.Uint("cpu"))
@@ -819,7 +831,7 @@ var clusterShrinkCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 		for i := uint(0); i < count; i++ {
-			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster)
+			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster.ID)
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
 				msgs = append(msgs, fmt.Sprintf("failed to delete node #%d: %s", i+1, err.Error()))
@@ -829,31 +841,6 @@ var clusterShrinkCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strings.Join(msgs, "\n")))
 		}
 		return clitools.SuccessResponse(nil)
-	},
-}
-
-var clusterDcosCommand = cli.Command{
-	Name:      "dcos",
-	Category:  "Administrative commands",
-	Usage:     "dcos CLUSTERNAME [COMMAND ...]",
-	ArgsUsage: "CLUSTERNAME",
-
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
-		err := extractClusterArgument(c)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-
-		identity := clusterInstance.GetIdentity(concurrency.RootTask())
-		if identity.Flavor != flavor.DCOS {
-			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s)", identity.Flavor.String())
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotApplicable, msg))
-		}
-
-		args := c.Args().Tail()
-		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		return executeCommand(cmdStr, nil, outputs.DISPLAY)
 	},
 }
 
@@ -874,7 +861,7 @@ var clusterKubectlCommand = cli.Command{
 		args := c.Args().Tail()
 		var filteredArgs []string
 		ignoreNext := false
-		valuesOnRemote := &RemoteFilesHandler{}
+		valuesOnRemote := &client.RemoteFilesHandler{}
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
 		for idx, arg := range args {
 			if ignoreNext {
@@ -916,7 +903,7 @@ var clusterKubectlCommand = cli.Command{
 						}
 
 						if localFile != "-" {
-							rfi := RemoteFileItem{
+							rfi := client.RemoteFileItem{
 								Local:  localFile,
 								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
 							}
@@ -940,7 +927,7 @@ var clusterKubectlCommand = cli.Command{
 		if len(filteredArgs) > 0 {
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
-		return executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
+		return executeCommand(concurrency.RootTask(), cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -963,7 +950,7 @@ var clusterHelmCommand = cli.Command{
 		args := c.Args().Tail()
 		ignoreNext := false
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
-		valuesOnRemote := &RemoteFilesHandler{}
+		valuesOnRemote := &client.RemoteFilesHandler{}
 		for idx, arg := range args {
 			if ignoreNext {
 				ignoreNext = false
@@ -1012,7 +999,7 @@ var clusterHelmCommand = cli.Command{
 						}
 
 						if localFile != "-" {
-							rfc := RemoteFileItem{
+							rfc := client.RemoteFileItem{
 								Local:  localFile,
 								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
 							}
@@ -1033,7 +1020,7 @@ var clusterHelmCommand = cli.Command{
 			}
 		}
 		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
-		return executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
+		return executeCommand(concurrency.RootTask(), cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -1054,7 +1041,7 @@ var clusterRunCommand = cli.Command{
 	},
 }
 
-func executeCommand(command string, files *RemoteFilesHandler, outs outputs.Enum) error {
+func executeCommand(task concurrency.Task, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 	master, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 	if err != nil {
@@ -1064,22 +1051,22 @@ func executeCommand(command string, files *RemoteFilesHandler, outs outputs.Enum
 
 	if files != nil && files.Count() > 0 {
 		if !Debug {
-			defer files.Cleanup(master)
+			defer files.Cleanup(task, master.ID)
 		}
-		err = files.Upload(master)
+		err = files.Upload(task, master.ID)
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error())
 		}
 	}
 
-	safescalessh := client.New().SSH
-	retcode, stdout, stderr, err := safescalessh.Run(master, command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	sshClient := client.New().SSH
+	retcode, stdout, stderr, err := sshClient.Run(task, master.ID, command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
-		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master, err.Error())
+		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master.ID, err.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		msg := fmt.Sprintf("command executed on master '%s' with failure: %s", master, stdout)
+		msg := fmt.Sprintf("command executed on master '%s' with failure: %s", master.ID, stdout)
 		if stderr != "" {
 			if stdout != "" {
 				msg += "\n"
@@ -1288,7 +1275,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
-		values := install.Variables{}
+		values := data.Map{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")

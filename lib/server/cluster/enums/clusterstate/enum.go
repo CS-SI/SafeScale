@@ -19,7 +19,7 @@ package clusterstate
 
 //go:generate stringer -type=Enum
 
-//Enum represents the state of a node
+// Enum represents the state of a node
 type Enum int
 
 const (

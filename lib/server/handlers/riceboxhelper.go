@@ -71,6 +71,6 @@ func exec(job server.Job, script string, data interface{}, hostid string, svc ia
 		return err
 	}
 
-	_, err = ssh.SudoCommand(job.Task(), scriptCmd, false)
+	_, err = ssh.SudoCommand(job.Task(), scriptCmd)
 	return err
 }
