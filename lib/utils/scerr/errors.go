@@ -528,6 +528,44 @@ func (e *ErrInvalidRequest) WithField(key string, value interface{}) Error {
 	return e
 }
 
+// ErrSyntax ...
+type ErrSyntax struct {
+	*errCore
+}
+
+// SyntaxError creates a ErrSyntax error
+func SyntaxError(msg string) *ErrSyntax {
+	return &ErrSyntax{
+		errCore: &errCore{
+			message:      msg,
+			causer:       nil,
+			consequences: []error{},
+			fields:       make(fields),
+			grpcCode:     codes.Internal,
+		},
+	}
+}
+
+// AddConsequence ...
+func (e *ErrSyntax) AddConsequence(err error) Error {
+	if err != nil {
+		if e.consequences == nil {
+			e.consequences = []error{}
+		}
+		e.consequences = append(e.consequences, err)
+	}
+	return e
+}
+
+// WithField ...
+func (e *ErrSyntax) WithField(key string, value interface{}) Error {
+	if e.fields != nil {
+		e.fields[key] = value
+	}
+
+	return e
+}
+
 // ErrNotAuthenticated when action is done without being authenticated first
 type ErrNotAuthenticated struct {
 	*errCore

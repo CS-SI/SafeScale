@@ -63,7 +63,7 @@ feature:
                             mkdir -p ${SF_ETCDIR}/elassandra ${SF_VARDIR}/elassandra
 
                             {{- if .ClusterFlavor }}
-                            seeds="{{- range .MasterIPs }}{{.}},{{ end -}}"
+                            seeds="{{- range .ClusterMasterIPs }}{{.}},{{ end -}}"
                             seeds=${seeds%,}
                             {{ end -}}
                             cat >${SF_ETCDIR}/elassandra/docker-compose.yml <<EOF

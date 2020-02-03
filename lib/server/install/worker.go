@@ -59,7 +59,7 @@ type worker struct {
 	target    Target
 	method    method.Enum
 	action    action.Enum
-	variables Variables
+	variables data.Map
 	settings  Settings
 	startTime time.Time
 
@@ -164,11 +164,11 @@ func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		host, err := w.cluster.FindAvailableNode(w.feature.task)
+		node, err := w.cluster.FindAvailableNode(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
-		host, err := client.New().Host.Inspect(host.ID, temporal.GetExecutionTimeout())
+		host, err := client.New().Host.Inspect(node.ID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -401,7 +401,7 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
+func (w *worker) Proceed(v data.Map, s Settings) (results Results, err error) {
 	w.variables = v
 	w.settings = s
 
@@ -477,7 +477,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		anon              interface{}
 		stepName, stepKey string
 		stepMap           map[string]interface{}
-		vars              Variables
+		vars              data.Map
 		ok                bool
 	)
 	p := params.(data.Map)
@@ -509,7 +509,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if anon, ok = p["variables"]; !ok {
 		return nil, scerr.InvalidParameterError("params[variables]", "is missing")
 	}
-	if vars, ok = p["variables"].(Variables); !ok {
+	if vars, ok = p["variables"].(data.Map); !ok {
 		return nil, scerr.InvalidParameterError("params[variables]", "must be a data.Map")
 	}
 	if vars == nil {
@@ -633,7 +633,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, err := normalizeScript(Variables{
+	templateCommand, err := normalizeScript(data.Map{
 		"reserved_Name":    w.feature.DisplayName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
@@ -836,7 +836,7 @@ func (w *worker) setReverseProxy() (err error) {
 
 	// Now submits all the rules to reverse proxy
 	primaryGatewayVariables := w.variables.Clone()
-	var secondaryGatewayVariables Variables
+	var secondaryGatewayVariables data.Map
 	if secondaryKongController != nil {
 		secondaryGatewayVariables = w.variables.Clone()
 	}
@@ -920,7 +920,7 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	if !ok {
 		return nil, scerr.InvalidParameterError("rule", "is not a map")
 	}
-	vars, ok := params.(data.Map)["vars"].(*Variables)
+	vars, ok := params.(data.Map)["vars"].(*data.Map)
 	if !ok {
 		return nil, scerr.InvalidParameterError("vars", "is not a *Variables")
 	}

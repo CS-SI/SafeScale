@@ -27,10 +27,20 @@ feature:
     requirements:
         features:
             - kubernetes
-            - helm
+            - k8s.helm2
 
     install:
         bash:
+            check:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm ls {{ .HelmRepoName }}/kibana || sfFail 192
+                            sfExit
+
             add:
                 pace: helm
                 steps:
@@ -38,14 +48,14 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            helm install {{ .HelmRepoName }}/kibana \
+                            sfHelm install {{ .HelmRepoName }}/kibana \
                                 --name kibana-log \
                                 --namespace "{{ .Namespace }}" \
                                 --version {{ .VERSION }} \
                                 --tls \
-                                --set image.pullSecrets[0].name="local-harbor" \
-                                --set image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/kibana" \
-                                --set image.tag=${IMAGE_TAG} \
+                                # --set image.pullSecrets[0].name="local-harbor" \
+                                # --set image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/kibana" \
+                                # --set image.tag=${IMAGE_TAG} \
                                 --set files.'kibana\.yml'.'elasticsearch\.hosts'="http://elasticsearch-processing-log-elasticsearch-coordinating-only:9200" \
                                 --set files.'kibana\.yml'.'server\.basePath'="/kibana-log" \
                                 --set files.'kibana\.yml'.'server\.rewriteBasePath'="true" \
@@ -57,14 +67,14 @@ feature:
                                 --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
                                 || sfFail 192
 
-                            helm install local_chart_monitoring/kibana \
+                            sfHelm install local_chart_monitoring/kibana \
                                 --name kibana-trace \
                                 --namespace {{ .Namespace }} \
                                 --version {{ .VERSION }} \
                                 --tls \
-                                --set image.pullSecrets[0].name="local-harbor" \
-                                --set image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/kibana" \
-                                --set image.tag=${IMAGE_TAG} \
+                                # --set image.pullSecrets[0].name="local-harbor" \
+                                # --set image.repository="harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/kibana" \
+                                # --set image.tag=${IMAGE_TAG} \
                                 --set files.'kibana\.yml'.'elasticsearch\.hosts'="http://elasticsearch-processing-trace-elasticsearch-coordinating-only:9200" \
                                 --set files.'kibana\.yml'.'server\.basePath'="/kibana-trace" \
                                 --set files.'kibana\.yml'.'server\.rewriteBasePath'="true" \
@@ -75,6 +85,17 @@ feature:
                                 --set ingress.controller="kong" \
                                 --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
                                 || sfFail 193
+                            sfExit
+
+            remove:
+                pace: helm
+                steps:
+                    helm:
+                        targets:
+                            masters: any
+                        run: |
+                            sfHelm delete --namespace {{ .Namespace }} kibana-trace || sfFail 192
+                            sfHelm delete --namespace {{ .Namespace }} kibana-log || sfFail 193
                             sfExit
 
 ---

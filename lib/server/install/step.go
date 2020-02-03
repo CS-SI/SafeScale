@@ -262,7 +262,7 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResults, err error) {
+func (is *step) Run(hosts []*pb.Host, v data.Map, s Settings) (results StepResults, err error) {
 	results = StepResults{}
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
@@ -393,7 +393,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	if !ok {
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'host' of type '*Host'")
 	}
-	variables, ok := p["variables"].(Variables)
+	variables, ok := p["variables"].(data.Map)
 	if !ok {
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'variables' of type 'Variables'")
 	}
