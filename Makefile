@@ -18,7 +18,7 @@ PKG_FILES := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -ty
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v lib/system/firewall/ | grep -v /vendor/)
 # List of packages alt
-PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v lib/security/ | grep -v lib/system/firewall/ | grep -v gomock_reflect_ | grep -v cluster/mocks | grep -v stacks/mocks | xargs -I {} dirname {} | uniq )
+PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v lib/security/ | grep -v lib/system/firewall/ | grep -v gomock_reflect_ | grep -v cluster/mocks | grep -v stacks/mocks | grep -v cloudwatt |xargs -I {} dirname {} | uniq )
 # List of packages to test
 TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v lib/system/firewall/ | grep -v sandbox)
 
