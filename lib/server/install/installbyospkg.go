@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // genericPackager is an object implementing the OS package management
@@ -21,7 +22,7 @@ type genericPackager struct {
 }
 
 // Check checks if the feature is installed
-func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Check(f *Feature, t Target, v data.Map, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".check"
 	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
@@ -35,14 +36,14 @@ func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (
 	}
 	err = worker.CanProceed(s)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Errorf(err.Error())
 		return nil, err
 	}
 	return worker.Proceed(v, s)
 }
 
 // Add installs the feature using apt
-func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Add(f *Feature, t Target, v data.Map, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".add"
 	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
@@ -52,12 +53,12 @@ func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Re
 
 	worker, err := newWorker(f, t, g.method, action.Add, g.addCommand)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Errorf(err.Error())
 		return nil, err
 	}
 	err = worker.CanProceed(s)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Errorf(err.Error())
 		return nil, err
 	}
 
@@ -65,7 +66,7 @@ func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Re
 }
 
 // Remove uninstalls the feature using the RemoveScript script
-func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Remove(f *Feature, t Target, v data.Map, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".remove"
 	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
@@ -79,7 +80,7 @@ func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) 
 	}
 	err = worker.CanProceed(s)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Errorf(err.Error())
 		return nil, err
 	}
 	return worker.Proceed(v, s)

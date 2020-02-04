@@ -279,7 +279,7 @@ func (pbc *PipeBridgeController) Stop() error {
 	}
 	if !ok {
 		// If not done, abort it and wait until the end
-		pbc.readersGroup.Abort()
+		_ = pbc.readersGroup.Abort()
 		err = pbc.Wait()
 		if err != nil {
 			// In case of error, report only if error is not aborted error, as we triggered it

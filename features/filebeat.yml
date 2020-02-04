@@ -27,9 +27,9 @@ feature:
     install:
         bash:
             check:
-                pace: docker
+                pace: service
                 steps:
-                    pkg:
+                    service:
                         targets:
                             hosts: yes
                             masters: all
@@ -44,8 +44,9 @@ feature:
                     config:
                         targets:
                             hosts: yes
+                            gateways: all
                             masters: all
-                            nodes: no
+                            nodes: all
                         run: |
                             mkdir -p ${SF_ETCDIR}/filebeat4safescale/modules.d ${SF_ETCDIR}/filebeat4safescale/configs.d
 
@@ -87,7 +88,7 @@ feature:
                             output.elasticsearch:
                                 hosts:
                             {{- if .ClusterFlavor }}
-                                {{- range .MasterIPs }}
+                                {{- range .ClusterMasterIPs }}
                                     - "http://{{ . }}:9200/"
                                 {{ end -}}
                             {{ else }}
@@ -102,12 +103,12 @@ feature:
 
                     compose:
                         targets:
-                            gateways: all
                             hosts: yes
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
-                            cat >${SF_ETCDIR}/filebeat4safescale/docker-compose.xml <<-EOF
+                            cat >${SF_ETCDIR}/filebeat4safescale/docker-compose.yml <<-EOF
                             version: '2.1'
 
                             services:
@@ -118,11 +119,12 @@ feature:
                                         - ${SF_ETCDIR}/filebeat4safescale/config.yml:/usr/share/heartbeat/heartbeat.yml:ro
                                     restart: always
                             EOF
+                            sfExit
 
                     start:
                         targets:
-                            gateways: all
                             hosts: yes
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -136,6 +138,7 @@ feature:
                     stop:
                         targets:
                             hosts: yes
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -144,8 +147,8 @@ feature:
 
                     cleanup:
                         targets:
-                            gateways: all
                             hosts: yes
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |

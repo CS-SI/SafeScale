@@ -286,24 +286,7 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 	if err != nil {
 		return nil, err
 	}
-	// mn := NewNetwork(svc)
-	// err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-	// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
-	// 	for netID := range hostNetworkV1.NetworksByID {
-	// 		err := mn.ReadByID(netID)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		err = mn.AttachHost(host)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
+
 	return mh, nil
 }
 
@@ -364,7 +347,6 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.StopRetryError("no metadata found", innerErr)
 				}
-
 				return innerErr
 			}
 			return nil

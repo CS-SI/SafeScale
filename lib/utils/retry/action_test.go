@@ -70,7 +70,7 @@ func CreateErrorWithNConsequences(n uint) (err error) {
 func CreateSkippableError() (err error) {
 	err = WhileSuccessfulDelay1Second(func() error {
 		fmt.Println("Around the world...")
-		return AbortedError("no more", scerr.NotFoundError("wrong place"))
+		return StopRetryError("no more", scerr.NotFoundError("wrong place"))
 	}, 60*time.Millisecond)
 	return err
 }
@@ -389,14 +389,13 @@ func genLimit() error {
 }
 
 func genAbort() error {
-	return AbortedError("bizarre provider error", fmt.Errorf("4hJx7NGwyH7dPGQNY3WG happened !! "))
+	return StopRetryError("weird provider error", fmt.Errorf("4hJx7NGwyH7dPGQNY3WG happened !! "))
 }
 
 func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
-
 	if _, ok := nerr.(*scerr.ErrNotFound); !ok {
-		t.Errorf("Is not a '*ErrNotFound', it's instead a '%s'", reflect.TypeOf(toe).String())
+		t.Errorf("Is not a '*ErrNotFound', it's instead a '%s'", reflect.TypeOf(nerr).String())
 	}
 }
 

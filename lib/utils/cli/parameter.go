@@ -18,10 +18,11 @@ package cli
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"strconv"
 	"strings"
 	"text/scanner"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Token describes a token (<keyword> <operator> <value>)
@@ -95,6 +96,10 @@ func (t *Token) Validate() (string, string, error) {
 	value := t.members[2]
 	switch operator {
 	case "~":
+		if keyword == "count" {
+			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+		}
+
 		// "~" means "[<value>-<value*2>]"
 		vali, err := strconv.Atoi(value)
 		if err != nil {
@@ -106,27 +111,31 @@ func (t *Token) Validate() (string, string, error) {
 		}
 		return fmt.Sprintf("%d", vali), fmt.Sprintf("%d", 2*vali), nil
 	case "=":
-		if value[0] == '[' && value[len(value)-1] == ']' {
-			value = value[1 : len(value)-1]
-			splitted := strings.Split(value, "-")
-			if len(splitted) != 2 {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of '%s' token isn't a valid interval", value, keyword))
+		if keyword != "count" {
+			if value[0] == '[' && value[len(value)-1] == ']' {
+				value = value[1 : len(value)-1]
+				splitted := strings.Split(value, "-")
+				if len(splitted) != 2 {
+					return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of '%s' token isn't a valid interval", value, keyword))
+				}
+				min := splitted[0]
+				_, err := strconv.ParseFloat(min, 64)
+				if err != nil {
+					return "", "", scerr.InvalidRequestError(fmt.Sprintf("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error()))
+				}
+				max := splitted[1]
+				_, err = strconv.ParseFloat(max, 64)
+				if err != nil {
+					return "", "", scerr.InvalidRequestError(fmt.Sprintf("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error()))
+				}
+				return min, max, nil
 			}
-			min := splitted[0]
-			_, err := strconv.ParseFloat(min, 64)
-			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error()))
-			}
-			max := splitted[1]
-			_, err = strconv.ParseFloat(max, 64)
-			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error()))
-			}
-			return min, max, nil
 		}
 		_, err := strconv.Atoi(value)
 		if err != nil {
-			_, err := strconv.ParseFloat(value, 64)
+			if keyword != "count" {
+				_, err = strconv.ParseFloat(value, 64)
+			}
 			if err != nil {
 				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
@@ -136,6 +145,10 @@ func (t *Token) Validate() (string, string, error) {
 	case "lt":
 		fallthrough
 	case "<":
+		if keyword == "count" {
+			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+		}
+
 		vali, err := strconv.Atoi(value)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
@@ -149,6 +162,10 @@ func (t *Token) Validate() (string, string, error) {
 	case "le":
 		fallthrough
 	case "<=":
+		if keyword == "count" {
+			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+		}
+
 		_, err := strconv.Atoi(value)
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
@@ -161,6 +178,10 @@ func (t *Token) Validate() (string, string, error) {
 	case "gt":
 		fallthrough
 	case ">":
+		if keyword == "count" {
+			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+		}
+
 		vali, err := strconv.Atoi(value)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
@@ -174,6 +195,10 @@ func (t *Token) Validate() (string, string, error) {
 	case "ge":
 		fallthrough
 	case ">=":
+		if keyword == "count" {
+			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+		}
+
 		_, err := strconv.Atoi(value)
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)

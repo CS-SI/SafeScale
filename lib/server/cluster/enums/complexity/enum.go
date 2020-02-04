@@ -16,11 +16,11 @@
 
 package complexity
 
-//go:generate stringer -type=Enum
-
 import (
 	"fmt"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Enum represents the complexity of a cluster
@@ -59,8 +59,17 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Complexity.Enum corresponding to '%s'", v)
+		return e, fmt.Errorf("failed to find a complexity.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 
+}
+
+// String returns a string representation of an Enum
+func (e Enum) String() string {
+	if str, found := enumMap[e]; found {
+		return str
+	}
+	logrus.Errorf("failed to find a complexity string corresponding to value '%d'", e)
+	return ""
 }

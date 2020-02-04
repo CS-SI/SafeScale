@@ -122,7 +122,6 @@ var networkInspect = cli.Command{
 		pgwID := network.GetGatewayId()
 		sgwID := network.GetSecondaryGatewayId()
 
-
 		// Added operation status
 		opState := network.GetState()
 		mapped["state"] = opState.String()
@@ -224,7 +223,7 @@ var networkCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		def, err := constructPBHostDefinitionFromCLI(c, "sizing")
+		def, _, err := constructPBHostDefinitionFromCLI(c, "sizing")
 		if err != nil {
 			return err
 		}

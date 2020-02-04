@@ -20,10 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
-
 	pb "github.com/CS-SI/SafeScale/lib"
 )
 
@@ -126,10 +123,6 @@ func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) (Target
 		methods = map[uint8]method.Enum{}
 	)
 	identity := cluster.GetIdentity(task)
-	if identity.Flavor == flavor.DCOS {
-		index++
-		methods[index] = method.DCOS
-	}
 	index++
 	methods[index] = method.Bash
 	return &ClusterTarget{

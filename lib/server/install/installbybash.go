@@ -7,6 +7,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // bashInstaller is an installer using script to add and remove a feature
@@ -17,7 +18,7 @@ func (i *bashInstaller) GetName() string {
 }
 
 // Check checks if the feature is installed, using the check script in Specs
-func (i *bashInstaller) Check(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (i *bashInstaller) Check(f *Feature, t Target, v data.Map, s Settings) (Results, error) {
 	yamlKey := "feature.install.bash.check"
 	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
@@ -39,7 +40,7 @@ func (i *bashInstaller) Check(f *Feature, t Target, v Variables, s Settings) (Re
 
 // Add installs the feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *bashInstaller) Add(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (i *bashInstaller) Add(f *Feature, t Target, v data.Map, s Settings) (Results, error) {
 	// Determining if install script is defined in specification file
 	if !f.specs.IsSet("feature.install.bash.add") {
 		msg := `syntax error in feature '%s' specification file (%s):
@@ -65,7 +66,7 @@ func (i *bashInstaller) Add(f *Feature, t Target, v Variables, s Settings) (Resu
 }
 
 // Remove uninstalls the feature
-func (i *bashInstaller) Remove(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (i *bashInstaller) Remove(f *Feature, t Target, v data.Map, s Settings) (Results, error) {
 	if !f.specs.IsSet("feature.install.bash.remove") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.remove' found`

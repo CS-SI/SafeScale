@@ -114,7 +114,7 @@ func work() {
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	fmt.Printf("Safescaled version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		logrus.Fatalf("Failed to serve: %v", err)
 	}
 }
 

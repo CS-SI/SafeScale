@@ -75,5 +75,5 @@ func (e Enum) String() string {
 	if str, found := enumMap[e]; found {
 		return str
 	}
-	return ""
+	return "<unknown>"
 }

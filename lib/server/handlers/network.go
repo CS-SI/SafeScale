@@ -51,7 +51,7 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(string, string, IPVersion.Enum, resources.SizingRequirements, string, string, bool) (*resources.Network, error)
+	Create(string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool) (*resources.Network, error)
 	List(bool) ([]*resources.Network, error)
 	Inspect(string) (*resources.Network, error)
 	Delete(string) error
@@ -63,7 +63,7 @@ type NetworkAPI interface {
 // NetworkHandler an implementation of NetworkAPI
 type NetworkHandler struct {
 	job       server.Job
-	ipVersion IPVersion.Enum
+	ipVersion ipversion.Enum
 }
 
 // NewNetworkHandler Creates new Network service
@@ -73,7 +73,7 @@ func NewNetworkHandler(job server.Job) NetworkAPI {
 
 // Create creates a network
 func (handler *NetworkHandler) Create(
-	name string, cidr string, ipVersion IPVersion.Enum,
+	name string, cidr string, ipVersion ipversion.Enum,
 	sizing resources.SizingRequirements, theos string, gwname string,
 	failover bool,
 ) (network *resources.Network, err error) {
@@ -662,7 +662,7 @@ func (handler *NetworkHandler) taskCreateGateway(t concurrency.Task, params conc
 
 	// Binds gateway to VIP
 	if request.Network.VIP != nil {
-		err = handler.job.Service().BindHostToVIP(request.Network.VIP, gw)
+		err = handler.job.Service().BindHostToVIP(request.Network.VIP, gw.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -676,8 +676,8 @@ func (handler *NetworkHandler) taskCreateGateway(t concurrency.Task, params conc
 	userData.IsPrimaryGateway = primary
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
-	err = gw.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		gwSizingV1 := v.(*propsv1.HostSizing)
+	err = gw.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		gwSizingV1 := clonable.(*propsv1.HostSizing)
 		gwSizingV1.RequestedSize = &propsv1.HostSize{
 			Cores:     sizing.MinCores,
 			RAMSize:   sizing.MinRAMSize,
@@ -853,7 +853,7 @@ func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) (err e
 }
 
 func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
-	err = handler.job.Service().UnbindHostFromVIP(vip, host)
+	err = handler.job.Service().UnbindHostFromVIP(vip, host.ID)
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrNotFound, *scerr.ErrTimeout:
@@ -938,8 +938,8 @@ func (handler *NetworkHandler) Delete(ref string) (err error) { // FIXME Unused 
 
 	// Check if hosts are still attached to network according to metadata
 	var errorMsg string
-	err = network.Properties.LockForRead(networkproperty.HostsV1).ThenUse(func(v interface{}) error {
-		networkHostsV1 := v.(*propsv1.NetworkHosts)
+	err = network.Properties.LockForRead(networkproperty.HostsV1).ThenUse(func(clonable data.Clonable) error {
+		networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 		hostsLen := uint(len(networkHostsV1.ByName))
 		if hostsLen > 0 {
 			list := make([]string, 0, hostsLen)
@@ -989,7 +989,7 @@ func (handler *NetworkHandler) Delete(ref string) (err error) { // FIXME Unused 
 				if merr != nil {
 					return merr
 				}
-				err = handler.job.Service().UnbindHostFromVIP(network.VIP, mhm)
+				err = handler.job.Service().UnbindHostFromVIP(network.VIP, mhm.ID)
 				if err != nil {
 					logrus.Errorf("failed to unbind primary gateway from VIP: %v", err)
 				}
@@ -1026,7 +1026,7 @@ func (handler *NetworkHandler) Delete(ref string) (err error) { // FIXME Unused 
 				return merr
 			}
 
-			err = handler.job.Service().UnbindHostFromVIP(network.VIP, mhm)
+			err = handler.job.Service().UnbindHostFromVIP(network.VIP, mhm.ID)
 			if err != nil {
 				logrus.Errorf("failed to unbind secondary gateway from VIP: %v", err)
 			}

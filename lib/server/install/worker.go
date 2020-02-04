@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
@@ -58,7 +59,7 @@ type worker struct {
 	target    Target
 	method    method.Enum
 	action    action.Enum
-	variables Variables
+	variables data.Map
 	settings  Settings
 	startTime time.Time
 
@@ -145,11 +146,11 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		node, err := w.cluster.FindAvailableMaster(w.feature.task)
+		master, err := w.cluster.FindAvailableMaster(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
-		w.availableMaster, err = client.New().Host.Inspect(node.ID, temporal.GetExecutionTimeout())
+		w.availableMaster, err = client.New().Host.Inspect(master.ID, temporal.GetExecutionTimeout())
 		if err != nil {
 			return nil, err
 		}
@@ -183,7 +184,7 @@ func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
 		return []*pb.Host{}, nil
 	}
 	if w.concernedMasters == nil {
-		hosts, err := w.identifyAllMasters()
+		hosts, err := w.identifyAllRunningMasters()
 		if err != nil {
 			return nil, err
 		}
@@ -193,6 +194,7 @@ func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
 		}
 		w.concernedMasters = concernedHosts
 	}
+	logrus.Debugf("Found %d concerned masters", len(w.concernedMasters))
 	return w.concernedMasters, nil
 }
 
@@ -238,25 +240,31 @@ func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) 
 	return concernedHosts, nil
 }
 
-// identifyAllMasters returns a list of all the hosts acting as masters and keep this list
+// identifyAllRunningMasters returns a list of all the running hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
+func (w *worker) identifyAllRunningMasters() ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []*pb.Host{}
-		safescale := client.New().Host
+		hostClt := client.New().Host
 		masters, err := w.cluster.ListMasterIDs(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
 		for _, i := range masters {
-			host, err := safescale.Inspect(i, temporal.GetExecutionTimeout())
+			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				return nil, err
 			}
-			w.allMasters = append(w.allMasters, host)
+			state, err := hostClt.Status(i, temporal.GetExecutionTimeout())
+			if err != nil {
+				return nil, err
+			}
+			if state.Status == hoststate.STARTED.String() {
+				w.allMasters = append(w.allMasters, host)
+			}
 		}
 	}
 	return w.allMasters, nil
@@ -270,7 +278,7 @@ func (w *worker) identifyConcernedNodes() ([]*pb.Host, error) {
 	}
 
 	if w.concernedNodes == nil {
-		hosts, err := w.identifyAllNodes()
+		hosts, err := w.identifyAllRunningNodes()
 		if err != nil {
 			return nil, err
 		}
@@ -280,12 +288,13 @@ func (w *worker) identifyConcernedNodes() ([]*pb.Host, error) {
 		}
 		w.concernedNodes = concernedHosts
 	}
+	logrus.Debugf("Found %d concerned nodes", len(w.concernedNodes))
 	return w.concernedNodes, nil
 }
 
-// identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
+// identifyAllRunningNodes returns a list of all the running hosts acting as nodes and keep this list
 // during all the install session
-func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
+func (w *worker) identifyAllRunningNodes() ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
@@ -302,7 +311,13 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 			if err != nil {
 				return nil, err
 			}
-			allHosts = append(allHosts, host)
+			state, err := hostClt.Status(i, temporal.GetExecutionTimeout())
+			if err != nil {
+				return nil, err
+			}
+			if state.Status == hoststate.STARTED.String() {
+				allHosts = append(allHosts, host)
+			}
 		}
 		w.allNodes = allHosts
 	}
@@ -352,7 +367,7 @@ func (w *worker) identifyConcernedGateways() ([]*pb.Host, error) {
 	return w.concernedGateways, nil
 }
 
-// identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
+// identifyAllGateways returns a list of all running hosts acting as gateways and keep this list
 // during all the install session
 func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	if w.allGateways != nil {
@@ -372,8 +387,6 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	results = append(results, w.allGateways...)
 	results = append(results, gw)
 
 	if netCfg.SecondaryGatewayID != "" {
@@ -388,7 +401,7 @@ func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
+func (w *worker) Proceed(v data.Map, s Settings) (results Results, err error) {
 	w.variables = v
 	w.settings = s
 
@@ -464,12 +477,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		anon              interface{}
 		stepName, stepKey string
 		stepMap           map[string]interface{}
-		vars              Variables
+		vars              data.Map
 		ok                bool
 	)
 	p := params.(data.Map)
 
-	if _, ok = p["stepName"]; !ok {
+	if anon, ok = p["stepName"]; !ok {
 		return nil, scerr.InvalidParameterError("params[stepName]", "is missing")
 	}
 	if stepName, ok = anon.(string); !ok {
@@ -478,7 +491,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if stepName == "" {
 		return nil, scerr.InvalidParameterError("param[stepName]", "cannot be an empty string")
 	}
-	if _, ok = p["stepKey"]; !ok {
+	if anon, ok = p["stepKey"]; !ok {
 		return nil, scerr.InvalidParameterError("params[stepKey]", "is missing")
 	}
 	if stepKey, ok = anon.(string); !ok {
@@ -487,16 +500,16 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if stepKey == "" {
 		return nil, scerr.InvalidParameterError("param[stepKey]", "cannot be an empty string")
 	}
-	if _, ok = p["stepMap"]; !ok {
+	if anon, ok = p["stepMap"]; !ok {
 		return nil, scerr.InvalidParameterError("params[stepMap]", "is missing")
 	}
 	if stepMap, ok = anon.(map[string]interface{}); !ok {
 		return nil, scerr.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
 	}
-	if _, ok = p["variables"]; !ok {
+	if anon, ok = p["variables"]; !ok {
 		return nil, scerr.InvalidParameterError("params[variables]", "is missing")
 	}
-	if vars, ok = p["variables"].(Variables); !ok {
+	if vars, ok = p["variables"].(data.Map); !ok {
 		return nil, scerr.InvalidParameterError("params[variables]", "must be a data.Map")
 	}
 	if vars == nil {
@@ -583,16 +596,16 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			ok      bool
 			content interface{}
 		)
-		c := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
+		clusterComplexity := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
 		for k, anon := range options {
 			avails[strings.ToLower(k)] = anon
 		}
-		if content, ok = avails[c]; !ok {
-			if c == strings.ToLower(complexity.Large.String()) {
-				c = complexity.Normal.String()
+		if content, ok = avails[clusterComplexity]; !ok {
+			if clusterComplexity == strings.ToLower(complexity.Large.String()) {
+				clusterComplexity = complexity.Normal.String()
 			}
-			if c == strings.ToLower(complexity.Normal.String()) {
-				if content, ok = avails[c]; !ok {
+			if clusterComplexity == strings.ToLower(complexity.Normal.String()) {
+				if content, ok = avails[clusterComplexity]; !ok {
 					content, ok = avails[complexity.Small.String()]
 				}
 			}
@@ -620,7 +633,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, err := normalizeScript(Variables{
+	templateCommand, err := normalizeScript(data.Map{
 		"reserved_Name":    w.feature.DisplayName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
@@ -636,7 +649,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if ok {
 		value, ok := anon.(string)
 		if ok {
-			if strings.ToLower(value) == "yes" || strings.ToLower(value) != "true" {
+			if strings.ToLower(value) == "yes" || strings.ToLower(value) == "true" {
 				serial = true
 			}
 		}
@@ -801,19 +814,29 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
-		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+		switch err.(type) {
+		case scerr.ErrNotFound:
+			return nil
+		default:
+			return scerr.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
+		}
 	}
 	var secondaryKongController *KongController
 	if network.SecondaryGatewayID != "" {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
-			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+			switch err.(type) {
+			case scerr.ErrNotFound:
+				return scerr.InconsistentError("reverseproxy found on primary gateway but not on secondary gateway")
+			default:
+				return scerr.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
+			}
 		}
 	}
 
 	// Now submits all the rules to reverse proxy
 	primaryGatewayVariables := w.variables.Clone()
-	var secondaryGatewayVariables Variables
+	var secondaryGatewayVariables data.Map
 	if secondaryKongController != nil {
 		secondaryGatewayVariables = w.variables.Clone()
 	}
@@ -846,13 +869,13 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 		hosts, err := w.identifyHosts(targets)
 		if err != nil {
-			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
+			return scerr.InvalidRequestError(fmt.Sprintf("failed to apply proxy rules: %s", err.Error()))
 		}
 
 		for _, h := range hosts {
 			primaryGatewayVariables["HostIP"] = h.PrivateIp
 			primaryGatewayVariables["Hostname"] = h.Name
-			tP, err := w.feature.task.StartInSubTask(asyncApplyProxyRule, data.Map{
+			tP, err := w.feature.task.StartInSubTask(taskApplyProxyRule, data.Map{
 				"ctrl": primaryKongController,
 				"rule": rule,
 				"vars": &primaryGatewayVariables,
@@ -865,7 +888,7 @@ func (w *worker) setReverseProxy() (err error) {
 			if secondaryKongController != nil {
 				secondaryGatewayVariables["HostIP"] = h.PrivateIp
 				secondaryGatewayVariables["Hostname"] = h.Name
-				tS, errOp := w.feature.task.StartInSubTask(asyncApplyProxyRule, data.Map{
+				tS, errOp := w.feature.task.StartInSubTask(taskApplyProxyRule, data.Map{
 					"ctrl": secondaryKongController,
 					"rule": rule,
 					"vars": &secondaryGatewayVariables,
@@ -888,7 +911,7 @@ func (w *worker) setReverseProxy() (err error) {
 	return nil
 }
 
-func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, err error) {
+func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, err error) {
 	ctrl, ok := params.(data.Map)["ctrl"].(*KongController)
 	if !ok {
 		return nil, scerr.InvalidParameterError("ctrl", "is not a *KongController")
@@ -897,7 +920,7 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 	if !ok {
 		return nil, scerr.InvalidParameterError("rule", "is not a map")
 	}
-	vars, ok := params.(data.Map)["vars"].(*Variables)
+	vars, ok := params.(data.Map)["vars"].(*data.Map)
 	if !ok {
 		return nil, scerr.InvalidParameterError("vars", "is not a *Variables")
 	}
@@ -952,7 +975,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		if w.action == action.Add {
 			all, err = w.identifyConcernedMasters()
 		} else {
-			all, err = w.identifyAllMasters()
+			all, err = w.identifyAllRunningMasters()
 		}
 		if err != nil {
 			return nil, err
@@ -971,7 +994,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		if w.action == action.Add {
 			all, err = w.identifyConcernedNodes()
 		} else {
-			all, err = w.identifyAllNodes()
+			all, err = w.identifyAllRunningNodes()
 		}
 		if err != nil {
 			return nil, err

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -30,7 +31,6 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // safescale nas|share create share1 host1 --path="/shared/data"
@@ -83,7 +83,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := ShareHandler(job)
+	handler := handlers.NewShareHandler(job)
 	share, err := handler.Create(
 		shareName,
 		hostRef, sharePath,
@@ -140,7 +140,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := ShareHandler(job)
+	handler := handlers.NewShareHandler(job)
 	_, _, _, err = handler.Inspect(shareName)
 	if err != nil {
 		return empty, err
@@ -185,7 +185,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ 
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := ShareHandler(job)
+	handler := handlers.NewShareHandler(job)
 	shares, err := handler.List()
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := ShareHandler(job)
+	handler := handlers.NewShareHandler(job)
 	mount, err := handler.Mount(shareRef, hostRef, hostPath, in.GetWithCache())
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := ShareHandler(job)
+	handler := handlers.NewShareHandler(job)
 	err = handler.Unmount(shareRef, hostRef)
 	if err != nil {
 		return empty, err
@@ -339,7 +339,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 	}
 	defer job.Close()
 
-	handler := ShareHandler(job)
+	handler := handlers.NewShareHandler(job)
 	host, share, mounts, err := handler.Inspect(shareRef)
 	if err != nil {
 		return nil, err
