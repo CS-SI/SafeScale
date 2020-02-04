@@ -18,7 +18,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -423,7 +422,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			}()
 
 			sshSvc := handlers.NewSSHHandler(job)
-			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
+			ssh, err := sshSvc.GetConfig(host.ID)
 			if err != nil {
 				logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
@@ -433,7 +432,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
 			}
-			c, err := ssh.Command(cmd)
+			c, err := ssh.Command(job.Task(), cmd)
 			if err != nil {
 				logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
