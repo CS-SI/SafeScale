@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 feature:
     suitableFor:
         host: no
-        cluster: yes
+        cluster: swarm
 
     parameters:
         - PurgeOnRemoval=no
@@ -123,10 +123,7 @@ feature:
                             log_status_interval=300
 
                             use_replication_slots=true
-                            pg_bindir=/usr/lib/postgresql/bin
-                            log_file=/var/log/repmgr.log
-                            log_level=WARN
-                            exitover=automatic
+                            failover=automatic
                             reconnect_attempts=3
                             promote_command='repmgr -f /etc/postgresql/repmgr.conf standby promote --log-to-file'
                             follow_command='repmgr -f /etc/postgresql/repmgr.conf standby follow --log-to-file --upstream-node-id=%n'
@@ -310,11 +307,11 @@ feature:
                                     update_pghba_conf
                                     op=-1
                                     pg_ctl start &>/dev/stdout && wait_for_local_postgres 60 && op=\$?
-                                    [ \$op -ne 0 ] && echo "failed to start postgresql instance." && sfFail 4
+                                    [ \$op -ne 0 ] && echo "exited to start postgresql instance." && sfFail 4
                                     echo -n "Registering postgresql instance as hot-standby... "
                                     op=-1
                                     repmgr --config-file=/etc/postgresql/repmgr.conf --host="\$REPMGR_PRIMARY_HOST" --username=repmgr --dbname=repmgr standby register && op=\$?
-                                    [ \$op -ne 0 ] && echo "failed." && sfFail 5
+                                    [ \$op -ne 0 ] && echo "exited." && sfFail 5
                                     echo done
                                 fi
                             fi
@@ -395,8 +392,6 @@ feature:
                             else
                                 exec postgres --config-file=/etc/postgresql/postgresql.conf "\$@"
                             fi
-
-                            exec /docker-entry-point.sh
                             EOF
 
                             cat >${SF_ETCDIR}/postgresql4platform/build/pgsql/Dockerfile <<-EOF

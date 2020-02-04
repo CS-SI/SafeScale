@@ -5,8 +5,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 // bashInstaller is an installer using script to add and remove a feature
@@ -24,7 +24,7 @@ func (i *bashInstaller) Check(f *Feature, t Target, v Variables, s Settings) (Re
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, Method.Bash, Action.Check, nil)
+	worker, err := newWorker(f, t, method.Bash, action.Check, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (i *bashInstaller) Add(f *Feature, t Target, v Variables, s Settings) (Resu
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename())
 	}
 
-	worker, err := newWorker(f, t, Method.Bash, Action.Add, nil)
+	worker, err := newWorker(f, t, method.Bash, action.Add, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (i *bashInstaller) Remove(f *Feature, t Target, v Variables, s Settings) (R
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename())
 	}
 
-	worker, err := newWorker(f, t, Method.Bash, Action.Remove, nil)
+	worker, err := newWorker(f, t, method.Bash, action.Remove, nil)
 	if err != nil {
 		return nil, err
 	}

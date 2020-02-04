@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -32,9 +29,12 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -62,7 +62,7 @@ type Subnet struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 	//IPVersion is IPv4 or IPv6 (see IPVersion)
-	IPVersion IPVersion.Enum `json:"ip_version,omitempty"`
+	IPVersion ipversion.Enum `json:"ip_version,omitempty"`
 	//Mask mask in CIDR notation
 	Mask string `json:"mask,omitempty"`
 	//NetworkID id of the parent network
@@ -377,8 +377,8 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	}()
 
 	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+		hostSizingV1 := clonable.(*propsv1.HostSizing)
 		hostSizingV1.Template = req.TemplateID
 		return nil
 	})
@@ -403,33 +403,33 @@ func (s *Stack) DeleteGateway(id string) error {
 }
 
 // ToGopherIPversion ...
-func ToGopherIPversion(v IPVersion.Enum) gophercloud.IPVersion {
-	if v == IPVersion.IPv4 {
+func ToGopherIPversion(v ipversion.Enum) gophercloud.IPVersion {
+	if v == ipversion.IPv4 {
 		return gophercloud.IPv4
 	}
-	if v == IPVersion.IPv6 {
+	if v == ipversion.IPv6 {
 		return gophercloud.IPv6
 	}
 	return -1
 }
 
-func fromGopherIPversion(v gophercloud.IPVersion) IPVersion.Enum {
-	if v == gophercloud.IPv4 {
-		return IPVersion.IPv4
-	}
-	if v == gophercloud.IPv6 {
-		return IPVersion.IPv6
-	}
-	return -1
-}
+// func fromGopherIPversion(v gophercloud.IPVersion) ipversion.Enum {
+// 	if v == gophercloud.IPv4 {
+// 		return ipversion.IPv4
+// 	}
+// 	if v == gophercloud.IPv6 {
+// 		return ipversion.IPv6
+// 	}
+// 	return -1
+// }
 
 // FromIntIPversion ...
-func FromIntIPversion(v int) IPVersion.Enum {
+func FromIntIPversion(v int) ipversion.Enum {
 	if v == 4 {
-		return IPVersion.IPv4
+		return ipversion.IPv4
 	}
 	if v == 6 {
-		return IPVersion.IPv6
+		return ipversion.IPv6
 	}
 	return -1
 }
@@ -438,7 +438,7 @@ func FromIntIPversion(v int) IPVersion.Enum {
 // - netID ID of the parent network
 // - name is the name of the sub network
 // - mask is a network mask defined in CIDR notation
-func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum, dnsServers []string) (subn *Subnet, err error) {
+func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion ipversion.Enum, dnsServers []string) (subn *Subnet, err error) {
 	// You must associate a new subnet with an existing network - to do this you
 	// need its UUID. You must also provide a well-formed CIDR value.
 	dhcp := true
@@ -479,7 +479,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 	r := subnets.Create(s.NetworkClient, opts)
 	subnet, err := r.Extract()
 	if err != nil {
-		switch r.Err.(type) {
+		switch r.Err.(type) { // nolint
 		case gophercloud.ErrDefault400:
 			neutronError := ParseNeutronError(r.Err.Error())
 			if neutronError != nil {
@@ -536,28 +536,28 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 	}, nil
 }
 
-// calcDhcpAllocationPool calculates the start and the end of the DHCP allocation pool based on cidr
-// Keeps 10 IP addresses out of the pool to allow static and VIP addresses
-func calcDhcpAllocationPool(cidr string) (string, string, error) {
-	_, _, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return "", "", fmt.Errorf("invalid cidr '%s'", cidr)
-	}
+// // calcDhcpAllocationPool calculates the start and the end of the DHCP allocation pool based on cidr
+// // Keeps 10 IP addresses out of the pool to allow static and VIP addresses
+// func calcDhcpAllocationPool(cidr string) (string, string, error) {
+// 	_, _, err := net.ParseCIDR(cidr)
+// 	if err != nil {
+// 		return "", "", fmt.Errorf("invalid cidr '%s'", cidr)
+// 	}
 
-	start, end, err := utils.CIDRToLongRange(cidr)
-	if err != nil {
-		return "", "", err
-	}
-	start += 11
-	if start >= end {
-		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr), 0, nil)
-	}
-	end -= 3
-	if end <= start {
-		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr), 0, nil)
-	}
-	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
-}
+// 	start, end, err := utils.CIDRToLongRange(cidr)
+// 	if err != nil {
+// 		return "", "", err
+// 	}
+// 	start += 11
+// 	if start >= end {
+// 		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+// 	}
+// 	end -= 3
+// 	if end <= start {
+// 		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+// 	}
+// 	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
+// }
 
 // getSubnet returns the sub network identified by id
 func (s *Stack) getSubnet(id string) (*Subnet, error) {
@@ -636,23 +636,24 @@ func (s *Stack) deleteSubnet(id string) error {
 		func() error {
 			r := subnets.Delete(s.NetworkClient, id)
 			err = r.ExtractErr()
-			if err != nil {
-				if _, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
-					neutronError := ParseNeutronError(err.Error())
-					switch neutronError["type"] {
-					case "SubnetInUse":
-						msg := fmt.Sprintf("hosts or services are still attached")
-						log.Warnf(utils.Capitalize(msg))
-						return resources.ResourceNotAvailableError("subnet", id)
-					default:
-						log.Debugf("NeutronError: type = %s", neutronError["type"])
-					}
-				} else {
-					msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-					log.Errorf(utils.Capitalize(msg))
-					return fmt.Errorf(msg)
+
+			if _, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
+				neutronError := ParseNeutronError(err.Error())
+				switch neutronError["type"] {
+				case "SubnetInUse":
+					msg := fmt.Sprintf("hosts or services are still attached")
+					log.Warnf(utils.Capitalize(msg))
+					return resources.ResourceNotAvailableError("subnet", id)
+				default:
+					log.Debugf("NeutronError: type = %s", neutronError["type"])
 				}
 			}
+			if err != nil {
+				msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
+				log.Errorf(utils.Capitalize(msg))
+				return fmt.Errorf(msg)
+			}
+
 			return nil
 		},
 		temporal.GetContextTimeout(),
@@ -783,7 +784,7 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -800,7 +801,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error)
 	if err != nil {
 		return nil, err
 	}
-	vip := resources.VIP{
+	vip := resources.VirtualIP{
 		ID:        port.ID,
 		PrivateIP: port.FixedIPs[0].IPAddress,
 	}
@@ -808,7 +809,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error)
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -817,15 +818,15 @@ func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
 		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
-	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
@@ -833,7 +834,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
 		return err
 	}
 	hostPorts, err := s.listPorts(ports.ListOpts{
-		DeviceID:  host.ID,
+		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
 	if err != nil {
@@ -854,15 +855,15 @@ func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
 		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
-	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
@@ -870,14 +871,14 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) erro
 		return err
 	}
 	hostPorts, err := s.listPorts(ports.ListOpts{
-		DeviceID:  host.ID,
+		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
 	if err != nil {
 		return err
 	}
 	for _, p := range hostPorts {
-		newAllowedAddressPairs := []ports.AddressPair{}
+		var newAllowedAddressPairs []ports.AddressPair
 		for _, a := range p.AllowedAddressPairs {
 			if a.MACAddress != vipPort.MACAddress {
 				newAllowedAddressPairs = append(newAllowedAddressPairs, a)
@@ -892,7 +893,7 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) erro
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}

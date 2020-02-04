@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,15 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with needed supplemental/overriding fields
 type NetworkDescription struct {
 	Purpose string    `json:"purpose,omitempty"` // contains the purpose of this network
 	Created time.Time `json:"created,omitempty"` // Contains the date of creation if the network
@@ -37,23 +38,29 @@ func NewNetworkDescription() *NetworkDescription {
 	return &NetworkDescription{}
 }
 
-// Content ... (serialize.Property interface)
-func (nd *NetworkDescription) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (nd *NetworkDescription) Content() data.Clonable {
 	return nd
 }
 
-// Clone ... (serialize.Property interface)
-func (nd *NetworkDescription) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (nd *NetworkDescription) Clone() data.Clonable {
 	return NewNetworkDescription().Replace(nd)
 }
 
-// Replace ... (serialize.Property interface)
-func (nd *NetworkDescription) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
 	*nd = *p.(*NetworkDescription)
 	return nd
 }
 
 // NetworkHosts contains information about hosts connected to the network
+// !!! FROZEN !!!
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental/overriding fields
 type NetworkHosts struct {
 	ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
 	ByName map[string]string `json:"by_name"` // list of host IDs, indexed by host name
@@ -75,18 +82,21 @@ func (nh *NetworkHosts) Reset() {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (nh *NetworkHosts) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (nh *NetworkHosts) Content() data.Clonable {
 	return nh
 }
 
-// Clone ... (serialize.Property interface)
-func (nh *NetworkHosts) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (nh *NetworkHosts) Clone() data.Clonable {
 	return NewNetworkHosts().Replace(nh)
 }
 
-// Replace ... (serialize.Property interface)
-func (nh *NetworkHosts) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 	src := p.(*NetworkHosts)
 	nh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
@@ -100,6 +110,6 @@ func (nh *NetworkHosts) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", NetworkProperty.HostsV1, NewNetworkHosts())
-	serialize.PropertyTypeRegistry.Register("resources.network", NetworkProperty.DescriptionV1, NewNetworkDescription())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.HostsV1, NewNetworkHosts())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.DescriptionV1, NewNetworkDescription())
 }

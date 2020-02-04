@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -65,7 +65,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 		return clitools.ExitOnRPC(err.Error())
 	}
 	if hostInstance == nil {
-		return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
+		return clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
 	}
 
 	return nil

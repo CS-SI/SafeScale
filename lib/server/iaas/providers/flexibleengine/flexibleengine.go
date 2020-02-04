@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
 	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -133,9 +133,9 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		DNSList:             []string{"100.125.0.41", "100.126.0.41"},
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
-		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"SATA": VolumeSpeed.COLD,
-			"SSD":  VolumeSpeed.SSD,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"SATA": volumespeed.COLD,
+			"SSD":  volumespeed.SSD,
 		},
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,
@@ -222,49 +222,49 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 // 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "t2.")
 // }
 
-func isS3Template(tpl resources.HostTemplate) bool {
-	return strings.HasPrefix(strings.ToUpper(tpl.Name), "S3.")
-}
+// func isS3Template(tpl resources.HostTemplate) bool {
+// 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "S3.")
+// }
 
-func templateFromWhite(regr string) templatefilters.Predicate {
-	return func(tpl resources.HostTemplate) bool {
-		re, err := regexp.Compile(regr)
-		if err != nil || len(regr) == 0 {
-			return true
-		}
-		return re.Match([]byte(tpl.Name))
-	}
-}
+// func templateFromWhite(regr string) templatefilters.Predicate {
+// 	return func(tpl resources.HostTemplate) bool {
+// 		re, err := regexp.Compile(regr)
+// 		if err != nil || len(regr) == 0 {
+// 			return true
+// 		}
+// 		return re.Match([]byte(tpl.Name))
+// 	}
+// }
 
-func templateFromBlack(regr string) templatefilters.Predicate {
-	return func(tpl resources.HostTemplate) bool {
-		re, err := regexp.Compile(regr)
-		if err != nil || len(regr) == 0 {
-			return false
-		}
-		return re.Match([]byte(tpl.Name))
-	}
-}
+// func templateFromBlack(regr string) templatefilters.Predicate {
+// 	return func(tpl resources.HostTemplate) bool {
+// 		re, err := regexp.Compile(regr)
+// 		if err != nil || len(regr) == 0 {
+// 			return false
+// 		}
+// 		return re.Match([]byte(tpl.Name))
+// 	}
+// }
 
-func imageFromWhite(regr string) imagefilters.Predicate {
-	return func(image resources.Image) bool {
-		re, err := regexp.Compile(regr)
-		if err != nil || len(regr) == 0 {
-			return true
-		}
-		return re.Match([]byte(image.Name))
-	}
-}
+// func imageFromWhite(regr string) imagefilters.Predicate {
+// 	return func(image resources.Image) bool {
+// 		re, err := regexp.Compile(regr)
+// 		if err != nil || len(regr) == 0 {
+// 			return true
+// 		}
+// 		return re.Match([]byte(image.Name))
+// 	}
+// }
 
-func imageFromBlack(regr string) imagefilters.Predicate {
-	return func(image resources.Image) bool {
-		re, err := regexp.Compile(regr)
-		if err != nil || len(regr) == 0 {
-			return false
-		}
-		return re.Match([]byte(image.Name))
-	}
-}
+// func imageFromBlack(regr string) imagefilters.Predicate {
+// 	return func(image resources.Image) bool {
+// 		re, err := regexp.Compile(regr)
+// 		if err != nil || len(regr) == 0 {
+// 			return false
+// 		}
+// 		return re.Match([]byte(image.Name))
+// 	}
+// }
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm

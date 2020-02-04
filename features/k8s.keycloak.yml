@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,20 +28,10 @@ feature:
     requirements:
         features:
             - kubernetes
-            - k8s.helm-repo.codecentric
+            - helm
 
     install:
         bash:
-            check:
-                pace: helm
-                steps:
-                    helm:
-                        targets:
-                            masters: any
-                        run: |
-                            sfHelm ls {{ .HelmRepoName }}/{{ .ReleaseName }} || sfFail 192
-                            sfExit
-
             add:
                 pace: helm
                 steps:
@@ -49,7 +39,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            sfHelm install {{ .HelmRepoName }}/keycloak \
+                            helm install {{ .HelmRepoName }}/keycloak \
                                 --name {{ .ReleaseName }}}} \
                                 --namespace "{{ .Namespace }}" \
                                 --version {{ .ChartVersion }} \
@@ -61,7 +51,6 @@ feature:
                                 --set ingress.controller="kong" \
                                 --set ingress.annotations."plugins\.konghq\.com"=kong-oidc-plugin \
                                 || sfFail 192
-                            sfExit
 
             remove:
                 pace: helm
@@ -70,7 +59,5 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            sfHelm delete {{ .ReleaseName }} || sfFail 192
-                            sfExit
-
+                            sfHelm delete {{ .ReleaseName }}
 ---

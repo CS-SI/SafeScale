@@ -14,8 +14,8 @@ func TestBuildMetadataBucketName(t *testing.T) {
 	}
 
 	suffix := ""
-	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
-		suffix = "." + suffix
+	if newsuffix, ok := os.LookupEnv(suffixEnvName); ok {
+		suffix = "." + newsuffix
 	}
 
 	tests := []struct {

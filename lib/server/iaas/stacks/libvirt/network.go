@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/libvirt/libvirt-go"
@@ -80,15 +80,15 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 		return nil, fmt.Errorf(fmt.Sprintf("failed get Unmarshal networks's xml description  : %s", err.Error()))
 	}
 
-	var ipVersion IPVersion.Enum
+	var ipVersion ipversion.Enum
 	if networkDescription.IPv6 == "" {
-		ipVersion = IPVersion.IPv4
+		ipVersion = ipversion.IPv4
 	} else {
-		ipVersion = IPVersion.IPv6
+		ipVersion = ipversion.IPv6
 	}
 
 	cidr := ""
-	if ipVersion == IPVersion.IPv4 {
+	if ipVersion == ipversion.IPv4 {
 		netmaskBloc := strings.Split(networkDescription.IPs[0].Netmask, ".")
 		ipBlocstring := strings.Split(networkDescription.IPs[0].Address, ".")
 		var ipBloc [4]int
@@ -131,7 +131,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	cidr := req.CIDR
 	dns := req.DNSServers
 
-	if ipVersion != IPVersion.IPv4 {
+	if ipVersion != ipversion.IPv4 {
 		// TODO implement IPV6 networks
 		return nil, scerr.NotImplementedError("only ipv4 networks are implemented")
 	}
@@ -148,7 +148,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	}
 
 	if libvirtNetwork != nil {
-		return nil, fmt.Errorf("Network %s already exists", name)
+		return nil, fmt.Errorf("network %s already exists", name)
 	}
 
 	ip, netmask, dhcpStart, dhcpEnd, err := infoFromCidr(cidr)
@@ -329,26 +329,26 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
 	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) error {
 	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
 }

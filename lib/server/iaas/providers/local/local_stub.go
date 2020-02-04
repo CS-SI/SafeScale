@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
@@ -117,19 +117,19 @@ func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resource
 func (provider *provider) DeleteGateway(string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+func (provider *provider) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) AddPublicIPToVIP(vip *resources.VIP) error {
+func (provider *provider) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (provider *provider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (provider *provider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteVIP(vip *resources.VIP) error {
+func (provider *provider) DeleteVIP(vip *resources.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 
@@ -145,8 +145,8 @@ func (provider *provider) InspectHost(interface{}) (*resources.Host, error) {
 func (provider *provider) GetHostByName(string) (*resources.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetHostState(interface{}) (HostState.Enum, error) {
-	return HostState.ERROR, fmt.Errorf(errorStr)
+func (provider *provider) GetHostState(interface{}) (hoststate.Enum, error) {
+	return hoststate.ERROR, fmt.Errorf(errorStr)
 }
 func (provider *provider) ListHosts() ([]*resources.Host, error) {
 	return nil, fmt.Errorf(errorStr)

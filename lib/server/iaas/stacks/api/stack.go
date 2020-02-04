@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@
 package api
 
 import (
+	"time"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"time"
 )
 
 //go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
@@ -67,15 +68,15 @@ type Stack interface {
 	DeleteGateway(networkID string) error
 
 	// CreateVIP ...
-	CreateVIP(string, string) (*resources.VIP, error)
+	CreateVIP(string, string) (*resources.VirtualIP, error)
 	// AddPublicIPToVIP adds a public IP to VIP
-	AddPublicIPToVIP(*resources.VIP) error
+	AddPublicIPToVIP(*resources.VirtualIP) error
 	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-	BindHostToVIP(*resources.VIP, *resources.Host) error
+	BindHostToVIP(*resources.VirtualIP, string) error
 	// UnbindHostFromVIP removes the bind between the VIP and a host
-	UnbindHostFromVIP(*resources.VIP, *resources.Host) error
+	UnbindHostFromVIP(*resources.VirtualIP, string) error
 	// DeleteVIP deletes the port corresponding to the VIP
-	DeleteVIP(*resources.VIP) error
+	DeleteVIP(*resources.VirtualIP) error
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error)
@@ -84,7 +85,7 @@ type Stack interface {
 	// GetHostByName returns the host identified by name
 	GetHostByName(string) (*resources.Host, error)
 	// GetHostState returns the current state of the host identified by id
-	GetHostState(interface{}) (HostState.Enum, error)
+	GetHostState(interface{}) (hoststate.Enum, error)
 	// ListHosts lists all hosts
 	ListHosts() ([]*resources.Host, error)
 	// DeleteHost deletes the host identified by id

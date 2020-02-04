@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,16 +177,12 @@ func (i *Item) BrowseInto(path string, callback func([]byte) error) error {
 	if path == "" {
 		path = "."
 	}
-	return i.folder.Browse(path, func(buf []byte) error {
-		return callback(buf)
-	})
+	return i.folder.Browse(path, callback)
 }
 
 // Browse walks through folder of item and executes a callback for each entry
 func (i *Item) Browse(callback func([]byte) error) error {
-	return i.BrowseInto(".", func(buf []byte) error {
-		return callback(buf)
-	})
+	return i.BrowseInto(".", callback)
 }
 
 // Acquire waits until the lock is available, then locks the metadata

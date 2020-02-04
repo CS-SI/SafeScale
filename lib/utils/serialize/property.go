@@ -1,5 +1,7 @@
+// +build ignore
+
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +23,7 @@ package serialize
 // Property is the interface each Property must satisfy
 type Property interface {
 	// Content allows to access real data from property
-	Content() interface{}
+	Content() data.Clonable
 	// Clone allows to duplicate Property
 	Clone() Property
 	// Replace allows to replace Property with data from source

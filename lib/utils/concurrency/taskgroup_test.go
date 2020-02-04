@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,13 @@ package concurrency
 
 import (
 	"fmt"
-	"github.com/gophercloud/gophercloud/acceptance/tools"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/gophercloud/gophercloud/acceptance/tools"
+	"github.com/stretchr/testify/require"
 )
 
 // FIXME The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
@@ -183,6 +185,10 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 		tasks = append(tasks, rt)
 	}
 
+	if len(tasks) == 0 {
+		t.Fatal("Unexpected error")
+	}
+
 	var res TaskResult
 
 	c := make(chan struct{})
@@ -237,10 +243,15 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 
 	begin := time.Now()
 	waited, _, err := overlord.WaitFor(time.Duration(10) * 10 * time.Millisecond)
+	if err != nil {
+		if _, ok := err.(*scerr.ErrTimeout); !ok {
+			t.Errorf("Unexpected group wait: %s", err)
+		}
+	}
 	end := time.Since(begin)
 
 	if end >= (time.Millisecond * 10 * 12) {
-		t.Errorf("It should have finished near 100 ms but it didn't !!")
+		t.Errorf("It should have finished near 100 ms but it didn't, it was %s !!", end)
 	}
 
 	if waited {

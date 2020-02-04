@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package install
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -33,6 +32,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -70,7 +70,7 @@ var featureScriptTemplate atomic.Value
 
 // parseTargets validates targets on the cluster from the feature specification
 // Without error, returns 'master target', 'private node target' and 'public node target'
-func parseTargets(specs *viper.Viper) (string, string, string, error) {
+func parseTargets(specs *viper.Viper) (string, string, string, error) { // nolint
 	if !specs.IsSet("feature.target.cluster") {
 		return "", "", "", fmt.Errorf("feature isn't suitable for a cluster")
 	}
@@ -175,11 +175,15 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	task, err := concurrency.NewTask()
+	if err != nil {
+		return err
+	}
 	sshClt := client.New().SSH
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(context.TODO(), localpath, to, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
+			retcode, _, _, err := sshClt.Copy(task, localpath, to, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -187,7 +191,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(context.TODO(), host.Name, fmt.Sprintf("sudo rm -f %s", localpath), temporal.GetBigDelay(), temporal.GetExecutionTimeout())
+					_, _, _, err = sshClt.Run(task, host.Name, fmt.Sprintf("sudo rm -f %s", localpath), outputs.COLLECT, temporal.GetBigDelay(), temporal.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -210,8 +214,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		return fmt.Errorf("an unrecoverable network error has occurred")
 	}
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case *retry.ErrTimeout:
+		if _, ok := retryErr.(*retry.ErrTimeout); ok {
 			return fmt.Errorf("timeout trying to copy temporary file to '%s': %s", to, retryErr.Error())
 		}
 		return retryErr
@@ -233,10 +236,11 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		}
 		cmd += "sudo chmod " + rights + " " + remotepath
 	}
+
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = sshClt.Run(context.TODO(), host.Name, cmd, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
+			retcode, _, _, err = sshClt.Run(task, host.Name, cmd, outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -370,7 +374,7 @@ func replaceVariablesInString(text string, v Variables) (string, error) {
 	return dataBuffer.String(), nil
 }
 
-func findConcernedHosts(list []string, c *Feature) (string, error) {
+func findConcernedHosts(list []string, c *Feature) (string, error) { // nolint
 	// No metadata yet for features, first host is designated concerned host
 	if len(list) > 0 {
 		return list[0], nil

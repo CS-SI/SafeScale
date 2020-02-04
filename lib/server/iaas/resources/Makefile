@@ -4,7 +4,7 @@ GO?=go
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
-generate:
+generate: clean
 	@(cd enums && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,9 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -84,7 +85,7 @@ func (s StepResults) ErrorMessages() string {
 // UncompletedEntries returns an array of string of all keys where the script
 // to run action wasn't completed
 func (s StepResults) UncompletedEntries() []string {
-	output := []string{}
+	var output []string
 	for k, v := range s {
 		if !v.Completed() {
 			output = append(output, k)
@@ -245,7 +246,7 @@ type step struct {
 	// Name is the name of the step
 	Name string
 	// Action is the action of the step (check, add, remove)
-	Action Action.Enum
+	Action action.Enum
 	// Targets contains the host targets to select
 	Targets stepTargets
 	// Script contains the script to execute
@@ -275,10 +276,6 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 	)()
 
 	if is.Serial || s.Serialize {
-		subtask, err := concurrency.NewTask(is.Worker.feature.task)
-		if err != nil {
-			return nil, err
-		}
 
 		for _, h := range hosts {
 			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
@@ -291,15 +288,20 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			if err != nil {
 				return nil, err
 			}
-			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
-			results[h.Name] = result.(stepResult)
-			_, err = subtask.Reset()
+			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
 			if err != nil {
 				return nil, err
 			}
+			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
+			results[h.Name] = result.(stepResult)
+			subtask.Close()
+			// err = subtask.Reset()
+			// if err != nil {
+			// 	return nil, err
+			// }
 
 			if !results[h.Name].Successful() {
-				if is.Worker.action == Action.Check { // Checks can fail and it's ok
+				if is.Worker.action == action.Check { // Checks can fail and it's ok
 					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
@@ -327,7 +329,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			if err != nil {
 				return nil, err
 			}
-			subtask, err := concurrency.NewTask(is.Worker.feature.task)
+			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
 			if err != nil {
 				return nil, err
 			}
@@ -352,7 +354,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			results[k] = result.(stepResult)
 
 			if !results[k].Successful() {
-				if is.Worker.action == Action.Check { // Checks can fail and it's ok
+				if is.Worker.action == action.Check { // Checks can fail and it's ok
 					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
@@ -374,7 +376,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
-func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		p  = data.Map{}
 		ok bool
@@ -393,11 +395,6 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	variables, ok := p["variables"].(Variables)
 	if !ok {
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'variables' of type 'Variables'")
-	}
-
-	ctx, err := t.GetContext()
-	if err != nil {
-		return nil, err
 	}
 
 	// Updates variables in step script
@@ -436,7 +433,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	// Executes the script on the remote host
-	retcode, outrun, _, err := client.New().SSH.Run(ctx, host.Name, command, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, err := client.New().SSH.Run(task, host.Name, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{err: err, output: outrun}, nil
 	}
@@ -451,7 +448,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
 	richErrc := fmt.Sprintf("%d", retcode)
 
-	collected := []string{}
+	var collected []string
 	if stdout != "" {
 		errLines := strings.Split(stdout, "\n")
 		for _, errline := range errLines {
@@ -474,15 +471,14 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
 		}
 		return fmt.Errorf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
-	} else {
-		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
-		}
-
-		if retcode != 0 {
-			return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
-		}
-
-		return nil
 	}
+
+	if err != nil {
+		return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
+	}
+	if retcode != 0 {
+		return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+	}
+
+	return nil
 }

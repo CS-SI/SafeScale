@@ -3,14 +3,8 @@ package install
 import (
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
-)
-
-const (
-	dcosCli     = "sudo -u cladm -i dcos"
-	kubectlCli  = "sudo -u cladm -i kubectl"
-	marathonCli = "sudo -u cladm -i marathon"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 // dcosInstaller is an installer using script to add and remove a feature
@@ -22,7 +16,7 @@ func (i *dcosInstaller) GetName() string {
 
 // Check checks if the feature is installed
 func (i *dcosInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	worker, err := newWorker(c, t, Method.DCOS, Action.Check, nil)
+	worker, err := newWorker(c, t, method.DCOS, action.Check, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -33,9 +27,6 @@ func (i *dcosInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Re
 	}
 
 	// Replaces variables in normalized script
-	//v["DomainName"] = cluster.GetDomainName().DomainName
-	//	v["dcos"] = dcosCli
-	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
 
 	return worker.Proceed(v, s)
@@ -43,7 +34,7 @@ func (i *dcosInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Re
 
 // Add installs the feature in a DCOS cluster
 func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	worker, err := newWorker(c, t, Method.DCOS, Action.Add, nil)
+	worker, err := newWorker(c, t, method.DCOS, action.Add, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -54,9 +45,6 @@ func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Resu
 	}
 
 	// Replaces variables in normalized script
-	//v["DomainName"] = cluster.GetDomainName().DomainName
-	//v["dcos"] = dcosCli
-	//v["kubectl"] = kubectlCli
 	v["options"] = ""
 
 	return worker.Proceed(v, s)
@@ -70,7 +58,7 @@ func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Resu
 //   of failures on what parts
 func (i *dcosInstaller) Remove(c *Feature, t Target, v Variables, s Settings) (Results, error) {
 
-	worker, err := newWorker(c, t, Method.DCOS, Action.Remove, nil)
+	worker, err := newWorker(c, t, method.DCOS, action.Remove, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -81,9 +69,6 @@ func (i *dcosInstaller) Remove(c *Feature, t Target, v Variables, s Settings) (R
 	}
 
 	// Replaces variables in normalized script
-	//v["DomainName"] = cluster.GetDomainName().DomainName
-	//	v["dcos"] = dcosCli
-	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
 
 	return worker.Proceed(v, s)

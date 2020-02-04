@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!darwin
 
 package concurrency
 
@@ -6,6 +6,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func goid() int {
+func goid() int { // nolint
 	return unix.Gettid()
 }

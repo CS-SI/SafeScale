@@ -1,10 +1,11 @@
-package utils
+package server
 
 import (
 	"fmt"
-	"github.com/gregoryv/gocyclo"
 	"path/filepath"
 	"testing"
+
+	"github.com/gregoryv/gocyclo"
 )
 
 func complexityTester(maximum int, subdir string, t *testing.T) {

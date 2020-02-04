@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,9 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"regexp"
 
 	log "github.com/sirupsen/logrus"
-
 	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -31,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 var (
@@ -58,26 +57,26 @@ func GetTenantNames() (map[string]string, error) {
 
 // GetTenants returns all known tenants
 func GetTenants() ([]interface{}, error) {
-	tenants, err := getTenantsFromCfg()
+	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
 	return tenants, err
 }
 
-// UseStorages return the storageService build around storages referenced in tenantNames
-func UseStorages(tenantNames []string) (*StorageServices, error) {
-	storageServices := NewStorageService()
+// // UseStorages return the storageService build around storages referenced in tenantNames
+// func UseStorages(tenantNames []string) (*StorageServices, error) {
+// 	storageServices := NewStorageService()
 
-	for _, tenantName := range tenantNames {
-		err := storageServices.RegisterStorage(tenantName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register storage tenant %s : %s", tenantName, err.Error())
-		}
-	}
+// 	for _, tenantName := range tenantNames {
+// 		err := storageServices.RegisterStorage(tenantName)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to register storage tenant %s : %s", tenantName, err.Error())
+// 		}
+// 	}
 
-	return &storageServices, nil
-}
+// 	return &storageServices, nil
+// }
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
@@ -85,14 +84,14 @@ func UseService(tenantName string) (newService Service, err error) {
 	defer scerr.OnExitLogError("", &err)()
 	defer scerr.OnPanic(&err)
 
-	tenants, err := getTenantsFromCfg()
+	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		tenantInCfg = false
-		found       = false
+		tenantInCfg bool
+		found       bool
 		name        string
 		svc         Service
 		svcProvider = "__not_found__"
@@ -250,15 +249,15 @@ func UseService(tenantName string) (newService Service, err error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocation objectstorage.Location, fakeMetaLocation objectstorage.Location) (Service, error) {
-	tenants, err := getTenantsFromCfg()
+func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocation objectstorage.Location, fakeMetaLocation objectstorage.Location) (Service, error) { // nolint
+	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		tenantInCfg = false
-		found       = false
+		tenantInCfg bool
+		found       bool
 		name        string
 		svc         Service
 		svcProvider = "__not_found__"
@@ -690,7 +689,7 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 }
 
 func loadConfig() error {
-	tenantsCfg, err := getTenantsFromCfg()
+	tenantsCfg, v, err := getTenantsFromCfg()
 	if err != nil {
 		return err
 	}
@@ -709,10 +708,8 @@ func loadConfig() error {
 	return nil
 }
 
-var v *viper.Viper
-
-func getTenantsFromCfg() ([]interface{}, error) {
-	v = viper.New()
+func getTenantsFromCfg() ([]interface{}, *viper.Viper, error) {
+	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
 	v.AddConfigPath("$HOME/.config/safescale")
@@ -722,9 +719,9 @@ func getTenantsFromCfg() ([]interface{}, error) {
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
 		log.Errorf(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, v, fmt.Errorf(msg)
 	}
 	settings := v.AllSettings()
 	tenantsCfg, _ := settings["tenants"].([]interface{})
-	return tenantsCfg, nil
+	return tenantsCfg, v, nil
 }

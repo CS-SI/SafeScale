@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package install
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,7 +50,7 @@ func init() {
 		metricbeatFeature(),
 		filebeatFeature(),
 		kibanaFeature(),
-		helmFeature(),
+		k8shelm2Feature(),
 		sparkmaster4platformFeature(),
 		elassandraFeature(),
 		consul4platformFeature(),
@@ -63,20 +63,20 @@ func init() {
 		allEmbeddedMap[item.DisplayName()] = item
 		installers := item.specs.GetStringMap("feature.install")
 		for k := range installers {
-			method, err := Method.Parse(k)
+			meth, err := method.Parse(k)
 			if err != nil {
-				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install method '%s' unknown!",
+				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install meth '%s' unknown!",
 					item.DisplayName(), item.DisplayFilename(), k))
 				continue
 			}
-			if _, found := availableEmbeddedMap[method]; !found {
-				availableEmbeddedMap[method] = map[string]*Feature{
+			if _, found := availableEmbeddedMap[meth]; !found {
+				availableEmbeddedMap[meth] = map[string]*Feature{
 					item.DisplayName(): item,
 					// item.BaseFilename(): item,
 				}
 			} else {
-				availableEmbeddedMap[method][item.DisplayName()] = item
-				// availableEmbeddedMap[method][item.BaseFilename()] = item
+				availableEmbeddedMap[meth][item.DisplayName()] = item
+				// availableEmbeddedMap[meth][item.BaseFilename()] = item
 			}
 		}
 	}

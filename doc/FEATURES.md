@@ -3,29 +3,28 @@
 Features allow user to install various tools on a single host or a cluster.
 
 The engine analyzes the feature .yaml file and cuts the action in steps. It tries to parallelize as much as possible the execution of these steps.<br>
-For example, when all the masters of a cluster are targeted, the engine executes each step on all hosts in parallel.
+For example, when all the masters of a cluster are targeted, the engine executes each step on all masters in parallel.
 
 ## Embedded Features
 
-Here is a list of features that are embedded with Safescale :
+Here is a non-exhaustive list of features that are embedded with Safescale :
 
 feature | description | specificities
 ----- | ----- | -----
-`apache-ignite` |  Install apache ignite on all the devices of a cluster   |  Only available for clusters
-`docker` |  Install docker     | -
-`docker-compose` |  Install docker-compose   | -
-`filebeat` |  Install filebeat on all hosts and links it to elassandra | For single host installation, will need parameters: <br>`KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
-`helm` |   Install helm packet manager  |  Only available on a kubernetes flavored cluster (or a dcos with kubernetes installed)
-`kubernetes` |  Install and configure a kubernetes cluster   |  Only available for clusters
+`docker` |  Install docker and docker-compose     |
+`filebeat` |  Install filebeat on all hosts | For single host installation, will need parameters: <br>`KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
 `metricbeat` |  Install metricbeat on all hosts and links it to elassandra | For single host installation, will need parameters: <br> `KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
 `nvidiadocker` |  Install nvidia-docker, allowing nvidia driver to works in a docker container   |  On a cluster it will only be applied to nodes
 `remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters <br>When installed on single host, will need to set these parameters: <br> `Username="existing_user"` <br> `Password="user_password"`
-`kong` |  Install a Kong reverse proxy for SafeScale use  | Only available for cluster (installed on gateway)
+`edgeproxy4network` |  Install a Kong reverse proxy for SafeScale use<br>Corresponds to `reverseproxy`  | Automatically installed on gateways of clusters
+`postgresql4gateway` |  Install a postgresql v9 server on gateways  | Dependency of `edgeproxy4network`
 `kibana` | Installs Kibana for SafeScale use and links it with `elassandra` | Only available for cluster
-`elassandra` | Install Elassandra on masters | Only available for cluster
-`spark` |  Install and configure a spark cluster   |  Only available on a kubernetes or dcos flavored cluster
+`sparkmaster` |  Install and configure a spark cluster   |  Only available on a Swarm or dcos flavored cluster
+`kubernetes` |  Install and configure a kubernetes cluster   |  Only available for clusters
+`k8s.helm2` |   Install helm packet manager v2  |  Only available on a kubernetes flavored cluster
+`k8s.prometheus-operator` |   Install prometheus-operator  |  Only available on K8S flavored cluster
 
-_Note_: the `kong` feature is automatically installed on the gateway when a cluster is created by SafeScale.
+_Note_: the `edgeproxy4network` feature is automatically installed on the gateway when a cluster is created by SafeScale.
 
 ## How to install a feature
 
@@ -62,7 +61,7 @@ feature:
         - mandatory_parameter1
         - ...
     install:
-        <apt | bash | dcos | dnf | yum>:
+        <apt | bash | dcos | yum>:
             check:
                 pace: step1_name[,...]
                 steps:
@@ -79,7 +78,7 @@ feature:
                 pace: step1_name,step2_name[,...]
                 steps:
                     step1_name:
-                        serial: <true | false>
+                        serialized: <true | false>
                         timeout: time_in_minutes
                         targets:
                             hosts: <true (default) | false>
@@ -89,7 +88,7 @@ feature:
                         run: |
                             script_to_execute
                     step2_name:
-                        serial: <true | false>
+                        serialized: <true | false>
                         timeout: time_in_minutes
                         targets:
                             hosts: <true (default) | false>
@@ -144,46 +143,58 @@ feature:
 ...
 ```
 
-key | description | subkeys | values | mandatory
------ | ----- | ----- | ----- | -----
-`suitableFor`    | Describe where the feature could be installed | host <br> cluster | - | True
-host    |  Allow the feature to be installed on a single host  | - | true <br> false | True
-cluster    |  Allow the feature to be installed on a cluster flavor   | - |  false (cannot be installed on any flavor)<br> any (can be installed on any flavor)<br> boh <br> dcos <br> k8s <br> ohpc <br> swarm <br> *Multiples flavors can be allowed separated with a comma; ex: (swarm,boh)* | True
-`requirements`   | Describe requirements for the feature to works properly | features <br> clusterSizing | - | False
-features    | Features who should be installed before to start   | -  |  feature_list | False
-clusterSizing    | ? |  ? | ? | False
-`parameters` | List of parameters mandatory to launch the feature installation | - | parameter_list | False
-`install` | Describe how to install the feature | apt <br> bash <br> dcos <br> dnf <br> yum <br> *You can specify how to install the feature with any combinaison of installation methods, just by creating a new subkey for each method* | - | True
-apt <br> bash <br> dcos <br> dnf <br> yum | Describe how to install the feature for a specific method | check <br> add <br> remove | - | True
-check    | Describe the process to check if the feature is already installed <br> runs should all exit with 0 if the feature is installed | pace <br> steps | - | True
-add    | Describe the process to install the feature <br> runs should all return 0 if the installation works well | pace <br> steps | - | True
-remove    | Describe the process to remove the feature <br> runs should all return 0 if the suppression works well | pace <br> steps | - | True
-pace | List the steps needed to achieve the check/add/remove | - | step_list <br> *Separated by commas, they will be executed in the provided order* | True
-steps | Each steps subkey will be a step | step <br> *There could be any number of step but they have to be registerd in pace to be taken in account* | - | True
-step<br>*Step real name could be anything* | A sub task of check/add/remove | timeout <br> targets <br> run | - | True
-serial | Allow the step to be executed on all targets in parallel | - | true (default) <br> false | False
-timeout | Timeout of the step (in minutes) | - | timeoutValue | False
-targets | Where shoud the step be executed | hosts <br> masters <br> nodes <br> gateways | - | True
-hosts | Should the step be executed on a single host | - | false (will not be executed) <br> yes (will be executed) | True
-gateways | Shoud the step be executed on gateway(s) | - | none (will not be executed on gateways; default) <br> one (will be executed on only one, the same on all steps) <br> all (will be executed on all gateways) | False
-masters <br> nodes | Shoud the step be executed on cluster masters/nodes | - | none (will not be executed; default) <br> one (will be executed on only one, the same on all steps) <br> all (will be executed on all) | True
-run | Script to execute remotely on the target(s) by the chosen method <br> An exit code different from 0 will be considered as a failure | - | script <br> *The script will be extended by preset functions and templated parameters, [cf. Install-step-run](###Install-step-run)* | True
-`proxy` | Describe the reverse-proxy modifications needed by the feature | rules | - | False
-rules  | Describe the reverse-proxy rules needed by the features | - | List_of_rule | True
-rule | Decribe a reverse-proxy rule | name <br> type <br> targets <br> content | - | True
-name | The rule name | - | rule_name | True
-type | The kind of rule to apply | - | service (https://docs.konghq.com/1.0.x/admin-api/#service-object) <br> route (https://docs.konghq.com/1.0.x/admin-api/#route-object) <br> upstream (https://docs.konghq.com/1.0.x/admin-api/#upstream-object) | True
-targets | Where shoud the step be executed | hosts <br> masters <br> nodes | - | True
-hosts | Shoud the step be executed on a single host | - | false (will not be executed) <br> yes (will be executed) | True
-masters <br> nodes | Shoud the step be executed on cluster masters/nodes | - | none (will not be executed) <br> one (will be executed on only one, the same | True
-content | Parameters of the rule, they will depend of the rule type | - | json repesentation of a map with param_name as key and param_value as value <br> *The script will be extanded by templated parameters, [cf. Proxy-rule-content](###Proxy-rule-content)* | True
+| key | description | subkeys | values | mandatory |
+| --- | --- | --- | --- | --- |
+| `suitableFor`    | Describe where the feature could be installed | *host*<br>*cluster* | - | Yes |
+| *host*    |  Allow the feature to be installed on a single host  | - | `true`<br>`false` | Yes |
+| *cluster*    |  Allow the feature to be installed on a cluster flavor   | - |  `false` (cannot be installed on any flavor)<br> `any` (can be installed on any flavor)<br> `boh`<br>`dcos`<br>`k8s`<br>`ohpc`<br>`swarm`<br>Multiples flavors can be allowed separated with a comma; ex: (swarm,boh) | Yes |
+||||||
+| `requirements`   | Describe requirements for the feature to works properly | *features*<br>*clusterSizing* | - | No |
+*features*    | Features who should be installed before to start   | -  |  `feature_list` | False
+*clusterSizing*    | ? |  ? | ? | False
+||||||
+`parameters` | List of parameters used by the feature | - | `parameter_list` | False
+||||||
+| `install` | Marks the beginning of the description of the install methods supported.<br>A single feature file can define several methods of installation using as many subkeys as needed | *apt*<br>*bash*<br>*dcos*<br>*yum*| - | Yes |
+| *apt* <br> *bash* <br> *dcos* <br> *yum* | Describe how to install the feature for a specific method | *check*<br>*add*<br>*remove*| - | Yes |
+| *check*    | Describe the process to check if the feature is already installed <br> runs should all exit with 0 if the feature is installed | *pace*<br>*steps*<br>*targets* | - | Yes |
+| *add*    | Describe the process to install the feature <br> runs should all return 0 if the installation works well | *pace*<br>*steps*<br>*targets* | - | Yes |
+| *remove*    | Describe the process to remove the feature <br> runs should all return 0 if the suppression works well | *pace*<br>*steps<br>*targets* | - | No |
+| *pace* | Comma-separated list of the steps needed to achieve the action, in specified order | - | `step_list` | Yes |
+| *steps* | Marks the beginning of step definitions<br>There could be any number of steps but they have to be registered in *pace* to be applied | *Step real name* | - | Yes |
+| *Step real name* | Name of a step<br>type: string | *timeout*<br>*targets*<br>*run*<br>*serialized* | - | Yes |
+| *serialized* | Force the step to be executed in serial on targets<br>if set to false, step is executed in parallel on targets | - | `false` (default) <br> `true` | No |
+| *timeout* | Timeout of the step (in minutes) | - | `timeout_value` | No |
+| *run* | Script to execute remotely on the target(s) by the chosen method <br> An exit code different from 0 will be considered as a failure | - | script <br> The script will be extended by preset functions and templated parameters, [cf. Install-step-run](###Install-step-run) | Yes |
+| *targets* | Where shoud the step be executed | *hosts*<br>*masters*<br>*nodes*<br>*gateways*| - | Yes |
+| *hosts* | Should the step be executed on a single host | - | `false`|`no` (will not be executed) <br> `true`|`yes` (will be executed) | Yes |
+| *gateways* | Shoud the step be executed on gateway(s) | - | `none` (will not be executed on gateways; default) <br> `one`|`any` (will be executed on only one, the same on all steps) <br> `all` (will be executed on all gateways) | No |
+| *masters* <br> nodes | Shoud the step be executed on cluster masters/nodes | - | `none` (will not be executed; default) <br> `one` (will be executed on only one, the same on all steps) <br> `all` (will be executed on all) | Yes |
+||||||
+| `proxy` | Describe the reverse-proxy modifications needed by the feature | *rules* | - | False |
+| *rules*  | Describe the reverse-proxy rules needed by the features | - | `rule_list` | True |
+| *rule* | Describe a reverse-proxy rule | *name*<br>*type*<br>*targets*<br>*content* | - | True |
+| *name* | The rule name | - | `rule_name` | Yes |
+| *type* | The kind of rule to apply | - | `service` (https://docs.konghq.com/1.0.x/admin-api/#service-object) <br> `route` (https://docs.konghq.com/1.0.x/admin-api/#route-object) <br> `upstream` (https://docs.konghq.com/1.0.x/admin-api/#upstream-object) | Yes |
+| *targets* | Where shoud the step be executed | *hosts* <br> *masters* <br> *nodes* | - | Yes |
+| *hosts* | Should the step be executed on a single host | - | `false`|`no` (will not be executed) <br> `true`|`yes` (will be executed) | Yes |
+| *masters* <br> *nodes* | Should the step be executed on cluster masters/nodes | - | `none` (will not be executed) <br> `one` (will be executed on only one, the same on all steps)<bt>`all`| Yes |
+| *content* | Parameters of the rule, they will depend of the rule type | - | json representation of a map with param_name as key and param_value as value <br> The script will be extended by templated parameters, [cf. Proxy-rule-content](###Proxy-rule-content)* | Yes |
 
+| values | description |
+| ----- | ----- |
+| `feature_list` | YAML array of feature names |
+| `parameter_list` | YAML array of parameters following the format: &lt;name&gt;[=[&lt;value&gt;]]<br>If no `=` is used, parameter &lt;name&gt; needs a mandatory &lt;value&gt; passed by the safescale command<br>if `=` is used without &lt;value&gt;, parameter value is empty |
+| `rule_name` | String containing the name of the rule |
+| `rule_list` | YAML list of rules |
+| `step_list` | Comma-separated string containing a list of steps |
+| `timeout_value` | Integer representing minutes |
 
 ### Install-step-run
 
 Each install step has a run field describing the commands who will be executed on the targeted host (the execution method will depend of the chosen installer). If a step exits with a return code different from 0, the step will be considered failed and the following steps will not be executed.<br>
 Several templated parameters are usable (using GO text template syntax) :
-*   `{{.Username}}` : the name of the default user of the targeted host/cluster
+*   `{{.Username}}` : the name of the user used by SafeScale
 *   `{{.Hostname}}` : the hostname of the current targeted host (keep in mind at the lower level, each step is applied on all hosts targeted)
 *   `{{.HostIP}}`   : the private IP of the current targeted host
 *   `{{.PublicIP}}`   : the public IP of the current targeted host (if there is one)
@@ -204,8 +215,8 @@ In addition, each rule of type `service` will define a parameter named as the ru
 This type of rule allows to define the backend(s) of a service in Reverse Proxy. The content follows what Kong is wanting.
 
 Example:
-```
-- name: upstream
+```yaml
+- name: controlplane
   type: upstream
   targets:
       masters: all
@@ -230,17 +241,17 @@ set directly in a `service`.
 This type of rule allows to define a Reverse Proxy service that will forward requests to an upstream (containing backend(s)).
 
 Example :
-```
+```yaml
 - name: guacamole
-    type: service
-    targets:
-        hosts: true
-        masters: all
-    content: |
-        {
-            "name": "remotedesktop_{{.Hostname}}",
-            "url": "http://{{.HostIP}}:9080/guacamole/"
-        }
+  type: service
+  targets:
+      hosts: true
+      masters: all
+  content: |
+      {
+          "name": "remotedesktop_{{.Hostname}}",
+          "url": "http://{{.HostIP}}:9080/guacamole/"
+      }
 ```
 
 In this example, we define a service in Reverse Proxy named `guacamole`, that will forward traffic to URL provided. Here we do this for all
@@ -253,21 +264,21 @@ _Note_: this example will induce the creation of a parameter called `guacamole`,
 A kong route aims to link a service to a public url.
 
 Example :
-```
+```yaml
 - name: remotedesktop
-    type: route
-    targets:
-        hosts: true
-        masters: all
-    content: |
-        {
-            "paths": ["/remotedesktop/{{.Hostname}}"],
-            "service": { "id": "{{.guacamole}}" }
-        }
+  type: route
+  targets:
+      hosts: true
+      masters: all
+  content: |
+      {
+          "paths": ["/remotedesktop/{{.Hostname}}"],
+          "service": { "id": "{{.guacamole}}" }
+      }
 ```
 
-In this example, we make the Reverse Proxy to react to an URL of /remotedesktop/<host name>, which will forward traffic
-to service id `guacamole`.
+In this example, we make the Reverse Proxy to react to an URL of /remotedesktop/&lt;host name&gt;, which will forward traffic
+to service id `guacamole` previously defined.
 
 _Note_: In the examples from `service` and `route` paragraphs, we used the same `masters: all` parameter as targets ; the feature engine ensures that the
 dynamically defined service parameters are consistent between all the masters, otherwise it may mess the configuration.

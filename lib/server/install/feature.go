@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,12 @@ import (
 	"io/ioutil"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -74,7 +74,7 @@ type Feature struct {
 	// embedded tells if the feature is embedded in deploy
 	embedded bool
 	// Installers defines the installers available for the feature
-	installers map[Method.Enum]Installer
+	installers map[method.Enum]Installer
 	// Dependencies lists other feature(s) (by name) needed by this one
 	//dependencies []string
 	// Management contains a string map of data that could be used to manage the feature (if it makes sense)
@@ -88,23 +88,28 @@ type Feature struct {
 // ListFeatures lists all features suitable for hosts or clusters
 func ListFeatures(suitableFor string) ([]interface{}, error) {
 	features := allEmbeddedMap
-	cfgFiles := []interface{}{}
+	var cfgFiles []interface{}
 
 	var paths []string
 	paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
 	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
 	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
 
-	errors := []error{}
+	var errors []error
+
+	task, err := concurrency.NewTask()
+	if err != nil {
+		return nil, err
+	}
 
 	for _, path := range paths {
 		files, err := ioutil.ReadDir(path)
 		if err == nil {
 			for _, f := range files {
 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile {
-					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					feature, err := NewFeature(task, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if err != nil {
-						log.Error(err)
+						logrus.Error(err)
 						errors = append(errors, err)
 						continue
 					}
@@ -189,16 +194,15 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 		default:
 			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
-	} else {
-		if v.IsSet("feature") {
-			feat = Feature{
-				fileName:    name + ".yml",
-				displayName: name,
-				specs:       v,
-				task:        task,
-			}
+	} else if v.IsSet("feature") {
+		feat = Feature{
+			fileName:    name + ".yml",
+			displayName: name,
+			specs:       v,
+			task:        task,
 		}
 	}
+
 	return &feat, err
 }
 
@@ -224,18 +228,18 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err err
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
-func (f *Feature) installerOfMethod(method Method.Enum) Installer {
+func (f *Feature) installerOfMethod(m method.Enum) Installer {
 	var installer Installer
-	switch method {
-	case Method.Bash:
+	switch m {
+	case method.Bash:
 		installer = NewBashInstaller()
-	case Method.Apt:
+	case method.Apt:
 		installer = NewAptInstaller()
-	case Method.Yum:
+	case method.Yum:
 		installer = NewYumInstaller()
-	case Method.Dnf:
+	case method.Dnf:
 		installer = NewDnfInstaller()
-	case Method.DCOS:
+	case method.DCOS:
 		installer = NewDcosInstaller()
 		//	case Method.Ansible:
 		//		installer = NewAnsibleInstaller()
@@ -301,9 +305,9 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 
 	methods := t.Methods()
 	var installer Installer
-	for _, method := range methods {
-		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = f.installerOfMethod(method)
+	for _, meth := range methods {
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(meth.String()))) {
+			installer = f.installerOfMethod(meth)
 			if installer != nil {
 				break
 			}
@@ -313,7 +317,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 		return nil, fmt.Errorf("failed to find a way to check '%s'", f.DisplayName())
 	}
 
-	log.Debugf("Checking if feature '%s' is installed on %s '%s'...", f.DisplayName(), t.Type(), t.Name())
+	logrus.Debugf("Checking if feature '%s' is installed on %s '%s'...", f.DisplayName(), t.Type(), t.Name())
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -355,9 +359,9 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 		i         uint8
 	)
 	for i = 1; i <= uint8(len(methods)); i++ {
-		method := methods[i]
-		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = f.installerOfMethod(method)
+		meth := methods[i]
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(meth.String()))) {
+			installer = f.installerOfMethod(meth)
 			if installer != nil {
 				break
 			}
@@ -396,7 +400,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 			return nil, fmt.Errorf("failed to check feature '%s': %s", f.DisplayName(), err.Error())
 		}
 		if results.Successful() {
-			log.Infof("Feature '%s' is already installed.", f.DisplayName())
+			logrus.Infof("Feature '%s' is already installed.", f.DisplayName())
 			return results, nil
 		}
 	}
@@ -428,9 +432,9 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 
 	methods := t.Methods()
 	var installer Installer
-	for _, method := range methods {
-		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = f.installerOfMethod(method)
+	for _, meth := range methods {
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(meth.String()))) {
+			installer = f.installerOfMethod(meth)
 			if installer != nil {
 				break
 			}
@@ -485,7 +489,7 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 			if clusterInstance != nil {
 				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetIdentity(f.task).Name)
 			}
-			log.Debugf("%s %s...", msgHead, msgTail)
+			logrus.Debugf("%s %s...\n", msgHead, msgTail)
 		}
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
 			needed, err := NewFeature(f.task, requirement)
@@ -582,7 +586,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		}
 
 		// v["Hostname"] = host.Name
-		// v["HostIP"] = host.PrivateIp
+		// v["HostIP"] = host.PrivateIP
 		// FIXME:
 		gw := gatewayFromHost(host)
 		if gw != nil {

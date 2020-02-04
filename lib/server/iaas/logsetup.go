@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package iaas
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -35,16 +36,31 @@ func init() {
 
 	// Output to stdout instead of the default stderr
 	// Can be any io.Writer, see below for File example
-	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale"), 0777)
-	file, err := os.OpenFile(utils.AbsPathify("$HOME/.safescale/providers-session.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	dirname := utils.AbsPathify("$HOME/.safescale")
+	_ = os.MkdirAll(dirname, 0777)
+
+	_, err := os.Stat(dirname)
 	if err != nil {
-		panic(err)
+		if os.IsNotExist(err) {
+			fmt.Printf("Unable to create directory %s", dirname)
+		} else {
+			fmt.Printf("Directory %s stat error: %v", dirname, err)
+		}
+		os.Exit(1)
 	}
 
-	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale"), 0777)
-	bfile, err := os.OpenFile(utils.AbsPathify("$HOME/.safescale/safescaled-session.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	logFileName := utils.AbsPathify("$HOME/.safescale/providers-session.log")
+	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		panic(err)
+		fmt.Println(fmt.Sprintf("Unable to access file %s, make sure the file is writable", logFileName))
+		os.Exit(1)
+	}
+
+	logFileName = utils.AbsPathify("$HOME/.safescale/safescaled-session.log")
+	bfile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Unable to access file %s, make sure the file is writable", logFileName))
+		os.Exit(1)
 	}
 
 	log.SetOutput(io.MultiWriter(os.Stdout, file, bfile))

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@
 package nfs
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // ExportOptions ...
@@ -45,7 +45,7 @@ type ExportACL struct {
 	//Host contains the pattern of hosts authorized (cf. exports man page)
 	Host string
 	//SecurityMode contains all the security mode allowed for the Host
-	SecurityModes []SecurityFlavor.Enum
+	SecurityModes []securityflavor.Enum
 	//Options contains the options of the export ACL
 	Options ExportOptions
 }
@@ -80,7 +80,7 @@ func (s *Share) AddACL(acl ExportACL) {
 }
 
 //Add configures and exports the share
-func (s *Share) Add(ctx context.Context) error {
+func (s *Share) Add(task concurrency.Task) error {
 	var acls string
 	for _, a := range s.ACLs {
 		acl := a.Host + "("
@@ -142,6 +142,6 @@ func (s *Share) Add(ctx context.Context) error {
 		"AccessRights": strings.TrimSpace(acls),
 	}
 
-	retcode, stdout, stderr, err := executeScript(ctx, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
+	retcode, stdout, stderr, err := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }

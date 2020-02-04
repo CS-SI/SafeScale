@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,13 @@ package objectstorage
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/graymeta/stow"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // bucket describes a Bucket
@@ -75,7 +76,7 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s)", path, prefix), concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
 
-	list := []string{}
+	var list []string
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -319,19 +320,19 @@ func humanReadableSize(bytes int64) string {
 	switch {
 	case bytes >= cPETABYTE:
 		unit = "P"
-		value = value / cPETABYTE
+		value /= cPETABYTE
 	case bytes >= cTERABYTE:
 		unit = "T"
-		value = value / cTERABYTE
+		value /= cTERABYTE
 	case bytes >= cGIGABYTE:
 		unit = "G"
-		value = value / cGIGABYTE
+		value /= cGIGABYTE
 	case bytes >= cMEGABYTE:
 		unit = "M"
-		value = value / cMEGABYTE
+		value /= cMEGABYTE
 	case bytes >= cKILOBYTE:
 		unit = "K"
-		value = value / cKILOBYTE
+		value /= cKILOBYTE
 	case bytes >= cBYTE:
 		unit = "B"
 	case bytes == 0:

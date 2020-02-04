@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,9 +37,9 @@ var TenantCmd = cli.Command{
 		tenantList,
 		tenantGet,
 		tenantSet,
-		tenantStorageList,
-		tenantStorageGet,
-		tenantStorageSet,
+		// tenantStorageList,
+		// tenantStorageGet,
+		// tenantStorageSet,
 	},
 }
 
@@ -91,52 +91,52 @@ var tenantSet = cli.Command{
 	},
 }
 
-var tenantStorageList = cli.Command{
-	Name:    "storage-list",
-	Aliases: []string{"storage-ls"},
-	Usage:   "List available storage tenants",
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		tenants, err := client.New().Tenant.StorageList(temporal.GetExecutionTimeout())
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
-		}
-		return clitools.SuccessResponse(tenants.GetTenants())
-	},
-}
+// var tenantStorageList = cli.Command{
+// 	Name:    "storage-list",
+// 	Aliases: []string{"storage-ls"},
+// 	Usage:   "List available storage tenants",
+// 	Action: func(c *cli.Context) error {
+// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+// 		tenants, err := client.New().Tenant.StorageList(temporal.GetExecutionTimeout())
+// 		if err != nil {
+// 			err = scerr.FromGRPCStatus(err)
+// 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
+// 		}
+// 		return clitools.SuccessResponse(tenants.GetTenants())
+// 	},
+// }
 
-var tenantStorageGet = cli.Command{
-	Name:  "storage-get",
-	Usage: "Get current storage tenants",
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		tenants, err := client.New().Tenant.StorageGet(temporal.GetExecutionTimeout())
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
-		}
-		return clitools.SuccessResponse(tenants.GetNames())
-	},
-}
+// var tenantStorageGet = cli.Command{
+// 	Name:  "storage-get",
+// 	Usage: "Get current storage tenants",
+// 	Action: func(c *cli.Context) error {
+// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+// 		tenants, err := client.New().Tenant.StorageGet(temporal.GetExecutionTimeout())
+// 		if err != nil {
+// 			err = scerr.FromGRPCStatus(err)
+// 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
+// 		}
+// 		return clitools.SuccessResponse(tenants.GetNames())
+// 	},
+// }
 
-var tenantStorageSet = cli.Command{
-	Name:      "storage-set",
-	Usage:     "Set storage tenants to work with",
-	ArgsUsage: "<storage_tenants...>",
-	Action: func(c *cli.Context) error {
-		if c.NArg() < 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
-		}
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		tenantNames := []string{c.Args().First()}
-		tenantNames = append(tenantNames, c.Args().Tail()...)
-		err := client.New().Tenant.StorageSet(tenantNames, temporal.GetExecutionTimeout())
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
-}
+// var tenantStorageSet = cli.Command{
+// 	Name:      "storage-set",
+// 	Usage:     "Set storage tenants to work with",
+// 	ArgsUsage: "<storage_tenants...>",
+// 	Action: func(c *cli.Context) error {
+// 		if c.NArg() < 1 {
+// 			_ = cli.ShowSubcommandHelp(c)
+// 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
+// 		}
+// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+// 		tenantNames := []string{c.Args().First()}
+// 		tenantNames = append(tenantNames, c.Args().Tail()...)
+// 		err := client.New().Tenant.StorageSet(tenantNames, temporal.GetExecutionTimeout())
+// 		if err != nil {
+// 			err = scerr.FromGRPCStatus(err)
+// 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
+// 		}
+// 		return clitools.SuccessResponse(nil)
+// 	},
+// }

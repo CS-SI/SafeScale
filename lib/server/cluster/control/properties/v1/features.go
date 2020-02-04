@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,20 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Features ...
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with updated/additional fields
 type Features struct {
 	// Installed ...
 	Installed map[string]string `json:"installed"`
 	// Disabled keeps track of features normally automatically added with cluster creation,
-	// but explicitely disabled; if a disabled feature is added, must be removed from this property
+	// but explicitly disabled; if a disabled feature is added, must be removed from this property
 	Disabled map[string]struct{} `json:"disabled"`
 }
 
@@ -37,24 +41,27 @@ func newFeatures() *Features {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (f *Features) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (f *Features) Content() data.Clonable {
 	return f
 }
 
-// Clone ... (serialize.Property interface)
-func (f *Features) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (f *Features) Clone() data.Clonable {
 	return newFeatures().Replace(f)
 }
 
-// Replace ... (serialize.Property interface)
-func (f *Features) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (f *Features) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Features)
 	f.Installed = make(map[string]string, len(src.Installed))
-	f.Disabled = make(map[string]struct{}, len(src.Installed))
 	for k, v := range src.Installed {
 		f.Installed[k] = v
 	}
+	f.Disabled = make(map[string]struct{}, len(src.Installed))
 	for k, v := range src.Disabled {
 		f.Disabled[k] = v
 	}
@@ -62,5 +69,5 @@ func (f *Features) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.FeaturesV1, newFeatures())
+	serialize.PropertyTypeRegistry.Register("clusters", property.FeaturesV1, newFeatures())
 }

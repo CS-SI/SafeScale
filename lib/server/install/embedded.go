@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 //go:generate rice embed-go
@@ -33,11 +33,11 @@ const featureFileExt = ".yml"
 
 var (
 	templateBox *rice.Box
-	emptyParams = map[string]interface{}{}
+	// emptyParams = map[string]interface{}{}
 
-	availableEmbeddedMap = map[Method.Enum]map[string]*Feature{}
+	availableEmbeddedMap = map[method.Enum]map[string]*Feature{}
 	allEmbeddedMap       = map[string]*Feature{}
-	allEmbedded          = []*Feature{}
+	allEmbedded          []*Feature
 )
 
 // loadSpecFile returns the content of the spec file of the feature named 'name'
@@ -196,7 +196,7 @@ func kubernetesFeature() *Feature {
 }
 
 // nexusFeature ...
-func nexusFeature() *Feature {
+func nexusFeature() *Feature { // nolint
 	name := "nexus3"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
@@ -240,9 +240,9 @@ func logstashFeature() *Feature {
 	}
 }
 
-// helmFeature ...
-func helmFeature() *Feature {
-	name := "helm"
+// k8shelm2Feature ...
+func k8shelm2Feature() *Feature {
+	name := "k8s.helm2"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

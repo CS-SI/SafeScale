@@ -1,4 +1,4 @@
-# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ feature:
     requirements:
         features:
             - kubernetes
+            - helm
             - k8s.postgres
-            - k8s.keycloak
 
     parameters:
         - RootURL=/grafana
@@ -29,90 +29,21 @@ feature:
         - NameSpace=default
         - KeycloakRealm=default
         - HelmRepoName=stable
-        - OIDCClientName=default
-        - OIDCGroupName=user_groups
-        - OIDCAudienceName=audience
-        - OIDCUsername=username
 
     install:
         bash:
             check:
-                pace: helm
+                pace: list_helm
                 steps:
-                    helm:
+                    list_helm:
                         targets:
                             masters: any
                         run: |
-                            sfHelm ls | grep kong-ingress || sfFail 192
-                            sfExit
+                            sudo -u cladm -i helm search ...
 
         add:
-            pace: cert,db,config,install
+            pace: db,install
             steps:
-                cert:
-                    targets:
-                        masters: all
-                    run: |
-                        mkdir -p ${SF_ETCDIR}/kong-ingress/pki
-
-                        openssl genrsa -out ${SF_ETCDIR}/kong-ingress/pki/key.pem 4096
-
-                        ## Create a config file for generating a Certificate Signing Request (CSR)
-                        cat >${SF_ETCDIR}/kong-ingress/pki/csr.conf <<EOF
-                        [ req ]
-                        default_bits = 2048
-                        prompt = no
-                        default_md = sha256
-                        req_extensions = req_ext
-                        distinguished_name = dn
-
-                        [ dn ]
-                        C=FR
-                        ST=FR
-                        L=Toulouse
-                        O=CSSI
-                        OU=Space
-                        CN=$master_ip
-
-                        [ req_ext ]
-                        subjectAltName = @alt_names
-
-                        [ alt_names ]
-                        DNS.1 = kong-ingress
-                        DNS.2 = kong-ingress.default
-                        DNS.3 = kong-ingress.default.svc
-                        DNS.4 = kong-ingress.default.svc.cluster
-                        DNS.5 = kong-ingress.default.svc.cluster.local
-                        DNS.6 = kong-ingress.default.svc.cluster.local.com
-                        IP = {{ .HostIP }}
-
-                        [ v3_ext ]
-                        authorityKeyIdentifier=keyid,issuer:always
-                        basicConstraints=CA:FALSE
-                        keyUsage=keyEncipherment,dataEncipherment
-                        extendedKeyUsage=serverAuth,clientAuth
-                        subjectAltName=@alt_names
-                        EOF
-
-                        # Generate the certificates signing request based on the config file
-                        openssl req -new -key ${SF_ETCDIR}/kong-ingress/pki/key.pem \
-                                    -out ${SF_ETCDIR}/kong-ingress/pki/csr.pem \
-                                    -config ${SF_ETCDIR}/kong-ingress/pki/csr.conf
-
-                        # Sign certificate with cluster CA
-                        sudo openssl x509 -req -CA ${SF_ETCDIR}/pki/ca/ca.cert.pem -CAkey ${SF_ETCDIR}/pki/ca/ca.key.pem -CAcreateserial \
-                                          -in ${SF_ETCDIR}/kong-ingress/pki/csr.pem \
-                                          -out ${SF_ETCDIR}/kong-ingress/pki/cert.pem \
-                                          -extfile ${SF_ETCDIR}/kong-ingress/pki/csr.conf \
-                                          -days {{ .ValidityDuration }}
-
-                        rm ca.srl ${SF_ETCDIR}/kong-ingress/pki/csr.conf ${SF_ETCDIR}/kong-ingress/pki/csr.pem
-
-                        sudo chown -R root:{{ .Username }} ${SF_ETCDIR}/pki && \
-                        sudo chmod -R ug+r-w,o-rwx ${SF_ETCDIR}/pki && \
-                        sudo find ${SF_ETCDIR}/kong-ingress/pki -type d -exec chmod ug+x {} \; || sfFail 192
-                        sfExit
-
                 db:
                     targets:
                         masters: any
@@ -124,7 +55,7 @@ feature:
 
                         sfExit
 
-                config:
+                install:
                     targets:
                         masters: all
                     run: |
@@ -209,7 +140,7 @@ feature:
 
                         #CREATE OIDC CLIENT
                         sfKubectl exec -n {{ .Namespace }} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh create clients -r {{ .KeycloakRealm }} \
-                            -s 'clientId='{{ .OIDCClientName }}'' \
+                            -s 'clientId='$KEYCLOAK_OIDC_CLIENT'' \
                             -s 'standardFlowEnabled="true"' \
                             -s 'directAccessGrantsEnabled="true"' \
                             -s 'serviceAccountsEnabled="true"' \
@@ -224,34 +155,11 @@ feature:
                             -s 'protocol=openid-connect' \
                             -s 'protocolMapper=oidc-group-membership-mapper' \
                             -s 'consentRequired=false' \
-                            -s 'config."claim.name"={{ .OIDCGroupName }}' \
+                            -s 'config."claim.name"=user_groups' \
                             -s 'config."full.path"=false' \
                             -s 'config."id.token.claim"=true' \
                             -s 'config."access.token.claim"=true' \
                             -s 'config."userinfo.token.claim"=false'
-
-                        #CREATE AUDIENCEMAPPER
-                        kubectl exec -n ${namespace_security} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh create clients/"${CID/$'\r'/}"/protocol-mappers/models -r $KEYCLOAK_REALM \
-                        -s 'name=audience' \
-                        -s 'protocol=openid-connect' \
-                        -s 'protocolMapper=oidc-audience-mapper' \
-                        -s 'consentRequired=false' \
-                        -s 'config."included.client.audience"={{ .OIDCAudienceName }}' \
-                        -s 'config."id.token.claim"=false' \
-                        -s 'config."access.token.claim"=true'
-
-                        #CREATE USERMAPPER
-                        kubectl exec -n ${namespace_security} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh create clients/"${CID/$'\r'/}"/protocol-mappers/models -r $KEYCLOAK_REALM \
-                        -s 'name=username' \
-                        -s 'protocol=openid-connect' \
-                        -s 'protocolMapper=oidc-usermodel-property-mapper' \
-                        -s 'consentRequired=false' \
-                        -s 'config."userinfo.token.claim"=true' \
-                        -s 'config."user.attribute"={{ .OIDCUsername }}' \
-                        -s 'config."id.token.claim"=true' \
-                        -s 'config."access.token.claim"=true' \
-                        -s 'config."claim.name"=username' \
-                        -s 'config."jsonType.label"=String'
 
                         #SAVE OIDC CLIENT SECRET
                         KEYCLOAK_CLIENT_SECRET=$(sfKubectl exec -n {{ .Namespace }} keycloak-0 -- /opt/keycloak/keycloak/bin/kcadm.sh get clients/"${CID/$'\r'/}"/client-secret -r {{ .KeycloakRealm }} --fields value --format csv --noquotes)
