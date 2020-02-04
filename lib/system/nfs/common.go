@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package nfs
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -31,7 +30,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/Outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -57,7 +57,7 @@ func getTemplateBox() (*rice.Box, error) {
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
+func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
 	bashLibrary, err := system.GetBashLibrary()
 	if err != nil {
 		return 255, "", "", err
@@ -119,7 +119,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	filename := utils.TempFolder + "/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, stdout, stderr, err := sshconfig.Copy(ctx, filename, f.Name(), true)
+			retcode, stdout, stderr, err := sshconfig.Copy(task, filename, f.Name(), true)
 			if err != nil {
 				return fmt.Errorf("ssh operation failed: %s", err.Error())
 			}
@@ -134,9 +134,9 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
 
-	k, uperr := sshconfig.Command("which scp")
+	k, uperr := sshconfig.Command(task, "which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(context.TODO(), nil, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -145,9 +145,9 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		}
 	}
 
-	k, uperr = sshconfig.SudoCommand("which scp")
+	k, uperr = sshconfig.SudoCommand("which scp", false)
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(context.TODO(), nil, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -179,7 +179,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			stderr = ""
 			retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(cmd)
+			sshCmd, err := sshconfig.SudoCommand(task, cmd, false)
 			if err != nil {
 				return err
 			}
@@ -204,7 +204,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			log.Errorf("Timeout running remote script '%s'", name)
+			logrus.Errorf("Timeout running remote script '%s'", name)
 			return 255, stdout, stderr, retryErr
 		default:
 			return 255, stdout, stderr, retryErr

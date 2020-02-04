@@ -21,10 +21,8 @@ import (
 
 var globalCtx = context.Background()
 var verifier *oidc.IDTokenVerifier
-var cfg *proxyConfig
 var config oauth2.Config
 var state = uuid.Must(uuid.NewV4()).String()
-var upgrader = websocket.Upgrader{} // use default options
 
 type requestInfo struct {
 	service  string
@@ -78,7 +76,7 @@ func authenticate(token string) (string, int) {
 	return claims.Email, http.StatusOK
 }
 
-func authorize(email, service, resource, method string) bool {
+func authorize(cfg *proxyConfig, email, service, resource, method string) bool {
 
 	da := model.NewDataAccess(cfg.DatabaseDialect, cfg.DatabaseDSN)
 	srv, err := da.GetServiceByName(service)
@@ -108,7 +106,7 @@ func authorize(email, service, resource, method string) bool {
 
 }
 
-func getServiceURL(service, resource string) (*url.URL, error) {
+func getServiceURL(cfg *proxyConfig, service, resource string) (*url.URL, error) {
 	da := model.NewDataAccess(cfg.DatabaseDialect, cfg.DatabaseDSN)
 	srv, err := da.GetServiceByName(service)
 	if err != nil {
@@ -141,16 +139,16 @@ func httpForward(w http.ResponseWriter, req *http.Request, url *url.URL) {
 
 }
 
-//httpProxyFunc forward authorized request to pr++++++++++++otected service
-func httpProxyFunc(w http.ResponseWriter, r *http.Request) {
+//httpProxyFunc forward authorized request to protected service
+func httpProxyFunc(proxyCfg *proxyConfig, w http.ResponseWriter, r *http.Request) {
 
 	info := parseRequest(r)
 
-	if !authorizedAndAuthenticated(w, r, info, "WS") {
+	if !authorizedAndAuthenticated(proxyCfg, w, r, info, "WS") {
 		return
 	}
 
-	proxyURL, err := getServiceURL(info.service, info.resource)
+	proxyURL, err := getServiceURL(proxyCfg, info.service, info.resource)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 		return
@@ -160,7 +158,7 @@ func httpProxyFunc(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func authorizedAndAuthenticated(w http.ResponseWriter, r *http.Request, info requestInfo, method string) bool {
+func authorizedAndAuthenticated(cfg *proxyConfig, w http.ResponseWriter, r *http.Request, info requestInfo, method string) bool {
 	if cfg.AuthenticationEnabled() {
 		email, status := authenticate(info.token)
 
@@ -173,7 +171,7 @@ func authorizedAndAuthenticated(w http.ResponseWriter, r *http.Request, info req
 			return false
 		}
 
-		ok := authorize(email, info.service, info.resource, info.method)
+		ok := authorize(cfg, email, info.service, info.resource, info.method)
 		if !ok {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return false
@@ -208,19 +206,20 @@ func fowardWSMessages(from *websocket.Conn, to *websocket.Conn) {
 	}
 }
 
-func wsProxyFunc(w http.ResponseWriter, r *http.Request) {
+func wsProxyFunc(proxyCfg *proxyConfig, w http.ResponseWriter, r *http.Request) {
 	info := parseRequest(r)
-	if !authorizedAndAuthenticated(w, r, info, "WS") {
+	if !authorizedAndAuthenticated(proxyCfg, w, r, info, "WS") {
 		return
 	}
 
+	upgrader := websocket.Upgrader{}
 	cOrig, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	theURL, err := getServiceURL(info.service, info.resource)
+	theURL, err := getServiceURL(proxyCfg, info.service, info.resource)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 		return
@@ -236,13 +235,12 @@ func wsProxyFunc(w http.ResponseWriter, r *http.Request) {
 	go fowardWSMessages(cDest, cOrig)
 }
 
-func proxify() http.Handler {
+func proxify(proxyCfg *proxyConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		if websocket.IsWebSocketUpgrade(r) { //Web socker connexion
-			wsProxyFunc(w, r)
+		if websocket.IsWebSocketUpgrade(r) { //Web socket connexion
+			wsProxyFunc(proxyCfg, w, r)
 		} else { //HTTP request
-			httpProxyFunc(w, r)
+			httpProxyFunc(proxyCfg, w, r)
 		}
 
 	})
@@ -323,7 +321,7 @@ func Start(bindingURL string, failure chan bool) {
 
 	//http.Handle("/", proxify(addCORS()))
 
-	err = http.ListenAndServeTLS(bindingURL, cfg.Certificate, cfg.PrivateKey, proxify())
+	err = http.ListenAndServeTLS(bindingURL, cfg.Certificate, cfg.PrivateKey, proxify(cfg))
 	if err != nil {
 		log.Error("ListenAndServe: ", err)
 		return

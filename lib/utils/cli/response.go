@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,15 +22,15 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	urfcli "github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/CmdStatus"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/cmdstatus"
 )
 
 // response define a standard response for most safescale commands
 type response struct {
-	Status CmdStatus.Enum
+	Status cmdstatus.Enum
 	Error  urfcli.ExitCoder
 	Result interface{}
 }
@@ -51,7 +51,7 @@ type responseDisplay struct {
 // newResponse ...
 func newResponse() response {
 	return response{
-		Status: CmdStatus.UNKNOWN,
+		Status: cmdstatus.UNKNOWN,
 		Error:  nil,
 		Result: nil,
 	}
@@ -64,7 +64,7 @@ func (r *response) GetError() error {
 
 // Success ...
 func (r *response) Success(result interface{}) error {
-	r.Status = CmdStatus.SUCCESS
+	r.Status = cmdstatus.SUCCESS
 	r.Result = result
 	r.Display()
 	return nil
@@ -73,13 +73,13 @@ func (r *response) Success(result interface{}) error {
 // Failure ...
 func (r *response) Failure(err error) error {
 	if err != nil {
-		r.Status = CmdStatus.FAILURE
+		r.Status = cmdstatus.FAILURE
 		if exitCoder, ok := err.(urfcli.ExitCoder); ok {
 			r.Error = exitCoder
 			r.Display()
 			return r.GetError()
 		}
-		log.Error("err is not an urfave/cli.ExitCoder")
+		logrus.Error("err is not an urfave/cli.ExitCoder")
 		return err
 	}
 	return nil
@@ -89,15 +89,15 @@ func (r *response) Failure(err error) error {
 func (r *response) Display() {
 	out, err := json.Marshal(r.getDisplayResponse())
 	if err != nil {
-		log.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
+		logrus.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
 		return
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		if r.Status == CmdStatus.FAILURE {
-			log.Error(string(out))
+		if r.Status == cmdstatus.FAILURE {
+			logrus.Error(string(out))
 		} else {
-			log.Warn(string(out))
+			logrus.Warn(string(out))
 		}
 	}
 

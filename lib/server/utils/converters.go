@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ package utils
 
 import (
 	"github.com/sirupsen/logrus"
-	"math"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // ToPBSshConfig converts a system.SSHConfig into a SshConfig
@@ -172,12 +172,12 @@ func ToPBHost(in *resources.Host) (pbHost *pb.Host) {
 		}
 	}()
 
-	err := in.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 = v.(*propsv1.HostNetwork)
-		return in.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-			hostSizingV1 = v.(*propsv1.HostSizing)
-			return in.Properties.LockForRead(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
-				hostVolumesV1 = v.(*propsv1.HostVolumes)
+	err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		hostNetworkV1 = clonable.(*propsv1.HostNetwork)
+		return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			hostSizingV1 = clonable.(*propsv1.HostSizing)
+			return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
+				hostVolumesV1 = clonable.(*propsv1.HostVolumes)
 				for k := range hostVolumesV1.VolumesByName {
 					volumes = append(volumes, k)
 				}
@@ -293,15 +293,16 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 	}
 }
 
-// ToPBFileList convert a list of file names from api to protocolbuffer FileList format
-func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, fileBuckets [][]string) *pb.FileList {
-	files := []*pb.File{}
-	nbFiles := int(math.Min(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))), float64(len(fileBuckets))))
-	for i := 0; i < nbFiles; i++ {
-		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
-	}
-	return &pb.FileList{Files: files}
-}
+// VPL: data stuff disabled
+// // ToPBFileList convert a list of file names from api to protocolbuffer FileList format
+// func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, fileBuckets [][]string) *pb.FileList {
+// 	files := []*pb.File{}
+// 	nbFiles := int(math.Min(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))), float64(len(fileBuckets))))
+// 	for i := 0; i < nbFiles; i++ {
+// 		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
+// 	}
+// 	return &pb.FileList{Files: files}
+// }
 
 // ToPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
 func ToPBHostSizing(src resources.SizingRequirements) pb.HostSizing {
@@ -329,17 +330,17 @@ func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
 	}
 }
 
-// ToPBVirtualIP converts a resources.VIP to a pb.VirtualIp
-func ToPBVirtualIP(src resources.VIP) pb.VirtualIp {
+// ToPBVirtualIP converts a resources.VirtualIP to a pb.VirtualIp
+func ToPBVirtualIP(src resources.VirtualIP) pb.VirtualIp {
 	dest := pb.VirtualIp{
 		Id:        src.ID,
 		NetworkId: src.NetworkID,
 		PrivateIp: src.PrivateIP,
 		PublicIp:  src.PublicIP,
-		Hosts:     []*pb.Host{},
 	}
-	for _, i := range src.Hosts {
-		dest.Hosts = append(dest.Hosts, ToPBHost(i))
+	dest.Hosts = make([]string, len(src.Hosts))
+	for _, h := range src.Hosts {
+		dest.Hosts = append(dest.Hosts, h.ID)
 	}
 	return dest
 }

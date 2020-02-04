@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh/enums/errorcode"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -50,7 +50,7 @@ var (
 			return i + 1
 		},
 		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.StringMap[msg]; ok {
+			if code, ok := errorcode.StringMap[msg]; ok {
 				return int(code)
 			}
 			return 1023
@@ -78,13 +78,13 @@ func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (uin
 		masterNodeCount  uint
 	)
 	switch foreman.Cluster().GetIdentity(task).Complexity {
-	case Complexity.Small:
+	case complexity.Small:
 		privateNodeCount = 1
 		masterNodeCount = 1
-	case Complexity.Normal:
+	case complexity.Normal:
 		privateNodeCount = 3
 		masterNodeCount = 2
-	case Complexity.Large:
+	case complexity.Large:
 		privateNodeCount = 7
 		masterNodeCount = 3
 	}
@@ -123,8 +123,10 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 
 // getTemplateBox
 func getTemplateBox() (*rice.Box, error) {
-	var b *rice.Box
-	var err error
+	var (
+		b   *rice.Box
+		err error
+	)
 	anon := templateBox.Load()
 	if anon == nil {
 		// Note: path MUST be literal for rice to work
@@ -186,14 +188,14 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 	return anon.(string), nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	data := map[string]interface{}{}
 	script := ""
 
 	switch nodeType {
-	case NodeType.Master:
+	case nodetype.Master:
 		script = "boh_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "boh_install_node.sh"
 	}
 	return script, data

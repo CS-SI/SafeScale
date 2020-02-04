@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,17 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Composite ...
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental fields
 type Composite struct {
-	// Array of tenants hosting a multu-tenant cluster (multi starting from 1)
+	// Array of tenants hosting a multi-tenant cluster (multi starting from 1)
 	Tenants []string `json:"tenants"`
 }
 
@@ -33,18 +37,21 @@ func newComposite() *Composite {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (c *Composite) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (c *Composite) Content() data.Clonable {
 	return c
 }
 
-// Clone ... (serialize.Property interface)
-func (c *Composite) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (c *Composite) Clone() data.Clonable {
 	return newComposite().Replace(c)
 }
 
-// Replace ... (serialize.Property interface)
-func (c *Composite) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (c *Composite) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Composite)
 	c.Tenants = make([]string, len(src.Tenants))
 	copy(c.Tenants, src.Tenants)
@@ -52,5 +59,5 @@ func (c *Composite) Replace(p serialize.Property) serialize.Property {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.CompositeV1, newComposite())
+	serialize.PropertyTypeRegistry.Register("clusters", property.CompositeV1, newComposite())
 }

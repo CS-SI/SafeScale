@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,16 +130,63 @@ func (ms *Share) Write() error {
 }
 
 // ReadByReference tries to read 'ref' as an ID, and if not found as a name
-func (ms *Share) ReadByReference(id string) (err error) {
+func (ms *Share) ReadByReference(ref string) (err error) {
 	if ms == nil {
 		return scerr.InvalidInstanceError()
 	}
-	errID := ms.ReadByID(id)
+	if ms.item == nil {
+		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
+	}
+	if ref == "" {
+		return scerr.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	errID := ms.mayReadByID(ref)
 	if errID != nil {
-		errName := ms.ReadByName(id)
+		errName := ms.mayReadByName(ref)
 		if errName != nil {
 			return errName
 		}
+	}
+	return nil
+}
+
+// mayReadByID reads the metadata of an export identified by ID from Object Storage
+// Doesn't log error or validate parameters by design; caller does that
+func (ms *Share) mayReadByID(id string) error {
+	var si shareItem
+	err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+		err := (&si).Deserialize(buf)
+		if err != nil {
+			return nil, err
+		}
+		return &si, nil
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName); err != nil {
+		return err
+	}
+	return nil
+}
+
+// mayReadByName reads the metadata of a nas identified by name
+// Doesn't log or validate parameters by design; caller does that
+func (ms *Share) mayReadByName(name string) error {
+	var si shareItem
+	err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+		err := (&si).Deserialize(buf)
+		if err != nil {
+			return nil, err
+		}
+		return &si, nil
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName); err != nil {
+		return err
 	}
 	return nil
 }
@@ -152,21 +199,15 @@ func (ms *Share) ReadByID(id string) (err error) {
 	if ms.item == nil {
 		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
-	var si shareItem
-	err = ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
-		err := (&si).Deserialize(buf)
-		if err != nil {
-			return nil, err
-		}
-		return &si, nil
-	})
-	if err != nil {
-		return err
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
-	if _, err := ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName); err != nil {
-		return err
-	}
-	return nil
+
+	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return ms.mayReadByID(id)
 }
 
 // ReadByName reads the metadata of a nas identified by name
@@ -177,21 +218,15 @@ func (ms *Share) ReadByName(name string) (err error) {
 	if ms.item == nil {
 		return scerr.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
-	var si shareItem
-	err = ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
-		err := (&si).Deserialize(buf)
-		if err != nil {
-			return nil, err
-		}
-		return &si, nil
-	})
-	if err != nil {
-		return err
+	if name == "" {
+		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
-	if _, err := ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName); err != nil {
-		return err
-	}
-	return nil
+
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return ms.mayReadByName(name)
 }
 
 // Delete updates the metadata corresponding to the share
@@ -391,7 +426,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 			innerErr := ms.ReadByReference(ref)
 			if innerErr != nil {
 				if _, ok := innerErr.(*scerr.ErrNotFound); ok {
-					return retry.AbortedError("no metadata found", innerErr)
+					return retry.StopRetryError("no metadata found", innerErr)
 				}
 				return innerErr
 			}
@@ -402,11 +437,14 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 	)
 	// If retry timed out, log it and return error ErrNotFound
 	if retryErr != nil {
-		// If it's not a timeout is something we don't know how to handle yet
-		if _, ok := retryErr.(*scerr.ErrTimeout); !ok {
-			return "", scerr.Cause(retryErr)
+		switch realErr := retryErr.(type) {
+		case retry.ErrStopRetry:
+			return "", realErr.Cause()
+		case scerr.ErrTimeout:
+			return "", realErr
+		default:
+			return "", scerr.Cause(realErr)
 		}
-		return "", retryErr
 	}
 
 	return ms.Get()

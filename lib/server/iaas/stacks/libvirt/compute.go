@@ -43,9 +43,9 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -197,7 +197,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Image with id=%s not found", id)
+	return nil, fmt.Errorf("image with id=%s not found", id)
 }
 
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
@@ -293,7 +293,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 		}
 	}
 
-	return nil, fmt.Errorf("Template with id=%s not found", id)
+	return nil, fmt.Errorf("template with id=%s not found", id)
 }
 
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
@@ -463,12 +463,12 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 		}
 	}
 
-	return "", fmt.Errorf("Image with id=%s not found", id)
+	return "", fmt.Errorf("image with id=%s not found", id)
 }
 
 func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) ([]*libvirtxml.StorageVolume, error) {
-	volumeDescriptions := []*libvirtxml.StorageVolume{}
-	domainVolumePaths := []string{}
+	var volumeDescriptions []*libvirtxml.StorageVolume
+	var domainVolumePaths []string
 
 	//List paths of domain disks
 	domainXML, err := domain.GetXMLDesc(0)
@@ -518,17 +518,17 @@ func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connec
 	return volumeDescriptions, nil
 }
 
-//stateConvert convert libvirt.DomainState to a HostState.Enum
-func stateConvert(stateLibvirt libvirt.DomainState) HostState.Enum {
+//stateConvert convert libvirt.DomainState to a hoststate.Enum
+func stateConvert(stateLibvirt libvirt.DomainState) hoststate.Enum {
 	switch stateLibvirt {
 	case 1:
-		return HostState.STARTED
+		return hoststate.STARTED
 	case 3, 5:
-		return HostState.STOPPED
+		return hoststate.STOPPED
 	case 4:
-		return HostState.STOPPING
+		return hoststate.STOPPING
 	default:
-		return HostState.ERROR
+		return hoststate.ERROR
 	}
 }
 
@@ -665,7 +665,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 	host.PrivateKey = "Impossible to fetch them from the domain, the private key is unknown by the domain"
 	host.LastState = stateConvert(state)
 
-	err = host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(v interface{}) error {
 		hostDescriptionV1, err := getDescriptionV1FromDomain(domain, s.LibvirtService)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("failed to get domain description : %s", err.Error()))
@@ -674,10 +674,10 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update HostProperty.DescriptionV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update hostproperty.DescriptionV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1, err := getSizingV1FromDomain(domain, s.LibvirtService)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("failed to get domain sizing : %s", err.Error()))
@@ -686,10 +686,10 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1, err := s.getNetworkV1FromDomain(domain)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("failed to get domain network : %s", err.Error()))
@@ -698,7 +698,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
 	return host, nil
@@ -742,9 +742,9 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 	}
 	host.LastState = newHost.LastState
 
-	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		newHostNetworkV1 := propsv1.NewHostNetwork()
-		readlockErr := newHost.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 			newHostNetworkV1 = v.(*propsv1.HostNetwork)
 			return nil
 		})
@@ -759,12 +759,12 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		newHostSizingV1 := propsv1.NewHostSizing()
-		readLockErr := newHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		readLockErr := newHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 			newHostSizingV1 = v.(*propsv1.HostSizing)
 			return nil
 		})
@@ -778,7 +778,7 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
+		return fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
 
 	return nil
@@ -832,20 +832,20 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		hostName = resourceName
 	}
 	if networks == nil || len(networks) == 0 {
-		return nil, userData, fmt.Errorf("The host %s must be on at least one network (even if public)", resourceName)
+		return nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
 	}
 	if defaultGateway == nil && !publicIP {
-		return nil, userData, fmt.Errorf("The host %s must have a gateway or be public", resourceName)
+		return nil, userData, fmt.Errorf("the host %s must have a gateway or be public", resourceName)
 	}
 	if templateID == "" {
-		return nil, userData, fmt.Errorf("The TemplateID is mandatory")
+		return nil, userData, fmt.Errorf("the TemplateID is mandatory")
 	}
 	if imageID == "" {
-		return nil, userData, fmt.Errorf("The ImageID is mandatory")
+		return nil, userData, fmt.Errorf("the ImageID is mandatory")
 	}
 	host, _, err = s.getHostAndDomainFromRef(resourceName)
 	if err == nil && host != nil {
-		return nil, userData, fmt.Errorf("The Host %s already exists", resourceName)
+		return nil, userData, fmt.Errorf("the Host %s already exists", resourceName)
 	}
 
 	//----Initialize----
@@ -902,7 +902,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					networkDefault, err = s.CreateNetwork(
 						resources.NetworkRequest{
 							Name:      "default",
-							IPVersion: IPVersion.IPv4,
+							IPVersion: ipversion.IPv4,
 							CIDR:      defaultNetworkCIDR,
 						},
 					)
@@ -965,7 +965,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
 	err = verifyVirtResizeCanAccessKernel()
 	if err != nil {
-		return nil, userData, fmt.Errorf("Libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+		return nil, userData, fmt.Errorf("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
 	}
 
 	var commands []string
@@ -1023,7 +1023,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = keyPair.PrivateKey
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 
 		if bridgedVMs {
@@ -1051,10 +1051,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil
 	})
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return nil, userData, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 	}
 
-	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 
 		hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
@@ -1067,7 +1067,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil
 	})
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
+		return nil, userData, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
 
 	return host, userData, nil
@@ -1079,15 +1079,20 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+		}
 		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
-	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
+		host = hostParam
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	newHost, _, err := s.getHostAndDomainFromRef(host.ID)
@@ -1255,14 +1260,14 @@ func (s *Stack) RebootHost(id string) error {
 }
 
 // GetHostState returns the host identified by id
-func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	if s == nil {
-		return HostState.ERROR, scerr.InvalidInstanceError()
+		return hoststate.ERROR, scerr.InvalidInstanceError()
 	}
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
-		return HostState.ERROR, err
+		return hoststate.ERROR, err
 	}
 	return host.LastState, nil
 }

@@ -12,7 +12,7 @@ import (
 type ErrTimeout = scerr.ErrTimeout
 
 // TimeoutError ...
-func TimeoutError(limit time.Duration, err error) *scerr.ErrTimeout {
+func TimeoutError(limit time.Duration, err error) *ErrTimeout {
 	msg := fmt.Sprintf("retries timed out after %s", temporal.FormatDuration(limit))
 	return scerr.TimeoutError(msg, limit, err)
 }
@@ -25,11 +25,11 @@ func LimitError(limit uint, err error) *ErrLimit {
 	return scerr.OverflowError("retry limit exceeded", limit, err)
 }
 
-// ErrAborted is returned when the context needs to stop the retries
-type ErrAborted = scerr.ErrAborted
+// ErrStopRetry is returned when the context needs to stop the retries
+type ErrStopRetry = scerr.ErrAborted
 
-// AbortedError ...
-func AbortedError(message string, err error) *scerr.ErrAborted {
+// StopRetryError ...
+func StopRetryError(message string, err error) *ErrStopRetry {
 	newMessage := message
 	if newMessage == "" {
 		newMessage = "stopping retries"

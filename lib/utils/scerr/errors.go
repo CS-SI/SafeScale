@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,13 +100,11 @@ func WithField(err error, key string, content interface{}) error {
 // DecorateError changes the error to something more comprehensible when
 // timeout occurred
 func DecorateError(err error, action string, timeout time.Duration) error {
-	if IsGRPCError(err) {
-		if IsGRPCTimeout(err) {
-			if timeout > 0 {
-				return fmt.Errorf("%s took too long (> %v) to respond", action, timeout)
-			}
-			return fmt.Errorf("%s took too long to respond", action)
+	if IsGRPCTimeout(err) {
+		if timeout > 0 {
+			return fmt.Errorf("%s took too long (> %v) to respond", action, timeout)
 		}
+		return fmt.Errorf("%s took too long to respond", action)
 	}
 	msg := err.Error()
 	if strings.Contains(msg, "desc = ") {
@@ -229,7 +227,19 @@ func (e *errCore) CauseFormatter() string {
 	return msgFinal
 }
 
-// Cause returns an error's causer
+// Reset imports content of error err to receiving error e
+func (e *errCore) Reset(err error) *errCore {
+	if err != nil {
+		if cerr, ok := err.(*errCore); ok {
+			e.message = cerr.message
+			e.consequences = cerr.consequences
+			e.causer = cerr.causer
+		}
+	}
+	return e
+}
+
+// Cause returns an error's cause
 func (e *errCore) Cause() error {
 	return e.causer
 }
@@ -239,7 +249,7 @@ func (e *errCore) Consequences() []error {
 	return e.consequences
 }
 
-//
+// Fields ...
 func (e *errCore) Fields() map[string]interface{} {
 	return e.fields
 }

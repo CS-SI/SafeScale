@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,12 @@ package retry
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/sirupsen/logrus"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Try keeps track of the number of tries, starting from 1. Action is valid only when Err is nil.
@@ -341,15 +342,15 @@ func (a action) loop() error {
 		}
 
 		// Asks what to do now
-		verdict, retryErr := arbiter(try)
+		v, retryErr := arbiter(try)
 
 		// Notify to interested parties
 		if a.Notify != nil {
-			a.Notify(try, verdict)
+			a.Notify(try, v)
 		}
 
-		switch verdict {
-		case Verdict.Done:
+		switch v {
+		case verdict.Done:
 			// Returns the error if no retry is wanted
 			var errLast error
 			if a.Last != nil {
@@ -359,7 +360,7 @@ func (a action) loop() error {
 				return fmt.Errorf("%s + %s", err.Error(), errLast.Error())
 			}
 			return err
-		case Verdict.Abort:
+		case verdict.Abort:
 			// Abort wanted, returns an error explaining why
 			var errLast error
 			if a.Last != nil {
@@ -423,13 +424,13 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 		}
 
 		// Asks what to do now
-		verdict, retryErr := arbiter(try)
+		v, retryErr := arbiter(try)
 		if a.Notify != nil {
-			a.Notify(try, verdict)
+			a.Notify(try, v)
 		}
 
-		switch verdict {
-		case Verdict.Done:
+		switch v {
+		case verdict.Done:
 			// Returns the error if no retry is wanted
 			var errLast error
 			if a.Last != nil {
@@ -439,7 +440,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 				return fmt.Errorf("%s + %s", err.Error(), errLast.Error())
 			}
 			return err
-		case Verdict.Abort:
+		case verdict.Abort:
 			// Abort wanted, returns an error explaining why
 			var errLast error
 			if a.Last != nil {

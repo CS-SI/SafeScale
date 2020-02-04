@@ -1,4 +1,4 @@
-# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ feature:
     requirements:
         features:
             - kubernetes
+            - helm
 
     parameters:
         - ChartVersion=1.4.0
@@ -34,14 +35,13 @@ feature:
     install:
         bash:
             check:
-                pace: helm
+                pace: list_helm
                 steps:
                     list_helm:
                         targets:
                             masters: any
                         run: |
-                            sfHelm ls | grep postgres-infra | fFail 192
-                            sfExit
+                            sudo -u cladm -i helm search ...
 
         add:
             pace: config,install,ready
@@ -52,7 +52,7 @@ feature:
                     run: |
                         mkdir -p ${SF_ETCDIR}/k8s.postgres
 
-                        cat >${SF_ETCDIR}/k8s.postgres.values.yaml <<-EOF
+                        cat >${SF_TMPDIR}/k8s.postgres.values.yaml <<-EOF
                         master:
                           affinity:
                             nodeAffinity:
@@ -131,8 +131,8 @@ feature:
                     run: |
                         #Install PostgreSQL Helm chart for Harbor
                         sfHelm install {{ .HelmRepoName }}/stolon \
-                            --name postgres-infra \
-                            --clusterName postgres-infra
+                            --name postgresql-infra \
+                            --clusterName postgresql-infra
                             --namespace {{ .Namespace }} \
                             --version {{ .ChartVersion }} \
                             # --tls \
@@ -154,10 +154,10 @@ feature:
                             --set proxy.replicaCount=3 \
                             --set sentinel.replicaCount=2 \
                             # --set metrics.image.registry="{{ .DockerRegistryURL }}/prometheus-exporter" \
-                            --values ${SF_ETCDIR}/k8s.postgres.values.yaml \
+                            --values ${SF_TMPDIR}/k8s.postgres.values.yaml \
                             || sfFail 192
 
-                        sfExit
+                        rm -f ${SF_TMPDIR}/k8s.postgres.values.yaml
 
                 ready:
                     targets:
@@ -167,20 +167,13 @@ feature:
                         sfExit
 
         remove:
-            pace: helm,cleanup
+            pace: helm
             steps:
                 helm:
                     targets:
                         masters: any
                     run: |
                         sfHelm delete postgresql-infra || sfFail 192
-                        sfExit
-
-                cleanup:
-                    targets:
-                        masters: all
-                    run: |
-                        rm -rf ${SF_ETCDIR}/k8s.postgres
                         sfExit
 
 ...

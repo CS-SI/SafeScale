@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,12 +34,12 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -79,7 +79,7 @@ type vpcCreateResult struct {
 type vpcGetResult struct {
 	vpcCommonResult
 }
-type vpcDeleteResult struct {
+type vpcDeleteResult struct { // nolint
 	gophercloud.ErrResult
 }
 
@@ -384,11 +384,11 @@ type subnetDeleteResult struct {
 }
 
 // convertIPv4ToNumber converts a net.IP to a uint32 representation
-func convertIPv4ToNumber(IP net.IP) (uint32, error) {
-	if IP.To4() == nil {
+func convertIPv4ToNumber(ip net.IP) (uint32, error) {
+	if ip.To4() == nil {
 		return 0, fmt.Errorf("not an IPv4")
 	}
-	n := uint32(IP[0])*0x1000000 + uint32(IP[1])*0x10000 + uint32(IP[2])*0x100 + uint32(IP[3])
+	n := uint32(ip[0])*0x1000000 + uint32(ip[1])*0x10000 + uint32(ip[2])*0x100 + uint32(ip[3])
 	return n, nil
 }
 
@@ -472,7 +472,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
 		tErr := openstack.TranslateProviderError(err)
-		switch tErr.(type) {
+		switch tErr.(type) { // nolint
 		case *scerr.ErrInvalidRequest:
 			body := map[string]interface{}{}
 			err = json.Unmarshal([]byte(tErr.Error()), &body)
@@ -514,8 +514,8 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 			return err
 		},
 		temporal.GetContextTimeout(),
-		func(try retry.Try, verdict Verdict.Enum) {
-			if verdict != Verdict.Done {
+		func(try retry.Try, v verdict.Enum) {
+			if v != verdict.Done {
 				log.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
 			}
 		},
@@ -588,11 +588,11 @@ func (s *Stack) deleteSubnet(id string) error {
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil,
-		func(t retry.Try, verdict Verdict.Enum) {
+		func(t retry.Try, v verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					log.Debugf("network still owns host(s), retrying in %s...", temporal.GetDefaultDelay())
+					log.Debugf("network still owns hosts and/or IP addresses, retrying in %s...", temporal.GetDefaultDelay())
 				default:
 					log.Debugf("error submitting network deletion (status=%s), retrying in %s...", t.Err.Error(), temporal.GetDefaultDelay())
 				}
@@ -631,12 +631,12 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 	return &subnet, nil
 }
 
-func fromIntIPVersion(v int) IPVersion.Enum {
+func fromIntIPVersion(v int) ipversion.Enum {
 	if v == 4 {
-		return IPVersion.IPv4
+		return ipversion.IPv4
 	}
 	if v == 6 {
-		return IPVersion.IPv6
+		return ipversion.IPv6
 	}
 	return -1
 }
@@ -687,7 +687,7 @@ func (s *Stack) DeleteGateway(id string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -700,7 +700,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error)
 	if err != nil {
 		return nil, err
 	}
-	vip := resources.VIP{
+	vip := resources.VirtualIP{
 		ID:        port.ID,
 		Name:      name,
 		NetworkID: networkID,

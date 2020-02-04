@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,8 +82,8 @@ reset_fw() {
 
     # Clear interfaces attached to zones
     for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
-        for nic in $(sfFirewall --zone=$zone --list-interfaces); do
-            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null
+        for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
+            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
         done
     done
 
@@ -388,10 +388,9 @@ configure_network_redhat() {
         }
     fi
 
-
     # We don't want NetworkManager
-    disable_svc NetworkManager &>/dev/null
     stop_svc NetworkManager &>/dev/null
+    disable_svc NetworkManager &>/dev/null
     yum remove -y NetworkManager &>/dev/null
 
     # Configure all network interfaces in dhcp
@@ -401,6 +400,7 @@ configure_network_redhat() {
 DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
+NM_CONTROLLED=no
 EOF
             {{- if .DNSServers }}
             i=1
@@ -422,6 +422,8 @@ EOF
 
     enable_svc network
     restart_svc network
+
+    echo "exclude=NetworkManager" >>/etc/yum.conf
 
     reset_fw || fail 200
 
@@ -487,9 +489,8 @@ EOF
     # Applies fw rules
     sfFirewallReload
 
-    grep -vi AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
-    echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new
-    mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
+    sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 196
+    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
     systemctl restart sshd
 
     echo done
@@ -846,8 +847,6 @@ ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
 #insert_tag
 
 force_dbus_restart
-
-ls -lR /opt/safescale
 
 set +x
 exit 0

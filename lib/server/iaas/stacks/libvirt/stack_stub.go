@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
@@ -125,27 +125,27 @@ func (s *Stack) DeleteGateway(string) error {
 }
 
 // CreateVIP stub
-func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
 // AddPublicIPToVIP stub
-func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 
 // BindHostToVIP stub
-func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
 
 // UnbindHostFromVIP stub
-func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
 
 // DeleteVIP stub
-func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 
@@ -170,8 +170,8 @@ func (s *Stack) GetHostByName(string) (*resources.Host, error) {
 }
 
 // GetHostState stub
-func (s *Stack) GetHostState(interface{}) (HostState.Enum, error) {
-	return HostState.ERROR, fmt.Errorf(errorStr)
+func (s *Stack) GetHostState(interface{}) (hoststate.Enum, error) {
+	return hoststate.ERROR, fmt.Errorf(errorStr)
 }
 
 // ListHosts stub

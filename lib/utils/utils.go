@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import (
 
 // AbsPathify ...
 func AbsPathify(inPath string) string {
-	r, _ := regexp.Compile("(\\$[\\{]{1}[A-Z]+[\\}]{1})|(\\$[A-Z]+)")
+	r := regexp.MustCompile(`(\$[\{]{1}[A-Z]+[\}]{1})|(\$[A-Z]+)`)
 	found := r.FindAllString(inPath, -1)
 
 	// Special variable treatment goes here
@@ -96,7 +96,7 @@ func ExtractRetCode(err error) (string, int, error) {
 		} else {
 			return msg, retCode, fmt.Errorf("ExitError.Sys is not a 'syscall.WaitStatus'")
 		}
-		//Retrieve error message
+		//Retrieve error Message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}

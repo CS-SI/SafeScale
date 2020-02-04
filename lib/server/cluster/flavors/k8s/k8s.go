@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,10 +32,12 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/server/install"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 //go:generate rice embed-go
@@ -55,24 +57,25 @@ var (
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
 		ConfigureCluster:            configureCluster,
+		UnconfigureCluster:          unconfigureCluster,
 		LeaveNodeFromCluster:        leaveNodeFromCluster,
 	}
 )
 
 func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (uint, uint, uint) {
-	complexity := foreman.Cluster().GetIdentity(task).Complexity
+	c := foreman.Cluster().GetIdentity(task).Complexity
 	var masterCount uint
 	var privateNodeCount uint
 	var publicNodeCount uint
 
-	switch complexity {
-	case Complexity.Small:
+	switch c {
+	case complexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
-	case Complexity.Normal:
+	case complexity.Normal:
 		masterCount = 3
 		privateNodeCount = 3
-	case Complexity.Large:
+	case complexity.Large:
 		masterCount = 5
 		privateNodeCount = 6
 	}
@@ -109,7 +112,7 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return "Ubuntu 18.04"
 }
 
-func configureCluster(task concurrency.Task, foreman control.Foreman) error {
+func configureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
 	clusterName := foreman.Cluster().GetIdentity(task).Name
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
@@ -121,7 +124,44 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error())
 	}
-	results, err := feature.Add(target, install.Variables{}, install.Settings{})
+
+	// Initializes variables
+	v := data.Map{}
+
+	// If hardening is disabled, set the appropriate variable for the kubernetes feature
+	_, ok := req.DisabledDefaultFeatures["hardening"]
+	v["Hardening"] = !ok
+
+	// If complexity == Normal or Large, creates a VIP for Kubernetes attached to masters
+	// FIXME: find a way to store VIP in cluster metadata
+	var controlplaneEndointIP string
+	vip, err := foreman.Cluster().GetService().CreateVirtualIP()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			derr := foreman.Cluster().GetService().DeleteVirtualIP(task, vip)
+			if derr != nil {
+				logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+			}
+		}
+	}()
+
+	for _, id := range foreman.Cluster().ListMasterIPs(task) {
+		err = vip.BindHost(task, id)
+		if err != nil {
+			return err
+		}
+	}
+	controlplaneEndpointIP = vip.GetPrivateIP(task)
+
+	// Installs kubernetes feature
+	results, err := feature.Add(
+		target,
+		install.Variables{"ControlplaneEndpointIP": controlplaneEndpointIP},
+		install.Settings{},
+	)
 	if err != nil {
 		return scerr.Wrap(err, fmt.Sprintf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error()))
 	}
@@ -134,15 +174,24 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func unconfigureCluster(task concurrency.Task, foreman control.Foreman, req control.Request) error {
+	clusterName := foreman.Cluster().GetIdentity(task).Name
+	logrus.Println(fmt.Sprintf("[cluster %s] removing virtual IP...", clusterName))
+
+	// FIXME: find a way to store VIP in cluster metadata
+	logrus.Println(fmt.Sprintf("[cluster %s] virtual IP is not deleted, not implemented")
+	return nil
+}
+
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 
 	switch nodeType {
-	case NodeType.Gateway:
-	case NodeType.Master:
+	case nodetype.Gateway:
+	case nodetype.Master:
 		script = "k8s_install_master.sh"
-	case NodeType.Node:
+	case nodetype.Node:
 		script = "k8s_install_node.sh"
 	}
 	return script, data
@@ -218,14 +267,9 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 
 	clientSSH := client.New().SSH
 
-	ctx, err := task.GetContext()
-	if err != nil {
-		return err
-	}
-
 	// Check worker belongs to k8s
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err := clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err := clientSSH.Run(task, selectedMasterID, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -237,7 +281,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl drain %s --delete-local-data --force --ignore-daemonsets", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(task, selectedMasterID, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -246,7 +290,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl delete node %s", pbHost.Name)
-	retcode, _, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, _, err = clientSSH.Run(task, selectedMasterID, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -256,7 +300,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 
 	// check node no longer belongs to k8s
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
-	retcode, retout, _, err = clientSSH.Run(ctx, selectedMasterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, retout, _, err = clientSSH.Run(task, selectedMasterID, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}

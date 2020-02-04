@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/stretchr/testify/assert"
@@ -29,11 +30,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
@@ -44,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialize tenant gcp
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialize tenant local
@@ -61,10 +61,10 @@ type ServiceTester struct {
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	var stack api.Stack
 
-	stack = &libvirt.Stack{}
-	stack = &huaweicloud.Stack{}
-	stack = &openstack.Stack{}
-	stack = &gcp.Stack{}
+	stack = &libvirt.Stack{}     // nolint
+	stack = &huaweicloud.Stack{} // nolint
+	stack = &openstack.Stack{}   // nolint
+	stack = &gcp.Stack{}         // nolint
 
 	_ = stack
 }
@@ -172,11 +172,12 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 	assert.EqualValues(t, nbKP+2, len(lst))
 	for _, kpe := range lst {
 		var kpr resources.KeyPair
-		if kpe.ID == kp.ID {
+		switch kpe.ID {
+		case kp.ID:
 			kpr = *kp
-		} else if kpe.ID == kp2.ID {
+		case kp2.ID:
 			kpr = *kp2
-		} else {
+		default:
 			continue
 		}
 		assert.Equal(t, kpe.ID, kpr.ID)
@@ -191,7 +192,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 
 	network, err := tester.Service.CreateNetwork(resources.NetworkRequest{
 		Name:      name,
-		IPVersion: IPVersion.IPv4,
+		IPVersion: ipversion.IPv4,
 		CIDR:      cidr,
 	})
 	require.NoError(t, err)
@@ -334,7 +335,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Equal(t, gw1.Name, "gw-"+network1.Name)
 	assert.NotEmpty(t, gw1.GetPublicIP)
 	gw1NetworkV1 := propsv1.NewHostNetwork()
-	err = gw1.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = gw1.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
 		gw1NetworkV1 = v.(*propsv1.HostNetwork)
 		return nil
 	})
@@ -436,13 +437,14 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	assert.Equal(t, nbHosts+3, len(hosts))
 	found := 0
 	for _, v := range hosts {
-		if v.Name == "gw-"+network.Name {
+		switch {
+		case v.Name == "gw-"+network.Name:
 			found++
-		} else if v.ID == host1.ID {
+		case v.ID == host1.ID:
 			found++
-		} else if v.ID == host2.ID {
+		case v.ID == host2.ID:
 			found++
-		} else {
+		default:
 			fmt.Printf("Unknown (preexisting?) host %+v\n", v)
 			continue
 		}
@@ -469,21 +471,21 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		err := tester.Service.StopHost(host.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, HostState.STOPPED, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.ID, hoststate.STOPPED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		//assert.Equal(t, host.State, HostState.STOPPED)
+		//assert.Equal(t, host.State, hoststate.STOPPED)
 	}
 	{
 		err := tester.Service.StartHost(host.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, HostState.STARTED, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.ID, hoststate.STARTED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		assert.Equal(t, host.LastState, HostState.STARTED)
+		assert.Equal(t, host.LastState, hoststate.STARTED)
 	}
 
 }
@@ -498,7 +500,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	v1, err := tester.Service.CreateVolume(resources.VolumeRequest{
 		Name:  "test_volume1",
 		Size:  25,
-		Speed: VolumeSpeed.HDD,
+		Speed: volumespeed.HDD,
 	})
 	assert.Nil(t, err)
 	defer func() {
@@ -507,41 +509,41 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 
 	assert.Equal(t, "test_volume1", v1.Name)
 	assert.Equal(t, 25, v1.Size)
-	assert.Equal(t, VolumeSpeed.HDD, v1.Speed)
+	assert.Equal(t, volumespeed.HDD, v1.Speed)
 
-	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(resources.VolumeRequest{
 		Name:  "test_volume2",
 		Size:  35,
-		Speed: VolumeSpeed.HDD,
+		Speed: volumespeed.HDD,
 	})
 	assert.Nil(t, err)
 	defer func() {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	lst, err = tester.Service.ListVolumes()
 	assert.Nil(t, err)
 	assert.Equal(t, nbVolumes+2, len(lst))
 	for _, vl := range lst {
-		if vl.ID == v1.ID {
+		switch vl.ID {
+		case v1.ID:
 			assert.Equal(t, v1.Name, vl.Name)
 			assert.Equal(t, v1.Size, vl.Size)
 			assert.Equal(t, v1.Speed, vl.Speed)
-		} else if vl.ID == v2.ID {
+		case v2.ID:
 			assert.Equal(t, v2.Name, vl.Name)
 			assert.Equal(t, v2.Size, vl.Size)
 			assert.Equal(t, v2.Speed, vl.Speed)
-		} else {
+		default:
 			t.Fail()
 		}
 	}
-
 }
 
 //VolumeAttachment test
@@ -568,26 +570,26 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	v1, err := tester.Service.CreateVolume(resources.VolumeRequest{
 		Name:  "test_volume1",
 		Size:  25,
-		Speed: VolumeSpeed.HDD,
+		Speed: volumespeed.HDD,
 	})
 	assert.Nil(t, err)
 	defer func() {
 		_ = tester.Service.DeleteVolume(v1.ID)
 	}()
-	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(resources.VolumeRequest{
 		Name:  "test_volume2",
 		Size:  35,
-		Speed: VolumeSpeed.HDD,
+		Speed: volumespeed.HDD,
 	})
 	assert.Nil(t, err)
 	defer func() {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
@@ -622,19 +624,20 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(lst))
 	for _, val := range lst {
-		if val.ID == va1ID {
+		switch val.ID {
+		case va1ID:
 			assert.Equal(t, va1ID, val.ID)
 			assert.Equal(t, va1.Name, val.Name)
 			assert.Equal(t, va1.Device, val.Device)
 			assert.Equal(t, va1.ServerID, val.ServerID)
 			assert.Equal(t, va1.VolumeID, val.VolumeID)
-		} else if val.ID == va2ID {
+		case va2ID:
 			assert.Equal(t, va2ID, val.ID)
 			assert.Equal(t, va2.Name, val.Name)
 			assert.Equal(t, va2.Device, val.Device)
 			assert.Equal(t, va2.ServerID, val.ServerID)
 			assert.Equal(t, va2.VolumeID, val.VolumeID)
-		} else {
+		default:
 			t.Fail()
 		}
 	}
@@ -655,6 +658,7 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 	err = tester.Service.DeleteBucket("testC2")
 	assert.Nil(t, err)
 	cl, err = tester.Service.ListBuckets("")
+	assert.Nil(t, err)
 	assert.NotContains(t, cl, "testC", "testC2")
 }
 

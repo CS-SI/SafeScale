@@ -1,4 +1,4 @@
-# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,8 +72,8 @@ feature:
                                 centos|redhat)
                                     yum install -y epel-release && \
                                     yum makecache fast && \
-                                    yum groupinstall -y -t "X Window system" && \
-                                    yum groupinstall -y -t Xfce && \
+                                    yum groupinstall -y -t "X Window system" --skip-broken && \
+                                    yum groupinstall -y -t Xfce --skip-broken && \
                                     yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     ;;
                                 debian|ubuntu)

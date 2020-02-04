@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,9 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -32,27 +31,26 @@ import (
 
 //TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
-	List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
+	List(all bool) ([]resources.HostTemplate, error)
 }
 
 // TemplateHandler template service
 type TemplateHandler struct {
-	service iaas.Service
+	job server.Job
 }
 
 // NewTemplateHandler creates a template service
-func NewTemplateHandler(svc iaas.Service) TemplateAPI {
-	return &TemplateHandler{
-		service: svc,
-	}
+//FIXME: what to do if job == nil ?
+func NewTemplateHandler(job server.Job) TemplateAPI {
+	return &TemplateHandler{job: job}
 }
 
 // List returns the template list
-func (handler *TemplateHandler) List(_ context.Context, all bool) (tlist []resources.HostTemplate, err error) {
+func (handler *TemplateHandler) List(all bool) (tlist []resources.HostTemplate, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	tlist, err = handler.service.ListTemplates(all)
+	tlist, err = handler.job.Service().ListTemplates(all)
 	return tlist, err
 }

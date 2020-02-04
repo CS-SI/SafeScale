@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,11 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
 	"github.com/sirupsen/logrus"
-
 	"github.com/urfave/cli"
 
 	pb "github.com/CS-SI/SafeScale/lib"
@@ -39,14 +34,18 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var (
@@ -71,6 +70,7 @@ var ClusterCommand = cli.Command{
 		clusterDeleteCommand,
 		clusterInspectCommand,
 		clusterStateCommand,
+		clusterRunCommand,
 		//clusterSshCommand,
 		clusterStartCommand,
 		clusterStopCommand,
@@ -78,6 +78,7 @@ var ClusterCommand = cli.Command{
 		clusterShrinkCommand,
 		clusterDcosCommand,
 		clusterKubectlCommand,
+		clusterHelmCommand,
 		clusterListFeaturesCommand,
 		clusterCheckFeatureCommand,
 		clusterAddFeatureCommand,
@@ -103,16 +104,14 @@ func extractClusterArgument(c *cli.Context) error {
 			err = scerr.FromGRPCStatus(err)
 			if _, ok := err.(*scerr.ErrNotFound); ok {
 				if !c.Command.HasName("create") {
-					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.", clusterName))
+					return clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Cluster '%s' not found.", clusterName))
 				}
 			} else {
 				msg := fmt.Sprintf("failed to query for cluster '%s': %s", clusterName, err.Error())
 				return clitools.ExitOnRPC(msg)
 			}
-		} else {
-			if c.Command.HasName("create") {
-				return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.", clusterName))
-			}
+		} else if c.Command.HasName("create") {
+			return clitools.ExitOnErrorWithMessage(exitcode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.", clusterName))
 		}
 	}
 
@@ -138,7 +137,7 @@ var clusterListCommand = cli.Command{
 			c, _ := value.(api.Cluster)
 			converted, err := convertToMap(c)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name)))
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name)))
 			}
 			formatted = append(formatted, formatClusterConfig(converted, false))
 		}
@@ -181,7 +180,7 @@ var clusterInspectCommand = cli.Command{
 
 		clusterConfig, err := outputClusterConfig()
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		return clitools.SuccessResponse(clusterConfig)
 	},
@@ -215,8 +214,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	}
 
 	properties := c.GetProperties(concurrency.RootTask())
-	err := properties.LockForRead(Property.CompositeV1).ThenUse(func(v interface{}) error {
-		result["tenant"] = v.(*clusterpropsv1.Composite).Tenants[0]
+	err := properties.LockForRead(property.CompositeV1).ThenUse(func(clonable data.Clonable) error {
+		result["tenant"] = clonable.(*clusterpropsv1.Composite).Tenants[0]
 		return nil
 	})
 	if err != nil {
@@ -239,9 +238,9 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		result["secondary_public_ip"] = netCfg.SecondaryPublicIP
 		result["public_ip"] = netCfg.EndpointIP // legacy ...
 	}
-	if !properties.Lookup(Property.DefaultsV2) {
-		err = properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
-			defaultsV1, ok := v.(*clusterpropsv1.Defaults)
+	if !properties.Lookup(property.DefaultsV2) {
+		err = properties.LockForRead(property.DefaultsV1).ThenUse(func(clonable data.Clonable) error {
+			defaultsV1, ok := clonable.(*clusterpropsv1.Defaults)
 			if !ok {
 				return fmt.Errorf("invalid metadata")
 			}
@@ -253,8 +252,11 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 			return nil
 		})
 	} else {
-		err = properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
-			defaultsV2, _ := v.(*clusterpropsv2.Defaults)
+		err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
+			defaultsV2, ok := clonable.(*clusterpropsv2.Defaults)
+			if !ok {
+				return fmt.Errorf("invalid metadata")
+			}
 			result["defaults"] = map[string]interface{}{
 				"image":   defaultsV2.Image,
 				"gateway": defaultsV2.GatewaySizing,
@@ -268,8 +270,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	err = properties.LockForRead(Property.NodesV2).ThenUse(func(v interface{}) error {
-		nodesV2, ok := v.(*clusterpropsv2.Nodes)
+	err = properties.LockForRead(property.NodesV2).ThenUse(func(clonable data.Clonable) error {
+		nodesV2, ok := clonable.(*clusterpropsv2.Nodes)
 		if !ok {
 			return fmt.Errorf("invalid metadata")
 		}
@@ -282,16 +284,16 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = properties.LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
-		result["features"] = v.(*clusterpropsv1.Features)
+	err = properties.LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		result["features"] = clonable.(*clusterpropsv1.Features)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	err = properties.LockForRead(Property.StateV1).ThenUse(func(v interface{}) error {
-		state := v.(*clusterpropsv1.State).State
+	err = properties.LockForRead(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+		state := clonable.(*clusterpropsv1.State).State
 		result["last_state"] = state
 		result["last_state_label"] = state.String()
 		return nil
@@ -360,8 +362,12 @@ var clusterCreateCommand = cli.Command{
 			Usage: "Defines the CIDR of the network to use with cluster",
 		},
 		cli.StringSliceFlag{
-			Name:  "disable",
-			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
+			Name: "disable",
+			Usage: `Allows to disable addition of default features (must be used several times to disable several features)
+	Accepted features are:
+		remotedesktop (all flavors), reverseproxy (all flavors),
+		gateway-failover (all flavors with Normal or Large complexity),
+		hardening (flavor K8S), helm (flavor K8S)`,
 		},
 		cli.StringFlag{
 			Name:  "os",
@@ -405,15 +411,15 @@ var clusterCreateCommand = cli.Command{
 		},
 		cli.UintFlag{
 			Name:  "cpu",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the number of cpu of masters and nodes in the cluster",
+			Usage: "DEPRECATED! use --sizing and friends instead! Defines the number of cpu of masters and nodes in the cluster",
 		},
 		cli.Float64Flag{
 			Name:  "ram",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+			Usage: "DEPRECATED! use --sizing and friends instead! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
 		cli.UintFlag{
 			Name:  "disk",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of system disk of masters and nodes (in GB)",
+			Usage: "DEPRECATED! use --sizing and friends instead! Defines the size of system disk of masters and nodes (in GB)",
 		},
 	},
 
@@ -425,14 +431,14 @@ var clusterCreateCommand = cli.Command{
 		}
 
 		complexityStr := c.String("complexity")
-		complexity, err := Complexity.Parse(complexityStr)
+		comp, err := complexity.Parse(complexityStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --complexity|-C: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
 
 		flavorStr := c.String("flavor")
-		flavor, err := Flavor.Parse(flavorStr)
+		fla, err := flavor.Parse(flavorStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --flavor|-F: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
@@ -445,11 +451,11 @@ var clusterCreateCommand = cli.Command{
 		disable := c.StringSlice("disable")
 		disableFeatures := map[string]struct{}{}
 		for _, v := range disable {
-			disableFeatures[v] = struct{}{}
+			disableFeatures[strings.ToLower(v)] = struct{}{}
 		}
 
 		los := c.String("os")
-		if flavor == Flavor.DCOS {
+		if fla == flavor.DCOS {
 			// DCOS forces to use RHEL/CentOS/CoreOS, and we've chosen to use CentOS, so ignore --os option
 			los = ""
 		}
@@ -511,9 +517,9 @@ var clusterCreateCommand = cli.Command{
 		}
 		clusterInstance, err := cluster.Create(concurrency.RootTask(), control.Request{
 			Name:                    clusterName,
-			Complexity:              complexity,
+			Complexity:              comp,
 			CIDR:                    cidr,
-			Flavor:                  flavor,
+			Flavor:                  fla,
 			KeepOnFailure:           keep,
 			GatewaysDef:             gatewaysDef,
 			MastersDef:              mastersDef,
@@ -529,16 +535,16 @@ var clusterCreateCommand = cli.Command{
 				}
 			}
 			msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		if clusterInstance == nil {
 			msg := fmt.Sprintf("failed to create cluster: unknown reason")
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 
 		toFormat, err := convertToMap(clusterInstance)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 
 		formatted := formatClusterConfig(toFormat, true)
@@ -710,27 +716,29 @@ var clusterExpandCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		count := c.Uint("count")
+		count := int(c.Uint("count"))
 		if count == 0 {
 			count = 1
 		}
 		los := c.String("os")
 
 		var nodesDef *pb.HostDefinition
-		if c.IsSet("node-sizing") {
-			nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
-			if err != nil {
-				return err
-			}
+		//		if c.IsSet("node-sizing") {
+		nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+		if err != nil {
+			return err
 		}
+		//		}
 
 		if nodesDef == nil {
 			cpu := int32(c.Uint("cpu"))
 			ram := float32(c.Float64("ram"))
 			disk := int32(c.Uint("disk"))
 			gpu := int32(c.Uint("gpu"))
-
-			if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
+			if gpu == 0 {
+				gpu = -1
+			}
+			if cpu > 0 || ram > 0.0 || disk > 0 || gpu >= 1 || los != "" {
 				nodesDef = &pb.HostDefinition{
 					ImageId: los,
 					Sizing: &pb.HostSizing{
@@ -811,7 +819,7 @@ var clusterShrinkCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 		for i := uint(0); i < count; i++ {
-			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster.ID)
+			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster)
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
 				msgs = append(msgs, fmt.Sprintf("failed to delete node #%d: %s", i+1, err.Error()))
@@ -838,21 +846,21 @@ var clusterDcosCommand = cli.Command{
 		}
 
 		identity := clusterInstance.GetIdentity(concurrency.RootTask())
-		if identity.Flavor != Flavor.DCOS {
+		if identity.Flavor != flavor.DCOS {
 			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s)", identity.Flavor.String())
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotApplicable, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotApplicable, msg))
 		}
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		return executeCommand(cmdStr, nil)
+		return executeCommand(cmdStr, nil, outputs.DISPLAY)
 	},
 }
 
 var clusterKubectlCommand = cli.Command{
 	Name:      "kubectl",
 	Category:  "Administrative commands",
-	Usage:     "kubectl CLUSTERNAME [COMMAND ...]",
+	Usage:     "kubectl CLUSTERNAME [KUBECTL_COMMAND]... [-- [KUBECTL_OPTIONS]...]",
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
@@ -864,7 +872,7 @@ var clusterKubectlCommand = cli.Command{
 
 		clientID := GenerateClientIdentity()
 		args := c.Args().Tail()
-		filteredArgs := []string{}
+		var filteredArgs []string
 		ignoreNext := false
 		valuesOnRemote := &RemoteFilesHandler{}
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
@@ -901,7 +909,7 @@ var clusterKubectlCommand = cli.Command{
 							if err != nil {
 								return cli.NewExitError(err.Error(), 1)
 							}
-							st, err = os.Stat(link)
+							_, err = os.Stat(link)
 							if err != nil {
 								return cli.NewExitError(err.Error(), 1)
 							}
@@ -928,11 +936,11 @@ var clusterKubectlCommand = cli.Command{
 				filteredArgs = append(filteredArgs, arg)
 			}
 		}
-		cmdStr := `sudo -u cladm -i kubectl`
+		cmdStr := "sudo -u cladm -i kubectl"
 		if len(filteredArgs) > 0 {
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
-		return executeCommand(cmdStr, valuesOnRemote)
+		return executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -951,7 +959,7 @@ var clusterHelmCommand = cli.Command{
 
 		clientID := GenerateClientIdentity()
 		useTLS := " --tls"
-		filteredArgs := []string{}
+		var filteredArgs []string
 		args := c.Args().Tail()
 		ignoreNext := false
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
@@ -965,7 +973,7 @@ var clusterHelmCommand = cli.Command{
 			switch arg {
 			case "init":
 				if idx == 0 {
-					return cli.NewExitError("helm init is forbidden", int(ExitCode.InvalidArgument))
+					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
 			case "search", "repo":
 				if idx == 0 {
@@ -997,7 +1005,7 @@ var clusterHelmCommand = cli.Command{
 							if err != nil {
 								return cli.NewExitError(err.Error(), 1)
 							}
-							st, err = os.Stat(link)
+							_, err = os.Stat(link)
 							if err != nil {
 								return cli.NewExitError(err.Error(), 1)
 							}
@@ -1013,7 +1021,7 @@ var clusterHelmCommand = cli.Command{
 							filteredArgs = append(filteredArgs, rfc.Remote)
 						} else {
 							// data comes from the standard input
-							return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "'-f -' is not yet supported")
+							return clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "'-f -' is not yet supported")
 						}
 						ignoreNext = true
 					}
@@ -1025,7 +1033,7 @@ var clusterHelmCommand = cli.Command{
 			}
 		}
 		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
-		return executeCommand(cmdStr, valuesOnRemote)
+		return executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -1042,16 +1050,16 @@ var clusterRunCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "clusterRunCmd not yet implemented"))
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "clusterRunCmd not yet implemented"))
 	},
 }
 
-func executeCommand(command string, files *RemoteFilesHandler) error {
+func executeCommand(command string, files *RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 	master, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 	if err != nil {
 		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.GetIdentity(concurrency.RootTask()).Name, err.Error())
-		return clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg)
+		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 
 	if files != nil && files.Count() > 0 {
@@ -1060,18 +1068,25 @@ func executeCommand(command string, files *RemoteFilesHandler) error {
 		}
 		err = files.Upload(master)
 		if err != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.RPC, err.Error())
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error())
 		}
 	}
 
 	safescalessh := client.New().SSH
-	retcode, _, _, err := safescalessh.Run(master, command, Outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescalessh.Run(master, command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master, err.Error())
-		return clitools.ExitOnErrorWithMessage(ExitCode.RPC, msg)
+		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		return cli.NewExitError("", retcode)
+		msg := fmt.Sprintf("command executed on master '%s' with failure: %s", master, stdout)
+		if stderr != "" {
+			if stdout != "" {
+				msg += "\n"
+			}
+			msg += stderr
+		}
+		return cli.NewExitError(msg, retcode)
 	}
 	return nil
 }
@@ -1095,7 +1110,7 @@ var clusterListFeaturesCommand = cli.Command{
 		features, err := install.ListFeatures("cluster")
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		return clitools.SuccessResponse(features)
 	},
@@ -1133,11 +1148,11 @@ var clusterAddFeatureCommand = cli.Command{
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
 		values := install.Variables{}
@@ -1168,7 +1183,7 @@ var clusterAddFeatureCommand = cli.Command{
 			if Debug || Verbose {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1200,11 +1215,11 @@ var clusterCheckFeatureCommand = cli.Command{
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			_, _ = fmt.Fprintln(os.Stderr, err.Error())
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
 		values := install.Variables{}
@@ -1266,11 +1281,11 @@ var clusterDeleteFeatureCommand = cli.Command{
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 
 		values := install.Variables{}
@@ -1302,7 +1317,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			if Verbose || Debug {
 				msg += fmt.Sprintf(":\n%s\n", results.AllErrorMessages())
 			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1320,6 +1335,7 @@ var clusterNodeCommand = cli.Command{
 		clusterNodeStartCommand,
 		clusterNodeStopCommand,
 		clusterNodeStateCommand,
+		clusterNodeDeleteCommand,
 	},
 }
 
@@ -1337,7 +1353,7 @@ var clusterNodeListCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 		hostClt := client.New().Host
-		formatted := []map[string]interface{}{}
+		var formatted []map[string]interface{}
 
 		list, err := clusterInstance.ListNodeIDs(concurrency.RootTask())
 		if err != nil {
@@ -1360,15 +1376,11 @@ var clusterNodeListCommand = cli.Command{
 	},
 }
 
-// formatNodeConfig...
-func formatNodeConfig(value interface{}) map[string]interface{} {
-	core, ok := value.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-
-	return core
-}
+// // formatNodeConfig...
+// func formatNodeConfig(value interface{}) map[string]interface{} {
+// 	core := value.(map[string]interface{})
+// 	return core
+// }
 
 // clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
 var clusterNodeInspectCommand = cli.Command{
@@ -1397,7 +1409,7 @@ var clusterNodeInspectCommand = cli.Command{
 }
 
 // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterNodeDeleteCommand = &cli.Command{
+var clusterNodeDeleteCommand = cli.Command{
 	Name:    "delete",
 	Aliases: []string{"destroy", "remove", "rm"},
 
@@ -1458,7 +1470,7 @@ var clusterNodeStopCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented"))
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
 	},
 }
 
@@ -1478,7 +1490,7 @@ var clusterNodeStartCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented"))
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
 	},
 }
 
@@ -1497,7 +1509,7 @@ var clusterNodeStateCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented"))
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
 	},
 }
 
@@ -1527,7 +1539,7 @@ var clusterMasterListCommand = cli.Command{
 		}
 
 		hostClt := client.New().Host
-		formatted := []map[string]interface{}{}
+		var formatted []map[string]interface{}
 
 		list, err := clusterInstance.ListMasterIDs(concurrency.RootTask())
 		if err != nil {

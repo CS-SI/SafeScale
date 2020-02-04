@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@ package handlers
 
 import (
 	"bytes"
-	"context"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"text/template"
+
+	"github.com/CS-SI/SafeScale/lib/server"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
@@ -58,35 +59,18 @@ func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
 }
 
 // Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
-func exec(ctx context.Context, script string, data interface{}, hostid string, svc iaas.Service) error {
+func exec(job server.Job, script string, data interface{}, hostid string, svc iaas.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
 		return err
 	}
 	// retrieve ssh config to perform some commands
-	sshHandler := NewSSHHandler(svc)
-	ssh, err := sshHandler.GetConfig(ctx, hostid)
+	sshHandler := NewSSHHandler(job)
+	ssh, err := sshHandler.GetConfig(hostid)
 	if err != nil {
 		return err
 	}
 
-	echan := make(chan error)
-	go func() {
-		defer close(echan)
-		cmd, err := ssh.SudoCommand(scriptCmd)
-		if err != nil {
-			echan <- err
-			return
-		}
-		_, err = cmd.Output()
-		echan <- err
-		return
-	}()
-
-	select {
-	case <-ctx.Done():
-		return scerr.AbortedError("operation aborted by user", nil)
-	case err := <-echan:
-		return err
-	}
+	_, err = ssh.SudoCommand(job.Task(), scriptCmd, false)
+	return err
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@
 package nfs
 
 import (
-	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 )
 
 // Server structure
@@ -48,13 +48,13 @@ func (s *Server) GetHost() string {
 }
 
 // Install installs and configure NFS service on the remote host
-func (s *Server) Install(ctx context.Context) error {
-	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+func (s *Server) Install(task concurrency.Task) error {
+	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 }
 
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(ctx context.Context, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
+func (s *Server) AddShare(task concurrency.Task, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
 	share, err := NewShare(s, path)
 	if err != nil {
 		return fmt.Errorf("failed to create the share : %s", err.Error())
@@ -62,7 +62,7 @@ func (s *Server) AddShare(ctx context.Context, path string, secutityModes []stri
 
 	acl := ExportACL{
 		Host:          "*",
-		SecurityModes: []SecurityFlavor.Enum{},
+		SecurityModes: []securityflavor.Enum{},
 		Options: ExportOptions{
 			ReadOnly:       readOnly,
 			NoRootSquash:   !rootSquash,
@@ -80,13 +80,13 @@ func (s *Server) AddShare(ctx context.Context, path string, secutityModes []stri
 	for _, securityMode := range secutityModes {
 		switch securityMode {
 		case "sys":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Sys)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Sys)
 		case "krb5":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5)
 		case "krb5i":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5i)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5i)
 		case "krb5p":
-			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5p)
+			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5p)
 		default:
 			return fmt.Errorf("cannot add the share, %s is not a valid security mode", securityMode)
 		}
@@ -94,36 +94,36 @@ func (s *Server) AddShare(ctx context.Context, path string, secutityModes []stri
 
 	share.AddACL(acl)
 
-	return share.Add(ctx)
+	return share.Add(task)
 }
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
-func (s *Server) RemoveShare(ctx context.Context, path string) error {
+func (s *Server) RemoveShare(task concurrency.Task, path string) error {
 	data := map[string]interface{}{
 		"Path": path,
 	}
-	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool) (string, error) {
+func (s *Server) MountBlockDevice(task concurrency.Task, deviceName, mountPoint, format string, doNotFormat bool) (string, error) {
 	data := map[string]interface{}{
 		"Device":      deviceName,
 		"MountPoint":  mountPoint,
 		"FileSystem":  format,
 		"DoNotFormat": doNotFormat,
 	}
-	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
+	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_mount.sh", data)
 	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
 	return stdout, err
 }
 
 // UnmountBlockDevice unmounts a local block device on the remote system
-func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) error {
+func (s *Server) UnmountBlockDevice(task concurrency.Task, volumeUUID string) error {
 	data := map[string]interface{}{
 		"UUID": volumeUUID,
 	}
-	retcode, stdout, stderr, err := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
+	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_unmount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }

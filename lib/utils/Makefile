@@ -1,11 +1,8 @@
 GO?=go
 
-.PHONY: clean generate retry vet
+.PHONY: clean generate vet
 
-all: retry
-
-retry:
-	@(cd retry && $(MAKE) all)
+all: generate
 
 generate:
 	@$(GO) generate -run stringer ./...

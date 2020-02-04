@@ -6,7 +6,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/sirupsen/logrus"
 )
@@ -244,7 +244,7 @@ func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateVIP ...
-func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *resources.VIP, err error) {
+func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *resources.VirtualIP, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -254,7 +254,7 @@ func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VIP) (err error) {
+func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -264,27 +264,27 @@ func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VIP) (err error) {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VIP, host *resources.Host) (err error) {
+func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:BindHostToVIP", w.Name))
-	return w.InnerProvider.BindHostToVIP(vip, host)
+	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) (err error) {
+func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:UnbindHostFromVIP", w.Name))
-	return w.InnerProvider.UnbindHostFromVIP(vip, host)
+	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (w ErrorTraceProvider) DeleteVIP(vip *resources.VIP) (err error) {
+func (w ErrorTraceProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -324,7 +324,7 @@ func (w ErrorTraceProvider) GetHostByName(name string) (_ *resources.Host, err e
 }
 
 // GetHostState ...
-func (w ErrorTraceProvider) GetHostState(something interface{}) (_ HostState.Enum, err error) {
+func (w ErrorTraceProvider) GetHostState(something interface{}) (_ hoststate.Enum, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)

@@ -1,4 +1,4 @@
-# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ feature:
     requirements:
         features:
             - kubernetes
+            - k8s.helm
             - k8s.kong-ingress
 
     parameters:
@@ -27,14 +28,13 @@ feature:
         - ChartVersion=4.0.4
         - Namespace=default
         - HelmRepoName=stable
-        - AdminPassword=
 
     install:
         bash:
             check:
-                pace: helm
+                pace: list_helm
                 steps:
-                    helm:
+                    list_helm:
                         targets:
                             masters: any
                         run: |
@@ -46,7 +46,7 @@ feature:
                 steps:
                     prepare:
                         targets:
-                            masters: all
+                            masters: any
                         run: |
                             mkdir -p ${SF_ETCDIR}/grafana
 
@@ -77,11 +77,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            {{ if eq .AdminPassword "" }}
                             GRAFANA_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
-                            {{ else }}
-                            GRAFANA_PASSWORD="{{ .AdminPassword }}"
-                            {{ end }}
 
                             sfHelm install {{ .HelmRepoName }}/grafana \
                                 --version {{ .ChartVersion }} \
@@ -107,20 +103,13 @@ feature:
                             sfExit
 
             remove:
-                pace: helm,cleanup
+                pace: helm
                 steps:
                     helm:
                         targets:
                             masters: one
                         run: |
                             sfHelm delete --purge --tls grafana || sfFail 192
-                            sfExit
-
-                    cleanup:
-                        targets:
-                            masters: all
-                        run: |
-                            rm -rf ${SF_ETCDIR}/grafana
                             sfExit
 
 ...

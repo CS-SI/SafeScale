@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,15 +19,19 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // State contains the bare minimum information about a cluster
+// !!! FROZEN !!!
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with updated/additional fields
 type State struct {
 	// State of the cluster
-	State ClusterState.Enum
+	State clusterstate.Enum
 	// StateCollectInterval in seconds
 	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`
 }
@@ -36,22 +40,25 @@ func newState() *State {
 	return &State{}
 }
 
-// Content ... (serialize.Property interface)
-func (s *State) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (s *State) Content() data.Clonable {
 	return s
 }
 
-// Clone ... (serialize.Property interface)
-func (s *State) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (s *State) Clone() data.Clonable {
 	return newState().Replace(s)
 }
 
-// Replace ... (serialize.Property interface)
-func (s *State) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (s *State) Replace(p data.Clonable) data.Clonable {
 	*s = *p.(*State)
 	return s
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Property.StateV1, &State{})
+	serialize.PropertyTypeRegistry.Register("clusters", property.StateV1, &State{})
 }

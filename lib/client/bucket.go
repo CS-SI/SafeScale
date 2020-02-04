@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -43,7 +43,7 @@ func (c *bucket) List(timeout time.Duration) (*pb.BucketList, error) {
 		return nil, err
 	}
 
-	return service.List(ctx, &google_protobuf.Empty{})
+	return service.List(ctx, &googleprotobuf.Empty{})
 }
 
 // Create ...
@@ -72,18 +72,18 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	}
 
 	var (
-		wg   sync.WaitGroup
-		errs int
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
 	)
 
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
 		_, err := service.Delete(ctx, &pb.Bucket{Name: aname})
 		if err != nil {
-			fmt.Printf("%v\n", DecorateError(err, "deletion of share", true))
-			errs++
-		} else {
-			fmt.Printf("Share '%s' deleted\n", aname)
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
 		}
 	}
 
@@ -93,8 +93,8 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	}
 	wg.Wait()
 
-	if errs > 0 {
-		return clitools.ExitOnRPC("")
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 }

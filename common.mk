@@ -1,4 +1,4 @@
-VERSION=19.11.0-alpha
+VERSION=20.1.0-alpha
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -10,10 +10,11 @@ MAKE_TRACE=$(shell printf '    %.0s' {1..$(MAKE_LEVEL)})
 endif
 export MAKE_LEVEL
 
-
 ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
+
+MAKEFLAGS += -s
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
@@ -23,6 +24,7 @@ REMOTE := $(shell git rev-parse $(UPSTREAM))
 BASE := $(shell git merge-base HEAD $(UPSTREAM))
 
 GO?=go
+GOFMT?=gofmt
 CP?=cp
 RM?=rm
 BROWSER?=firefox

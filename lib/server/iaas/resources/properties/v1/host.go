@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,15 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostDescription contains description information for the host
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostDescription struct {
 	Created time.Time `json:"created,omitempty"`  // tells when the host has been created
 	Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of a host
@@ -45,18 +46,21 @@ func (hd *HostDescription) Reset() {
 	*hd = HostDescription{}
 }
 
-// Content ... (serialize.Property interface)
-func (hd *HostDescription) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (hd *HostDescription) Content() data.Clonable {
 	return hd
 }
 
-// Clone ... (serialize.Property interface)
-func (hd *HostDescription) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (hd *HostDescription) Clone() data.Clonable {
 	return NewHostDescription().Replace(hd)
 }
 
-// Replace ... (serialize.Property interface)
-func (hd *HostDescription) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (hd *HostDescription) Replace(p data.Clonable) data.Clonable {
 	*hd = *p.(*HostDescription)
 	return hd
 }
@@ -64,7 +68,7 @@ func (hd *HostDescription) Replace(p serialize.Property) serialize.Property {
 // HostNetwork contains network information related to Host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostNetwork struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
 	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // contains the ID of the Default Gateway
@@ -98,18 +102,21 @@ func (hn *HostNetwork) Reset() {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (hn *HostNetwork) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (hn *HostNetwork) Content() data.Clonable {
 	return hn
 }
 
-// Clone ... (serialize.Property interface)
-func (hn *HostNetwork) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (hn *HostNetwork) Clone() data.Clonable {
 	return NewHostNetwork().Replace(hn)
 }
 
-// Replace ... (serialize.Property interface)
-func (hn *HostNetwork) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (hn *HostNetwork) Replace(p data.Clonable) data.Clonable {
 	src := p.(*HostNetwork)
 	*hn = *src
 	hn.NetworksByID = make(map[string]string, len(src.NetworksByID))
@@ -134,7 +141,7 @@ func (hn *HostNetwork) Replace(p serialize.Property) serialize.Property {
 // HostSize represent sizing elements of an host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostSize struct {
 	Cores     int     `json:"cores,omitempty"`
 	RAMSize   float32 `json:"ram_size,omitempty"`
@@ -157,7 +164,7 @@ func (hs *HostSize) Reset() {
 // HostTemplate represents an host template
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostTemplate struct {
 	Cores     int     `json:"cores,omitempty"`
 	RAMSize   float32 `json:"ram_size,omitempty"`
@@ -182,7 +189,7 @@ func (p *HostTemplate) Reset() {
 // HostSizing contains sizing information about the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostSizing struct {
 	RequestedSize *HostSize `json:"requested_size,omitempty"`
 	Template      string    `json:"template,omitempty"`
@@ -205,18 +212,21 @@ func (hs *HostSizing) Reset() {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (hs *HostSizing) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (hs *HostSizing) Content() data.Clonable {
 	return hs
 }
 
-// Clone ... (serialize.Property interface)
-func (hs *HostSizing) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (hs *HostSizing) Clone() data.Clonable {
 	return NewHostSizing().Replace(hs)
 }
 
-// Replace ... (serialize.Property interface)
-func (hs *HostSizing) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
 	src := p.(*HostSizing)
 	hs.RequestedSize = NewHostSize()
 	*hs.RequestedSize = *src.RequestedSize
@@ -229,7 +239,7 @@ func (hs *HostSizing) Replace(p serialize.Property) serialize.Property {
 // HostSystem contains information about the operating system
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostSystem struct {
 	Type     string `json:"type,omitempty"`     // Type of operating system (ie linux, windows, ... Not normalized yet...)
 	Flavor   string `json:"flavor,omitempty"`   // Flavor of operating system (ie 'ubuntu server', 'windows server 2016', ... Not normalized yet...)
@@ -248,9 +258,9 @@ func (p *HostSystem) Reset() {
 }
 
 // HostVolume contains information about attached volume
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostVolume struct {
 	AttachID string `json:"attach_id"` // contains the ID of the volume attachment
 	Device   string `json:"device"`    // contains the device on the host
@@ -267,9 +277,9 @@ func (p *HostVolume) Reset() {
 }
 
 // HostVolumes contains information about attached volumes
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with updated/additional fields
 type HostVolumes struct {
 	VolumesByID     map[string]*HostVolume `json:"volumes_by_id"`     // contains the volume name of the attached volume, indexed by ID
 	VolumesByName   map[string]string      `json:"volumes_by_name"`   // contains the ID of attached volume, indexed by volume name
@@ -297,22 +307,26 @@ func (hv *HostVolumes) Reset() {
 	}
 }
 
-// Content ... (serialize.Property interface)
-func (hv *HostVolumes) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (hv *HostVolumes) Content() data.Clonable {
 	return hv
 }
 
-// Clone ... (serialize.Property interface)
-func (hv *HostVolumes) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (hv *HostVolumes) Clone() data.Clonable {
 	return NewHostVolumes().Replace(hv)
 }
 
-// Replace ... (serialize.Property interface)
-func (hv *HostVolumes) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (hv *HostVolumes) Replace(p data.Clonable) data.Clonable {
 	src := p.(*HostVolumes)
 	hv.VolumesByID = make(map[string]*HostVolume, len(src.VolumesByID))
 	for k, v := range src.VolumesByID {
-		hv.VolumesByID[k] = v
+		newV := *v
+		hv.VolumesByID[k] = &newV
 	}
 	hv.VolumesByName = make(map[string]string, len(src.VolumesByName))
 	for k, v := range src.VolumesByName {
@@ -330,9 +344,9 @@ func (hv *HostVolumes) Replace(p serialize.Property) serialize.Property {
 }
 
 // HostLocalMount stores information about a device (as an attached volume) mount
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//       Create a new version instead with updated/additional fields
 type HostLocalMount struct {
 	Device     string `json:"device"`            // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
 	Path       string `json:"mountpoint"`        // Path is the mount point of the device
@@ -351,9 +365,9 @@ func (p *HostLocalMount) Reset() {
 }
 
 // HostRemoteMount stores information about a remote filesystem mount
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//       Create a new version instead with updated/additional fields
 type HostRemoteMount struct {
 	ShareID    string `json:"share_id"`          // contains the ID of the share mounted
 	Export     string `json:"export"`            // contains the path of the export (ie: <host>:/data/shared)
@@ -373,9 +387,9 @@ func (p *HostRemoteMount) Reset() {
 }
 
 // HostMounts contains information about mounts on the host
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//       Create a new version instead with updated/additional fields
 type HostMounts struct {
 	LocalMountsByDevice   map[string]string           `json:"local_mounts_by_device"`  // contains local mount path, indexed by devices
 	LocalMountsByPath     map[string]*HostLocalMount  `json:"local_mounts_by_path"`    // contains HostLocalMount structs, indexed by path
@@ -406,18 +420,21 @@ func (hm *HostMounts) Reset() {
 	}
 }
 
-// Content ...  (serialize.Property interface)
-func (hm *HostMounts) Content() interface{} {
+// Content ...
+// satisfies interface data.Clonable
+func (hm *HostMounts) Content() data.Clonable {
 	return hm
 }
 
-// Clone ...  (serialize.Property interface)
-func (hm *HostMounts) Clone() serialize.Property {
+// Clone ...
+// satisfies interface data.Clonable
+func (hm *HostMounts) Clone() data.Clonable {
 	return NewHostMounts().Replace(hm)
 }
 
-// Replace ...  (serialize.Property interface)
-func (hm *HostMounts) Replace(p serialize.Property) serialize.Property {
+// Replace ...
+// satisfies interface data.Clonable
+func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 	src := p.(*HostMounts)
 	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
 	for k, v := range src.LocalMountsByDevice {
@@ -425,7 +442,8 @@ func (hm *HostMounts) Replace(p serialize.Property) serialize.Property {
 	}
 	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
 	for k, v := range src.LocalMountsByPath {
-		hm.LocalMountsByPath[k] = v
+		newV := *v
+		hm.LocalMountsByPath[k] = &newV
 	}
 	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
 	for k, v := range src.RemoteMountsByShareID {
@@ -437,28 +455,29 @@ func (hm *HostMounts) Replace(p serialize.Property) serialize.Property {
 	}
 	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.LocalMountsByDevice))
 	for k, v := range src.RemoteMountsByPath {
-		hm.RemoteMountsByPath[k] = v
+		newV := *v
+		hm.RemoteMountsByPath[k] = &newV
 	}
 	return hm
 }
 
 // HostShare describes a filesystem exported from the host
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//       Create a new version instead with updated/additional fields
 type HostShare struct {
-	ID            string            `json:"id"`                         // ID ...
-	Name          string            `json:"name"`                       // the name of the share
-	Path          string            `json:"path"`                       // the path on the host filesystem that is shared
-	PathAcls      string            `json:"path_acls,omitempty"`        // filesystem acls to set on the exported folder
-	Type          string            `json:"type,omitempty"`             // export type is lowercase (ie. nfs, glusterfs, ...)
-	ShareAcls     string            `json:"share_acls,omitempty"`       // the acls to set on the share
-	ShareOptions  string            `json:"share_options,omitempty"`    // the options (other than acls) to set on the share
-	ClientsByID   map[string]string `json:"clients_by_id,omit_empty"`   // contains the name of the hosts mounting the export, indexed by ID
-	ClientsByName map[string]string `json:"clients_by_name,omit_empty"` // contains the ID of the hosts mounting the export, indexed by Name
+	ID            string            `json:"id"`                        // ID ...
+	Name          string            `json:"name"`                      // the name of the share
+	Path          string            `json:"path"`                      // the path on the host filesystem that is shared
+	PathAcls      string            `json:"path_acls,omitempty"`       // filesystem acls to set on the exported folder
+	Type          string            `json:"type,omitempty"`            // export type is lowercase (ie. nfs, glusterfs, ...)
+	ShareAcls     string            `json:"share_acls,omitempty"`      // the acls to set on the share
+	ShareOptions  string            `json:"share_options,omitempty"`   // the options (other than acls) to set on the share
+	ClientsByID   map[string]string `json:"clients_by_id,omitempty"`   // contains the name of the hosts mounting the export, indexed by ID
+	ClientsByName map[string]string `json:"clients_by_name,omitempty"` // contains the ID of the hosts mounting the export, indexed by Name
 }
 
-// NewHostShare ...
+// NewHostShare creates a new struct HostShare
 func NewHostShare() *HostShare {
 	return &HostShare{
 		ClientsByID:   map[string]string{},
@@ -467,17 +486,45 @@ func NewHostShare() *HostShare {
 }
 
 // Reset resets an HostShare
-func (p *HostShare) Reset() {
-	*p = HostShare{
+func (hs *HostShare) Reset() {
+	*hs = HostShare{
 		ClientsByID:   map[string]string{},
 		ClientsByName: map[string]string{},
 	}
 }
 
+// Content returns itself
+// satisfies interface serialize.Clonable
+func (hs *HostShare) Content() data.Clonable {
+	return hs
+}
+
+// Clone returns a copy of itself
+// satisfies interface data.Clonable
+func (hs *HostShare) Clone() data.Clonable {
+	return NewHostShare().Replace(hs)
+}
+
+// Replace replaces the struct with a copy of the content of another one
+// satisfies interface serialize.Clonable
+func (hs *HostShare) Replace(p data.Clonable) data.Clonable {
+	src := p.(*HostShare)
+	*hs = *src
+	hs.ClientsByID = make(map[string]string, len(src.ClientsByID))
+	for k, v := range src.ClientsByID {
+		hs.ClientsByID[k] = v
+	}
+	hs.ClientsByName = make(map[string]string, len(src.ClientsByName))
+	for k, v := range src.ClientsByName {
+		hs.ClientsByName[k] = v
+	}
+	return hs
+}
+
 // HostShares contains information about the shares of the host
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//       Create a new version instead with updated/additional fields
 type HostShares struct {
 	ByID   map[string]*HostShare `json:"by_id"`
 	ByName map[string]string     `json:"by_name"`
@@ -500,21 +547,21 @@ func (hs *HostShares) Reset() {
 }
 
 // Content ...
-func (hs *HostShares) Content() interface{} {
+func (hs *HostShares) Content() data.Clonable {
 	return hs
 }
 
 // Clone ...
-func (hs *HostShares) Clone() serialize.Property {
+func (hs *HostShares) Clone() data.Clonable {
 	return NewHostShares().Replace(hs)
 }
 
 // Replace ...
-func (hs *HostShares) Replace(p serialize.Property) serialize.Property {
+func (hs *HostShares) Replace(p data.Clonable) data.Clonable {
 	src := p.(*HostShares)
 	hs.ByID = make(map[string]*HostShare, len(src.ByID))
 	for k, v := range src.ByID {
-		hs.ByID[k] = v
+		hs.ByID[k] = v.Clone().(*HostShare)
 	}
 	hs.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
@@ -526,7 +573,7 @@ func (hs *HostShares) Replace(p serialize.Property) serialize.Property {
 // HostInstalledFeature ...
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//       Create a new version instead with updated/additional fields
 type HostInstalledFeature struct {
 	HostContext bool     `json:"host_context,omitempty"` // tells if the feature has been explicitly installed for host (opposed to for cluster)
 	RequiredBy  []string `json:"required_by,omitempty"`  // tells what feature(s) needs this one
@@ -542,17 +589,40 @@ func NewHostInstalledFeature() *HostInstalledFeature {
 }
 
 // Reset resets the content of the property
-func (p *HostInstalledFeature) Reset() {
-	*p = HostInstalledFeature{
+func (hif *HostInstalledFeature) Reset() {
+	*hif = HostInstalledFeature{
 		RequiredBy: []string{},
 		Requires:   []string{},
 	}
 }
 
+// Content ...
+// satisfies interface data.Clonable
+func (hif *HostInstalledFeature) Content() data.Clonable {
+	return hif
+}
+
+// Clone ...
+// satisfies interface data.Clonable
+func (hif *HostInstalledFeature) Clone() data.Clonable {
+	return NewHostInstalledFeature().Replace(hif)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
+	src := p.(*HostInstalledFeature)
+	hif.RequiredBy = make([]string, len(src.RequiredBy))
+	copy(hif.RequiredBy, src.RequiredBy)
+	hif.Requires = make([]string, len(src.Requires))
+	copy(hif.Requires, src.Requires)
+	return hif
+}
+
 // HostFeatures ...
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//       Create a new version instead with needed supplemental/overriding fields
 type HostFeatures struct {
 	Installed map[string]*HostInstalledFeature `json:"installed,omitempty"` // list of installed features, indexed on feature name
 }
@@ -565,17 +635,38 @@ func NewHostFeatures() *HostFeatures {
 }
 
 // Reset resets the content of the property
-func (p *HostFeatures) Reset() {
-	*p = HostFeatures{
+func (hf *HostFeatures) Reset() {
+	*hf = HostFeatures{
 		Installed: map[string]*HostInstalledFeature{},
 	}
 }
 
+// Content ...
+func (hf *HostFeatures) Content() data.Clonable {
+	return hf
+}
+
+// Clone ...
+func (hf *HostFeatures) Clone() data.Clonable {
+	return NewHostFeatures().Replace(hf)
+}
+
+// Replace ...
+func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
+	src := p.(*HostFeatures)
+	hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
+	for k, v := range src.Installed {
+		hf.Installed[k] = v.Clone().(*HostInstalledFeature)
+	}
+	return hf
+}
+
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.DescriptionV1, NewHostDescription())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.NetworkV1, NewHostNetwork())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.SizingV1, NewHostSizing())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.SharesV1, NewHostShares())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.VolumesV1, NewHostVolumes())
-	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.MountsV1, NewHostMounts())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.DescriptionV1, NewHostDescription())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.NetworkV1, NewHostNetwork())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV1, NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SharesV1, NewHostShares())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.VolumesV1, NewHostVolumes())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.MountsV1, NewHostMounts())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.FeaturesV1, NewHostFeatures())
 }

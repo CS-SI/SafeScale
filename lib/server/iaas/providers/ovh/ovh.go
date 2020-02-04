@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	filters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
@@ -154,9 +154,9 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		UseLayer3Networking:       false,
 		AutoHostNetworkInterfaces: false,
 		DNSList:                   dnsServers,
-		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"classic":    VolumeSpeed.COLD,
-			"high-speed": VolumeSpeed.HDD,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"classic":    volumespeed.COLD,
+			"high-speed": volumespeed.HDD,
 		},
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,
@@ -262,6 +262,25 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 }
 
 func addGPUCfg(tpl *resources.HostTemplate) {
+	var gpuMap = map[string]gpuCfg{
+		"g2-15": gpuCfg{
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1070",
+		},
+		"g2-30": gpuCfg{
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1070",
+		},
+		"g3-120": gpuCfg{
+			GPUNumber: 3,
+			GPUType:   "NVIDIA 1080 TI",
+		},
+		"g3-30": gpuCfg{
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1080 TI",
+		},
+	}
+
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -310,7 +329,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		}
 	}
 
-	listAvailableTemplates := []resources.HostTemplate{}
+	var listAvailableTemplates []resources.HostTemplate
 	for _, template := range allTemplates {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)

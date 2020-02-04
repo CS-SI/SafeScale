@@ -11,7 +11,7 @@ func isEmpty(v reflect.Value) bool {
 
 	switch v.Kind() {
 	case reflect.Bool:
-		return v.Bool() == false
+		return !v.Bool()
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return v.Int() == 0

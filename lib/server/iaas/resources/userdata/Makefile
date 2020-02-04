@@ -14,7 +14,7 @@ gensrc:
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
 
-generate: gensrc
+generate: clean gensrc
 	@$(GO) generate
 
 vet:

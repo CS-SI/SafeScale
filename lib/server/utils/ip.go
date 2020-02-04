@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ func CIDRToLongRange(cidr string) (uint32, uint32, error) {
 		start = ip
 	}
 
-	ip = ip | (0xFFFFFFFF >> bits)
+	ip |= 0xFFFFFFFF >> bits
 	if end < ip {
 		end = ip
 	}

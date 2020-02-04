@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,26 +19,21 @@ package listeners
 import (
 	"context"
 	"fmt"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
-
-// NetworkHandler ...
-var NetworkHandler = handlers.NewNetworkHandler
 
 // safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
 // safescale network list
@@ -50,14 +45,20 @@ type NetworkListener struct{}
 
 // Create a new network
 func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) (_ *pb.Network, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot create network").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -69,27 +70,18 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 
 	networkName := in.GetName()
 	if networkName == "" {
-		return nil, scerr.InvalidRequestError("cannot create network: name can't be empty string")
+		return nil, scerr.InvalidRequestError("network name cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", fmt.Sprintf("network create '%s'", networkName))
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Create network "+networkName); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot create network: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
 
 	var (
 		sizing    *resources.SizingRequirements
@@ -115,20 +107,26 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		gwName = in.GetGateway().GetName()
 	}
 
-	handler := NetworkHandler(tenant.Service)
-	network, err := handler.Create(ctx,
-		networkName,
-		in.GetCidr(),
-		IPVersion.IPv4,
-		*sizing,
-		gwImageID,
-		gwName,
-		in.FailOver,
+	handler := NetworkHandler(job)
+	r, err := job.Task().Run(
+		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
+			tracer.Trace("calling handler.Create()...")
+			return handler.Create(
+				networkName,
+				in.GetCidr(),
+				IPVersion.IPv4,
+				*sizing,
+				gwImageID,
+				gwName,
+				in.FailOver,
+			)
+		},
+		nil,
 	)
 	if err != nil {
-		// returned error is not wrap with "cannot create network" because already tells why the
-		return nil, scerr.ToGRPCStatus(err)
+		return nil, err
 	}
+	network := r.(*resources.Network)
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)
 	return conv.ToPBNetwork(network), nil
@@ -136,14 +134,20 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 
 // List existing networks
 func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (_ *pb.NetworkList, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot list networks").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -153,29 +157,20 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "network list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "List networks"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot list networks: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := NetworkHandler(tenant.Service)
-	networks, err := handler.List(ctx, in.GetAll())
+	handler := NetworkHandler(job)
+	networks, err := handler.List(in.GetAll())
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot list networks").ToGRPCStatus()
+		return nil, err
 	}
 
 	// Map resources.Network to pb.Network
@@ -189,14 +184,20 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.Network, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot inspect network").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -208,52 +209,49 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, scerr.InvalidRequestError("cannot inspect network: neither name nor id given as reference").ToGRPCStatus()
+		return nil, scerr.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "network inspect")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot inspect network: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := NetworkHandler(currentTenant.Service)
-	network, err := handler.Inspect(ctx, ref)
+	handler := NetworkHandler(job)
+	network, err := handler.Inspect(ref)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot inspect network").ToGRPCStatus()
+		return nil, err
 	}
 	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if network == nil {
-		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect network '%s': not found", ref))
+		return nil, scerr.NotFoundError(fmt.Sprintf("network '%s' not found", ref))
 	}
 
 	return conv.ToPBNetwork(network), nil
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot delete network").ToGRPCStatus()
+		}
+	}()
+
 	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -268,29 +266,25 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *
 		return empty, scerr.InvalidRequestError("cannot delete network: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "delete network")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot delete network: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := NetworkHandler(currentTenant.Service)
-	err = handler.Delete(ctx, ref)
+	handler := NetworkHandler(job)
+	_, err = job.Task().Run(
+		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
+			return nil, handler.Delete(ref)
+		},
+		nil,
+	)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot delete network").ToGRPCStatus()
+		return empty, err
 	}
 
 	tracer.Trace("Network '%s' successfully deleted.", ref)

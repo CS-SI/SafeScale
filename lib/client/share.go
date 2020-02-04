@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // share is the part of the safescale client handilng Shares
@@ -74,7 +74,7 @@ func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
 		return nil, err
 	}
 
-	list, err := service.List(ctx, &google_protobuf.Empty{})
+	list, err := service.List(ctx, &googleprotobuf.Empty{})
 	if err != nil {
 		return nil, DecorateError(err, "list of shares", true)
 	}

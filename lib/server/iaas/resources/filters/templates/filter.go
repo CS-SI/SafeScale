@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ func (f *Filter) Not() *Filter {
 func (f *Filter) And(other *Filter) *Filter {
 	oldFilter := f.filter
 	f.filter = func(in resources.HostTemplate) bool {
-		return oldFilter(in) && (*other).filter(in)
+		return oldFilter(in) && other.filter(in)
 	}
 	return f
 }
@@ -55,7 +55,7 @@ func (f *Filter) And(other *Filter) *Filter {
 func (f *Filter) Or(other *Filter) *Filter {
 	oldFilter := f.filter
 	f.filter = func(in resources.HostTemplate) bool {
-		return oldFilter(in) || (*other).filter(in)
+		return oldFilter(in) || other.filter(in)
 	}
 	return f
 }

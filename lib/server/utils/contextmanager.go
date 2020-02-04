@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (contex
 	return ctx, cancel, nil
 }
 
-//GetUUID ...
+// GetUUID ...
 func GetUUID() string {
 	mutexContextManager.Lock()
 	defer mutexContextManager.Unlock()

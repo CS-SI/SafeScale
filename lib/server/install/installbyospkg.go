@@ -6,15 +6,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 // genericPackager is an object implementing the OS package management
 // It handles package management on single host or entire cluster
 type genericPackager struct {
 	keyword       string
-	method        Method.Enum
+	method        method.Enum
 	checkCommand  alterCommandCB
 	addCommand    alterCommandCB
 	removeCommand alterCommandCB
@@ -29,7 +29,7 @@ func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, g.method, Action.Check, g.checkCommand)
+	worker, err := newWorker(f, t, g.method, action.Check, g.checkCommand)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Re
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, g.method, Action.Add, g.addCommand)
+	worker, err := newWorker(f, t, g.method, action.Add, g.addCommand)
 	if err != nil {
 		log.Println(err.Error())
 		return nil, err
@@ -73,7 +73,7 @@ func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) 
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, g.method, Action.Remove, g.removeCommand)
+	worker, err := newWorker(f, t, g.method, action.Remove, g.removeCommand)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +94,8 @@ type aptInstaller struct {
 func NewAptInstaller() Installer {
 	return &aptInstaller{
 		genericPackager: genericPackager{
-			keyword: strings.ToLower(Method.Apt.String()),
-			method:  Method.Apt,
+			keyword: strings.ToLower(method.Apt.String()),
+			method:  method.Apt,
 			checkCommand: func(pkg string) string {
 				return fmt.Sprintf("sudo dpkg-query -s '%s' &>/dev/null", pkg)
 			},
@@ -118,8 +118,8 @@ type yumInstaller struct {
 func NewYumInstaller() Installer {
 	return &yumInstaller{
 		genericPackager: genericPackager{
-			keyword: strings.ToLower(Method.Yum.String()),
-			method:  Method.Yum,
+			keyword: strings.ToLower(method.Yum.String()),
+			method:  method.Yum,
 			checkCommand: func(pkg string) string {
 				return fmt.Sprintf("sudo rpm -q %s &>/dev/null", pkg)
 			},
@@ -142,8 +142,8 @@ type dnfInstaller struct {
 func NewDnfInstaller() Installer {
 	return &dnfInstaller{
 		genericPackager: genericPackager{
-			keyword: strings.ToLower(Method.Dnf.String()),
-			method:  Method.Dnf,
+			keyword: strings.ToLower(method.Dnf.String()),
+			method:  method.Dnf,
 			checkCommand: func(pkg string) string {
 				return fmt.Sprintf("sudo dnf list installed %s &>/dev/null", pkg)
 			},
