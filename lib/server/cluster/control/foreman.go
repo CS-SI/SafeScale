@@ -198,8 +198,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 		metaErr := b.cluster.UpdateMetadata(task, func() error {
 			// Cluster created and configured successfully
-			return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(v interface{}) error {
-				v.(*clusterpropsv1.State).State = state
+			return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+				clonable.(*clusterpropsv1.State).State = state
 				return nil
 			})
 		})
@@ -399,8 +399,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	b.cluster.Identity.Keypair = kp
 	b.cluster.Identity.AdminPassword = cladmPassword
 	err = b.cluster.UpdateMetadata(task, func() error {
-		err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(func(v interface{}) error {
-			defaultsV2 := v.(*clusterpropsv2.Defaults)
+		err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
+			defaultsV2 := clonable.(*clusterpropsv2.Defaults)
 			defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(*gatewaysDef.Sizing)
 			defaultsV2.MasterSizing = srvutils.FromPBHostSizing(*mastersDef.Sizing)
 			defaultsV2.NodeSizing = srvutils.FromPBHostSizing(*nodesDef.Sizing)
@@ -411,24 +411,24 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			return err
 		}
 
-		err = b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(v interface{}) error {
-			v.(*clusterpropsv1.State).State = clusterstate.Creating
+		err = b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+			clonable.(*clusterpropsv1.State).State = clusterstate.Creating
 			return nil
 		})
 		if err != nil {
 			return err
 		}
 
-		err = b.cluster.GetProperties(task).LockForWrite(property.CompositeV1).ThenUse(func(v interface{}) error {
-			v.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
+		err = b.cluster.GetProperties(task).LockForWrite(property.CompositeV1).ThenUse(func(clonable data.Clonable) error {
+			clonable.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
 			return nil
 		})
 		if err != nil {
 			return err
 		}
 
-		return b.cluster.GetProperties(task).LockForWrite(property.NetworkV2).ThenUse(func(v interface{}) error {
-			networkV2 := v.(*clusterpropsv2.Network)
+		return b.cluster.GetProperties(task).LockForWrite(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
+			networkV2 := clonable.(*clusterpropsv2.Network)
 			networkV2.NetworkID = req.NetworkID
 			networkV2.CIDR = req.CIDR
 			networkV2.GatewayID = primaryGateway.ID
@@ -714,7 +714,7 @@ func (b *foreman) configureNode(task concurrency.Task, index uint, pbHost *pb.Ho
 	}
 
 	if b.makers.ConfigureNode != nil {
-		return b.makers.ConfigureNode(task, b, index, pbHost)
+		return b.makers.ConfigureNode(task, b, int(index), pbHost)
 	}
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil
@@ -736,7 +736,7 @@ func (b *foreman) unconfigureNode(task concurrency.Task, hostID string, selected
 // configureMaster ...
 func (b *foreman) configureMaster(task concurrency.Task, index uint, pbHost *pb.Host) error {
 	if b.makers.ConfigureNode != nil {
-		return b.makers.ConfigureMaster(task, b, index, pbHost)
+		return b.makers.ConfigureMaster(task, b, int(index), pbHost)
 	}
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil
@@ -1698,8 +1698,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 			properties := b.cluster.GetProperties(t)
 
 			// References new node in cluster
-			return properties.LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
-				nodesV2 := v.(*clusterpropsv2.Nodes)
+			return properties.LockForWrite(property.NodesV2).ThenUse(func(clonable data.Clonable) error {
+				nodesV2 := clonable.(*clusterpropsv2.Nodes)
 
 				nodesV2.GlobalLastIndex++
 				node := &clusterpropsv2.Node{
@@ -2026,8 +2026,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	if pbHost != nil {
 		mErr := b.cluster.UpdateMetadata(t, func() error {
 			// Locks for write the NodesV2 extension...
-			return b.cluster.GetProperties(t).LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
-				nodesV2 := v.(*clusterpropsv2.Nodes)
+			return b.cluster.GetProperties(t).LockForWrite(property.NodesV2).ThenUse(func(clonable data.Clonable) error {
+				nodesV2 := clonable.(*clusterpropsv2.Nodes)
 				// Registers the new Agent in the swarmCluster struct
 				nodesV2.GlobalLastIndex++
 				node = &clusterpropsv2.Node{
@@ -2202,7 +2202,7 @@ func (b *foreman) installTimeServer(task concurrency.Task) (err error) {
 	if err != nil {
 		return err
 	}
-	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	results, err := feat.Add(target, data.Map{}, install.Settings{})
 	if err != nil {
 		return err
 	}
@@ -2233,10 +2233,14 @@ func (b *foreman) installTimeClient(task concurrency.Task) (err error) {
 		return err
 	}
 	peers := []string{}
-	for _, i := range b.Cluster().ListMasterIPs(task) {
+	list, err := b.Cluster().ListMasterIPs(task)
+	if err != nil {
+		return err
+	}
+	for _, i := range list {
 		peers = append(peers, i)
 	}
-	results, err := feat.Add(target, install.Variables{"Peers": peers}, install.Settings{})
+	results, err := feat.Add(target, data.Map{"Peers": peers}, install.Settings{})
 	if err != nil {
 		return err
 	}
@@ -2260,10 +2264,10 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["remotedesktop"]
 		if !disabled {
-			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+			_, disabled = clonable.(*clusterpropsv1.Features).Disabled["reverseproxy"]
 		}
 		return nil
 	})
@@ -2280,7 +2284,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 		if err != nil {
 			return err
 		}
-		results, err := feat.Add(target, install.Variables{}, install.Settings{})
+		results, err := feat.Add(target, data.Map{}, install.Settings{})
 		if err != nil {
 			return err
 		}
@@ -2305,10 +2309,10 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["remotedesktop"]
 		if !disabled {
-			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+			_, disabled = clonable.(*clusterpropsv1.Features).Disabled["reverseproxy"]
 		}
 		return nil
 	})
@@ -2329,7 +2333,7 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 		if err != nil {
 			return err
 		}
-		results, err := feat.Add(target, install.Variables{
+		results, err := feat.Add(target, data.Map{
 			"Username": "cladm",
 			"Password": adminPassword,
 		}, install.Settings{})
@@ -2367,8 +2371,8 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 			return inErr
 		}
 
-		_ = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-			_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
+		_ = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+			_, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
 			return nil
 		})
 
@@ -2391,7 +2395,7 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 		if err != nil {
 			return err
 		}
-		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		results, err := feature.Add(target, data.Map{}, install.Settings{})
 		if err != nil {
 			return err
 		}
@@ -2419,8 +2423,8 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	disabled := false
-	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
+	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+		_, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
 		return nil
 	})
 	if err != nil {
@@ -2435,7 +2439,7 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 		if err != nil {
 			return err
 		}
-		results, err := feat.Add(target, install.Variables{}, install.Settings{})
+		results, err := feat.Add(target, data.Map{}, install.Settings{})
 		if err != nil {
 			return err
 		}
@@ -2468,7 +2472,7 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 	if err != nil {
 		return err
 	}
-	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	results, err := feat.Add(target, data.Map{}, install.Settings{})
 	if err != nil {
 		return err
 	}
@@ -2492,8 +2496,8 @@ func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType nod
 	if err != nil {
 		return "", err
 	}
-	outerErr := b.cluster.GetProperties(task).LockForWrite(property.NodesV2).ThenUse(func(v interface{}) error {
-		nodesV2 := v.(*clusterpropsv2.Nodes)
+	outerErr := b.cluster.GetProperties(task).LockForWrite(property.NodesV2).ThenUse(func(clonable data.Clonable) error {
+		nodesV2 := clonable.(*clusterpropsv2.Nodes)
 		switch nodeType {
 		case nodetype.Node:
 			nodesV2.PrivateLastIndex++

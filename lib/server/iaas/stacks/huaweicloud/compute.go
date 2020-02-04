@@ -715,6 +715,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 
 	// Updates Host Property HostNetwork
 	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+		var errors []error
+
 		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 		if hostNetworkV1.PublicIPv4 == "" {
 			hostNetworkV1.PublicIPv4 = ipv4

@@ -69,7 +69,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *p
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := ImageHandler(job)
+	handler := handlers.NewImageHandler(job)
 	images, err := handler.List(in.GetAll())
 	if err != nil {
 		return nil, err

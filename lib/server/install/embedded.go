@@ -20,9 +20,8 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/spf13/viper"
-
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
@@ -104,6 +103,21 @@ func dockerFeature() *Feature {
 // 		specs:       specs,
 // 	}
 // }
+
+// certificateAuthorityFeature ...
+func certificateAuthorityFeature() *Feature {
+	name := "certificateauthority"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
 
 // ntpServerFeature ...
 func ntpServerFeature() *Feature {
@@ -195,20 +209,20 @@ func kubernetesFeature() *Feature {
 	}
 }
 
-// nexusFeature ...
-func nexusFeature() *Feature { // nolint
-	name := "nexus3"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
+// // nexusFeature ...
+// func nexusFeature() *Feature {
+// 	name := "nexus3"
+// 	filename, specs, err := loadSpecFile(name)
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
+// 	return &Feature{
+// 		displayName: name,
+// 		fileName:    filename,
+// 		embedded:    true,
+// 		specs:       specs,
+// 	}
+// }
 
 // elasticsearchFeature ...
 func elasticsearchFeature() *Feature {

@@ -61,7 +61,7 @@ feature:
                             mkdir -p ${SF_ETCDIR}/logstash/pipeline
 
                             {{ if .ClusterFlavor }}
-                            ES_URL="{{- range .MasterIPs }}'{{.}}:9200',{{ end -}}"
+                            ES_URL="{{- range .ClusterMasterIPs }}'{{.}}:9200',{{ end -}}"
                             ES_URL=${ES_URL%,}
                             {{ else }}
                             ES_URL="'{{ .ElasticsearchURL }}'"

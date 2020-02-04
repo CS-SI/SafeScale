@@ -134,18 +134,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
 
-	k, uperr := sshconfig.Command(task, "which scp")
-	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
-		if kerr == nil {
-			connected := strings.Contains(uptext, "/scp")
-			if !connected {
-				logrus.Warn("SSH problem ?")
-			}
-		}
-	}
-
-	k, uperr = sshconfig.SudoCommand("which scp", false)
+	k, uperr := sshconfig.SudoCommand(task, "which scp")
 	if uperr != nil && k != nil {
 		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
@@ -179,7 +168,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 			stderr = ""
 			retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(task, cmd, false)
+			sshCmd, err := sshconfig.SudoCommand(task, cmd)
 			if err != nil {
 				return err
 			}

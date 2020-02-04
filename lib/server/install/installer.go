@@ -16,14 +16,16 @@
 
 package install
 
+import "github.com/CS-SI/SafeScale/lib/utils/data"
+
 //go:generate mockgen -destination=../mocks/mock_installer.go -package=mocks github.com/CS-SI/SafeScale/lib/server/install Installer
 
 // Installer defines the API of an Installer
 type Installer interface {
 	// Check checks if the feature is installed
-	Check(*Feature, Target, Variables, Settings) (Results, error)
+	Check(*Feature, Target, data.Map, Settings) (Results, error)
 	// Add executes installation of feature
-	Add(*Feature, Target, Variables, Settings) (Results, error)
+	Add(*Feature, Target, data.Map, Settings) (Results, error)
 	// Remove executes deletion of feature
-	Remove(*Feature, Target, Variables, Settings) (Results, error)
+	Remove(*Feature, Target, data.Map, Settings) (Results, error)
 }

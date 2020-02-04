@@ -77,7 +77,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := SSHHandler(job)
+	handler := handlers.NewSSHHandler(job)
 	retcode, stdout, stderr, err := handler.Run(host, command)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := SSHHandler(job)
+	handler := handlers.NewSSHHandler(job)
 	retcode, stdout, stderr, err := handler.Copy(source, dest)
 	if err != nil {
 		return nil, err

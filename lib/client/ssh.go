@@ -24,9 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
@@ -47,7 +45,14 @@ type ssh struct {
 }
 
 // Run executes the command
-func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+	if s == nil {
+		return -1, "", "", scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return -1, "", "", scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
 	var (
 		retcode        int
 		stdout, stderr string
@@ -55,7 +60,7 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 
 	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 
 	if executionTimeout < temporal.GetHostTimeout() {
@@ -68,31 +73,31 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	_, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	// _, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	// if err != nil {
+	// 	return -1, "", "", err
+	// }
+	// defer cancel()
+
+	// Create the command
+	var sshCmd *system.SSHCommand
+	sshCmd, err = sshCfg.Command(task, command)
 	if err != nil {
 		return -1, "", "", err
 	}
-	defer cancel()
 
-	var breakErr error
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			// Create the command
-			var sshCmd *system.SSHCommand
-			sshCmd, err := sshCfg.Command(task, command)
-			if err != nil {
-				return err
-			}
-
-			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(task, outs, executionTimeout)
+			var innerErr error
+			retcode, stdout, stderr, innerErr = sshCmd.RunWithTimeout(task, outs, executionTimeout)
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
-			if breakErr != nil {
-				if _, ok := breakErr.(*scerr.ErrTimeout); ok {
-					return breakErr
+			if innerErr != nil {
+				if _, ok := innerErr.(*scerr.ErrTimeout); ok {
+					return innerErr
 				}
 				retcode = -1
-				return nil
+				return retry.StopRetryError("", innerErr)
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 {
@@ -103,15 +108,15 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 		connectionTimeout,
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
+				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
 			}
 		},
 	)
 	if retryErr != nil {
+		if realErr, ok := retryErr.(retry.ErrStopRetry); ok {
+			return -1, "", "", realErr.Cause()
+		}
 		return -1, "", "", retryErr
-	}
-	if breakErr != nil {
-		return -1, "", "", breakErr
 	}
 	return retcode, stdout, stderr, nil
 }
@@ -220,11 +225,11 @@ func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, ex
 		connectionTimeout = executionTimeout
 	}
 
-	_, cancel, err := utils.GetTimeoutContext(executionTimeout)
-	if err != nil {
-		return -1, "", "", err
-	}
-	defer cancel()
+	// _, cancel, err := utils.GetTimeoutContext(executionTimeout)
+	// if err != nil {
+	// 	return -1, "", "", err
+	// }
+	// defer cancel()
 
 	var (
 		retcode        int
@@ -232,7 +237,7 @@ func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, ex
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err = sshCfg.Copy(task, remotePath, localPath, upload)
+			retcode, stdout, stderr, err = sshCfg.CopyWithTimeout(task, remotePath, localPath, upload, executionTimeout)
 			// If an error occurred, stop the loop and propagates this error
 			if err != nil {
 				retcode = -1
@@ -290,7 +295,7 @@ func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) e
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostname)
+				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostname)
 			}
 		},
 	)
@@ -323,7 +328,7 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 				for _, t := range tunnels {
 					nerr := t.Close()
 					if nerr != nil {
-						log.Errorf("error closing ssh tunnel: %v", nerr)
+						logrus.Errorf("error closing ssh tunnel: %v", nerr)
 					}
 				}
 				return fmt.Errorf("unable to create command : %s", err.Error())
@@ -334,7 +339,7 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
 			}
 		},
 	)
@@ -365,12 +370,12 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 		for _, portStr := range portStrs {
 			_, err = strconv.Atoi(portStr)
 			if err != nil {
-				log.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
+				logrus.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
 				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
-				log.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
+				logrus.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
 				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 		}

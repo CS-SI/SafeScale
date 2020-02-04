@@ -46,4 +46,8 @@ type Request struct {
 	NodesDef *pb.HostDefinition
 	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
 	DisabledDefaultFeatures map[string]struct{}
+	// MastersCount defines the number of masters wanted at the creation (can be 0 or an integer greater or equal to the value implied by the complexity)
+	MastersCount uint
+	// NodesCount defines the number of nodes wanted at the creation
+	NodesCount uint
 }

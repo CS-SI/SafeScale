@@ -23,6 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -66,7 +67,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := TemplateHandler(job)
+	handler := handlers.NewTemplateHandler(job)
 	templates, err := handler.List(all)
 	if err != nil {
 		return nil, err

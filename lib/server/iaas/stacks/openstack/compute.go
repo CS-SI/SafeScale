@@ -635,6 +635,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) (er
 		return err
 	}
 
+	var errors []error
+
 	// Updates Host Property propsv1.HostNetwork
 	return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
 		hostNetworkV1 := clonable.(*propsv1.HostNetwork)

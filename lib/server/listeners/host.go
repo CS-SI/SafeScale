@@ -24,6 +24,7 @@ import (
 
 	"google.golang.org/grpc/status"
 
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -63,14 +64,14 @@ type StoredCPUInfo struct {
 }
 
 // Start ...
-func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot start host").ToGRPCStatus()
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}
@@ -99,7 +100,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	err = handler.Start(ref)
 	if err != nil {
 		return empty, err
@@ -149,7 +150,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	err = handler.Stop(ref)
 	if err != nil {
 		return empty, err
@@ -196,7 +197,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	err = handler.Reboot(ref)
 	if err != nil {
 		return empty, err
@@ -239,7 +240,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	hosts, err := handler.List(all)
 	if err != nil {
 		return nil, err
@@ -306,7 +307,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		sizing = &s
 	}
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	host, err := handler.Create(
 		name,
 		in.GetNetwork(),
@@ -358,7 +359,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	host, err := handler.Resize(
 		name,
 		int(in.GetCpuCount()),
@@ -414,7 +415,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	host, err := handler.ForceInspect(ref)
 	if err != nil {
 		return nil, err
@@ -462,7 +463,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	host, err := handler.ForceInspect(ref)
 	if err != nil {
 		return nil, err
@@ -511,7 +512,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	err = handler.Delete(ref)
 	if err != nil {
 		return empty, err
@@ -560,7 +561,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := HostHandler(job)
+	handler := handlers.NewHostHandler(job)
 	sshConfig, err := handler.SSH(ref)
 	if err != nil {
 		return nil, err

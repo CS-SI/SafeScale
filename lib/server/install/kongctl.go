@@ -59,7 +59,10 @@ type KongController struct {
 }
 
 // NewKongController ...
-// func NewKongController(host *pb.Host) (*KongController, error) {
+// returns:
+//    *KongController, nil if successful
+//    nil, scerr.ErrNotFound if reverseproxy is not installed
+//    nil, scerr.ErrNotAvailable if cannot check if reverseproxy is installed
 func NewKongController(svc iaas.Service, network *resources.Network, addressPrimaryGateway bool) (*KongController, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
@@ -69,14 +72,13 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 	}
 
 	// Check if reverseproxy feature is installed on host
-
 	voidtask, err := concurrency.NewTask()
 	if err != nil {
 		return nil, err
 	}
 	rp, err := NewEmbeddedFeature(voidtask, "edgeproxy4network")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find a feature called 'edgeproxy4network'")
+		return nil, err
 	}
 	var (
 		addressedGateway *resources.Host
@@ -120,12 +122,12 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 			if err != nil {
 				return false, err
 			}
-			results, err := rp.Check(target, Variables{}, Settings{})
+			results, err := rp.Check(target, data.Map{}, Settings{})
 			if err != nil {
-				return false, fmt.Errorf("failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s", err.Error(), addressedGateway.Name)
+				return false, scerr.NotAvailableError(fmt.Sprintf("failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s", err.Error(), addressedGateway.Name))
 			}
 			if !results.Successful() {
-				return false, fmt.Errorf("feature 'edgeproxy4network' isn't installed on gateway '%s'", addressedGateway.Name)
+				return false, scerr.NotFoundError(fmt.Sprintf("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.Name))
 			}
 
 			return true, nil
@@ -136,7 +138,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		present = true
 	}
 	if !present {
-		return nil, fmt.Errorf("'edgeproxy4network' feature isn't installed on gateway '%s'", addressedGateway.Name)
+		return nil, scerr.NotFoundError(fmt.Sprintf("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.Name))
 	}
 
 	ctrl := KongController{
@@ -154,7 +156,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
 // Returns rule name and error
-func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variables) (string, error) {
+func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Map) (string, error) {
 	ruleType, ok := rule["type"].(string)
 	if !ok {
 		return "", scerr.InvalidParameterError("rule['type']", "is not a string")
@@ -278,7 +280,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 	}
 }
 
-func (k *KongController) realizeRuleData(content string, v Variables) (string, error) {
+func (k *KongController) realizeRuleData(content string, v data.Map) (string, error) {
 	contentTmpl, err := template.New("proxy_content").Parse(content)
 	if err != nil {
 		return "", fmt.Errorf("error preparing rule: %s", err.Error())
@@ -291,7 +293,7 @@ func (k *KongController) realizeRuleData(content string, v Variables) (string, e
 	return dataBuffer.String(), nil
 }
 
-func (k *KongController) createUpstream(name string, options data.Map, v *Variables) error {
+func (k *KongController) createUpstream(name string, options data.Map, v *data.Map) error {
 	jsoned, _ := json.Marshal(&options)
 	response, _, err := k.put(name, "upstreams/"+name, string(jsoned), v, true)
 	if response == nil && err != nil {
@@ -303,7 +305,7 @@ func (k *KongController) createUpstream(name string, options data.Map, v *Variab
 	return nil
 }
 
-func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *Variables) error {
+func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *data.Map) error {
 	if sourceControl == nil {
 		return nil
 	}
@@ -384,7 +386,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 }
 
 // post creates a rule
-func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) post(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
@@ -412,7 +414,7 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 }
 
 // put updates or creates a rule
-func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) put(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
@@ -440,7 +442,7 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 }
 
 // patch updates an existing rule
-func (k *KongController) patch(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) patch(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
