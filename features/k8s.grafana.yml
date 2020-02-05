@@ -77,10 +77,10 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            {{ if eq .AdminPassword "" }}
+                            {{ if eq .ClusterAdminPassword "" }}
                             GRAFANA_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
                             {{ else }}
-                            GRAFANA_PASSWORD="{{ .AdminPassword }}"
+                            GRAFANA_PASSWORD="{{ .ClusterAdminPassword }}"
                             {{ end }}
 
                             sfHelm install {{ .HelmRepoName }}/grafana \
