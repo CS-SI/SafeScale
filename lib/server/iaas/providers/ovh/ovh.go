@@ -61,7 +61,7 @@ var gpuMap = map[string]gpuCfg{
 }
 
 var (
-	identityEndpoint = "https://auth.cloud.ovh.net/v2.0"
+	identityEndpoint = "https://auth.cloud.ovh.net/v3"
 	externalNetwork  = "Ext-Net"
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
 )
