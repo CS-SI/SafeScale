@@ -30,6 +30,6 @@ const (
 	STARTED
 	// STOPPING when host is stopping
 	STOPPING
-	// ERROR when host is in error state*/
+	// ERROR when host is in error state
 	ERROR
 )

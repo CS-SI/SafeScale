@@ -110,7 +110,7 @@ type Stack interface {
 	GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error)
 	// ListVolumeAttachments lists available volume attachment
 	ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error)
-	// DeleteVolumeAttachment deletes the volume attachment identifed by id
+	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) error
 }
 
