@@ -42,7 +42,7 @@ Here is an example of a TOML encoded configuration file :
     # if provided, missing fields are reused from tenants.objectstorage section
     [tenants.metadata]
         Type = "swift"
-        AuthURL = "https://auth.cloud.ovh.net/v2.0"
+        AuthURL = "https://auth.cloud.ovh.net/v3"
         ApplicationKey = "<Openstack Application Key>"
         OpenstackID = "<Openstack ID>"
         OpenstackPassword = "<Openstack password>"
@@ -72,7 +72,7 @@ Here is the JSON equivalent of the example TOML configuration file :
       },
       "metadata": {
         "ApplicationKey": "<Openstack Application Key>",
-        "AuthURL": "https://auth.cloud.ovh.net/v2.0",
+        "AuthURL": "https://auth.cloud.ovh.net/v3",
         "CryptKey": "<metadata crypt password>",
         "OpenstackID": "<Openstack ID>",
         "OpenstackPassword": "<Openstack password>",
@@ -111,7 +111,7 @@ tenants:
     Username: <Username>
   metadata:
     ApplicationKey: <Openstack Application Key>
-    AuthURL: https://auth.cloud.ovh.net/v2.0
+    AuthURL: https://auth.cloud.ovh.net/v3
     CryptKey: <metadata crypt password>
     OpenstackID: <Openstack ID>
     OpenstackPassword: <Openstack password>
