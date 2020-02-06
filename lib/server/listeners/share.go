@@ -21,12 +21,12 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	convert "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -44,7 +44,7 @@ import (
 type ShareListener struct{}
 
 // Create calls share service creation
-func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *pb.ShareDefinition, err error) {
+func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot create share").ToGRPCStatus()
@@ -99,11 +99,11 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (_ *
 	if err != nil {
 		return nil, err
 	}
-	return convert.ToPBShare(in.GetName(), share), err
+	return convert.ToProtocolShare(in.GetName(), share), err
 }
 
 // Delete call share service deletion
-func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot delete share").ToGRPCStatus()
@@ -154,7 +154,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 }
 
 // List return the list of all available shares
-func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ *pb.ShareList, err error) {
+func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.ShareList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list shares").ToGRPCStatus()
@@ -202,7 +202,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (_ 
 }
 
 // Mount mounts share on a local directory of the given host
-func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) (smd *pb.ShareMountDefinition, err error) {
+func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefinition) (smd *protocol.ShareMountDefinition, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot mount share").ToGRPCStatus()
@@ -249,7 +249,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 }
 
 // Unmount unmounts share from the given host
-func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (empty *google_protobuf.Empty, err error) {
+func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot unmount share").ToGRPCStatus()
@@ -344,9 +344,9 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 	if err != nil {
 		return nil, err
 	}
-	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
+	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if host == nil {
-		return nil, resources.ResourceNotFoundError("share", shareRef)
+		return nil, abstracts.ResourceNotFoundError("share", shareRef)
 	}
 
 	return convert.ToPBShareMountList(host.Name, share, mounts), nil

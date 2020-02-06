@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
@@ -33,16 +33,16 @@ type network struct {
 }
 
 // List ...
-func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error) {
+func (n *network) List(all bool, timeout time.Duration) (*protocol.NetworkList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
+	service := protocol.NewNetworkServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.List(ctx, &pb.NetworkListRequest{
+	return service.List(ctx, &protocol.NetworkListRequest{
 		All: all,
 	})
 }
@@ -52,7 +52,7 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 func (n *network) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
+	service := protocol.NewNetworkServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 
 	networkDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
+		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
 
 		if err != nil {
 			mutex.Lock()
@@ -89,24 +89,24 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 }
 
 // Inspect ...
-func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, error) {
+func (n *network) Inspect(name string, timeout time.Duration) (*protocol.Network, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
+	service := protocol.NewNetworkServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.Inspect(ctx, &pb.Reference{Name: name})
+	return service.Inspect(ctx, &protocol.Reference{Name: name})
 
 }
 
 // Create ...
-func (n *network) Create(def pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
+func (n *network) Create(def protocol.NetworkDefinition, timeout time.Duration) (*protocol.Network, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
+	service := protocol.NewNetworkServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err

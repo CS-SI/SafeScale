@@ -21,18 +21,18 @@ import (
 	"io"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
 )
 
 func init() {
-	log.SetFormatter(commonlog.GetDefaultFormatter())
-	log.SetLevel(log.DebugLevel)
+	logrus.SetFormatter(commonlog.GetDefaultFormatter())
+	logrus.SetLevel(logrus.DebugLevel)
 
 	// Log as JSON instead of the default ASCII formatter.
-	// log.SetFormatter(&log.JSONFormatter{})
+	// logrus.SetFormatter(&logrus.JSONFormatter{})
 
 	// Output to stdout instead of the default stderr
 	// Can be any io.Writer, see below for File example
@@ -56,12 +56,5 @@ func init() {
 		os.Exit(1)
 	}
 
-	logFileName = utils.AbsPathify("$HOME/.safescale/safescaled-session.log")
-	bfile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("Unable to access file %s, make sure the file is writable", logFileName))
-		os.Exit(1)
-	}
-
-	log.SetOutput(io.MultiWriter(os.Stdout, file, bfile))
+	logrus.SetOutput(io.MultiWriter(os.Stdout, file, bfile))
 }

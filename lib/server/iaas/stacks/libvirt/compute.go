@@ -35,26 +35,23 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
-
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"golang.org/x/crypto/ssh"
-
 	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"golang.org/x/crypto/ssh"
 )
 
 // The createds hosts could be connected to the network with a bridge or a nat
@@ -108,7 +105,7 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (images []resources.Image, err error) {
+func (s *Stack) ListImages() (images []abstracts.Image, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -137,9 +134,9 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 	if !ok {
 		return nil, scerr.InvalidParameterError("result['images']]", "is not an array")
 	}
-	images = []resources.Image{}
+	images = []abstracts.Image{}
 	for _, imageJSON := range imagesJSON {
-		image := resources.Image{
+		image := abstracts.Image{
 			ID:   imageJSON.(map[string]interface{})["imageID"].(string),
 			Name: imageJSON.(map[string]interface{})["imageName"].(string),
 		}
@@ -150,7 +147,7 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
+func (s *Stack) GetImage(id string) (image *abstracts.Image, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -184,13 +181,13 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, ok := imageJSON.(map[string]interface{})["imageID"]; ok && imageID == id {
-			return &resources.Image{
+			return &abstracts.Image{
 				ID:   imageJSON.(map[string]interface{})["imageID"].(string),
 				Name: imageJSON.(map[string]interface{})["imageName"].(string),
 			}, nil
 		}
 		if imageName, ok := imageJSON.(map[string]interface{})["imageName"]; ok && imageName == id {
-			return &resources.Image{
+			return &abstracts.Image{
 				ID:   imageJSON.(map[string]interface{})["imageID"].(string),
 				Name: imageJSON.(map[string]interface{})["imageName"].(string),
 			}, nil
@@ -203,7 +200,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) {
+func (s *Stack) ListTemplates() (templates []abstracts.HostTemplate, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -232,9 +229,9 @@ func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) 
 	if !ok {
 		return nil, scerr.InvalidParameterError("result['templates']]", "is not an array")
 	}
-	templates = []resources.HostTemplate{}
+	templates = []abstracts.HostTemplate{}
 	for _, templateJSON := range templatesJSON {
-		template := resources.HostTemplate{
+		template := abstracts.HostTemplate{
 			Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
 			RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
 			DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
@@ -250,7 +247,7 @@ func (s *Stack) ListTemplates() (templates []resources.HostTemplate, err error) 
 }
 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
+func (s *Stack) GetTemplate(id string) (template *abstracts.HostTemplate, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -281,7 +278,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 	}
 	for _, templateJSON := range templatesJSON {
 		if templateID, _ := templateJSON.(map[string]interface{})["templateID"]; templateID == id {
-			return &resources.HostTemplate{
+			return &abstracts.HostTemplate{
 				Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
 				RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
 				DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
@@ -299,7 +296,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstracts.KeyPair, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -323,7 +320,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate uuid key : %s", err.Error())
 	}
-	return &resources.KeyPair{
+	return &abstracts.KeyPair{
 		ID:         newUuid.String(),
 		Name:       name,
 		PublicKey:  pubKey,
@@ -332,12 +329,12 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstracts.KeyPair, error) {
 	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstracts.KeyPair, error) {
 	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
 }
 
@@ -518,7 +515,7 @@ func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connec
 	return volumeDescriptions, nil
 }
 
-//stateConvert convert libvirt.DomainState to a hoststate.Enum
+//stateConvert convert libvirt.DomainState to a HostState.Enum
 func stateConvert(stateLibvirt libvirt.DomainState) hoststate.Enum {
 	switch stateLibvirt {
 	case 1:
@@ -532,8 +529,8 @@ func stateConvert(stateLibvirt libvirt.DomainState) hoststate.Enum {
 	}
 }
 
-func getDescriptionV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propsv1.HostDescription, error) {
-	hostDescription := propsv1.NewHostDescription()
+func getDescriptionV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propertiesv1.HostDescription, error) {
+	hostDescription := propertiesv1.NewHostDescription()
 
 	//var Created time.Time
 	//var Creator string
@@ -544,8 +541,8 @@ func getDescriptionV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.
 
 	return hostDescription, nil
 }
-func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propsv1.HostSizing, error) {
-	hostSizing := propsv1.NewHostSizing()
+func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propertiesv1.HostSizing, error) {
+	hostSizing := propertiesv1.NewHostSizing()
 
 	info, err := domain.GetInfo()
 	if err != nil {
@@ -572,8 +569,8 @@ func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Conne
 
 	return hostSizing, nil
 }
-func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.HostNetwork, error) {
-	hostNetwork := propsv1.NewHostNetwork()
+func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.HostNetwork, error) {
+	hostNetwork := propertiesv1.NewHostNetwork()
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
@@ -641,8 +638,8 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.HostNet
 	return hostNetwork, nil
 }
 
-// getHostFromDomain build a resources.Host struct representing a Domain
-func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, err error) {
+// getHostFromDomain build a abstracts.Host struct representing a Domain
+func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstracts.Host, err error) {
 	defer scerr.OnPanic(&err)()
 
 	id, err := domain.GetUUIDString()
@@ -658,54 +655,57 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *resources.Host, er
 		return nil, fmt.Errorf(fmt.Sprintf("failed to fetch state from domain : %s", err.Error()))
 	}
 
-	host := resources.NewHost()
+	host := abstracts.NewHost()
 
 	host.ID = id
 	host.Name = name
 	host.PrivateKey = "Impossible to fetch them from the domain, the private key is unknown by the domain"
 	host.LastState = stateConvert(state)
 
-	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
-		hostDescriptionV1, err := getDescriptionV1FromDomain(domain, s.LibvirtService)
-		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("failed to get domain description : %s", err.Error()))
-		}
-		clonable.(*propsv1.HostDescription).Replace(hostDescriptionV1)
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to update hostproperty.DescriptionV1 : %s", err.Error())
-	}
+	err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
+		innerErr := props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
+			hostDescriptionV1, err := getDescriptionV1FromDomain(domain, s.LibvirtService)
+			if err != nil {
+				return scerr.Wrap(err, "failed to get domain description")
+			}
+			clonable.(*propsv1.HostDescription).Replace(hostDescriptionV1)
+			return nil
+		})
 
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
-		hostSizingV1, err := getSizingV1FromDomain(domain, s.LibvirtService)
-		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("failed to get domain sizing : %s", err.Error()))
+		if innerErr != nil {
+			return nil, scerr.Wrap(err, "failed to update hostproperty.DescriptionV1)
 		}
-		clonable.(*propsv1.HostSizing).Replace(hostSizingV1)
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
-	}
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-		hostNetworkV1, err := s.getNetworkV1FromDomain(domain)
-		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("failed to get domain network : %s", err.Error()))
+		innerErr = props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
+			hostSizingV1, err := getSizingV1FromDomain(domain, s.LibvirtService)
+			if err != nil {
+				return fmt.Errorf(fmt.Sprintf("failed to get domain sizing : %s", err.Error()))
+			}
+			clonable.(*propsv1.HostSizing).Replace(hostSizingV1)
+			return nil
+		})
+		if innerErr != nil {
+			return nil, scerr.Wrap(err, "failed to update hostproperty.SizingV1")
 		}
-		clonable.(*propsv1.HostNetwork).Replace(hostNetworkV1)
-		return nil
+
+		return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			hostNetworkV1, err := s.getNetworkV1FromDomain(domain)
+			if err != nil {
+				return fmt.Errorf(fmt.Sprintf("failed to get domain network : %s", err.Error()))
+			}
+			clonable.(*propsv1.HostNetwork).Replace(hostNetworkV1)
+			return nil
+		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to update hostproperty.NetworkV1")
 	}
 
 	return host, nil
 }
 
 // getHostAndDomainFromRef retrieve the host and the domain associated to an ref (id or name)
-func (s *Stack) getHostAndDomainFromRef(ref string) (*resources.Host, *libvirt.Domain, error) {
+func (s *Stack) getHostAndDomainFromRef(ref string) (*abstracts.Host, *libvirt.Domain, error) {
 	domain, err := s.LibvirtService.LookupDomainByUUIDString(ref)
 	if err != nil {
 		domain, err = s.LibvirtService.LookupDomainByName(ref)
@@ -716,7 +716,7 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*resources.Host, *libvirt.D
 			}
 			errCode, _ := strconv.Atoi(re.FindString(err.Error()))
 			if errCode == 42 {
-				return nil, nil, resources.ResourceNotFoundError("host", ref)
+				return nil, nil, abstracts.ResourceNotFoundError("host", ref)
 			}
 			return nil, nil, fmt.Errorf(fmt.Sprintf("failed to fetch domain from ref : %s", err.Error()))
 		}
@@ -729,7 +729,7 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*resources.Host, *libvirt.D
 	return host, domain, nil
 }
 
-func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (err error) {
+func (s *Stack) complementHost(host *abstracts.Host, newHost *abstracts.Host) (err error) {
 	if host == nil || newHost == nil {
 		return fmt.Errorf("both host and newHost have to be set")
 	}
@@ -742,46 +742,43 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) (e
 	}
 	host.LastState = newHost.LastState
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-		newHostNetworkV1 := propsv1.NewHostNetwork()
-		readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-			newHostNetworkV1 = clonable.(*propsv1.HostNetwork)
+	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
+		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			newHostNetworkV1 := propsv1.NewHostNetwork()
+			readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+				newHostNetworkV1 = clonable.(*propsv1.HostNetwork)
+				return nil
+			})
+			if readlockErr != nil {
+				return scerr.Wrap(err, "failed to update hostproperty.NetworkV1")
+			}
+			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
+			hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
+			hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
+			hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
+			hostNetworkV1.NetworksByName = newHostNetworkV1.NetworksByName
 			return nil
 		})
-		if readlockErr != nil {
-			return readlockErr
+		if innerErr != nil {
+			return innerErr
 		}
-		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-		hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
-		hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
-		hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
-		hostNetworkV1.NetworksByName = newHostNetworkV1.NetworksByName
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
-	}
 
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
-		newHostSizingV1 := propsv1.NewHostSizing()
-		readLockErr := newHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
-			newHostSizingV1 = clonable.(*propsv1.HostSizing)
+		return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
+			newHostSizingV1 := propsv1.NewHostSizing()
+			readLockErr := newHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+				newHostSizingV1 = clonable.(*propsv1.HostSizing)
+				return nil
+			})
+			if readLockErr != nil {
+				return scerr.Wrap(readLockErr, "failed to update hostproperty.SizingV1")
+			}
+			hostSizingV1 := clonable.(*propsv1.HostSizing)
+			hostSizingV1.AllocatedSize.Cores = newHostSizingV1.AllocatedSize.Cores
+			hostSizingV1.AllocatedSize.RAMSize = newHostSizingV1.AllocatedSize.RAMSize
+			hostSizingV1.AllocatedSize.DiskSize = newHostSizingV1.AllocatedSize.DiskSize
 			return nil
 		})
-		if readLockErr != nil {
-			return readLockErr
-		}
-		hostSizingV1 := clonable.(*propsv1.HostSizing)
-		hostSizingV1.AllocatedSize.Cores = newHostSizingV1.AllocatedSize.Cores
-		hostSizingV1.AllocatedSize.RAMSize = newHostSizingV1.AllocatedSize.RAMSize
-		hostSizingV1.AllocatedSize.DiskSize = newHostSizingV1.AllocatedSize.DiskSize
-		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
-	}
-
-	return nil
 }
 
 func verifyVirtResizeCanAccessKernel() (err error) {
@@ -806,7 +803,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host, userData *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -900,7 +897,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				switch err.(type) {
 				case *scerr.ErrNotFound:
 					networkDefault, err = s.CreateNetwork(
-						resources.NetworkRequest{
+						abstracts.NetworkRequest{
 							Name:      "default",
 							IPVersion: ipversion.IPv4,
 							CIDR:      defaultNetworkCIDR,
@@ -1008,7 +1005,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}()
 
-	//----Generate resources.Host----
+	//----Generate abstracts.Host----
 
 	domain, err := s.LibvirtService.LookupDomainByName(resourceName)
 	if err != nil {
@@ -1023,58 +1020,64 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	host.PrivateKey = keyPair.PrivateKey
 	host.Password = request.Password
 
-	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-		hostNetworkV1 := clonable.(*propsv1.HostNetwork)
+	// FIXME: move this Alter to resources.Host
+	err = host.Alter(_ data.Clonable, props *serialize.JSONProperties) error {
+		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 
-		if bridgedVMs {
-			var vmInfo VMInfo
-			if publicIP {
-				vmInfo = <-vmInfoChannel
-				hostNetworkV1.PublicIPv4 = vmInfo.publicIP
-				userData.PublicIP = vmInfo.publicIP
-			}
-		}
-
-		hostNetworkV1.DefaultNetworkID = request.Networks[0].ID
-		hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName
-		if request.DefaultGateway != nil {
-			hostNetworkV1.DefaultGatewayID = request.DefaultGateway.ID
-
-			gateway, err := s.InspectHost(request.DefaultGateway)
-			if err != nil {
-				return fmt.Errorf("failed to get gateway host : %s", err.Error())
+			if bridgedVMs {
+				var vmInfo VMInfo
+				if publicIP {
+					vmInfo = <-vmInfoChannel
+					hostNetworkV1.PublicIPv4 = vmInfo.publicIP
+					userData.PublicIP = vmInfo.publicIP
+				}
 			}
 
-			hostNetworkV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
+			hostNetworkV1.DefaultNetworkID = request.Networks[0].ID
+			hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName
+			if request.DefaultGateway != nil {
+				hostNetworkV1.DefaultGatewayID = request.DefaultGateway.ID
+
+				gateway, err := s.InspectHost(request.DefaultGateway)
+				if err != nil {
+					return fmt.Errorf("failed to get gateway host : %s", err.Error())
+				}
+
+				hostNetworkV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
+			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, userData, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
 		}
 
-		return nil
+		return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
+			hostSizingV1, ok := clonable.(*propsv1.HostSizing)
+			if !ok {
+				return scerr.InconsistentError("expecting '*propsv1.HostSizing', providing '%s'", reflect.TypeOf(clonable).String())
+			}
+
+			hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
+			hostSizingV1.RequestedSize.Cores = template.Cores
+			hostSizingV1.RequestedSize.DiskSize = template.DiskSize
+			// TODO GPU not implemented
+			hostSizingV1.RequestedSize.GPUNumber = template.GPUNumber
+			hostSizingV1.RequestedSize.GPUType = template.GPUType
+
+			return nil
+		})
 	})
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
-	}
-
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
-		hostSizingV1 := clonable.(*propsv1.HostSizing)
-
-		hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
-		hostSizingV1.RequestedSize.Cores = template.Cores
-		hostSizingV1.RequestedSize.DiskSize = template.DiskSize
-		// TODO GPU not implemented
-		hostSizingV1.RequestedSize.GPUNumber = template.GPUNumber
-		hostSizingV1.RequestedSize.GPUType = template.GPUType
-
-		return nil
-	})
-	if err != nil {
-		return nil, userData, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
+		return nil, userData, err
 	}
 
 	return host, userData, nil
 }
 
-// GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
+// GetHost returns the host identified by ref (name or id) or by a *abstracts.Host containing an id
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -1084,15 +1087,15 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		if hostParam == "" {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
-		host = resources.NewHost()
+		host = abstracts.NewHost()
 		host.ID = hostParam
-	case *resources.Host:
+	case *abstracts.Host:
 		if hostParam == nil {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
 		}
 		host = hostParam
 	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *abstracts.Host")
 	}
 
 	newHost, _, err := s.getHostAndDomainFromRef(host.ID)
@@ -1112,7 +1115,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
+func (s *Stack) GetHostByName(name string) (*abstracts.Host, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -1175,13 +1178,13 @@ func (s *Stack) DeleteHost(id string) error {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstracts.SizingRequirements) (*abstracts.Host, error) {
 	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	var hosts []*resources.Host
+func (s *Stack) ListHosts() ([]*abstracts.Host, error) {
+	var hosts []*abstracts.Host
 	if s == nil {
 		return hosts, scerr.InvalidInstanceError()
 	}

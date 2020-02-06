@@ -1,0 +1,210 @@
+#
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    install:
+        bash:
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    dpkg -l | grep docker-ce &>/dev/null || sfFail 1
+                                    docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
+                                    ;;
+                                centos|rhel)
+                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 1
+                                    docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 1
+                                    ;;
+                            esac
+
+            add:
+                pace: docker-ce,docker-compose,config,firewall,ready
+                steps:
+                    docker-ce:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
+                                    sfRetry 5m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail 192
+                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193
+                                    echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
+                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 3 "sfApt install -qqy docker-ce" || sfFail 194
+                                    ;;
+                                centos|rhel)
+                                    sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
+                                    sfRetry 7m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
+                                    sfRetry 7m 3 yum install -y docker-ce || sfFail 194
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 195
+                                    ;;
+                            esac
+                            sfExit
+
+                    docker-compose:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            op=-1
+                            VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
+                            [ $op -ne 0 ] && sfFail 192
+                            URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+                            sfDownload "$URL" docker-compose 3m 5 || sfFail 193
+                            chmod +x docker-compose && mv docker-compose /usr/bin
+                            sfExit
+
+                    config:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            mkdir -p /etc/docker
+                            # if [ "$(sfGetFact use_systemd)" = "1" ]; then
+                            #     DRIVER=systemd
+                            # else
+                                DRIVER=cgroupfs
+                            # fi
+                            if [ "$(sfGetFact redhat_like)" = "1" ]; then
+                                cat > /etc/docker/daemon.json <<-EOF
+                            {
+                                "iptables": false,
+                                "exec-opts": [
+                                    "native.cgroupdriver=${DRIVER}"
+                                ],
+                                "no-new-privileges": false,
+                                "log-driver": "json-file",
+                                "log-level":"info",
+                                "log-opts": {
+                                    "max-size": "100m"
+                                },
+                                "experimental": true,
+                                "metrics-addr": "0.0.0.0:9323",
+                                "storage-driver": "overlay2",
+                                "userland-proxy": false,
+                                "storage-opts": [
+                                    "overlay2.override_kernel_check=true"
+                                ]
+                            }
+                            EOF
+                            else
+                                cat > /etc/docker/daemon.json <<-EOF
+                            {
+                                "iptables": false,
+                                "exec-opts": [
+                                    "native.cgroupdriver=${DRIVER}"
+                                ],
+                                "no-new-privileges": false,
+                                "log-driver": "json-file",
+                                "log-level":"info",
+                                "log-opts": {
+                                    "max-size": "100m"
+                                },
+                                "experimental": true,
+                                "metrics-addr": "0.0.0.0:9323",
+                                "storage-driver": "overlay2"
+                            }
+                            EOF
+                            fi
+                            sfExit
+
+                    firewall:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            # Makes sure firewalld is running, starting first its dependency dbus...
+                            sfService start dbus
+                            # then firewalld  itself
+                            sfService restart firewalld
+                            sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
+                            sfFirewallAdd --zone=trusted --add-service docker-swarm
+                            sfFirewallAdd --zone=trusted --add-masquerade
+                            sfFirewallReload || sfFail 204 "Firewall problem"
+
+                    ready:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService enable docker || sfFail 195
+                            sfService restart docker || sfFail 196
+                            op=-1
+                            sfRetry 2m 5 "sfService status docker &>/dev/null" && op=$? || true
+                            [ $op -ne 0 ] && sfFail 197
+                            sfExit
+
+            remove:
+                pace: cleanup
+                steps:
+                    docker-ce:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService disable docker
+                            sfService stop docker
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfApt purge -y docker-ce*
+                                    ;;
+                                centos|rhel)
+                                    yum remove -y docker-ce*
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 1 "Unsupported operating system '$LINUX_KIND'"
+                                    ;;
+                            esac
+                            rm -f /usr/bin/docker-compose || true
+                            sfExit
+
+...

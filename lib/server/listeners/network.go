@@ -22,14 +22,9 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
-
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -45,7 +40,7 @@ import (
 type NetworkListener struct{}
 
 // Create a new network
-func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) (_ *pb.Network, err error) {
+func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefinition) (_ *protocol.Network, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot create network").ToGRPCStatus()
@@ -85,12 +80,12 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
-		sizing    *resources.SizingRequirements
+		sizing    *abstracts.SizingRequirements
 		gwImageID string
 		gwName    string
 	)
 	if in.Gateway == nil || in.Gateway.Sizing == nil {
-		sizing = &resources.SizingRequirements{
+		sizing = &abstracts.SizingRequirements{
 			MinCores:    int(in.Gateway.Sizing.MinCpuCount),
 			MaxCores:    int(in.Gateway.Sizing.MaxCpuCount),
 			MinRAMSize:  in.Gateway.Sizing.MinRamSize,
@@ -127,14 +122,14 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	if err != nil {
 		return nil, err
 	}
-	network := r.(*resources.Network)
+	network := r.(*abstracts.Network)
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)
 	return conv.ToPBNetwork(network), nil
 }
 
 // List existing networks
-func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (_ *pb.NetworkList, err error) {
+func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequest) (_ *protocol.NetworkList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list networks").ToGRPCStatus()
@@ -174,17 +169,17 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 		return nil, err
 	}
 
-	// Map resources.Network to pb.Network
-	var pbnetworks []*pb.Network
+	// Build response mapping abstracts.Network to protocol.Network
+	var pbnetworks []*protocol.Network
 	for _, network := range networks {
 		pbnetworks = append(pbnetworks, conv.ToPBNetwork(network))
 	}
-	rv := &pb.NetworkList{Networks: pbnetworks}
+	rv := &protocol.NetworkList{Networks: pbnetworks}
 	return rv, nil
 }
 
 // Inspect returns infos on a network
-func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.Network, err error) {
+func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot inspect network").ToGRPCStatus()
@@ -237,7 +232,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot delete network").ToGRPCStatus()

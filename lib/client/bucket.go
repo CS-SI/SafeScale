@@ -21,10 +21,11 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -34,10 +35,10 @@ type bucket struct {
 }
 
 // List ...
-func (c *bucket) List(timeout time.Duration) (*pb.BucketList, error) {
+func (c *bucket) List(timeout time.Duration) (*protocol.BucketList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewBucketServiceClient(c.session.connection)
+	service := protocol.NewBucketServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
@@ -51,13 +52,13 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	service := pb.NewBucketServiceClient(c.session.connection)
+	service := protocol.NewBucketServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Create(ctx, &pb.Bucket{Name: name})
+	_, err = service.Create(ctx, &protocol.Bucket{Name: name})
 	return err
 }
 
@@ -65,7 +66,7 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewBucketServiceClient(c.session.connection)
+	service := protocol.NewBucketServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -79,7 +80,7 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Bucket{Name: aname})
+		_, err := service.Delete(ctx, &protocol.Bucket{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
@@ -100,33 +101,31 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 }
 
 // Inspect ...
-func (c *bucket) Inspect(name string, timeout time.Duration) (*pb.BucketMountingPoint, error) {
+func (c *bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketMountingPoint, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewBucketServiceClient(c.session.connection)
+	service := protocol.NewBucketServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.Inspect(ctx, &pb.Bucket{Name: name})
+	return service.Inspect(ctx, &protocol.Bucket{Name: name})
 }
 
 // Mount ...
 func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewBucketServiceClient(c.session.connection)
+	service := protocol.NewBucketServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Mount(ctx, &pb.BucketMountingPoint{
+	_, err = service.Mount(ctx, &protocol.BucketMountingPoint{
 		Bucket: bucketName,
-		Host: &pb.Reference{
-			Name: hostName,
-		},
+		Host: &protocol.Reference{Name: hostName},
 		Path: mountPoint,
 	})
 	return err
@@ -136,15 +135,15 @@ func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dur
 func (c *bucket) Unmount(bucketName, hostName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewBucketServiceClient(c.session.connection)
+	service := protocol.NewBucketServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Unmount(ctx, &pb.BucketMountingPoint{
+	_, err = service.Unmount(ctx, &protocol.BucketMountingPoint{
 		Bucket: bucketName,
-		Host:   &pb.Reference{Name: hostName},
+		Host:   &protocol.Reference{Name: hostName},
 	})
 	return err
 }

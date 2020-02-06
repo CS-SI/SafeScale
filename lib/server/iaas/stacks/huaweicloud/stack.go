@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	// Gophercloud OpenStack API
-	gc "github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 
@@ -34,7 +34,7 @@ type Stack struct {
 	// use openstack stack when fully openstack compliant
 	*openstack.Stack
 	// Identity contains service client of openstack Identity service
-	identityClient *gc.ServiceClient
+	identityClient *gophercloud.ServiceClient
 	// Opts contains authentication options
 	authOpts stacks.AuthenticationOptions
 	// CfgOpts ...
@@ -52,7 +52,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	}
 
 	authOptions := auth
-	scope := gc.AuthScope{
+	scope := gophercloud.AuthScope{
 		ProjectName: auth.Region,
 		DomainName:  auth.DomainName,
 	}
@@ -63,14 +63,14 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	}
 
 	// Identity API
-	identity, err := gcos.NewIdentityV3(stack.Driver, gc.EndpointOpts{})
+	identity, err := gcos.NewIdentityV3(stack.Driver, gophercloud.EndpointOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
 	// Recover Project ID of region
 	listOpts := projects.ListOpts{
-		Enabled: gc.Enabled,
+		Enabled: gophercloud.Enabled,
 		Name:    authOptions.Region,
 	}
 	allPages, err := projects.List(identity, listOpts).AllPages()

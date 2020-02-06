@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -35,15 +33,18 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	providers "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
-	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
-	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstracts/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstracts/filters/templates"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //go:generate mockgen -destination=mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas Service
@@ -53,16 +54,16 @@ import (
 type Service interface {
 	// --- from service ---
 
-	CreateHostWithKeyPair(resources.HostRequest) (*resources.Host, *userdata.Content, *resources.KeyPair, error)
-	FilterImages(string) ([]resources.Image, error)
+	CreateHostWithKeyPair(abstracts.HostRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *userdata.Content, *abstracts.KeyPair, error)
+	FilterImages(string) ([]abstracts.Image, error)
 	GetMetadataKey() *crypt.Key
 	GetMetadataBucket() objectstorage.Bucket
-	ListHostsByName() (map[string]*resources.Host, error)
-	SearchImage(string) (*resources.Image, error)
-	SelectTemplatesBySize(resources.SizingRequirements, bool) ([]*resources.HostTemplate, error)
-	SelectTemplateByName(string) (*resources.HostTemplate, error)
+	ListHostsByName() (map[string]*abstracts.Host, error)
+	SearchImage(string) (*abstracts.Image, error)
+	SelectTemplatesBySize(abstracts.SizingRequirements, bool) ([]*abstracts.HostTemplate, error)
+	SelectTemplateByName(string) (*abstracts.HostTemplate, error)
 	WaitHostState(string, hoststate.Enum, time.Duration) error
-	WaitVolumeState(string, volumestate.Enum, time.Duration) (*resources.Volume, error)
+	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstracts.Volume, error)
 
 	// --- from interface iaas.Providers ---
 	providers.Provider
@@ -95,7 +96,7 @@ const (
 )
 
 // RankDRF computes the Dominant Resource Fairness Rank of an host template
-func RankDRF(t *resources.HostTemplate) float32 {
+func RankDRF(t *abstracts.HostTemplate) float32 {
 	fc := float32(t.Cores)
 	fr := t.RAMSize
 	fd := float32(t.DiskSize)
@@ -104,7 +105,7 @@ func RankDRF(t *resources.HostTemplate) float32 {
 
 // ByRankDRF implements sort.Interface for []HostTemplate based on
 // the Dominant Resource Fairness
-type ByRankDRF []*resources.HostTemplate
+type ByRankDRF []*abstracts.HostTemplate
 
 func (a ByRankDRF) Len() int           { return len(a) }
 func (a ByRankDRF) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -112,8 +113,8 @@ func (a ByRankDRF) Less(i, j int) bool { return RankDRF(a[i]) < RankDRF(a[j]) }
 
 // // HostAccess an host and the SSH Key Pair
 // type HostAccess struct {
-// 	Host    *resources.Host
-// 	Key     *resources.KeyPair
+// 	Host    *abstracts.Host
+// 	Key     *abstracts.KeyPair
 // 	User    string
 // 	Gateway *HostAccess
 // }
@@ -147,10 +148,10 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 	var err error
 
 	timer := time.After(timeout)
-	host := resources.NewHost()
+	host := abstracts.NewHost()
 	host.ID = hostID
 	for {
-		host, err = svc.InspectHost(host)
+		host, _, _, err = svc.InspectHost(host)
 		if err != nil {
 			return err
 		}
@@ -171,14 +172,14 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 
 // WaitVolumeState waits an host achieve state
 // If timeout is reached, returns utils.ErrTimeout
-func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, timeout time.Duration) (*resources.Volume, error) {
+func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, timeout time.Duration) (*abstracts.Volume, error) {
 	if svc == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
 	cout := make(chan int)
 	next := make(chan bool)
-	vc := make(chan *resources.Volume)
+	vc := make(chan *abstracts.Volume)
 
 	go pollVolume(svc, volumeID, state, cout, next, vc)
 	for {
@@ -200,7 +201,7 @@ func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, tim
 	}
 }
 
-func pollVolume(svc *service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *resources.Volume) {
+func pollVolume(svc *service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstracts.Volume) {
 	for {
 		v, err := svc.GetVolume(volumeID)
 		if err != nil {
@@ -221,7 +222,7 @@ func pollVolume(svc *service, volumeID string, state volumestate.Enum, cout chan
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (svc *service) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (svc *service) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 	allTemplates, err := svc.Provider.ListTemplates(all)
 	if err != nil {
 		return nil, err
@@ -233,7 +234,7 @@ func (svc *service) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 }
 
 // SelectTemplateByName returns the template by its name
-func (svc *service) SelectTemplateByName(name string) (*resources.HostTemplate, error) {
+func (svc *service) SelectTemplateByName(name string) (*abstracts.HostTemplate, error) {
 	allTemplates, err := svc.Provider.ListTemplates(true)
 	if err != nil {
 		return nil, err
@@ -246,7 +247,7 @@ func (svc *service) SelectTemplateByName(name string) (*resources.HostTemplate, 
 	return nil, scerr.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
 }
 
-func (svc *service) reduceTemplates(tpls []resources.HostTemplate) []resources.HostTemplate {
+func (svc *service) reduceTemplates(tpls []abstracts.HostTemplate) []abstracts.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if svc.whitelistTemplateRE != nil {
 		finalFilter = templatefilters.NewFilter(filterTemplatesByRegex(svc.whitelistTemplateRE))
@@ -273,7 +274,7 @@ func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
 
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (selectedTpls []*resources.HostTemplate, err error) {
+func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, force bool) (selectedTpls []*abstracts.HostTemplate, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -332,9 +333,9 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					return nil, fmt.Errorf(noHostError)
 				}
 			} else {
-				var images []resources.StoredCPUInfo
+				var images []abstracts.StoredCPUInfo
 				for _, f := range imageList {
-					imageFound := resources.StoredCPUInfo{}
+					imageFound := abstracts.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
 						logrus.Error(fmt.Sprintf("error unmarsalling image %s : %v", f, err))
 					}
@@ -439,7 +440,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 }
 
 type scoredImage struct {
-	resources.Image
+	abstracts.Image
 	score float64
 }
 
@@ -450,7 +451,7 @@ func (a scoredImages) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
-func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
+func (svc *service) FilterImages(filter string) ([]abstracts.Image, error) {
 	if svc == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -479,7 +480,7 @@ func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 		}
 
 	}
-	var fimgs []resources.Image
+	var fimgs []abstracts.Image
 	sort.Sort(scoredImages(simgs))
 	for _, simg := range simgs {
 		fimgs = append(fimgs, simg.Image)
@@ -489,7 +490,7 @@ func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 
 }
 
-func (svc *service) reduceImages(imgs []resources.Image) []resources.Image {
+func (svc *service) reduceImages(imgs []abstracts.Image) []abstracts.Image {
 	var finalFilter *imagefilters.Filter
 	if svc.whitelistImageRE != nil {
 		finalFilter = imagefilters.NewFilter(filterImagesByRegex(svc.whitelistImageRE))
@@ -516,7 +517,7 @@ func filterImagesByRegex(re *regexp.Regexp) imagefilters.Predicate {
 }
 
 // ListImages reduces the list of needed
-func (svc *service) ListImages(all bool) ([]resources.Image, error) {
+func (svc *service) ListImages(all bool) ([]abstracts.Image, error) {
 	imgs, err := svc.Provider.ListImages(all)
 	if err != nil {
 		return nil, err
@@ -525,7 +526,7 @@ func (svc *service) ListImages(all bool) ([]resources.Image, error) {
 }
 
 // SearchImage search an image corresponding to OS Name
-func (svc *service) SearchImage(osname string) (*resources.Image, error) {
+func (svc *service) SearchImage(osname string) (*abstracts.Image, error) {
 	if svc == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -560,30 +561,36 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 }
 
 // CreateHostWithKeyPair creates an host
-func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, *userdata.Content, *resources.KeyPair, error) {
+func (svc *service) CreateHostWithKeyPair(request abstracts.HostRequest) (
+	*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork,
+	*userdata.Content,
+	*abstracts.KeyPair,
+	error,
+) {
+
 	if svc == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	_, err := svc.GetHostByName(request.ResourceName)
 	if err == nil {
-		return nil, nil, nil, resources.ResourceDuplicateError("Host", request.ResourceName)
+		return nil, nil, nil, nil, nil, abstracts.ResourceDuplicateError("Host", request.ResourceName)
 	}
 
 	// Create temporary key pair
 	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	kpName := kpNameuuid.String()
 	kp, err := svc.CreateKeyPair(kpName)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// Create host
-	hostReq := resources.HostRequest{
+	hostReq := abstracts.HostRequest{
 		ResourceName:   request.ResourceName,
 		HostName:       request.HostName,
 		ImageID:        request.ImageID,
@@ -594,15 +601,15 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		DefaultGateway: request.DefaultGateway,
 		TemplateID:     request.TemplateID,
 	}
-	host, userData, err := svc.CreateHost(hostReq)
+	host, hsV2, hnV1, userData, err := svc.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
-	return host, userData, kp, nil
+	return host, hsV2, hnV1, userData, kp, nil
 }
 
 // ListHostsByName list hosts by name
-func (svc *service) ListHostsByName() (map[string]*resources.Host, error) {
+func (svc *service) ListHostsByName() (map[string]*abstracts.Host, error) {
 	if svc == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -611,7 +618,7 @@ func (svc *service) ListHostsByName() (map[string]*resources.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	hostMap := make(map[string]*resources.Host)
+	hostMap := make(map[string]*abstracts.Host)
 	for _, host := range hosts {
 		hostMap[host.Name] = host
 	}

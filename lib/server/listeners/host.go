@@ -21,17 +21,12 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
-
-	"google.golang.org/grpc/status"
-
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -64,7 +59,7 @@ type StoredCPUInfo struct {
 }
 
 // Start ...
-func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot start host").ToGRPCStatus()
@@ -111,7 +106,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 }
 
 // Stop shutdowns a host.
-func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot stop host").ToGRPCStatus()
@@ -161,7 +156,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 }
 
 // Reboot reboots a host.
-func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot reboot host").ToGRPCStatus()
@@ -208,7 +203,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 }
 
 // List lists hosts managed by SafeScale only, or all hosts.
-func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb.HostList, err error) {
+func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (hl *protocol.HostList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list hosts").ToGRPCStatus()
@@ -246,17 +241,17 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 		return nil, err
 	}
 
-	// Map resources.Host to pb.Host
-	var pbhost []*pb.Host
+	// build response mapping abstracts.Host to protocol.Host
+	var pbhost []*protocol.Host
 	for _, host := range hosts {
 		pbhost = append(pbhost, srvutils.ToPBHost(host))
 	}
-	rv := &pb.HostList{Hosts: pbhost}
+	rv := &protocol.HostList{Hosts: pbhost}
 	return rv, nil
 }
 
 // Create creates a new host
-func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb.Host, err error) {
+func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) (h *protocol.Host, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot create host").ToGRPCStatus()
@@ -291,9 +286,9 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	var sizing *resources.SizingRequirements
+	var sizing *abstracts.SizingRequirements
 	if in.Sizing == nil {
-		sizing = &resources.SizingRequirements{
+		sizing = &abstracts.SizingRequirements{
 			MinCores:    int(in.GetCpuCount()),
 			MaxCores:    int(in.GetCpuCount()),
 			MinRAMSize:  in.GetRam(),
@@ -324,7 +319,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 }
 
 // Resize an host
-func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb.Host, err error) {
+func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot resize host").ToGRPCStatus()
@@ -376,7 +371,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb
 }
 
 // Status returns the status of a host (running or stopped mainly)
-func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.HostStatus, err error) {
+func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *protocol.HostStatus, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot get host status").ToGRPCStatus()
@@ -424,7 +419,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 }
 
 // Inspect an host
-func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Host, err error) {
+func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot inspect host").ToGRPCStatus()
@@ -472,7 +467,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 }
 
 // Delete an host
-func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot delete host").ToGRPCStatus()
@@ -522,7 +517,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 }
 
 // SSH returns ssh parameters to access an host
-func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshConfig, err error) {
+func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *protocol.SshConfig, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot get host ssh config").ToGRPCStatus()

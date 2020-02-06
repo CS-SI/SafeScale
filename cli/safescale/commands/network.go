@@ -23,8 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -118,7 +118,7 @@ var networkInspect = cli.Command{
 		_ = json.Unmarshal(jsoned, &mapped)
 
 		// Get gateway(s) information (needs the name(s) in the output map)
-		var pgw, sgw *pb.Host
+		var pgw, sgw *protocol.Host
 		pgwID := network.GetGatewayId()
 		sgwID := network.GetSecondaryGatewayId()
 
@@ -227,11 +227,11 @@ var networkCreate = cli.Command{
 		if err != nil {
 			return err
 		}
-		netdef := pb.NetworkDefinition{
+		netdef := protocol.NetworkDefinition{
 			Cidr:     c.String("cidr"),
 			Name:     c.Args().Get(0),
 			FailOver: c.Bool("failover"),
-			Gateway: &pb.GatewayDefinition{
+			Gateway: &protocol.GatewayDefinition{
 				ImageId: c.String("os"),
 				Name:    c.String("gwname"),
 				Sizing:  def.Sizing,

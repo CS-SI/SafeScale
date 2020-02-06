@@ -19,10 +19,11 @@ package openstack
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 // GetSecurityGroup returns the default security group

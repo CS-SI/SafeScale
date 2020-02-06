@@ -24,8 +24,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -40,7 +40,7 @@ var hostCmdName = "host"
 
 // HostCmd command
 var HostCmd = cli.Command{
-	Name:  "host",
+	Name:  hostCmdName,
 	Usage: "host COMMAND",
 	Subcommands: []cli.Command{
 		hostList,
@@ -334,7 +334,7 @@ var hostResize = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified"))
 		}
 
-		def := pb.HostDefinition{
+		def := protocol.HostDefinition{
 			Name:     c.Args().First(),
 			CpuCount: int32(c.Int("cpu")),
 			Disk:     int32(c.Float64("disk")),

@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"regexp"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -64,20 +64,6 @@ func GetTenants() ([]interface{}, error) {
 	return tenants, err
 }
 
-// // UseStorages return the storageService build around storages referenced in tenantNames
-// func UseStorages(tenantNames []string) (*StorageServices, error) {
-// 	storageServices := NewStorageService()
-
-// 	for _, tenantName := range tenantNames {
-// 		err := storageServices.RegisterStorage(tenantName)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to register storage tenant %s : %s", tenantName, err.Error())
-// 		}
-// 	}
-
-// 	return &storageServices, nil
-// }
-
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func UseService(tenantName string) (newService Service, err error) {
@@ -101,7 +87,7 @@ func UseService(tenantName string) (newService Service, err error) {
 		tenant, _ := t.(map[string]interface{})
 		name, found = tenant["name"].(string)
 		if !found {
-			log.Error("tenant found without 'name'")
+			logrus.Error("tenant found without 'name'")
 			continue
 		}
 		if name != tenantName {
@@ -113,7 +99,7 @@ func UseService(tenantName string) (newService Service, err error) {
 		if !found {
 			provider, found = tenant["client"].(string)
 			if !found {
-				log.Error("Missing field 'provider' in tenant")
+				logrus.Error("Missing field 'provider' in tenant")
 				continue
 			}
 		}
@@ -121,33 +107,33 @@ func UseService(tenantName string) (newService Service, err error) {
 		svcProvider = provider
 		svc, found = allProviders[provider]
 		if !found {
-			log.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
+			logrus.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
 			continue
 		}
 
 		// tenantIdentity, found := tenant["identity"].(map[string]interface{})
 		// if !found {
-		// 	log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+		// 	logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
 		// }
 		// tenantCompute, found := tenant["compute"].(map[string]interface{})
 		// if !found {
-		// 	log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+		// 	logrus.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
 		// }
 		// tenantNetwork, found := tenant["network"].(map[string]interface{})
 		// if !found {
-		// 	log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+		// 	logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		// }
 		_, found = tenant["identity"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
 		}
 		_, found = tenant["compute"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
 		}
 		_, found = tenant["network"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
 		// tenantClient := map[string]interface{}{
 		// 	"identity": tenantIdentity,
@@ -179,7 +165,7 @@ func UseService(tenantName string) (newService Service, err error) {
 				return nil, fmt.Errorf("error connecting to Object Storage Location: %s", err.Error())
 			}
 		} else {
-			log.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
+			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
 		// Initializes Metadata Object Storage (may be different than the Object Storage)
@@ -244,10 +230,10 @@ func UseService(tenantName string) (newService Service, err error) {
 	if !tenantInCfg {
 		return nil, fmt.Errorf("tenant '%s' not found in configuration", tenantName)
 	}
-	return nil, resources.ResourceNotFoundError("provider builder for", svcProvider)
+	return nil, abstracts.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
-// UseService return the service referenced by the given name.
+// UseSpecialService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocation objectstorage.Location, fakeMetaLocation objectstorage.Location) (Service, error) { // nolint
 	tenants, _, err := getTenantsFromCfg()
@@ -267,7 +253,7 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 		tenant, _ := t.(map[string]interface{})
 		name, found = tenant["name"].(string)
 		if !found {
-			log.Error("tenant found without 'name'")
+			logrus.Error("tenant found without 'name'")
 			continue
 		}
 		if name != tenantName {
@@ -279,7 +265,7 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 		if !found {
 			provider, found = tenant["client"].(string)
 			if !found {
-				log.Error("Missing field 'provider' in tenant")
+				logrus.Error("Missing field 'provider' in tenant")
 				continue
 			}
 		}
@@ -287,21 +273,21 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 		svcProvider = provider
 		svc, found = allProviders[provider]
 		if !found {
-			log.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
+			logrus.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
 			continue
 		}
 
 		tenantIdentity, found := tenant["identity"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
 		}
 		tenantCompute, found := tenant["compute"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
 		}
 		tenantNetwork, found := tenant["network"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
 		tenantClient := map[string]interface{}{
 			"identity": tenantIdentity,
@@ -380,7 +366,7 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 	if !tenantInCfg {
 		return nil, fmt.Errorf("tenant '%s' not found in configuration", tenantName)
 	}
-	return nil, resources.ResourceNotFoundError("provider builder for", svcProvider)
+	return nil, abstracts.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
 // validatRegexps validates regexp values from tenants file
@@ -718,7 +704,7 @@ func getTenantsFromCfg() ([]interface{}, *viper.Viper, error) {
 
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
-		log.Errorf(msg)
+		logrus.Errorf(msg)
 		return nil, v, fmt.Errorf(msg)
 	}
 	settings := v.AllSettings()

@@ -19,23 +19,22 @@ package openstack
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
 	"github.com/davecgh/go-spew/spew"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-	gc "github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud"
 	volumesv1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -88,7 +87,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources.Volume, err error) {
+func (s *Stack) CreateVolume(request abstracts.VolumeRequest) (volume *abstracts.Volume, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -105,15 +104,15 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 		}
 	}
 	if volume != nil {
-		return nil, resources.ResourceDuplicateError("volume", request.Name)
+		return nil, abstracts.ResourceDuplicateError("volume", request.Name)
 	}
 
 	az, err := s.SelectedAvailabilityZone()
 	if err != nil {
-		return nil, resources.ResourceDuplicateError("volume", request.Name)
+		return nil, abstracts.ResourceDuplicateError("volume", request.Name)
 	}
 
-	var v resources.Volume
+	var v abstracts.Volume
 	switch s.versions["volume"] {
 	case "v1":
 		var vol *volumesv1.Volume
@@ -130,7 +129,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
 			break
 		}
-		v = resources.Volume{
+		v = abstracts.Volume{
 			ID:    vol.ID,
 			Name:  vol.Name,
 			Size:  vol.Size,
@@ -152,7 +151,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
 			break
 		}
-		v = resources.Volume{
+		v = abstracts.Volume{
 			ID:    vol.ID,
 			Name:  vol.Name,
 			Size:  vol.Size,
@@ -170,7 +169,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
+func (s *Stack) GetVolume(id string) (*abstracts.Volume, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -183,13 +182,13 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	r := volumesv2.Get(s.VolumeClient, id)
 	volume, err := r.Extract()
 	if err != nil {
-		if _, ok := err.(gc.ErrDefault404); ok {
-			return nil, resources.ResourceNotFoundError("volume", id)
+		if _, ok := err.(gophercloud.ErrDefault404); ok {
+			return nil, abstracts.ResourceNotFoundError("volume", id)
 		}
 		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(err)))
 	}
 
-	av := resources.Volume{
+	av := abstracts.Volume{
 		ID:    volume.ID,
 		Name:  volume.Name,
 		Size:  volume.Size,
@@ -200,22 +199,22 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s *Stack) ListVolumes() ([]resources.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstracts.Volume, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	var vs []resources.Volume
+	var vs []abstracts.Volume
 	err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumesv2.ExtractVolumes(page)
 		if err != nil {
-			log.Errorf("Error listing volumes: volume extraction: %+v", err)
+			logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
 			return false, err
 		}
 		for _, vol := range list {
-			av := resources.Volume{
+			av := abstracts.Volume{
 				ID:    vol.ID,
 				Name:  vol.Name,
 				Size:  vol.Size,
@@ -230,7 +229,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		if err != nil {
 			return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 		}
-		log.Warnf("Complete volume list empty")
+		logrus.Warnf("Complete volume list empty")
 	}
 	return vs, nil
 }
@@ -256,7 +255,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 			err := r.ExtractErr()
 			if err != nil {
 				switch err.(type) {
-				case gc.ErrDefault400:
+				case gophercloud.ErrDefault400:
 					return fmt.Errorf("volume not in state 'available'")
 				default:
 					return err
@@ -279,7 +278,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstracts.VolumeAttachmentRequest) (string, error) {
 	if s == nil {
 		return "", scerr.InvalidInstanceError()
 	}
@@ -308,7 +307,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstracts.VolumeAttachment, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -325,7 +324,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 	if err != nil {
 		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
 	}
-	return &resources.VolumeAttachment{
+	return &abstracts.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
 		VolumeID: va.VolumeID,
@@ -334,7 +333,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstracts.VolumeAttachment, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -344,14 +343,14 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 	defer concurrency.NewTracer(nil, "('"+serverID+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	var vs []resources.VolumeAttachment
+	var vs []abstracts.VolumeAttachment
 	err := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumeattach.ExtractVolumeAttachments(page)
 		if err != nil {
 			return false, scerr.Wrap(err, "Error listing volume attachment: extracting attachments")
 		}
 		for _, va := range list {
-			ava := resources.VolumeAttachment{
+			ava := abstracts.VolumeAttachment{
 				ID:       va.ID,
 				ServerID: va.ServerID,
 				VolumeID: va.VolumeID,

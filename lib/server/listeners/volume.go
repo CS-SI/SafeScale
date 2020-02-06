@@ -21,11 +21,10 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -51,7 +50,7 @@ var VolumeHandler = handlers.NewVolumeHandler
 type VolumeListener struct{}
 
 // List the available volumes
-func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ *pb.VolumeList, err error) {
+func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list volumes").ToGRPCStatus()
@@ -92,17 +91,17 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 		return nil, err
 	}
 
-	// Map resources.Volume to pb.Volume
-	var pbvolumes []*pb.Volume
+	// Map resources.Volume to protocol.Volume
+	var pbvolumes []*protocol.Volume
 	for _, volume := range volumes {
 		pbvolumes = append(pbvolumes, conv.ToPBVolume(&volume))
 	}
-	rv := &pb.VolumeList{Volumes: pbvolumes}
+	rv := &protocol.VolumeList{Volumes: pbvolumes}
 	return rv, nil
 }
 
 // Create a new volume
-func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_ *pb.Volume, err error) {
+func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefinition) (_ *protocol.Volume, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot create volume").ToGRPCStatus()
@@ -139,7 +138,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := VolumeHandler(job)
+	handler := NewVolumeHandler(job)
 	vol, err := handler.Create(name, int(size), volumespeed.Enum(speed))
 	if err != nil {
 		return nil, err
@@ -150,7 +149,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 }
 
 // Attach a volume to an host and create a mount point
-func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachment) (_ *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot attach volume").ToGRPCStatus()
@@ -215,7 +214,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 }
 
 // Detach a volume from an host. It umount associated mountpoint
-func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachment) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot detach volume").ToGRPCStatus()
@@ -270,7 +269,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 }
 
 // Delete a volume
-func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot delete volume").ToGRPCStatus()
@@ -321,7 +320,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 }
 
 // Inspect a volume
-func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.VolumeInfo, err error) {
+func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInfo, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot inspect volume").ToGRPCStatus()

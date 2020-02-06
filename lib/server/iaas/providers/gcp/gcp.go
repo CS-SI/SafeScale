@@ -25,10 +25,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 )
 
 // provider is the provider implementation of the Gcp provider
@@ -105,7 +105,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstracts.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 	}
@@ -189,7 +189,7 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
 	return p.Stack.ListImages()
 }
 

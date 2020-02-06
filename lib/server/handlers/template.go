@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -29,25 +29,32 @@ import (
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-//TemplateAPI defines API to manipulate hosts
-type TemplateAPI interface {
-	List(all bool) ([]resources.HostTemplate, error)
+//TemplateHandler defines API to manipulate hosts
+type TemplateHandler interface {
+	List(all bool) ([]abstracts.HostTemplate, error)
 }
 
-// TemplateHandler template service
-type TemplateHandler struct {
+// templateHandler template service
+type templateHandler struct {
 	job server.Job
 }
 
 // NewTemplateHandler creates a template service
 //FIXME: what to do if job == nil ?
-func NewTemplateHandler(job server.Job) TemplateAPI {
-	return &TemplateHandler{job: job}
+func NewTemplateHandler(job server.Job) TemplateHandler {
+	return &templateHandler{job: job}
 }
 
 // List returns the template list
-func (handler *TemplateHandler) List(all bool) (tlist []resources.HostTemplate, err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+func (handler *templateHandler) List(all bool) (tlist []abstracts.HostTemplate, err error) {
+	if handler == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+
+	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

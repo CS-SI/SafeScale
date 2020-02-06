@@ -24,8 +24,11 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // GenerateClientIdentity builds a string identifying the client
@@ -64,7 +67,7 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 		return nil, 0, clitools.FailureResponse(clitools.ExitOnInvalidArgument(err.Error()))
 	}
 
-	def := pb.HostDefinition{
+	def := protocol.HostDefinition{
 		Name:    c.Args().First(),
 		ImageId: c.String("os"),
 		Network: c.String("net"),
