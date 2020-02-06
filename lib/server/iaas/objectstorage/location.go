@@ -18,19 +18,20 @@ package objectstorage
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/graymeta/stow"
+	"github.com/sirupsen/logrus"
+
 	// necessary for connect
 	// _ "github.com/graymeta/stow/azure"
 	_ "github.com/graymeta/stow/google"
 	_ "github.com/graymeta/stow/s3"
 	_ "github.com/graymeta/stow/swift"
+
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // location ...
@@ -91,12 +92,12 @@ func (l *location) connect() error {
 	// Check config location
 	err := stow.Validate(kind, config)
 	if err != nil {
-		log.Debugf("invalid config: %v", err)
+		logrus.Debugf("invalid config: %v", err)
 		return err
 	}
 	l.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
-		log.Debugf("failed dialing location: %v", err)
+		logrus.Debugf("failed dialing location: %v", err)
 	}
 	return err
 }
@@ -147,7 +148,7 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
 		func(c stow.Container, err error) error {
 			if err != nil {
-				log.Debugf("%v", err)
+				logrus.Debugf("%v", err)
 				return err
 			}
 			if c.Name() == bucketName {

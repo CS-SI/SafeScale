@@ -26,9 +26,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	conv "github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -272,16 +272,15 @@ func (s *ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHCon
 	if err != nil {
 		return nil, err
 	}
-	service := pb.NewHostServiceClient(s.session.connection)
+	service := protocol.NewHostServiceClient(s.session.connection)
 
-	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})
+	sshConfig, err := service.SSH(ctx, &protocol.Reference{Name: name})
 	if err != nil {
 		return nil, err
 	}
 	return conv.ToSystemSSHConfig(sshConfig), nil
 }
 
-// FIXME: ROBUSTNESS All functions MUST propagate context
 // Connect ...
 func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) error {
 	sshCfg, err := s.getSSHConfigFromName(hostname, timeout)
@@ -295,7 +294,7 @@ func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) e
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostname)
+				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...", hostname)
 			}
 		},
 	)

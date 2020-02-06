@@ -27,10 +27,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 )
 
 const (
@@ -69,12 +69,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		identityEndpoint = fmt.Sprintf(identityEndpointTemplate, region)
 	}
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstracts.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			operatorUsername = abstracts.DefaultUser
 		}
 	}
 
@@ -177,7 +177,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -187,7 +187,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
 	allImages, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err

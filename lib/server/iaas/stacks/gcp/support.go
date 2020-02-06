@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"google.golang.org/api/compute/v1"
+
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 // OpContext ...

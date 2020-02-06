@@ -19,7 +19,7 @@ package client
 import (
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
@@ -30,14 +30,14 @@ type template struct {
 }
 
 // List return the list of availble templates on the current tenant
-func (t *template) List(all bool, timeout time.Duration) (*pb.TemplateList, error) {
+func (t *template) List(all bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := pb.NewTemplateServiceClient(t.session.connection)
+	service := protocol.NewTemplateServiceClient(t.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
-	return service.List(ctx, &pb.TemplateListRequest{All: all})
+	return service.List(ctx, &protocol.TemplateListRequest{All: all})
 
 }

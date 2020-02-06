@@ -23,7 +23,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -39,7 +39,7 @@ import (
 type SSHListener struct{}
 
 // Run executes an ssh command an an host
-func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshResponse, err error) {
+func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot run by ssh").ToGRPCStatus()
@@ -83,7 +83,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 		return nil, err
 	}
 
-	return &pb.SshResponse{
+	return &protocol.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
 		OutputErr: stderr,
@@ -91,7 +91,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 }
 
 // Copy copy file from/to an host
-func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.SshResponse, err error) {
+func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot copy by ssh").ToGRPCStatus()
@@ -136,7 +136,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 		return nil, scerr.NewError(fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr), nil, nil)
 	}
 
-	return &pb.SshResponse{
+	return &protocol.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
 		OutputErr: stderr,

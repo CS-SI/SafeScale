@@ -24,7 +24,7 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -59,7 +59,7 @@ func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (
 type JobManagerListener struct{}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *google_protobuf.Empty, err error) {
+func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot stop job").ToGRPCStatus()
@@ -125,7 +125,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 }
 
 // List running process
-func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *pb.JobList, err error) {
+func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *protocol.JobList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list jobs").ToGRPCStatus()
@@ -173,12 +173,12 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 
 	// handler := JobManagerHandler(tenant.Service)
 	jobMap := server.ListJobs()
-	var pbProcessList []*pb.JobDefinition
+	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {
 		if task.Aborted() {
 			return nil, scerr.AbortedError("aborted", nil)
 		}
-		pbProcessList = append(pbProcessList, &pb.JobDefinition{Uuid: uuid, Info: info})
+		pbProcessList = append(pbProcessList, &protocol.JobDefinition{Uuid: uuid, Info: info})
 	}
-	return &pb.JobList{List: pbProcessList}, nil
+	return &protocol.JobList{List: pbProcessList}, nil
 }

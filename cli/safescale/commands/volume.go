@@ -22,9 +22,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -139,7 +139,7 @@ var volumeCreate = cli.Command{
 		}
 
 		speed := c.String("speed")
-		volSpeed, ok := pb.VolumeSpeed_value[speed]
+		volSpeed, ok := protocol.VolumeSpeed_value[speed]
 		if !ok {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
 		}
@@ -147,10 +147,10 @@ var volumeCreate = cli.Command{
 		if volSize <= 0 {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize)))
 		}
-		def := pb.VolumeDefinition{
+		def := protocol.VolumeDefinition{
 			Name:  c.Args().First(),
 			Size:  volSize,
-			Speed: pb.VolumeSpeed(volSpeed),
+			Speed: protocol.VolumeSpeed(volSpeed),
 		}
 
 		volume, err := client.New().Volume.Create(def, temporal.GetExecutionTimeout())
@@ -169,7 +169,7 @@ var volumeAttach = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultVolumeMountPoint,
+			Value: abstracts.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
 		cli.StringFlag{
@@ -188,12 +188,12 @@ var volumeAttach = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		}
-		def := pb.VolumeAttachment{
+		def := protocol.VolumeAttachment{
 			Format:      c.String("format"),
 			DoNotFormat: c.Bool("do-not-format"),
 			MountPath:   c.String("path"),
-			Host:        &pb.Reference{Name: c.Args().Get(1)},
-			Volume:      &pb.Reference{Name: c.Args().Get(0)},
+			Host:        &protocol.Reference{Name: c.Args().Get(1)},
+			Volume:      &protocol.Reference{Name: c.Args().Get(0)},
 		}
 		err := client.New().Volume.Attach(def, temporal.GetExecutionTimeout())
 		if err != nil {
@@ -242,11 +242,11 @@ type volumeDisplayable struct {
 	Size  int32
 }
 
-func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
+func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInfo) *volumeInfoDisplayable {
 	return &volumeInfoDisplayable{
 		volumeInfo.GetId(),
 		volumeInfo.GetName(),
-		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 		srvutils.GetReference(volumeInfo.GetHost()),
 		volumeInfo.GetMountPath(),
@@ -255,11 +255,11 @@ func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
 	}
 }
 
-func toDisplaybleVolume(volumeInfo *pb.Volume) *volumeDisplayable {
+func toDisplayableVolume(volumeInfo *protocol.Volume) *volumeDisplayable {
 	return &volumeDisplayable{
 		volumeInfo.GetId(),
 		volumeInfo.GetName(),
-		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 	}
 }
@@ -267,7 +267,7 @@ func toDisplaybleVolume(volumeInfo *pb.Volume) *volumeDisplayable {
 func getAllowedSpeeds() string {
 	speeds := ""
 	i := 0
-	for k := range pb.VolumeSpeed_value {
+	for k := range protocol.VolumeSpeed_value {
 		if i > 0 {
 			speeds += ", "
 		}

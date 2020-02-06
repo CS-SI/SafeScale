@@ -23,17 +23,17 @@ import (
 
 	"github.com/asaskevich/govalidator"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	filters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstracts/filters/templates"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 )
 
 type gpuCfg struct {
@@ -61,7 +61,7 @@ var gpuMap = map[string]gpuCfg{
 }
 
 var (
-	identityEndpoint = "https://auth.cloud.ovh.net/v2.0"
+	identityEndpoint = "https://auth.cloud.ovh.net/v3"
 	externalNetwork  = "Ext-Net"
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
 )
@@ -113,12 +113,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		alternateAPIConsumerKey = val3.(string)
 	}
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstracts.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
-			log.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			operatorUsername = abstracts.DefaultUser
 		}
 	}
 
@@ -253,7 +253,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (p *provider) GetTemplate(id string) (*abstracts.HostTemplate, error) {
 	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -261,26 +261,7 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return tpl, err
 }
 
-func addGPUCfg(tpl *resources.HostTemplate) {
-	var gpuMap = map[string]gpuCfg{
-		"g2-15": gpuCfg{
-			GPUNumber: 1,
-			GPUType:   "NVIDIA 1070",
-		},
-		"g2-30": gpuCfg{
-			GPUNumber: 1,
-			GPUType:   "NVIDIA 1070",
-		},
-		"g3-120": gpuCfg{
-			GPUNumber: 3,
-			GPUType:   "NVIDIA 1080 TI",
-		},
-		"g3-30": gpuCfg{
-			GPUNumber: 1,
-			GPUType:   "NVIDIA 1080 TI",
-		},
-	}
-
+func addGPUCfg(tpl *abstracts.HostTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -288,12 +269,12 @@ func addGPUCfg(tpl *resources.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -308,7 +289,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	// check flavor disponibilities through OVH-API
 	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
-		log.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
+		logrus.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
 		return allTemplates, nil
 	}
 	service := authOpts.GetString("TenantID")
@@ -317,7 +298,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, err := p.requestOVHAPI(restURL, "GET")
 	if err != nil {
-		log.Warnf("Unable to request OVH API, flavors availability won't be checked: %v", err)
+		logrus.Warnf("Unable to request OVH API, flavors availability won't be checked: %v", err)
 		return allTemplates, nil
 	}
 
@@ -329,12 +310,12 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		}
 	}
 
-	var listAvailableTemplates []resources.HostTemplate
+	var listAvailableTemplates []abstracts.HostTemplate
 	for _, template := range allTemplates {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)
 		} else {
-			log.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
+			logrus.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
 		}
 	}
 	allTemplates = listAvailableTemplates
@@ -342,16 +323,16 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	return allTemplates, nil
 }
 
-func isWindowsTemplate(t resources.HostTemplate) bool {
+func isWindowsTemplate(t abstracts.HostTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
 
-func isFlexTemplate(t resources.HostTemplate) bool {
+func isFlexTemplate(t abstracts.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (p *provider) CreateNetwork(req abstracts.NetworkRequest) (*abstracts.Network, error) {
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
 	if len(req.DNSServers) == 0 {

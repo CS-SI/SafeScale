@@ -18,17 +18,18 @@ package huaweicloud
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 
-	gc "github.com/gophercloud/gophercloud"
+	"github.com/sirupsen/logrus"
+
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // // DeleteVolume deletes the volume identified by id
@@ -83,7 +84,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 }
 
 // CreateVolume creates a block volume
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (s *Stack) CreateVolume(request abstracts.VolumeRequest) (*abstracts.Volume, error) {
 	volume, err := s.GetVolume(request.Name)
 	if volume != nil && err == nil {
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
@@ -103,7 +104,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	if err != nil {
 		return nil, fmt.Errorf("error creating volume : %s", openstack.ProviderErrorToString(err))
 	}
-	v := resources.Volume{
+	v := abstracts.Volume{
 		ID:    vol.ID,
 		Name:  vol.Name,
 		Size:  vol.Size,
@@ -115,17 +116,17 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 
 // GetVolume returns the volume identified by id
 // If volume not found, returns (nil, nil) - TODO: returns utils.ErrNotFound
-func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
+func (s *Stack) GetVolume(id string) (*abstracts.Volume, error) {
 	r := volumes.Get(s.Stack.VolumeClient, id)
 	volume, err := r.Extract()
 	if err != nil {
-		if _, ok := err.(gc.ErrDefault404); ok {
-			return nil, resources.ResourceNotFoundError("volume", id)
+		if _, ok := err.(gophercloud.ErrDefault404); ok {
+			return nil, abstracts.ResourceNotFoundError("volume", id)
 		}
 		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}
 
-	av := resources.Volume{
+	av := abstracts.Volume{
 		ID:    volume.ID,
 		Name:  volume.Name,
 		Size:  volume.Size,
@@ -136,16 +137,16 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 }
 
 // ListVolumes lists volumes
-func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	var vs []resources.Volume
+func (s *Stack) ListVolumes() ([]abstracts.Volume, error) {
+	var vs []abstracts.Volume
 	err := volumes.List(s.Stack.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
 		if err != nil {
-			log.Errorf("Error listing volumes: volume extraction: %+v", err)
+			logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
 			return false, err
 		}
 		for _, vol := range list {
-			av := resources.Volume{
+			av := abstracts.Volume{
 				ID:    vol.ID,
 				Name:  vol.Name,
 				Size:  vol.Size,
@@ -160,23 +161,23 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		if err != nil {
 			return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)))
 		}
-		log.Warnf("Complete volume list empty")
+		logrus.Warnf("Complete volume list empty")
 	}
 	return vs, nil
 }
 
 // CreateVolumeAttachment attaches a volume to an host
-func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstracts.VolumeAttachmentRequest) (string, error) {
 	return s.Stack.CreateVolumeAttachment(request)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstracts.VolumeAttachment, error) {
 	return s.Stack.GetVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstracts.VolumeAttachment, error) {
 	return s.Stack.ListVolumeAttachments(serverID)
 }
 

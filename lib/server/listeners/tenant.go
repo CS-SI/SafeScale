@@ -24,7 +24,7 @@ import (
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -67,7 +67,7 @@ func getCurrentTenant() *Tenant {
 type TenantListener struct{}
 
 // List registered tenants
-func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantList, err error) {
+func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list tenants").ToGRPCStatus()
@@ -104,19 +104,19 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 		return nil, err
 	}
 
-	var list []*pb.Tenant
+	var list []*protocol.Tenant
 	for tenantName, providerName := range tenants {
-		list = append(list, &pb.Tenant{
+		list = append(list, &protocol.Tenant{
 			Name:     tenantName,
 			Provider: providerName,
 		})
 	}
 
-	return &pb.TenantList{Tenants: list}, nil
+	return &protocol.TenantList{Tenants: list}, nil
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantName, err error) {
+func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantName, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot get tenant").ToGRPCStatus()
@@ -152,7 +152,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	if currentTenant == nil {
 		return nil, scerr.NotFoundError("no tenant set")
 	}
-	return &pb.TenantName{Name: currentTenant.name}, nil
+	return &protocol.TenantName{Name: currentTenant.name}, nil
 }
 
 // Set the the tenant to use for each command
@@ -246,7 +246,7 @@ func getCurrentStorageTenants() *StorageTenants {
 
 
 // StorageList lists registered storage tenants
-func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantList, err error) {
+func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
 	}
@@ -276,12 +276,12 @@ func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Emp
 		return nil, scerr.Wrap(err, "cannot list storage tenants").ToGRPCStatus()
 	}
 
-	var tenantList []*pb.Tenant
+	var tenantList []*protocol.Tenant
 	for _, tenant := range tenants {
 		tenantCast, ok := tenant.(map[string]interface{})
 		if ok {
 			if _, ok := tenantCast["objectstorage"]; ok {
-				tenantList = append(tenantList, &pb.Tenant{
+				tenantList = append(tenantList, &protocol.Tenant{
 					Name:     tenantCast["name"].(string),
 					Provider: tenantCast["client"].(string),
 				})
@@ -289,11 +289,11 @@ func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Emp
 		}
 	}
 
-	return &pb.TenantList{Tenants: tenantList}, nil
+	return &protocol.TenantList{Tenants: tenantList}, nil
 }
 
 // StorageGet returns the name of the current storage tenants used for data related commands
-func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empty) (_ *pb.TenantNameList, err error) {
+func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantNameList, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
 	}
@@ -325,11 +325,11 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empt
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
-	return &pb.TenantNameList{Names: currentStorageTenants.names}, nil
+	return &protocol.TenantNameList{Names: currentStorageTenants.names}, nil
 }
 
 // StorageSet set the tenants to use for data related commands
-func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) (empty *googleprotobuf.Empty, err error) {
+func (s *TenantListener) StorageSet(ctx context.Context, in *protocol.TenantNameList) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError().ToGRPCStatus()

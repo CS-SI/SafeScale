@@ -20,15 +20,16 @@ package local
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 )
 
 // provider is the provider implementation of the local provider
@@ -94,19 +95,19 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	compute, _ := params["compute"].(map[string]interface{})
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstracts.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			operatorUsername = abstracts.DefaultUser
 		}
 	}
 	config.OperatorUsername = operatorUsername
 
 	uri, found := compute["uri"].(string)
 	if !found {
-		return nil, fmt.Errorf("uri is not set")
+		return nil, fmt.Errorf("URI is not set")
 	}
 	imagesJSONPath, found := compute["imagesJSONPath"].(string)
 	if !found {
@@ -141,14 +142,14 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 // GetAuthOpts returns authentication options as a Config
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
-	cfg := resources.ConfigMap{}
+	cfg := abstracts.ConfigMap{}
 	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
-	config := resources.ConfigMap{}
+	config := abstracts.ConfigMap{}
 
 	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
 	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
@@ -164,12 +165,12 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates ...
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 	return p.Stack.ListTemplates()
 }
 

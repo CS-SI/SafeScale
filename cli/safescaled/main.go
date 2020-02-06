@@ -33,7 +33,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/listeners"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
@@ -93,17 +93,17 @@ func work() {
 	s := grpc.NewServer()
 
 	logrus.Infoln("Registering services")
-	pb.RegisterBucketServiceServer(s, &listeners.BucketListener{})
+	protocol.RegisterBucketServiceServer(s, &listeners.BucketListener{})
 	// pb.RegisterDataServiceServer(s, &listeners.DataListener{})
-	pb.RegisterHostServiceServer(s, &listeners.HostListener{})
-	pb.RegisterImageServiceServer(s, &listeners.ImageListener{})
-	pb.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
-	pb.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
-	pb.RegisterShareServiceServer(s, &listeners.ShareListener{})
-	pb.RegisterSshServiceServer(s, &listeners.SSHListener{})
-	pb.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
-	pb.RegisterTenantServiceServer(s, &listeners.TenantListener{})
-	pb.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
+	protocol.RegisterHostServiceServer(s, &listeners.HostListener{})
+	protocol.RegisterImageServiceServer(s, &listeners.ImageListener{})
+	protocol.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
+	protocol.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
+	protocol.RegisterShareServiceServer(s, &listeners.ShareListener{})
+	protocol.RegisterSshServiceServer(s, &listeners.SSHListener{})
+	protocol.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
+	protocol.RegisterTenantServiceServer(s, &listeners.TenantListener{})
+	protocol.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
 
 	// log.Println("Initializing service factory")
 	// commands.InitServiceFactory()

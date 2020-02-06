@@ -22,7 +22,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -35,7 +35,7 @@ import (
 type ImageListener struct{}
 
 // List available images
-func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *pb.ImageList, err error) {
+func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list image").ToGRPCStatus()
@@ -75,11 +75,11 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (_ *p
 		return nil, err
 	}
 
-	// Map resources.Image to pb.Image
-	var pbImages []*pb.Image
+	// Build response mapping abstracts.Image to protocol.Image
+	var pbImages []*protocol.Image
 	for _, image := range images {
 		pbImages = append(pbImages, conv.ToPBImage(&image))
 	}
-	rv := &pb.ImageList{Images: pbImages}
+	rv := &protocol.ImageList{Images: pbImages}
 	return rv, nil
 }

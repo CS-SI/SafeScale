@@ -18,9 +18,10 @@ package ovh
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/ovh/go-ovh/ovh"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, error) {

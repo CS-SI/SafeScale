@@ -18,10 +18,12 @@ package utils
 
 import (
 	"fmt"
-	pb "github.com/CS-SI/SafeScale/lib"
-	"google.golang.org/grpc"
 	"log"
 	"strings"
+
+	"google.golang.org/grpc"
+
+	"github.com/CS-SI/SafeScale/lib/protocol"
 )
 
 // GetConnection returns a connection to GRPC server
@@ -36,8 +38,8 @@ func GetConnection(host string, port int) *grpc.ClientConn {
 	return conn
 }
 
-// GetReference return a reference from the name or id given in the pb.Reference
-func GetReference(in *pb.Reference) string {
+// GetReference return a reference from the name or id given in the protocol.Reference
+func GetReference(in *protocol.Reference) string {
 	var ref string
 	name := in.GetName()
 	if strings.TrimSpace(name) != "" {

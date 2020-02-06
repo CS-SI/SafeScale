@@ -23,8 +23,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 )
 
 // ListOpts to define parameter of list
@@ -178,7 +178,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 	if found {
 		return &fip, nil
 	}
-	return nil, resources.ResourceNotFoundError("Floating IP", ipAddress)
+	return nil, abstracts.ResourceNotFoundError("Floating IP", ipAddress)
 }
 
 // CreateFloatingIP creates a floating IP
@@ -236,7 +236,7 @@ func (s *Stack) DeleteFloatingIP(id string) error {
 }
 
 // AssociateFloatingIP to host
-func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
+func (s *Stack) AssociateFloatingIP(host *abstracts.Host, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
 		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
@@ -258,7 +258,7 @@ func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
 }
 
 // DissociateFloatingIP from host
-func (s *Stack) DissociateFloatingIP(host *resources.Host, id string) error {
+func (s *Stack) DissociateFloatingIP(host *abstracts.Host, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
 		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))

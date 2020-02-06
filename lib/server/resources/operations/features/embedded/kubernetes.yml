@@ -1,0 +1,511 @@
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: all
+
+    requirements:
+        features:
+            - docker
+
+        # "clusterSizing" not honored currently
+        clusterSizing:
+            dcos:
+                small:
+                    nodes: "count >= 2, cpu >= 2"   # 1 master, 1 node
+                normal:
+                    nodes: "count >= 4, cpu >= 2"   # 3 masters, 1 node
+                large:
+                    nodes: "count >= 6, cpu >= 2 "  # 3 masters, 3 nodes
+            boh:
+                small:
+                    masters: "count >= 1, cpu >= 2"
+                    nodes:   "count >= 1, cpu >= 2"
+                normal:
+                    masters: "count >= 3, cpu >= 2"
+                    nodes:   "count >= 1, cpu >= 2"
+                large:
+                    masters: "count >= 3, cpu >= 2"
+                    nodes:   "count >= 3, cpu >= 2"
+            k8s:
+                small:
+                    masters: "cpu >= 2"
+                    nodes:   "cpu >= 2"
+                normal:
+                    masters: "count >= 3, cpu >= 2"
+                    nodes:   "count >= 3, cpu >= 2"
+                large:
+                    masters: "count >= 5, cpu >= 2"
+                    nodes:   "count >= 8, cpu >= 2"
+
+    parameters:
+        - AllowPodsOnMasters=false
+        - CNI=flannel
+        - Dashboard=true
+
+    install:
+        dcos:
+            check:
+                pace: deploy
+                steps:
+                    deploy:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos kubernetes &>/dev/null
+
+            add:
+                #pace: package,cli+config
+                pace: package,cli,config
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        options:
+                            small: |
+                                {
+                                    "kubernetes": {
+                                        "node_count": 1,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
+                            normal: |
+                                {
+                                    "kubernetes": {
+                                        "high_availability": true,
+                                        "node_count": 1,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
+                            large: |
+                                {
+                                    "kubernetes": {
+                                        "high_availability": true,
+                                        "node_count": 3,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
+                        run: |
+                            op=-1
+                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1) && op=$? || true
+                            [ $op -ne 0 ] && {
+                                echo $output
+                                echo $output | grep "already installed" &>/dev/null || sfFail $op
+                            }
+                            sfExit
+
+                    cli:
+                        targets:
+                            masters: all
+                        run: |
+                            sfDcos package install --yes kubernetes --cli
+                            sfExit
+
+                    config:
+                        targets:
+                            masters: all
+                        run: |
+                            sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || sfFail 192
+                            sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
+                            sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
+                            sfExit
+
+            remove:
+                pace: package
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos package remove --yes kubernetes || sfFail 192
+                            sfExit
+
+        bash:
+            check:
+                pace: kubectl,nodes
+                steps:
+                    kubectl:
+                        targets:
+                            masters: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && [ $(sfKubectl get nodes &>/dev/null | wc -l) -gt 1 ]
+
+                    nodes:
+                        targets:
+                            nodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
+
+            add:
+                # pace: cp-dir,common-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
+                pace: sysconf,common-tools,reverseproxy,cp1-init,cni,cpx-init,join,final
+                steps:
+                    common-tools:
+                        targets:
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
+                            case $(sfGetFact "linux_kind") in
+                                debian|ubuntu)
+                                    curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+                                    cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
+                            deb https://apt.kubernetes.io/ kubernetes-xenial main
+                            EOF
+                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 192
+                                    apt-mark hold kubelet kubeadm kubectl
+                                    ;;
+
+                                centos|redhat)
+                                    cat >/etc/yum.repos.d/kubernetes.repo <<-EOF
+                            [kubernetes]
+                            name=Kubernetes
+                            baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+                            enabled=1
+                            gpgcheck=1
+                            repo_gpgcheck=1
+                            gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+                            exclude=kube*
+                            EOF
+
+                                    yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 192
+                                    ;;
+
+                                *) echo "unsupported linux distribution ''"
+                                   sfFail 193
+                            esac
+                            sfService enable kubelet && sfService start kubelet
+                            sfExit
+
+                    sysconf:
+                        targets:
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt
+                                    sfRetry 5m 5 sfApt install -y ebtables socat || sfFail 194
+                                    ;;
+                                redhat|centos)
+                                    sfRetry 5m 5 yum install -y ebtables socat || sfFail 195
+                                    cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
+                            net.bridge.bridge-nf-call-ip6tables = 1
+                            net.bridge.bridge-nf-call-iptables = 1
+                            EOF
+                                    modprobe br_netfilter &>/dev/null
+                                    sysctl --system
+
+                                    # Set SELinux in permissive mode (effectively disabling it)
+                                    if [[ -n $(command -v getenforce) ]]; then
+                                        act=0
+                                        getenforce | grep "Disabled" || act=1
+                                        if [ $act -eq 1 ]; then
+                                            if [[ -n $(command -v setenforce) ]]; then
+                                                setenforce 0 || sfFail 201 "Error setting selinux in Permissive mode"
+                                                sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+                                            fi
+                                        fi
+                                    fi
+                                    ;;
+                                *)
+                                    echo "Unmanaged Linux distribution '$LINUX_KIND'"
+                                    sfFail 196
+                                    ;;
+                            esac
+
+                            echo "# IPVS modules used by Kubernetes" >>/etc/modules
+                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4; do
+                                echo $i >>/etc/modules
+                                modprobe $i
+                            done
+
+                            echo "net.ipv4.ip_forward=1" >>/etc/sysctl.d/99-sysctl.conf
+                            sysctl --system
+
+                            # Disable swap if enabled
+                            op=-1
+                            SWAPS=$(grep "swap[[:space:]]*sw[[:space:]]*" /etc/fstab | column -t | cut -d' ' -f1) && op=$? || true
+                            if [ $op -eq 0 ]; then
+                                cp /etc/fstab /etc/fstab.before_swap_disable
+                                for s in $SWAPS; do
+                                    swapoff $s &>/dev/null
+                                    grep -v "$s" /etc/fstab >>/etc/fstab.new && mv /etc/fstab.new /etc/fstab
+                                done
+                            fi
+                            sfExit
+
+                    reverseproxy:
+                        targets:
+                            gateways: all
+                        run: |
+                            if [ -d ${SF_ETCDIR}/edgeproxy4network ]; then
+                                TARGET_DIR=${SF_ETCDIR}/edgeproxy4network
+                            elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
+                                TARGET_DIR=${SF_ETCDIR}/kong4gateway
+                            fi
+                            [ -z "${TARGET_DIR+x}" ] && sfFail 197
+
+                            cat >${TARGET_DIR}/includes/kubernetes.conf <<-'EOF'
+                            upstream kubernetes-api-cluster {
+                                {{range .MasterIPs}}server {{.}}:6443;
+                                {{end}}
+                            }
+
+                            server {
+                                listen 6443;
+                                proxy_pass kubernetes-api-cluster;
+                            }
+                            EOF
+                            sfReverseProxyReload
+                            sfExit
+
+                    cp1-init:
+                        targets:
+                            masters: one
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
+                            mkdir -p /etc/kubernetes/kubeadm
+                            cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-'EOF'
+                            apiVersion: kubeadm.k8s.io/v1beta1
+                            kind: ClusterConfiguration
+                            kubernetesVersion: stable
+                            controlPlaneEndpoint: "{{.DefaultRouteIP}}:6443"
+                            networking:
+                                podSubnet: 10.244.0.0/16
+                            EOF
+
+                            # if [ "$(sfGetFact "redhat_like")" == "1" ]; then
+                            #     cat >/etc/sysconfig/kubelet <<-EOF
+                            # KUBELET_EXTRA_ARGS="--hostname-override {{ .HostIP }}
+                            # EOF
+                            # fi
+
+                            sfRetry 5m 5 kubeadm config images pull || sfFail 198
+                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 199
+                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 200
+                            cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1) || sfFail 201
+
+                            cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
+                            mkdir -p ~{{.Username}}/.kube
+                            cp -f /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
+                            chmod -R go-rwx ~{{.Username}}/.kube
+                            EOF
+
+                            # execute init_cluster_admin_kube.sh on the current master
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 202
+                            # Starting from here, any kubectl command must be changed to sfKubectl
+
+                            # Push control-plane join command to all the other masters
+                            echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
+                            cat ${SF_TMPDIR}/cp_join_cmd.sh
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 203
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 204
+                            for ip in {{range .MasterIPs}}{{.}} {{end}}; do
+                                [ "$ip" = "{{.HostIP}}" ] && continue
+                                sfDropzoneSync $ip || sfFail 205
+                            done
+                            rm ${SF_TMPDIR}/cp_join_cmd.sh ${SF_TMPDIR}/init_cluster_admin_kube.sh
+                            sfDropzoneClean
+
+                            # waits availability of key pods
+
+                            set -u -o pipefail
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 206
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 207
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 208
+
+                            touch /etc/kubernetes/.joined
+                            echo "init done"
+                            sfExit
+
+                    cni:
+                        targets:
+                            masters: one
+                        run: |
+                            case {{.CNI}} in
+                                flannel)
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 209
+
+                                    sfFirewallAdd --zone=trusted --add-interface=flannel.1
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    ;;
+                                calico) # Untested yet...
+                                    sfKubectl apply -f https://gist.githubusercontent.com/joshrosso/ed1f5ea5a2f47d86f536e9eee3f1a2c2/raw/dfd95b9230fb3f75543706f3a95989964f36b154/calico-3.5.yaml || sfFail 210
+                                    ;;
+                                canal) # Untested yet...
+                                    sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || sfFail 211
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    ;;
+                            esac
+                            sfExit 0
+
+                    cpx-init:
+                        targets:
+                            masters: all
+                        run: |
+                            # Don't try to init a kubernetes cluster already running
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 212
+                            sfDropzoneClean
+
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 213
+                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 215
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 215
+                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 216
+
+                            # waits availability of key pods
+                            set -u -o pipefail
+                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 217
+                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || sfFail 218
+                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 219
+
+                            # Configure firewall
+                            case {{.CNI}} in
+                                flannel)
+                                    sfFirewallAdd --zone=trusted --add-interface=flannel.1
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    ;;
+                                canal)
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                                    ;;
+                            esac
+                            sfExit
+
+                    join:
+                        targets:
+                            nodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
+                            MASTERIP=
+                            for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
+                                op=-1
+                                NODE_JOIN_CMD=$(sfRemoteExec $m kubeadm token create --print-join-command) && op=$? || true
+                                [ $op -ne 0 ] && continue
+                                NODE_JOIN_CMD=$(echo $NODE_JOIN_CMD | head -1)
+                                MASTERIP=$m
+                                break
+                            done
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 220
+                            eval $NODE_JOIN_CMD || sfFail 221
+                            touch /etc/kubernetes/.joined
+                            sfExit
+
+                    final:
+                        targets:
+                            masters: one
+                        run: |
+                            # Allows pods to start on master if there is only one master or if it's explicitely requested
+                            [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
+                            # adds Kubernetes Dashboard
+                            if [ "{{.Dashboard}}" = "true" ]; then
+                                if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
+                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                else
+                                    if curl --output /dev/null --silent --head --sfFail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
+                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                    fi
+                                fi
+                            fi
+
+                            # cat <<EOF | kubectl apply -f -
+                            # apiVersion: v1
+                            # kind: ServiceAccount
+                            # metadata:
+                            #   name: {{ .ClusterAdminUsername }}
+                            #   namespace: kube-system
+                            # ---
+                            # apiVersion: rbac.authorization.k8s.io/v1
+                            # kind: ClusterRoleBinding
+                            # metadata:
+                            #   name: {{ .ClusterAdminUsername }}
+                            # roleRef:
+                            #   apiGroup: rbac.authorization.k8s.io
+                            #   kind: ClusterRole
+                            #   name: cluster-admin
+                            # subjects:
+                            #   - kind: ServiceAccount
+                            #     name: {{ .ClusterAdminUsername }}
+                            #     namespace: kube-system
+                            # EOF
+                            sfExit
+
+            remove:
+                pace: node,reset,reverseproxy,clean
+                steps:
+                    node:
+                        targets:
+                            masters: one
+                        run: |
+                            sfKubectl drain {{.Hostname}} --delete-local-data --force --ignore-daemonsets
+                            sfKubectl delete node {{.Hostname}}
+
+                    reverseproxy:
+                        targets:
+                            gateways: all
+                        run: |
+                            rm -f ${SF_ETCDIR}/kong4gateway/includes/kubernetes.conf
+                            sfReverseProxyReload
+
+                    reset:
+                        targets:
+                            masters: all
+                            nodes: all
+                        run: |
+                            kubeadm reset -f
+
+                    clean:
+                        targets:
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 223 "failure purging kubernetes"
+                                    ;;
+                                redhat|centos)
+                                    yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
+                                    ;;
+                            esac
+                            sfFirewallReload || sfFail 204 "Firewall problem"
+                            rm -f /etc/kubernetes/.joined
+                            sfExit
+
+...

@@ -19,20 +19,21 @@ package objectstorage
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"io"
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/graymeta/stow"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	// necessary for connect
 	// _ "github.com/graymeta/stow/azure"
 	_ "github.com/graymeta/stow/google"
 	_ "github.com/graymeta/stow/s3"
 	_ "github.com/graymeta/stow/swift"
+
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // object implementation of Object interface
@@ -147,7 +148,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 	defer func() {
 		clerr := source.Close()
 		if clerr != nil {
-			log.Error("Error closing item")
+			logrus.Error("Error closing item")
 		}
 	}()
 
@@ -159,13 +160,13 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 	} else {
 		buf := make([]byte, seekTo)
 		if _, err := io.ReadAtLeast(source, buf, int(seekTo)); err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 
 		bufbis := make([]byte, length)
 		if _, err := io.ReadAtLeast(source, bufbis, int(length)); err != nil {
-			log.Println("error ")
-			log.Fatal(err)
+			logrus.Println("error ")
+			logrus.Fatal(err)
 		}
 
 		readerbis := bytes.NewReader(bufbis)
@@ -241,7 +242,7 @@ func writeChunk(
 	nBytesRead, err := source.Read(buf)
 	if err == io.EOF {
 		msg := fmt.Sprintf("failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
-		log.Errorf(msg)
+		logrus.Errorf(msg)
 		return fmt.Errorf(msg)
 	}
 	r := bytes.NewReader(buf)
@@ -251,7 +252,7 @@ func writeChunk(
 	if err != nil {
 		return err
 	}
-	log.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
+	logrus.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
 	return err
 }
 

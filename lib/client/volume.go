@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
@@ -33,30 +33,30 @@ type volume struct {
 }
 
 // List ...
-func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
+func (v *volume) List(all bool, timeout time.Duration) (*protocol.VolumeList, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
-	service := pb.NewVolumeServiceClient(v.session.connection)
+	service := protocol.NewVolumeServiceClient(v.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.List(ctx, &pb.VolumeListRequest{All: all})
+	return service.List(ctx, &protocol.VolumeListRequest{All: all})
 
 }
 
 // Inspect ...
-func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, error) {
+func (v *volume) Inspect(name string, timeout time.Duration) (*protocol.VolumeInfo, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
-	service := pb.NewVolumeServiceClient(v.session.connection)
+	service := protocol.NewVolumeServiceClient(v.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.Inspect(ctx, &pb.Reference{Name: name})
+	return service.Inspect(ctx, &protocol.Reference{Name: name})
 
 }
 
@@ -64,7 +64,7 @@ func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, er
 func (v *volume) Delete(names []string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
-	service := pb.NewVolumeServiceClient(v.session.connection)
+	service := protocol.NewVolumeServiceClient(v.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 	volumeDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
+		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
 
 		if err != nil {
 			mutex.Lock()
@@ -101,10 +101,10 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 }
 
 // Create ...
-func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
+func (v *volume) Create(def protocol.VolumeDefinition, timeout time.Duration) (*protocol.Volume, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
-	service := pb.NewVolumeServiceClient(v.session.connection)
+	service := protocol.NewVolumeServiceClient(v.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
@@ -115,10 +115,10 @@ func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Vol
 }
 
 // Attach ...
-func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
+func (v *volume) Attach(def protocol.VolumeAttachment, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
-	service := pb.NewVolumeServiceClient(v.session.connection)
+	service := protocol.NewVolumeServiceClient(v.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -133,15 +133,15 @@ func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 func (v *volume) Detach(volumeName string, hostName string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
-	service := pb.NewVolumeServiceClient(v.session.connection)
+	service := protocol.NewVolumeServiceClient(v.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Detach(ctx, &pb.VolumeDetachment{
-		Volume: &pb.Reference{Name: volumeName},
-		Host:   &pb.Reference{Name: hostName},
+	_, err = service.Detach(ctx, &protocol.VolumeDetachment{
+		Volume: &protocol.Reference{Name: volumeName},
+		Host:   &protocol.Reference{Name: hostName},
 	})
 	return err
 }

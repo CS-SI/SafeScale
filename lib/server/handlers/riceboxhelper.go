@@ -20,13 +20,12 @@ import (
 	"bytes"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	rice "github.com/GeertJohan/go.rice"
+
+	"github.com/CS-SI/SafeScale/lib/server"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //go:generate rice embed-go

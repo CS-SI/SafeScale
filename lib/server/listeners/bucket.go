@@ -22,12 +22,10 @@ import (
 
 	"github.com/asaskevich/govalidator"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -44,7 +42,7 @@ import (
 type BucketListener struct{}
 
 // List available buckets
-func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *pb.BucketList, err error) {
+func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (bl *protocol.BucketList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list buckets").ToGRPCStatus()
@@ -85,7 +83,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 }
 
 // Create a new bucket
-func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *google_protobuf.Empty, err error) {
+func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot create bucket").ToGRPCStatus()
@@ -131,7 +129,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *google_protobuf.Empty, err error) {
+func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot delete bucket").ToGRPCStatus()
@@ -177,7 +175,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 }
 
 // Inspect a bucket
-func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.BucketMountingPoint, err error) {
+func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *protocol.BucketMountingPoint, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot inspect bucket").ToGRPCStatus()
@@ -225,7 +223,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (_ *pb.Buck
 }
 
 // Mount a bucket on the filesystem of the host
-func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
+func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot mount bucket").ToGRPCStatus()
@@ -271,7 +269,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 }
 
 // Unmount a bucket from the filesystem of the host
-func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
+func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountingPoint) (empty *google_protobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot unmount bucket").ToGRPCStatus()

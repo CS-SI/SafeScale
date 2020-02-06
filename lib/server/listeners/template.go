@@ -22,7 +22,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -35,7 +35,7 @@ import (
 type TemplateListener struct{}
 
 // List available templates
-func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (tl *pb.TemplateList, err error) {
+func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (tl *protocol.TemplateList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list templates").ToGRPCStatus()
@@ -73,11 +73,11 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 		return nil, err
 	}
 
-	// Map resources.Host to pb.Host
-	var pbTemplates []*pb.HostTemplate
+	// Build response mapping resources.Host to protocol.Host
+	var pbTemplates []*protocol.HostTemplate
 	for _, template := range templates {
 		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))
 	}
-	rv := &pb.TemplateList{Templates: pbTemplates}
+	rv := &protocol.TemplateList{Templates: pbTemplates}
 	return rv, nil
 }

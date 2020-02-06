@@ -19,9 +19,10 @@ package client
 import (
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // tenant is the part of safescale client handling tenants
@@ -31,10 +32,10 @@ type tenant struct {
 }
 
 // List ...
-func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
+func (t *tenant) List(timeout time.Duration) (*protocol.TenantList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := pb.NewTenantServiceClient(t.session.connection)
+	service := protocol.NewTenantServiceClient(t.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
@@ -45,10 +46,10 @@ func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
 }
 
 // Get ...
-func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
+func (t *tenant) Get(timeout time.Duration) (*protocol.TenantName, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := pb.NewTenantServiceClient(t.session.connection)
+	service := protocol.NewTenantServiceClient(t.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
@@ -61,52 +62,13 @@ func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
 func (t *tenant) Set(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := pb.NewTenantServiceClient(t.session.connection)
+	service := protocol.NewTenantServiceClient(t.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Set(ctx, &pb.TenantName{Name: name})
+	_, err = service.Set(ctx, &protocol.TenantName{Name: name})
 	return err
 }
 
-// // StorageList ...
-// func (t *tenant) StorageList(timeout time.Duration) (*pb.TenantList, error) {
-// 	t.session.Connect()
-// 	defer t.session.Disconnect()
-// 	service := pb.NewTenantServiceClient(t.session.connection)
-// 	ctx, err := utils.GetContext(true)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return service.StorageList(ctx, &google_protobuf.Empty{})
-// }
-
-// // StorageGet ...
-// func (t *tenant) StorageGet(timeout time.Duration) (*pb.TenantNameList, error) {
-// 	t.session.Connect()
-// 	defer t.session.Disconnect()
-// 	service := pb.NewTenantServiceClient(t.session.connection)
-// 	ctx, err := utils.GetContext(true)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return service.StorageGet(ctx, &google_protobuf.Empty{})
-// }
-
-// // StorageSet ...
-// func (t *tenant) StorageSet(names []string, timeout time.Duration) error {
-// 	t.session.Connect()
-// 	defer t.session.Disconnect()
-// 	service := pb.NewTenantServiceClient(t.session.connection)
-// 	ctx, err := utils.GetContext(true)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	_, err = service.StorageSet(ctx, &pb.TenantNameList{Names: names})
-// 	return err
-// }

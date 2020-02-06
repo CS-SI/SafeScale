@@ -25,19 +25,24 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+
+	"github.com/sirupsen/logrus"
+
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/cluster"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
-	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-	"github.com/CS-SI/SafeScale/lib/server/install"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
+	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -51,7 +56,7 @@ import (
 var (
 	clusterName string
 	// clusterServiceName *string
-	clusterInstance api.Cluster
+	clusterInstance resources.Cluster
 )
 
 var clusterCommandName = "cluster"
@@ -98,7 +103,7 @@ func extractClusterArgument(c *cli.Context) error {
 		}
 
 		var err error
-		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
+		clusterInstance, err = clusterfactory.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			if _, ok := err.(*scerr.ErrNotFound); ok {
@@ -125,7 +130,7 @@ var clusterListCommand = cli.Command{
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
-		list, err := cluster.List()
+		list, err := clusterfactory.List()
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("failed to get cluster list: %v", err)))
@@ -213,7 +218,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	}
 
 	properties := c.GetProperties(concurrency.RootTask())
-	err := properties.LockForRead(property.CompositeV1).ThenUse(func(clonable data.Clonable) error {
+	err := properties.Inspect(property.CompositeV1, func(clonable data.Clonable) error {
 		result["tenant"] = clonable.(*clusterpropsv1.Composite).Tenants[0]
 		return nil
 	})
@@ -237,8 +242,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		result["secondary_public_ip"] = netCfg.SecondaryPublicIP
 		result["public_ip"] = netCfg.EndpointIP // legacy ...
 	}
-	if !properties.Lookup(property.DefaultsV2) {
-		err = properties.LockForRead(property.DefaultsV1).ThenUse(func(clonable data.Clonable) error {
+	if !properties.Lookup(clusterproperty.DefaultsV2) {
+		err = properties.Inspect(property.DefaultsV1, func(clonable data.Clonable) error {
 			defaultsV1, ok := clonable.(*clusterpropsv1.Defaults)
 			if !ok {
 				return fmt.Errorf("invalid metadata")
@@ -251,7 +256,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 			return nil
 		})
 	} else {
-		err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
+		err = properties.Inspect(property.DefaultsV2, func(clonable data.Clonable) error {
 			defaultsV2, ok := clonable.(*clusterpropsv2.Defaults)
 			if !ok {
 				return fmt.Errorf("invalid metadata")
@@ -269,7 +274,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	err = properties.LockForRead(property.NodesV2).ThenUse(func(clonable data.Clonable) error {
+	err = properties.Inspect(property.NodesV2, func(clonable data.Clonable) error {
 		nodesV2, ok := clonable.(*clusterpropsv2.Nodes)
 		if !ok {
 			return fmt.Errorf("invalid metadata")
@@ -283,7 +288,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = properties.LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
+	err = properties.Inspect(property.FeaturesV1, func(clonable data.Clonable) error {
 		result["features"] = clonable.(*clusterpropsv1.Features)
 		return nil
 	})
@@ -291,7 +296,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	err = properties.LockForRead(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+	err = properties.Inspect(property.StateV1, func(clonable data.Clonable) error {
 		state := clonable.(*clusterpropsv1.State).State
 		result["last_state"] = state
 		result["last_state_label"] = state.String()
@@ -361,12 +366,8 @@ var clusterCreateCommand = cli.Command{
 			Usage: "Defines the CIDR of the network to use with cluster",
 		},
 		cli.StringSliceFlag{
-			Name: "disable",
-			Usage: `Allows to disable addition of default features (must be used several times to disable several features)
-	Accepted features are:
-		remotedesktop (all flavors), reverseproxy (all flavors),
-		gateway-failover (all flavors with Normal or Large complexity),
-		hardening (flavor K8S), helm (flavor K8S)`,
+			Name:  "disable",
+			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
 		},
 		cli.StringFlag{
 			Name:  "os",
@@ -401,32 +402,24 @@ var clusterCreateCommand = cli.Command{
 			Usage: `Describe gateway sizing in format "<component><operator><value>[,...] (cf. --sizing for details)`,
 		},
 		cli.StringFlag{
-			Name: "master-sizing",
-			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for common details).
-			<component> accept a supplemental value: "count" to define the count of masters wanted. Only '=' is accepted as <operator> and <value> cannot be less than 1.
-			if --complexity|-C is used and <value> is less than the count implied by the complexity, count will be ignored.
-			example:
-			--master-sizing "count=4, cpu <= 4, ram <= 10, disk = 100"`,
+			Name:  "master-sizing",
+			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
 		cli.StringFlag{
-			Name: "node-sizing",
-			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for common details).
-			<component> accept a supplemental value: "count" to define the count of masters wanted. Only '=' is accepted as <operator> and <value> cannot be less than 1.
-			if --complexity|-C is used and <value> is less than the count implied by the complexity, count will be ignored.
-			example:
-			--node-sizing "count=10, cpu <= 4, ram <= 10, disk = 100"`,
+			Name:  "node-sizing",
+			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
 		cli.UintFlag{
 			Name:  "cpu",
-			Usage: "DEPRECATED! use --sizing and friends instead! Defines the number of cpu of masters and nodes in the cluster",
+			Usage: "DEPRECATED! uses --sizing and friends! Defines the number of cpu of masters and nodes in the cluster",
 		},
 		cli.Float64Flag{
 			Name:  "ram",
-			Usage: "DEPRECATED! use --sizing and friends instead! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
 		cli.UintFlag{
 			Name:  "disk",
-			Usage: "DEPRECATED! use --sizing and friends instead! Defines the size of system disk of masters and nodes (in GB)",
+			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of system disk of masters and nodes (in GB)",
 		},
 	},
 
@@ -438,14 +431,14 @@ var clusterCreateCommand = cli.Command{
 		}
 
 		complexityStr := c.String("complexity")
-		comp, err := complexity.Parse(complexityStr)
+		comp, err := clustercomplexity.Parse(complexityStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --complexity|-C: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
 
 		flavorStr := c.String("flavor")
-		fla, err := flavor.Parse(flavorStr)
+		fla, err := clusterflavor.Parse(flavorStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --flavor|-F: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
@@ -458,15 +451,15 @@ var clusterCreateCommand = cli.Command{
 		disable := c.StringSlice("disable")
 		disableFeatures := map[string]struct{}{}
 		for _, v := range disable {
-			disableFeatures[strings.ToLower(v)] = struct{}{}
+			disableFeatures[v] = struct{}{}
 		}
 
 		los := c.String("os")
 
 		var (
-			gatewaysDef *pb.HostDefinition
-			mastersDef  *pb.HostDefinition
-			nodesDef    *pb.HostDefinition
+			gatewaysDef *protocol.HostDefinition
+			mastersDef  *protocol.HostDefinition
+			nodesDef    *protocol.HostDefinition
 		)
 		if c.IsSet("sizing") {
 			nodesDef, _, err = constructPBHostDefinitionFromCLI(c, "sizing")
@@ -504,9 +497,9 @@ var clusterCreateCommand = cli.Command{
 			gpu := int32(c.Uint("gpu"))
 
 			if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
-				nodesDef = &pb.HostDefinition{
+				nodesDef = &protocol.HostDefinition{
 					ImageId: los,
-					Sizing: &pb.HostSizing{
+					Sizing: &protocol.HostSizing{
 						MinCpuCount: cpu,
 						MaxCpuCount: cpu * 2,
 						MinRamSize:  ram,
@@ -521,7 +514,7 @@ var clusterCreateCommand = cli.Command{
 			}
 		}
 
-		clusterInstance, err := cluster.Create(concurrency.RootTask(), control.Request{
+		clusterInstance, err := cluster.Create(concurrency.RootTask(), resources.ClusterRequest{
 			Name:                    clusterName,
 			Complexity:              comp,
 			CIDR:                    cidr,
@@ -731,7 +724,7 @@ var clusterExpandCommand = cli.Command{
 		los := c.String("os")
 
 		var (
-			nodesDef   *pb.HostDefinition
+			nodesDef   *protocol.HostDefinition
 			nodesCount uint
 		)
 		nodesDef, nodesCount, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
@@ -751,9 +744,9 @@ var clusterExpandCommand = cli.Command{
 				gpu = -1
 			}
 			if cpu > 0 || ram > 0.0 || disk > 0 || gpu >= 1 || los != "" {
-				nodesDef = &pb.HostDefinition{
+				nodesDef = &protocol.HostDefinition{
 					ImageId: los,
-					Sizing: &pb.HostSizing{
+					Sizing: &protocol.HostSizing{
 						MinCpuCount: cpu,
 						MaxCpuCount: cpu * 2,
 						MinRamSize:  ram,
@@ -1094,7 +1087,7 @@ var clusterListFeaturesCommand = cli.Command{
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
-		features, err := install.ListFeatures("cluster")
+		features, err := clusterInstance.ListFeatures()
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
@@ -1132,16 +1125,6 @@ var clusterAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
-		}
-
 		values := data.Map{}
 		params := c.StringSlice("param")
 		for _, k := range params {
@@ -1151,15 +1134,10 @@ var clusterAddFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := install.Settings{}
+		settings := resources.InstallSettings{}
 		settings.SkipProxy = c.Bool("skip-proxy")
 
-		target, err := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(err)
-		}
-		results, err := feature.Add(target, values, settings)
+		results, err := clusterInstance.AddFeature(featureName, values, settings)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error installing feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
@@ -1198,16 +1176,6 @@ var clusterCheckFeatureCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			_, _ = fmt.Fprintln(os.Stderr, err.Error())
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
-		}
 
 		values := data.Map{}
 		params := c.StringSlice("param")
@@ -1218,13 +1186,9 @@ var clusterCheckFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := install.Settings{}
+		settings := resources.InstallSettings{}
 
-		target, err := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		results, err := feature.Check(target, values, settings)
+		results, err := clusterInstance.CheckFeature(concurrency.RootTask(), featureName, values, settings)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s", featureName, clusterName, err.Error())
@@ -1265,15 +1229,6 @@ var clusterDeleteFeatureCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
-		}
 
 		values := data.Map{}
 		params := c.StringSlice("param")
@@ -1284,16 +1239,12 @@ var clusterDeleteFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := install.Settings{}
+		settings := resources.InstallSettings{}
 		// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
 		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 		settings.SkipProxy = true
 
-		target, err := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		results, err := feature.Remove(target, values, settings)
+		results, err := clusterInstance.DeleteFeature(concurrency.RootTask(), featureName, values, settings)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())

@@ -17,18 +17,19 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"path"
+	"reflect"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/metadata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
+	sharefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/share"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -37,29 +38,26 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ShareAPI
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
-// ShareAPI defines API to manipulate Shares
-type ShareAPI interface {
-	Create(string, string, string, []string, bool, bool, bool, bool, bool, bool, bool) (*propsv1.HostShare, error)
-	ForceInspect(string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	Inspect(string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
+// ShareHandler defines API to manipulate Shares
+type ShareHandler interface {
+	Create(string, string, string, []string, bool, bool, bool, bool, bool, bool, bool) (resources.Share, error)
+	Inspect(string) (resources.Share, error)
 	Delete(string) error
-	List() (map[string]map[string]*propsv1.HostShare, error)
-	Mount(string, string, string, bool) (*propsv1.HostRemoteMount, error)
+	List() (map[string]map[string]*propertiesv1.HostShare, error)
+	Mount(string, string, string, bool) (*propertiesv1.HostRemoteMount, error)
 	Unmount(string, string) error
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
-
-// ShareHandler nas service
-type ShareHandler struct {
+// shareHandler nas service
+type shareHandler struct {
 	job server.Job
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(job server.Job) ShareAPI {
-	return &ShareHandler{job: job}
+func NewShareHandler(job server.Job) ShareHandler {
+	return &shareHandler{job: job}
 }
 
 func sanitize(in string) (string, error) {
@@ -71,12 +69,15 @@ func sanitize(in string) (string, error) {
 }
 
 // Create a share on host
-func (handler *ShareHandler) Create(
+func (handler *shareHandler) Create(
 	shareName, hostName, path string, securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
-) (share *propsv1.HostShare, err error) {
+) (share resources.Share, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if shareName == "" {
 		return nil, scerr.InvalidParameterError("shareName", "cannot be empty")
@@ -88,166 +89,21 @@ func (handler *ShareHandler) Create(
 		return nil, scerr.InvalidParameterError("path", "cannot be empty")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	task := handler.job.Task()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	// Check if a share already exists with the same name
-	server, _, _, err := handler.Inspect(shareName)
-	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
-			return nil, err
-		}
-	}
-	if server != nil {
-		return nil, resources.ResourceDuplicateError("share", shareName)
-	}
-
-	// Sanitize path
-	sharePath, err := sanitize(path)
+	objs, err := sharefactory.New(handler.service)
 	if err != nil {
 		return nil, err
 	}
-
-	hostHandler := NewHostHandler(handler.job)
-	server, err = hostHandler.Inspect(hostName)
+	objh, err := hostfactory.Load(task, handler.service, hostName)
 	if err != nil {
 		return nil, err
 	}
-
-	// Check if the path to share isn't a remote mount or contains a remote mount
-	err = server.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
-		serverMountsV1 := clonable.(*propsv1.HostMounts)
-		if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
-			return fmt.Errorf("path to export '%s' is a mounted share", sharePath)
-		}
-		for k := range serverMountsV1.RemoteMountsByPath {
-			if strings.Index(sharePath, k) == 0 {
-				return fmt.Errorf("export path '%s' contains a share mounted in '%s'", sharePath, k)
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Installs NFS Server software if needed
-	sshHandler := NewSSHHandler(handler.job)
-	sshConfig, err := sshHandler.GetConfig(server)
-	if err != nil {
-		return nil, err
-	}
-	nfsServer, err := nfs.NewServer(sshConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-		serverSharesV1 := clonable.(*propsv1.HostShares)
-		if len(serverSharesV1.ByID) == 0 {
-			// Host doesn't have shares yet, so install NFS
-			err = nfsServer.Install(handler.job.Task())
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = nfsServer.AddShare(handler.job.Task(), sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			err2 := nfsServer.RemoveShare(handler.job.Task(), sharePath)
-			if err2 != nil {
-				logrus.Warn("failed to RemoveShare")
-				err = scerr.AddConsequence(err, err2)
-			}
-		}
-	}()
-
-	// Updates Host Property propsv1.HostShares
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-		serverSharesV1 := clonable.(*propsv1.HostShares)
-
-		share = propsv1.NewHostShare()
-		share.Name = shareName
-		shareID, err := uuid.NewV4()
-		if err != nil {
-			return scerr.Wrap(err, "Error creating UUID for share")
-		}
-		share.ID = shareID.String()
-		share.Path = sharePath
-		share.Type = "nfs"
-
-		serverSharesV1.ByID[share.ID] = share
-		serverSharesV1.ByName[share.Name] = share.ID
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if handler.job.Aborted() {
-		return nil, scerr.AbortedError("aborted", nil)
-	}
-
-	mh, err := metadata.SaveHost(handler.job.Service(), server)
-	if err != nil {
-		return nil, err
-	}
-	newShare := share
-
-	defer func() {
-		if err != nil {
-			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-				serverSharesV1 := clonable.(*propsv1.HostShares)
-				delete(serverSharesV1.ByID, newShare.ID)
-				delete(serverSharesV1.ByName, newShare.Name)
-				return nil
-			})
-			if err2 != nil {
-				logrus.Warnf("failed to set shares metadata of host %s", hostName)
-				err = scerr.AddConsequence(err, err2)
-			}
-			err2 = mh.Write()
-			if err2 != nil {
-				logrus.Warnf("failed to save metadata of host %s", hostName)
-				err = scerr.AddConsequence(err, err2)
-			}
-		}
-	}()
-	ms, err := metadata.SaveShare(handler.job.Service(), server.ID, server.Name, share.ID, share.Name)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			derr := ms.Delete()
-			if derr != nil {
-				logrus.Warnf("failed to delete metadata of share '%s'", newShare.Name)
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
-
-	// select {
-	// case <-ctx.Done():
-	// 	logrus.Warnf("Share creation cancelled by user")
-	// 	err = fmt.Errorf("share creation cancelled by user")
-	// 	return nil, err
-	// default:
-	// }
-
-	return share, nil
+	return objs, objs.Create(task, shareName, objh, path, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
 }
 
 // Delete a share from host
@@ -262,78 +118,21 @@ func (handler *ShareHandler) Delete(name string) (err error) {
 		return scerr.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	task := handler.job.Task()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	// Retrieve info about the share
-	server, share, _, err := handler.ForceInspect(name)
+	objs, err := sharefactory.Load(task, handler.service, name)
 	if err != nil {
 		return err
 	}
-	if server == nil {
-		return fmt.Errorf("delete share: unable to inspect host '%s'", name)
-	}
-	if share == nil {
-		return fmt.Errorf("delete share: unable to found share of host '%s'", name)
-	}
-
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-		serverSharesV1 := clonable.(*propsv1.HostShares)
-		if len(share.ClientsByName) > 0 {
-			var list []string
-			for k := range share.ClientsByName {
-				list = append(list, "'"+k+"'")
-			}
-			return fmt.Errorf("still used by: %s", strings.Join(list, ","))
-		}
-
-		sshHandler := NewSSHHandler(handler.job)
-		sshConfig, err := sshHandler.GetConfig(server.ID)
-		if err != nil {
-			return err
-		}
-
-		nfsServer, err := nfs.NewServer(sshConfig)
-		if err != nil {
-			return err
-		}
-		err = nfsServer.RemoveShare(handler.job.Task(), share.Path)
-		if err != nil {
-			return err
-		}
-
-		delete(serverSharesV1.ByID, share.ID)
-		delete(serverSharesV1.ByName, share.Name)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// check if job has been aborted; if yes stop here
-	if handler.job.Aborted() {
-		return scerr.AbortedError("aborted", nil)
-	}
-
-	// Save server metadata
-	_, err = metadata.SaveHost(handler.job.Service(), server)
-	if err != nil {
-		return err
-	}
-
-	// Remove share metadata
-	err = metadata.RemoveShare(handler.job.Service(), server.ID, server.Name, share.ID, share.Name)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return objs.Delete(task)
 }
 
 // List return the list of all shares from all servers
-func (handler *ShareHandler) List() (props map[string]map[string]*propsv1.HostShare, err error) {
+func (handler *ShareHandler) List() (shares map[string]map[string]*propertiesv1.HostShare, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -341,22 +140,18 @@ func (handler *ShareHandler) List() (props map[string]map[string]*propsv1.HostSh
 		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), "", true).WithStopwatch().GoingIn()
+	task := handler.job.Task()
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	shares := map[string]map[string]*propsv1.HostShare{}
-
-	var servers []string
-	ms, err := metadata.NewShare(handler.job.Service())
+	objs, err := sharefactory.New(handler.service)
 	if err != nil {
 		return nil, err
 	}
-	err = ms.Browse(func(hostName string, shareID string) error {
-		if handler.job.Aborted() {
-			return scerr.AbortedError("aborted", nil)
-		}
+	var servers []string
+	err = objs.Browse(task, func(hostName string, shareID string) error {
 		servers = append(servers, hostName)
 		return nil
 	})
@@ -365,25 +160,30 @@ func (handler *ShareHandler) List() (props map[string]map[string]*propsv1.HostSh
 	}
 
 	// Now walks through the hosts acting as Nas
+	shares = map[string]map[string]*propertiesv1.HostShare{}
 	if len(servers) == 0 {
 		return shares, nil
 	}
 
-	hostSvc := NewHostHandler(handler.job)
 	for _, serverID := range servers {
-		if handler.job.Aborted() {
-			return nil, scerr.AbortedError("aborted", nil)
-		}
-
-		host, err := hostSvc.Inspect(serverID)
+		host, err := hostfactory.Load(task, handler.service, serverID)
 		if err != nil {
 			return nil, err
 		}
 
-		err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-			hostSharesV1 := clonable.(*propsv1.HostShares)
-			shares[serverID] = hostSharesV1.ByID
-			return nil
+		err = host.Inspect(task, func(_ data.Clonable) error {
+			props, inErr := host.Properties(task)
+			if inErr != nil {
+				return inErr
+			}
+			return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
+				if !ok {
+					return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				shares[serverID] = hostSharesV1.ByID
+				return nil
+			})
 		})
 		if err != nil {
 			return nil, err
@@ -393,38 +193,37 @@ func (handler *ShareHandler) List() (props map[string]map[string]*propsv1.HostSh
 }
 
 // Mount a share on a local directory of an host
-func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache bool) (mount *propsv1.HostRemoteMount, err error) {
+func (handler *shareHandler) Mount(shareName, hostRef, path string,	withCache bool) (mount *propertiesv1.HostRemoteMount, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-
+	if handler.job == nil {
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
 	if shareName == "" {
-		return nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("shareName", "cannot be empty string")
 	}
-
-	if hostName == "" {
-		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
+	if hostRef == "" {
+		return nil, scerr.InvalidParameterError("hostRef", "cannot be empty string")
 	}
-
 	if path == "" {
-		return nil, scerr.InvalidParameterError("hostName", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	task := handler.job.Task()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s', '%s')", shareName, hostRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	// Retrieve info about the share
-	server, share, _, err := handler.Inspect(shareName)
+	objs, err := sharefactory.Load(task, handler.service, shareName)
 	if err != nil {
 		return nil, err
 	}
-	if share == nil {
-		return nil, resources.ResourceNotFoundError("share", shareName)
-	}
-	if server == nil {
-		return nil, resources.ResourceNotFoundError("host", hostName)
+	server, err := objs.Server(task)
+	if err != nil {
+		return nil, err
 	}
 
 	// Sanitize path
@@ -433,12 +232,11 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 		return nil, fmt.Errorf("invalid mount path '%s': '%s'", path, err)
 	}
 
-	var target *resources.Host
-	if server.Name == hostName || server.ID == hostName {
+	var target resources.Host
+	if server.Name() == hostRef || server.ID() == hostRef {
 		target = server
 	} else {
-		hostSvc := NewHostHandler(handler.job)
-		target, err = hostSvc.Inspect(hostName)
+		target, err = hostfactory.Load(task, handler.service, hostRef)
 		if err != nil {
 			return nil, err
 		}
@@ -446,83 +244,136 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 
 	// Check if share is already mounted
 	// Check if there is already volume mounted in the path (or in subpath)
-	err = target.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
-		targetMountsV1 := clonable.(*propsv1.HostMounts)
-		if s, ok := targetMountsV1.RemoteMountsByShareID[share.ID]; ok {
-			return fmt.Errorf("already mounted in '%s:%s'", target.Name, targetMountsV1.RemoteMountsByPath[s].Path)
-		}
-		for _, i := range targetMountsV1.LocalMountsByPath {
-			if i.Path == path {
-				// Can't mount a share in place of a volume (by convention, nothing technically preventing it)
-				return fmt.Errorf("there is already a volume in path '%s:%s'", target.Name, path)
+	var targetNetwork *propertiesv1.HostNetwork
+	err = target.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		inErr = props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) error {
+			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostsMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-		}
-		for _, i := range targetMountsV1.RemoteMountsByPath {
-			if strings.Index(path, i.Path) == 0 {
-				// Can't mount a share inside another share (at least by convention, if not technically)
-				return fmt.Errorf("there is already a share mounted in '%s:%s'", target.Name, i.Path)
+			if s, ok := targetMountsV1.RemoteMountsByShareID[objs.ID()]; ok {
+				return scerr.DuplicateError("already mounted in '%s:%s'", target.Name, targetMountsV1.RemoteMountsByPath[s].Path)
 			}
+			for _, i := range targetMountsV1.LocalMountsByPath {
+				if i.Path == path {
+					// Can't mount a share in place of a volume (by convention, nothing technically preventing it)
+					return fmt.Errorf("there is already a volume in path '%s:%s'", target.Name(), path)
+				}
+			}
+			for _, i := range targetMountsV1.RemoteMountsByPath {
+				if strings.Index(path, i.Path) == 0 {
+					// Can't mount a share inside another share (at least by convention, if not technically)
+					return fmt.Errorf("there is already a share mounted in '%s:%s'", target.Name(), i.Path)
+				}
+			}
+			return nil
+		})
+		if inErr != nil {
+			return inErr
 		}
 
-		return nil
+		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			var ok bool
+			targetNetwork, ok = clonable.(*propertiesv1.HostNetwork)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return nil
+		})
+	})
+
+	var export, sharePath string
+	shareID := objs.ID()
+	err = server.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		var ip string
+		inErr = props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			serverNetwork, ok := clonable.(*propertiesv1.HostNetwork)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if netID, ok := serverNetwork.NetworksByID[targetNetwork.DefaultNetworkID]; ok {
+				ip = serverNetwork.IPv4Addresses[netID]
+			} else {
+				for _, v := range targetNetwork.NetworksByID {
+					if _, ok := serverNetwork.NetworksByID[v]; ok {
+						ip = serverNetwork.IPv4Addresses[v]
+						break
+					}
+				}
+				if ip == "" {
+					ip = serverNetwork.IPv4Addresses[serverNetwork.DefaultNetworkID]
+				}
+			}
+			if ip == "" {
+				return scerr.NotFoundError("no IP address found on server '%s' to serve the share to host '%s'", server.Name(), target.Name())
+			}
+			return nil
+		})
+		if inErr != nil {
+			return inErr
+		}
+
+		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			sharePath = hostSharesV1.ByID[objs.ID()].Path
+			export = ip + ":" + sharePath
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	export := ""
-	err = target.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-		if clonable.(*propsv1.HostNetwork).DefaultGatewayPrivateIP == server.GetPrivateIP() {
-			export = server.GetPrivateIP() + ":" + share.Path
-		} else {
-			export = server.GetAccessIP() + ":" + share.Path
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	sshHandler := NewSSHHandler(handler.job)
-	sshConfig, err := sshHandler.GetConfig(target)
+	sshConfig, err := target.SSHConfig(task)
 	if err != nil {
 		return nil, err
 	}
 
 	// Mount the share on host
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-		serverSharesV1 := clonable.(*propsv1.HostShares)
-		_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
-		if !found {
-			return fmt.Errorf("failed to find metadata about share '%s'", shareName)
-		}
-		shareID := serverSharesV1.ByName[shareName]
+	err = server.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) error {
+			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostShare' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
+			if !found {
+				return fmt.Errorf("failed to find metadata about share '%s'", shareName)
+			}
+			shareID = serverSharesV1.ByName[shareName]
+			sharePath = serverSharesV1.ByID[shareID].Path
 
-		nfsClient, err := nfs.NewNFSClient(sshConfig)
-		if err != nil {
-			return err
-		}
-		err = nfsClient.Install(handler.job.Task())
-		if err != nil {
-			return err
-		}
+			nfsClient, err := nfs.NewNFSClient(sshConfig)
+			if err != nil {
+				return err
+			}
+			err = nfsClient.Install(ctx)
+			if err != nil {
+				return err
+			}
 
-		err = nfsClient.Mount(handler.job.Task(), export, mountPath, withCache)
-		if err != nil {
-			return err
-		}
+			err = nfsClient.Mount(ctx, export, mountPath, withCache)
+			if err != nil {
+				return err
+			}
 
-		serverSharesV1.ByID[shareID].ClientsByName[target.Name] = target.ID
-		serverSharesV1.ByID[shareID].ClientsByID[target.ID] = target.Name
-		return nil
+			serverSharesV1.ByID[shareID].ClientsByName[target.Name()] = target.ID()
+			serverSharesV1.ByID[shareID].ClientsByID[target.ID()] = target.Name()
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		if err != nil {
-			sshHandler := NewSSHHandler(handler.job)
-			sshConfig, derr := sshHandler.GetConfig(target)
+			sshConfig, derr := target.SSHConfig(task)
 			if derr != nil {
 				logrus.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
@@ -545,329 +396,201 @@ func (handler *ShareHandler) Mount(shareName, hostName, path string, withCache b
 				logrus.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
+
+			derr = server.Alter(task, func(_ data.Clonable) error {
+				props, inErr := server.Properties(task)
+				if inErr != nil {
+					return inErr
+				}
+				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) error {
+					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
+					if !ok {
+						return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name())
+					delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID())
+					return nil
+				})
+			})
+			if derr != nil {
+				logrus.Warnf("failed to remove mounted share %s from host '%s' metadata", shareName, server.Name())
+				err = scerr.AddConsequence(err, derr)
+			}
 		}
 	}()
 
-	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
-		targetMountsV1 := clonable.(*propsv1.HostMounts)
-		// Make sure the HostMounts is correctly init if there are no mount yet
-		if !target.Properties.Lookup(hostproperty.MountsV1) {
-			targetMountsV1.Reset()
-		}
-		mount = propsv1.NewHostRemoteMount()
-		mount.ShareID = share.ID
-		mount.Export = export
-		mount.Path = mountPath
-		mount.FileSystem = "nfs"
-		targetMountsV1.RemoteMountsByPath[mount.Path] = mount
-		targetMountsV1.RemoteMountsByShareID[mount.ShareID] = mount.Path
-		targetMountsV1.RemoteMountsByExport[mount.Export] = mount.Path
-		return nil
+	err = target.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
+			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			// Make sure the HostMounts is correctly init if there are no mount yet
+			if !props.Lookup(hostproperty.MountsV1) {
+				targetMountsV1.Reset()
+			}
+			mount = propertiesv1.NewHostRemoteMount()
+			mount.ShareID = objs.ID()
+			mount.Export = export
+			mount.Path = mountPath
+			mount.FileSystem = "nfs"
+			targetMountsV1.RemoteMountsByPath[mount.Path] = mount
+			targetMountsV1.RemoteMountsByShareID[mount.ShareID] = mount.Path
+			targetMountsV1.RemoteMountsByExport[mount.Export] = mount.Path
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	mh, err := metadata.SaveHost(handler.job.Service(), server)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			err2 := server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-				serverSharesV1 := clonable.(*propsv1.HostShares)
-				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByName, target.Name)
-				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByID, target.ID)
-				return nil
-			})
-			if err2 != nil {
-				logrus.Warnf("failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
-				err = scerr.AddConsequence(err, err2)
-			}
-			err2 = mh.Write()
-			if err2 != nil {
-				logrus.Warnf("failed to save host %s metadatas : %s", server.Name, err2.Error())
-				err = scerr.AddConsequence(err, err2)
-			}
-		}
-	}()
-
-	if target != server {
-		_, err = metadata.SaveHost(handler.job.Service(), target)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	newMount := mount
-	defer func() {
-		if err != nil {
-			err2 := target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
-				targetMountsV1 := clonable.(*propsv1.HostMounts)
-				delete(targetMountsV1.RemoteMountsByShareID, newMount.ShareID)
-				delete(targetMountsV1.RemoteMountsByPath, newMount.Path)
-				delete(targetMountsV1.RemoteMountsByExport, newMount.Export)
-				return nil
-			})
-			if err2 != nil {
-				logrus.Warnf("failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
-				err = scerr.AddConsequence(err, err2)
-			}
-			_, err2 = metadata.SaveHost(handler.job.Service(), target)
-			if err2 != nil {
-				logrus.Warnf("failed to save host '%s' metadata : %s", hostName, err2.Error())
-				err = scerr.AddConsequence(err, err2)
-			}
-		}
-	}()
-
-	// select {
-	// case <-ctx.Done():
-	// 	logrus.Warnf("Share mount cancelled by user")
-	// 	err = fmt.Errorf("share mount cancelled by user")
-	// 	return nil, err
-	// default:
-	// }
 
 	return mount, nil
 }
 
 // Unmount a share from local directory of an host
-func (handler *ShareHandler) Unmount(shareName, hostName string) (err error) {
+func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	if shareName == "" {
-		return scerr.InvalidParameterError("shareName", "cannot be empty!")
+	if handler.job == nil {
+		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
-	if hostName == "" {
-		return scerr.InvalidParameterError("hostName", "cannot be empty!")
+	if shareRef == "" {
+		return scerr.InvalidParameterError("shareRef", "cannot be empty string")
+	}
+	if hostRef == "" {
+		return scerr.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	task := handler.job.Task()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s', '%s')", shareRef, hostRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	server, share, _, err := handler.ForceInspect(shareName)
+	objs, err := sharefactory.Load(task, handler.service, shareRef)
+	if err != nil {
+		return err
+	}
+	server, err := objs.Server(task)
 	if err != nil {
 		return err
 	}
 
-	var shareID string
-	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-		serverSharesV1 := clonable.(*propsv1.HostShares)
-		var found bool
-		shareID, found = serverSharesV1.ByName[shareName]
-		if !found {
-			return fmt.Errorf("failed to find data about share '%s'", shareName)
-		}
-		// share := serverSharesV1.ByID[shareID]
-		// remotePath := server.GetAccessIP() + ":" + share.Path
-		return nil
+	var shareID, sharePath string
+	err = server.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			var found bool
+			shareID, found = serverSharesV1.ByName[shareRef]
+			if !found {
+				var share *propertiesv1.HostShare
+				share, found = serverSharesV1.ByID[shareRef]
+				if !found {
+					return fmt.Errorf("failed to find data about share '%s'", shareRef)
+				}
+				shareID = share.ID
+				sharePath = share.Path
+			}
+			return nil
+		})
 	})
 	if err != nil {
 		return err
 	}
 
-	var target *resources.Host
-	if server.Name == hostName || server.ID == hostName {
+	var target resources.Host
+	if server.Name() == hostRef || server.ID() == hostRef {
 		target = server
 	} else {
-		hostSvc := NewHostHandler(handler.job)
-		target, err = hostSvc.ForceInspect(hostName)
+		target, err = hostfactory.Load(task, handler.service, hostRef)
 		if err != nil {
 			return err
 		}
 	}
 
 	var mountPath string
-	err = target.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
-		targetMountsV1 := clonable.(*propsv1.HostMounts)
-		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
-		if !found {
-			return fmt.Errorf("not mounted on host '%s'", target.Name)
-		}
+	err = target.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
+			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
+			if !found {
+				return fmt.Errorf("not mounted on host '%s'", target.Name())
+			}
 
-		// Unmount share from client
-		sshHandler := NewSSHHandler(handler.job)
-		sshConfig, err := sshHandler.GetConfig(target.ID)
-		if err != nil {
-			return err
-		}
-		nfsClient, err := nfs.NewNFSClient(sshConfig)
-		if err != nil {
-			return err
-		}
-		err = nfsClient.Unmount(handler.job.Task(), server.GetAccessIP()+":"+share.Path)
-		if err != nil {
-			return err
-		}
+			serverIP, inErr := server.AccessIP(task)
+			if inErr != nil {
+				return inErr
+			}
 
-		// Remove mount from mount list
-		mountPath = mount.Path
-		delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
-		delete(targetMountsV1.RemoteMountsByPath, mountPath)
-		return nil
+			// Unmount share from client
+			sshConfig, inErr := target.SSHConfig(task)
+			if inErr != nil {
+				return inErr
+			}
+			nfsClient, inErr := nfs.NewNFSClient(sshConfig)
+			if inErr != nil {
+				return inErr
+			}
+			inErr = nfsClient.Unmount(ctx, serverIP+":"+sharePath)
+			if inErr != nil {
+				return inErr
+			}
+
+			// Remove mount from mount list
+			mountPath = mount.Path
+			delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
+			delete(targetMountsV1.RemoteMountsByPath, mountPath)
+			return nil
+		})
 	})
 	if err != nil {
 		return err
 	}
 
 	// Remove host from client lists of the share
-	err = server.Properties.LockForWrite(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-		serverSharesV1 := clonable.(*propsv1.HostShares)
-		delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
-		delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
-		return nil
+	err = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) error {
+			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name())
+			delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID())
+			return nil
+		})
 	})
 	if err != nil {
 		return err
 	}
-
-	// Saves metadata
-	_, err = metadata.SaveHost(handler.job.Service(), server)
-	if err != nil {
-		return err
-	}
-	if server != target {
-		_, err = metadata.SaveHost(handler.job.Service(), target)
-		if err != nil {
-			return err
-		}
-	}
-
-	// select { // FIXME Unorthodox usage of context; use instead job.Aborted() in strategic places to react accordingly
-	// case <-ctx.Done():
-	// 	logrus.Warnf("Share unmount cancelled by user")
-	// 	_, err = handler.Mount(context.Background(), shareName, hostName, mountPath, false)
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to stop share unmount")
-	// 	}
-	// 	return fmt.Errorf("share unmounting cancelled by user")
-	// default:
-	// }
 
 	return nil
 }
 
-// ForceInspect returns the host and share corresponding to 'shareName'
-func (handler *ShareHandler) ForceInspect(shareName string) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
-	if handler == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
-	}
-	if shareName == "" {
-		return nil, nil, nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
-	}
-
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	host, share, mounts, err := handler.Inspect(shareName)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if host == nil {
-		return nil, nil, nil, fmt.Errorf("failed to find host exporting the share '%s'", shareName)
-	}
-	return host, share, mounts, nil
-}
-
 // Inspect returns the host and share corresponding to 'shareName'
 // If share isn't found, return (nil, nil, nil, utils.ErrNotFound)
-func (handler *ShareHandler) Inspect(shareName string) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
+func (handler *ShareHandler) Inspect(shareRef string) (share resources.Share, err error) {
 	if handler == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
-	if shareName == "" {
-		return nil, nil, nil, scerr.InvalidParameterError("shareName", "cannot be empty!")
+	if handler.job == nil {
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+	if shareRef == "" {
+		return nil, scerr.InvalidParameterError("shareName", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	task := handler.job.Task()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", shareRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	hostName, err := metadata.LoadShare(handler.job.Service(), shareName)
-	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); ok {
-			return nil, nil, nil, resources.ResourceNotFoundError("share", shareName)
-		}
-		return nil, nil, nil, err
-	}
-	if hostName == "" {
-		return nil, nil, nil, fmt.Errorf("failed to find host sharing '%s'", shareName)
-	}
-
-	hostSvc := NewHostHandler(handler.job)
-	server, err := hostSvc.ForceInspect(hostName)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	var (
-		shareID string
-	)
-	err = server.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
-		serverSharesV1 := clonable.(*propsv1.HostShares)
-		var found bool
-		shareID, found = serverSharesV1.ByName[shareName]
-		if !found {
-			shareID = shareName
-			_, found = serverSharesV1.ByID[shareID]
-		}
-		if !found {
-			return resources.ResourceNotFoundError("share", fmt.Sprintf("no share named '%s'", shareName))
-		}
-		share = serverSharesV1.ByID[shareID]
-		return nil
-	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	var errors []error
-
-	mounts := map[string]*propsv1.HostRemoteMount{}
-	for k := range share.ClientsByName {
-		client, err := hostSvc.Inspect(k)
-		if err != nil {
-			logrus.Errorf("%+v", err)
-			errors = append(errors, err)
-			continue
-		}
-
-		err = client.Properties.LockForRead(hostproperty.MountsV1).ThenUse(func(clonable data.Clonable) error {
-			clientMountsV1 := clonable.(*propsv1.HostMounts)
-			mountPath, ok := clientMountsV1.RemoteMountsByShareID[shareID]
-			if ok {
-				mount := clientMountsV1.RemoteMountsByPath[mountPath]
-				mounts[client.Name] = &propsv1.HostRemoteMount{
-					Path:       mount.Path,
-					FileSystem: mount.FileSystem,
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			logrus.Error(err)
-			errors = append(errors, err)
-			continue
-		}
-	}
-
-	if len(errors) > 0 {
-		return nil, nil, nil, scerr.ErrListError(errors)
-	}
-
-	return server, share, mounts, nil
-}
-
-func (handler *ShareHandler) findShare(shareName string) (string, error) {
-	hostName, err := metadata.LoadShare(handler.job.Service(), shareName)
-	if err != nil {
-		return "", err
-	}
-	return hostName, nil
+	return sharefactory.Load(task, handler.service, shareRef)
 }

@@ -21,8 +21,8 @@ import (
 
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -35,7 +35,7 @@ var (
 	Debug bool
 
 	hostName     string
-	hostInstance *pb.Host
+	hostInstance *protocol.Host
 	featureName  string
 )
 

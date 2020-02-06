@@ -4,12 +4,13 @@ package local
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/libvirt/libvirt-go"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 type Stack struct {
@@ -19,7 +20,7 @@ type Stack struct {
 	AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstracts.Host, error) {
 	return nil, scerr.NotImplementedError("WaitHostReady not implemented yet!") // FIXME Technical debt
 }
 

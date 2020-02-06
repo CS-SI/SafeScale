@@ -25,9 +25,9 @@ import (
 
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -59,7 +59,7 @@ var shareCreate = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultShareExportedPath,
+			Value: abstracts.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
 		cli.BoolFlag{
@@ -103,11 +103,11 @@ var shareCreate = cli.Command{
 		}
 
 		shareName := c.Args().Get(0)
-		def := pb.ShareDefinition{
+		def := protocol.ShareDefinition{
 			Name: shareName,
-			Host: &pb.Reference{Name: c.Args().Get(1)},
+			Host: &protocol.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
-			Options: &pb.ExportOptions{
+			Options: &protocol.ExportOptions{
 				ReadOnly:     c.Bool("readonly"),
 				RootSquash:   c.Bool("rootsquash"),
 				Secure:       c.Bool("secure"),
@@ -197,7 +197,7 @@ var shareMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultShareMountPath,
+			Value: abstracts.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
 		cli.BoolFlag{
@@ -215,9 +215,9 @@ var shareMount = cli.Command{
 		shareName := c.Args().Get(0)
 		hostName := c.Args().Get(1)
 		path := c.String("path")
-		def := pb.ShareMountDefinition{
-			Host:      &pb.Reference{Name: hostName},
-			Share:     &pb.Reference{Name: shareName},
+		def := protocol.ShareMountDefinition{
+			Host:      &protocol.Reference{Name: hostName},
+			Share:     &protocol.Reference{Name: shareName},
 			Path:      path,
 			Type:      "nfs",
 			WithCache: c.Bool("ac"),
@@ -245,9 +245,9 @@ var shareUnmount = cli.Command{
 
 		shareName := c.Args().Get(0)
 		hostName := c.Args().Get(1)
-		def := pb.ShareMountDefinition{
-			Host:  &pb.Reference{Name: hostName},
-			Share: &pb.Reference{Name: shareName},
+		def := protocol.ShareMountDefinition{
+			Host:  &protocol.Reference{Name: hostName},
+			Share: &protocol.Reference{Name: shareName},
 		}
 		err := client.New().Share.Unmount(def, temporal.GetExecutionTimeout())
 		if err != nil {
