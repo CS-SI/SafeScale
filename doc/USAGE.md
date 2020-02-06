@@ -80,7 +80,7 @@ Here is an example of a tenant file:
 
   [tenants.objectstorage]
     Type = "swift"
-    AuthURL = "https://auth.cloud.ovh.net/v2.0"
+    AuthURL = "https://auth.cloud.ovh.net/v3"
 
 [[tenants]]
   client = "flexibleengine"
