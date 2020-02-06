@@ -20,6 +20,7 @@ echo "Cloning branch '${BRANCH_NAME}' from repo '${GIT_REPO_URL}'"
 git clone ${GIT_REPO_URL} -b ${BRANCH_NAME} --depth=1
 
 cd SafeScale
+sed -i "s/\(.*\)develop/\1${BRANCH_NAME}/" common.mk
 
 # ----------------------
 # Compile
