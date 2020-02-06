@@ -33,9 +33,12 @@ make ensure
 
 echo "All"
 make all
+[ $? -ne 0 ] && echo "Build failure" && return 1
 
 echo "Install"
 make install
+[ $? -ne 0 ] && echo "Install failure" && return 1
 
 echo "Export"
 CIBIN=/export make installci
+[ $? -ne 0 ] && echo "Export failure" && return 1
