@@ -17,24 +17,31 @@
 package clusters
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
-	"time"
 
+	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
+	featurefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/feature"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -59,8 +66,8 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		return nil
 	}
 
-	task.Lock(c.core.lock)
-	defer task.Unlock(c.core.lock)
+	task.Lock(c.Core.lock)
+	defer task.Unlock(c.Core.lock)
 
 	if c.installMethods == nil {
 		c.installMethods = map[uint8]installmethod.Enum{}
@@ -88,7 +95,7 @@ func (c *cluster) InstalledFeatures(task concurrency.Task) []string {
 // ComplementFeatureParameters configures parameters that are implicitely defined, based on target
 func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) error {
 	var err error
-	var complexity Complexity.Enum
+	var complexity ClusterComplexity.Enum
 	if complexity, err = c.Complexity(); err != nil {
 		return err
 	}
@@ -130,26 +137,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 // AddFeature installs a feature on the cluster
 func (c *Cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.InstallSettings) (resources.InstallResults, error) {
 	if c == nil {
-		return nil, scerr.InvalidInstanceError().Error()
-	}
-	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	feat, err := featurefactorys.New(task, name)
-	if err != nil {
-		return nil, err
-	}
-	return feat.Add(c, vars, settings)
-}
-
-// CheckFeature tells if a feature is installed on the cluster
-func (c *Cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.InstallSettings) (resources.InstallResults, error) {
-	if c == nil {
-		return nil, scerr.InvalidInstanceError().Error()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
@@ -162,6 +150,25 @@ func (c *Cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 	if err != nil {
 		return nil, err
 	}
+	return feat.Add(c, vars, settings)
+}
+
+// CheckFeature tells if a feature is installed on the cluster
+func (c *Cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.InstallSettings) (resources.InstallResults, error) {
+	if c == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if name == "" {
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	feat, err := featurefactory.New(task, c.service, name)
+	if err != nil {
+		return nil, err
+	}
 
 	return feat.Check(c, vars, settings)
 }
@@ -169,7 +176,7 @@ func (c *Cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 // DeleteFeature uninstalls a feature from the cluster
 func (c *cluster) DeleteFeature(task concurrency.Task, name string, vars data.Map, settings resources.InstallSettings) (resources.InstallResults, error) {
 	if c == nil {
-		return nil, scerr.InvalidInstanceError().Error()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
@@ -185,7 +192,6 @@ func (c *cluster) DeleteFeature(task concurrency.Task, name string, vars data.Ma
 
 	return feat.Delete(c, vars, settings)
 }
-
 
 // ExecuteScript executes the script template with the parameters on target Host
 func (c *cluster) ExecuteScript(

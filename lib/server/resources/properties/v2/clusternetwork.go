@@ -23,8 +23,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Network ...
-// NOT FROZEN YET
+// Network contains network information relative to cluster
+// !!! FROZEN !!!
 type Network struct {
 	NetworkID          string            `json:"network_id"`           // contains the ID of the network
 	CIDR               string            `json:"cidr"`                 // the network CIDR
@@ -45,22 +45,19 @@ func newNetwork() *Network {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (n *Network) Content() interface{} {
-	return n
-}
-
-// Clone ... (data.Clonable interface)
+// Clone ...
+// satisfies interface data.Clonable
 func (n *Network) Clone() data.Clonable {
 	return newNetwork().Replace(n)
 }
 
-// Replace ... (data.Clonable interface)
+// Replace ...
+// satisfies interface data.Clonable
 func (n *Network) Replace(p data.Clonable) data.Clonable {
 	*n = *p.(*Network)
 	return n
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.NetworkV2, &Network{})
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.NetworkV2, &Network{})
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
@@ -91,7 +92,7 @@ func (si *ShareIdentity) Replace(src data.Clonable) data.Clonable {
 
 // Share contains information to maintain in Object Storage a list of shared folders
 type Share struct {
-	*resources.Core
+	*operations.Core
 	properties *serialize.JSONProperties
 }
 
@@ -101,14 +102,11 @@ func New(svc iaas.Service) (*Share, error) {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	core, err := resources.NewCore(svc, "share", sharesFolderName)
+	core, err := operations.NewCore(svc, "share", sharesFolderName)
 	if err != nil {
 		return nil, err
 	}
-	props, err := serialize.NewJSONProperties("resources.share")
-	if err != nil {
-		return nil, err
-	}
+	props := serialize.NewJSONProperties("resources.share")
 	return &Share{Core: core, properties: props}, nil
 }
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package payloads
+package operations
 
 const (
 	// BucketNamePrefix is the begining of the name of the bucket for Metadata

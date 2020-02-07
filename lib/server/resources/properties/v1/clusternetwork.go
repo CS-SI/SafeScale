@@ -22,8 +22,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Network ...
+// ClusterNetwork contains network information relative to cluster
 // !!! FROZEN !!!
+// !!! DEPRECATED !!! superseded by propertiesv2.ClusterNetwork
 type ClusterNetwork struct {
 	NetworkID string `json:"network_id"` // contains the ID of the network
 	GatewayID string `json:"gateway_id"` // DEPRECATED
@@ -36,22 +37,24 @@ func newNetwork() *ClusterNetwork {
 	return &ClusterNetwork{}
 }
 
-// Content ... (data.Clonable interface)
-func (n *ClusterNetwork) Content() interface{} {
-	return n
-}
+// // Content ... (data.Clonable interface)
+// func (n *ClusterNetwork) Content() interface{} {
+// 	return n
+// }
 
-// Clone ... (data.Clonable interface)
+// Clone ...
+// satisfies interface data.Clonable
 func (n *ClusterNetwork) Clone() data.Clonable {
 	return newNetwork().Replace(n)
 }
 
-// Replace ... (data.Clonable interface)
+// Replace ...
+// satisfies interface data.Clonable
 func (n *ClusterNetwork) Replace(p data.Clonable) data.Clonable {
 	*n = *p.(*ClusterNetwork)
 	return n
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.NetworkV1, &ClusterNetwork{})
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.NetworkV1, &ClusterNetwork{})
 }

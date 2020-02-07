@@ -313,7 +313,7 @@ func (w ErrorTraceProvider) DeleteVIP(vip *abstracts.VIP) (err error) {
 }
 
 // CreateHost ...
-func (w ErrorTraceProvider) CreateHost(request abstracts.HostRequest) (_ *abstracts.Host, _ *propsv2.HostSizing, _ *propsv1.HostNetwork, _ *userdata.Content, err error) {
+func (w ErrorTraceProvider) CreateHost(request abstracts.HostRequest) (_ *abstracts.Host, _ *propsv2.HostSizing, _ *propsv1.HostNetwork,_ *propsv1.HostDescription, _ *userdata.Content, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)

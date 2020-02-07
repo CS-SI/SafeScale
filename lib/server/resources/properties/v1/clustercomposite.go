@@ -34,17 +34,14 @@ func newComposite() *Composite {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (c *Composite) Content() interface{} {
-	return c
-}
-
-// Clone ... (data.Clonable interface)
+// Clone ...
+// satisfies interface data.Clonable
 func (c *Composite) Clone() data.Clonable {
 	return newComposite().Replace(c)
 }
 
-// Replace ... (data.Clonable interface)
+// Replace ...
+// satisfies interface data.Clonable
 func (c *Composite) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Composite)
 	c.Tenants = make([]string, len(src.Tenants))
@@ -53,5 +50,5 @@ func (c *Composite) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.CompositeV1, newComposite())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.CompositeV1, newComposite())
 }

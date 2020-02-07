@@ -26,9 +26,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumeproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -46,24 +47,21 @@ const (
 
 // Volume links Object Storage folder and Volumes
 type Volume struct {
-	*runtime.Core
+	*operations.Core
 	properties *serialize.JSONProperties
 }
 
 // NewVolume creates an instance of metadata.Volume
-func NewVolume(svc iaas.Service) (_ *Volume, err error) {
+func New(svc iaas.Service) (_ *Volume, err error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "can't be nil")
 	}
 
-	core, err := runtime.NewCore(svc, "volume", volumesFolderName)
+	core, err := operations.NewCore(svc, "volume", volumesFolderName)
 	if err != nil {
 		return nil, err
 	}
-	props, err := serialize.NewJSONProperties("resources.volume")
-	if err != nil {
-		return nil, err
-	}
+	props := serialize.NewJSONProperties("resources.volume")
 	return &Volume{Core: core, properties: props}, nil
 }
 

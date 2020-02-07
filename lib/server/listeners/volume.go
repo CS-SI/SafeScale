@@ -26,7 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -94,7 +94,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, conv.ToPBVolume(&volume))
+		pbvolumes = append(pbvolumes, conv.ToProtocolVolume(&volume))
 	}
 	rv := &protocol.VolumeList{Volumes: pbvolumes}
 	return rv, nil
@@ -138,14 +138,14 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefiniti
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := NewVolumeHandler(job)
+	handler := handlers.NewVolumeHandler(job)
 	vol, err := handler.Create(name, int(size), volumespeed.Enum(speed))
 	if err != nil {
 		return nil, err
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return conv.ToPBVolume(vol), nil
+	return conv.ToProtocolVolume(vol), nil
 }
 
 // Attach a volume to an host and create a mount point
@@ -369,5 +369,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, scerr.NotFoundError(fmt.Sprintf("volume '%s' not found", ref))
 	}
 
-	return conv.ToPBVolumeInfo(volume, mounts), nil
+	return conv.ToProtocolVolumeInfo(volume, mounts), nil
 }

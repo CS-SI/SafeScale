@@ -265,8 +265,8 @@ func (e *errCore) ToGRPCStatus() error {
 }
 
 // Wrap creates a new error with a message 'message' and a causer error 'causer'
-func Wrap(cause error, message string) Error {
-	newErr := &errCore{message: message, causer: cause, consequences: []error{}}
+func Wrap(cause error, format, a ...string) Error {
+	newErr := &errCore{message: fmt.Sprintf(format, a), causer: cause, consequences: []error{}}
 	if casted, ok := cause.(*errCore); ok {
 		newErr.grpcCode = casted.GRPCCode()
 	} else {
@@ -276,12 +276,12 @@ func Wrap(cause error, message string) Error {
 }
 
 // NewError creates a new error with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
-func NewError(message string, cause error, consequences []error) Error {
+func NewError(cause error, consequences []error, format, a ...string) Error {
 	if consequences == nil {
 		consequences = []error{}
 	}
 	return &errCore{
-		message:      message,
+		message:      fmt.Sprintf(format, a),
 		causer:       cause,
 		consequences: consequences,
 		fields:       make(fields),
@@ -289,6 +289,7 @@ func NewError(message string, cause error, consequences []error) Error {
 	}
 }
 
+// AddConsequence ...
 // AddConsequence adds an error 'err' to the list of consequences
 func (e *errCore) AddConsequence(err error) Error {
 	if err != nil {
@@ -386,10 +387,10 @@ type ErrNotFound struct {
 }
 
 // NotFoundError creates a ErrNotFound error
-func NotFoundError(msg string) *ErrNotFound {
+func NotFoundError(format, a ...string) *ErrNotFound {
 	return &ErrNotFound{
 		errCore: &errCore{
-			message:      msg,
+			message:      fmt.Sprintf(format, a),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -398,6 +399,7 @@ func NotFoundError(msg string) *ErrNotFound {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrNotFound) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -1044,10 +1046,10 @@ type ErrInconsistent struct {
 }
 
 // InconsistentError creates a ErrInconsistent error
-func InconsistentError(msg string) *ErrInconsistent {
+func InconsistentError(format, a ...string) *ErrInconsistent {
 	return &ErrInconsistent{
 		errCore: &errCore{
-			message:      decorateWithCallTrace(msg, "", ""),
+			message:      decorateWithCallTrace(fmt.Sprintf(format, a), "", ""),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -1056,6 +1058,7 @@ func InconsistentError(msg string) *ErrInconsistent {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrInconsistent) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {

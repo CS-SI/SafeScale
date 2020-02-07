@@ -24,7 +24,7 @@ import (
 )
 
 // Defaults ...
-// NOT FROZEN YET
+// !!! FROZEN !!!
 type Defaults struct {
 	// GatewaySizing keeps the default node definition
 	GatewaySizing abstracts.SizingRequirements `json:"gateway_sizing"`
@@ -40,22 +40,19 @@ func newDefaults() *Defaults {
 	return &Defaults{}
 }
 
-// Content ... (data.Clonable interface)
-func (d *Defaults) Content() interface{} {
-	return d
-}
-
-// Clone ... (data.Clonable interface)
+// Clone ...
+// satisfies interface data.Clonable
 func (d *Defaults) Clone() data.Clonable {
 	return newDefaults().Replace(d)
 }
 
-// Replace ... (data.Clonable interface)
+// Replace ...
+// satisfies interface data.Clonable
 func (d *Defaults) Replace(p data.Clonable) data.Clonable {
 	*d = *p.(*Defaults)
 	return d
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.DefaultsV2, &Defaults{})
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV2, &Defaults{})
 }

@@ -21,12 +21,17 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -59,7 +64,7 @@ type StoredCPUInfo struct {
 }
 
 // Start ...
-func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot start host").ToGRPCStatus()
@@ -244,7 +249,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	// build response mapping abstracts.Host to protocol.Host
 	var pbhost []*protocol.Host
 	for _, host := range hosts {
-		pbhost = append(pbhost, srvutils.ToPBHost(host))
+		pbhost = append(pbhost, srvutils.ToProtocolHost(host))
 	}
 	rv := &protocol.HostList{Hosts: pbhost}
 	return rv, nil
@@ -298,24 +303,31 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 			MinFreq:     in.GetCpuFreq(),
 		}
 	} else {
-		s := srvutils.FromPBHostSizing(*in.Sizing)
+		s := srvutils.FromProtocolHostSizing(*in.Sizing)
 		sizing = &s
+	}
+
+	network, err := networkfactory.Load(job.Task(), job.Service(), in.GetNetwork())
+	if err != nil {
+		return nil, err
 	}
 
 	handler := handlers.NewHostHandler(job)
 	host, err := handler.Create(
-		name,
-		in.GetNetwork(),
-		in.GetImageId(),
-		in.GetPublic(),
-		sizing,
+		abstracts.HostRequest{
+			ResourceName: name,
+			Networks:     []*resources.Network{network},
+			ImageID:      in.GetImageId(),
+			PublicIP:     in.GetPublic(),
+		},
+		*sizing,
 		in.Force,
 	)
 	if err != nil {
 		return nil, err
 	}
 	logrus.Infof("Host '%s' created", name)
-	return srvutils.ToPBHost(host), nil
+	return srvutils.ToProtocolHost(host), nil
 }
 
 // Resize an host
@@ -367,7 +379,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, err
 	}
 	tracer.Trace("Host '%s' successfully resized", name)
-	return srvutils.ToPBHost(host), nil
+	return srvutils.ToProtocolHost(host), nil
 }
 
 // Status returns the status of a host (running or stopped mainly)
@@ -463,7 +475,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	if err != nil {
 		return nil, err
 	}
-	return srvutils.ToPBHost(host), nil
+	return srvutils.ToProtocolHost(host), nil
 }
 
 // Delete an host
@@ -563,5 +575,5 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 
 	tracer.Trace("SSH config of host '%s' successfully loaded", ref)
-	return srvutils.ToPBSshConfig(sshConfig), nil
+	return srvutils.ToProtocolSSHConfig(sshConfig), nil
 }

@@ -54,5 +54,5 @@ func (s *State) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.StateV1, &State{})
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.StateV1, &State{})
 }

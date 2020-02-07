@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package payloads
+package operations
 
 import (
 	"bytes"

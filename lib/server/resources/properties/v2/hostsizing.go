@@ -51,11 +51,6 @@ func (hs *HostSizing) Reset() {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (hs *HostSizing) Content() interface{} {
-	return hs
-}
-
 // Clone ... (data.Clonable interface)
 func (hs *HostSizing) Clone() data.Clonable {
 	return NewHostSizing().Replace(hs)

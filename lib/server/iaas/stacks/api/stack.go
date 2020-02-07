@@ -74,14 +74,14 @@ type Stack interface {
 	// AddPublicIPToVIP adds a public IP to VIP
 	AddPublicIPToVIP(*abstracts.VIP) error
 	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-	BindHostToVIP(*abstracts.VIP, *abstracts.Host) (string, string, error)
+	BindHostToVIP(*abstracts.VIP, string) error
 	// UnbindHostFromVIP removes the bind between the VIP and a host
-	UnbindHostFromVIP(*abstracts.VIP, *abstracts.Host) error
+	UnbindHostFromVIP(*abstracts.VIP, string) error
 	// DeleteVIP deletes the port corresponding to the VIP
 	DeleteVIP(*abstracts.VIP) error
 
 	// CreateHost creates an host that fulfils the request
-	CreateHost(request abstracts.HostRequest) (*abstracts.Host, *propsv2.HostSizing, *propsv1.HostNetwork, *userdata.Content, error)
+	CreateHost(request abstracts.HostRequest) (*abstracts.Host, *propsv2.HostSizing, *propsv1.HostNetwork, *propsv1.HostDescription, *userdata.Content, error)
 	// GetHost returns the host identified by id or updates content of a *abstracts.Host
 	InspectHost(interface{}) (*abstracts.Host, *propsv2.HostSizing, *propsv1.HostNetwork, error)
 	// GetHostByName returns the ID of the host identified by name

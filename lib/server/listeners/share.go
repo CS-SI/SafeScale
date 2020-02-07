@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
@@ -110,7 +111,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}
@@ -141,7 +142,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := handlers.NewShareHandler(job)
-	_, _, _, err = handler.Inspect(shareName)
+	_, err = handler.Inspect(shareName)
 	if err != nil {
 		return empty, err
 	}
@@ -191,13 +192,13 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 		return nil, err
 	}
 
-	var pbshares []*pb.ShareDefinition
+	var pbshares []*protocol.ShareDefinition
 	for k, item := range shares {
 		for _, share := range item {
-			pbshares = append(pbshares, convert.ToPBShare(k, share))
+			pbshares = append(pbshares, convert.ToProtocolShare(k, share))
 		}
 	}
-	list := &pb.ShareList{ShareList: pbshares}
+	list := &protocol.ShareList{ShareList: pbshares}
 	return list, nil
 }
 
@@ -297,7 +298,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 }
 
 // Inspect shows the detail of a share and all connected clients
-func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.ShareMountList, err error) {
+func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot inspect share").ToGRPCStatus()
@@ -349,5 +350,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 		return nil, abstracts.ResourceNotFoundError("share", shareRef)
 	}
 
-	return convert.ToPBShareMountList(host.Name, share, mounts), nil
+	return convert.ToProtocolShareMountList(host.Name, share, mounts), nil
 }

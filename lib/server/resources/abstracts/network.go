@@ -63,20 +63,20 @@ type Network struct {
 	SecondaryGatewayID string                    `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
 	VIP                *VIP                      `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
 	IPVersion          ipversion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
-	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
+	// Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
 	NetworkState       networkstate.Enum         `json:"status,omitempty"`
 }
 
 // NewNetwork ...
 func NewNetwork() *Network {
-	//FIXME: remove props from abstracts
-	props, err := serialize.NewJSONProperties("resources.network")
-	if err != nil {
-		panic(err)
-	}
+	// //FIXME: remove props from abstracts
+	// props, err := serialize.NewJSONProperties("resources.network")
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	return &Network{
-		Properties:   props,
+		// Properties:   props,
 		NetworkState: networkstate.UNKNOWNSTATE,
 	}
 }

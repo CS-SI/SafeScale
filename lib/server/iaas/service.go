@@ -267,7 +267,7 @@ func (svc *service) reduceTemplates(tpls []abstracts.HostTemplate) []abstracts.H
 }
 
 func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
-	return func(tpl resources.HostTemplate) bool {
+	return func(tpl abstracts.HostTemplate) bool {
 		return re.Match([]byte(tpl.Name))
 	}
 }
@@ -511,7 +511,7 @@ func (svc *service) reduceImages(imgs []abstracts.Image) []abstracts.Image {
 }
 
 func filterImagesByRegex(re *regexp.Regexp) imagefilters.Predicate {
-	return func(img resources.Image) bool {
+	return func(img abstracts.Image) bool {
 		return re.Match([]byte(img.Name))
 	}
 }

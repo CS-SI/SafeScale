@@ -23,8 +23,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Defaults ...
-type Defaults struct {
+// ClusterDefaults contains default information used by the cluster after initial creation
+// !!! FROZEN !!!
+// !!! DEPRECATED !!! superseded by propertiesv2.ClusterDefaults
+type ClusterDefaults struct {
 	// GatewaySizing keeps the default node definition
 	GatewaySizing abstracts.HostDefinition `json:"gateway_sizing"`
 	// MasterSizing keeps the default node definition
@@ -35,26 +37,21 @@ type Defaults struct {
 	Image string `json:"image"`
 }
 
-func newDefaults() *Defaults {
-	return &Defaults{}
-}
-
-// Content ... (data.Clonable interface)
-func (d *Defaults) Content() interface{} {
-	return d
+func newDefaults() *ClusterDefaults {
+	return &ClusterDefaults{}
 }
 
 // Clone ... (data.Clonable interface)
-func (d *Defaults) Clone() data.Clonable {
+func (d *ClusterDefaults) Clone() data.Clonable {
 	return newDefaults().Replace(d)
 }
 
 // Replace ... (data.Clonable interface)
-func (d *Defaults) Replace(p data.Clonable) data.Clonable {
-	*d = *p.(*Defaults)
+func (d *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
+	*d = *p.(*ClusterDefaults)
 	return d
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.DefaultsV1, &Defaults{})
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV1, &ClusterDefaults{})
 }

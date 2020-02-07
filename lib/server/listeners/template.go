@@ -76,7 +76,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	// Build response mapping resources.Host to protocol.Host
 	var pbTemplates []*protocol.HostTemplate
 	for _, template := range templates {
-		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))
+		pbTemplates = append(pbTemplates, conv.ToProtocolHostTemplate(&template))
 	}
 	rv := &protocol.TemplateList{Templates: pbTemplates}
 	return rv, nil

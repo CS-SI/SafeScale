@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package payloads
+package operations
 
 var (
 	// Trace contains what to trace during debug log

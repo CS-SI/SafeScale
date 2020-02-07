@@ -265,21 +265,21 @@ func (w ValidatedProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateHost ...
-func (w ValidatedProvider) CreateHost(request abstracts.HostRequest) (res *abstracts.Host, hsV2 *propsv2.HostSizing, hnV1 *propsv1.HostNetwork, data *userdata.Content, err error) {
-	res, hsV2, hnV1, data, err = w.InnerProvider.CreateHost(request)
+func (w ValidatedProvider) CreateHost(request abstracts.HostRequest) (res *abstracts.Host, hsV2 *propsv2.HostSizing, hnV1 *propsv1.HostNetwork, hdV1 *propsv1.HostDescription, ud *userdata.Content, err error) {
+	res, hsV2, hnV1, hdV1, ud, err = w.InnerProvider.CreateHost(request)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
 				logrus.Warnf("Invalid host: %v", *res)
 			}
 		}
-		if data != nil {
-			if !data.OK() {
-				logrus.Warnf("Invalid userdata: %v", *data)
+		if ud != nil {
+			if !ud.OK() {
+				logrus.Warnf("Invalid userdata: %v", *ud)
 			}
 		}
 	}
-	return res, hsV2, hnV1, data, err
+	return res, hsV2, hnV1, hdV1, ud, err
 }
 
 // InspectHost ...
@@ -417,12 +417,12 @@ func (w ValidatedProvider) DeleteVolume(id string) (err error) {
 }
 
 // CreateVolumeAttachment ...
-func (w ValidatedProvider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (id string, err error) {
+func (w ValidatedProvider) CreateVolumeAttachment(request abstracts.VolumeAttachmentRequest) (id string, err error) {
 	return w.InnerProvider.CreateVolumeAttachment(request)
 }
 
 // GetVolumeAttachment ...
-func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *resources.VolumeAttachment, err error) {
+func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *abstracts.VolumeAttachment, err error) {
 	res, err = w.InnerProvider.GetVolumeAttachment(serverID, id)
 	if err != nil {
 		if res != nil {
@@ -435,7 +435,7 @@ func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *resour
 }
 
 // ListVolumeAttachments ...
-func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []resources.VolumeAttachment, err error) {
+func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []abstracts.VolumeAttachment, err error) {
 	res, err = w.InnerProvider.ListVolumeAttachments(serverID)
 	if err != nil {
 		for _, item := range res {

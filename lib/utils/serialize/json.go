@@ -17,6 +17,7 @@
 package serialize
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -26,222 +27,205 @@ import (
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-	Data data.Clonable
-	sync.RWMutex
+	*concurrency.Shielded
 	module, key string
 }
 
-// MarshalJSON (json.Marshaller interface)
-func (jp *jsonProperty) MarshalJSON() ([]byte, error) {
-	jp.Lock()
-	defer jp.Unlock()
-
-	jsoned, err := ToJSON(jp.Data)
-	if err != nil {
-		return nil, err
-	}
-	return ToJSON(string(jsoned))
+func (jp *jsonProperty) Clone() data.Clonable {
+	newP := &jsonProperty{}
+	return newP.Replace(jp)
 }
 
-// SyncedJSONProperty is used to manipulate jsonProperty with type of lock asked (as returns by JSONProperties.LockBy<x>)
-type SyncedJSONProperty struct {
-	*jsonProperty
-	readLock bool
+func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
+	srcP := clonable.(*jsonProperty)
+	*jp = *srcP
+	jp.Shielded = srcP.Shielded.Clone()
+	return jp
 }
 
-// ThenUse allows to run a function with 'key' decoded content passed as parameter after a
-// call to JSonProperties.LockForRead() or JSonProperties.LockForWrite().
-// If the extension is locked for write, changes to the decoded data are encoded back into the extension
-// on 'apply' success.
-// If the extension is locked for read, no change will be encoded into the extension.
-// The lock applied on the extension is automatically released on exit.
-func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err error) {
-	if sp == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if sp.jsonProperty == nil {
-		return scerr.InvalidParameterError("sp.jsonProperty", "cannot be nil")
-	}
-	if apply == nil {
-		return scerr.InvalidParameterError("apply", "cannot be nil")
-	}
-
-	tracer := concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
-	defer sp.unlock()
-
-	if data := sp.jsonProperty.Data; data != nil {
-		clone := data.Clone()
-		err := apply(clone)
-		if err != nil {
-			return err
-		}
-		if !sp.readLock {
-			sp.jsonProperty.Data.Replace(clone)
-		}
-	}
-
-	return nil
-}
-
-// unlock ...
-//
-// May panic; see scerr.OnPanic() to capture it.
-func (sp *SyncedJSONProperty) unlock() {
-	if sp == nil {
-		panic("Calling sp.unlock() with sp==nil!")
-	}
-	if !sp.readLock {
-		sp.jsonProperty.Unlock()
-	} else {
-		sp.jsonProperty.RUnlock()
-	}
-}
-
-// jsonProperties ...
-type jsonProperties map[string]*jsonProperty
+// // MarshalJSON ...
+// // satisfies json.Marshaller interface
+// func (jp *jsonProperty) MarshalJSON() ([]byte, error) {
+// 	var jsoned []byte
+// 	err := jp.Shielded.Inspect(concurrency.VoidTask(), func(clonable data.Clonable) error {
+// 		var inErr error
+// 		jsoned, inErr = ToJSON(clonable)
+// 		return inErr
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return ToJSON(string(jsoned))
+// }
 
 // JSONProperties ...
 type JSONProperties struct {
-	Properties jsonProperties
+	// Properties jsonProperties
+	Properties data.Map
 	// This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
-	sync.Mutex
+	sync.RWMutex
 	module string
 }
 
 // NewJSONProperties creates a new JSonProperties instance
-//
-// May panic; see scerr.OnPanic() to capture it
-func NewJSONProperties(module string) *JSONProperties {
+func NewJSONProperties(module string) (*JSONProperties, error) {
 	if module == "" {
-		panic("module is empty!")
+		return nil, scerr.InvalidParameterError("module", "can't be empty string")
 	}
 	return &JSONProperties{
-		Properties: jsonProperties{},
+		Properties: data.Map{},
 		module:     module,
-	}
+	}, nil
 }
 
 // Lookup tells if a key is present in JSonProperties
 func (x *JSONProperties) Lookup(key string) bool {
-	x.Lock()
-	defer x.Unlock()
+	x.RLock()
+	defer x.RUnlock()
 
 	_, ok := x.Properties[key]
 	return ok
 }
 
-// LockForRead is used to lock an extension for read
-// Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
-// If no extension exists corresponding to the key, an empty extension is created (in other words, this call
-// cannot fail because a key doesn't exist).
-//
-// May panic; see scerr.OnPanic() to capture it
-func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
-	if x == nil {
-		panic("Calling utils.serialize.JSONProperties::LockForRead() from nil pointer!")
-	}
-	if x.Properties == nil {
-		panic("x.Properties is nil!")
-	}
-	if x.module == "" {
-		panic("x.module is empty!")
-	}
-	if key == "" {
-		panic("key is empty!")
-	}
+// Clone ...
+func (x *JSONProperties) Clone() *JSONProperties {
+	x.RLock()
+	defer x.RUnlock()
 
-	x.Lock()
-	defer x.Unlock()
-
-	var (
-		item  *jsonProperty
-		found bool
-	)
-	if item, found = x.Properties[key]; !found {
-		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-		item = &jsonProperty{
-			Data:   zeroValue,
-			module: x.module,
-			key:    key,
-		}
-		x.Properties[key] = item
+	newP := &JSONProperties{
+		module: x.module,
 	}
-	item.RLock()
-	return &SyncedJSONProperty{jsonProperty: item, readLock: true}
+	for k, v := range x.Properties {
+		newP.Properties[k] = v
+	}
+	return newP
 }
 
-// LockForWrite is used to lock an extension for write
-// Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
-// If no extension exists corresponding to the key, an empty one is created (in other words, this call
-// cannot fail because a key doesn't exist).
-//
-// May panic; see scerr.OnPanic() to capture it.
-func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
+// Inspect allows to consult the content of the property 'key' inside 'inspector' function
+// Changes in the property won't be kept
+func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) error) error {
 	if x == nil {
-		panic("Calling x.LockForWrite() with x==nil!")
+		return scerr.InvalidInstanceError()
 	}
 	if x.Properties == nil {
-		panic("x.jsonProperties is nil!")
+		return scerr.InvalidInstanceContentError("x.Properties", "can't be nil")
 	}
 	if x.module == "" {
-		panic("x.module is empty!")
+		return scerr.InvalidInstanceContentError("x.module", "can't be empty string")
 	}
 	if key == "" {
-		panic("key is empty!")
+		return scerr.InvalidParameterError("key", "cannot be empty string")
 	}
-
-	x.Lock()
-	defer x.Unlock()
+	if inspector == nil {
+		return scerr.InvalidParameterError("inspector", "cannot be nil")
+	}
 
 	var (
 		item  *jsonProperty
 		found bool
 	)
-	if item, found = x.Properties[key]; !found {
+	x.RLock()
+	if item, found = x.Properties[key].(*jsonProperty); !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
 		item = &jsonProperty{
-			Data:   zeroValue,
-			module: x.module,
-			key:    key,
+			Shielded: concurrency.NewShielded(zeroValue),
+			module:   x.module,
+			key:      key,
 		}
 		x.Properties[key] = item
 	}
-	item.Lock()
-	return &SyncedJSONProperty{jsonProperty: item, readLock: false}
+	clone := item.Clone()
+	x.RUnlock()
+
+	return inspector(clone)
+}
+
+// Alter is used to lock an extension for write
+// Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
+// If no extension exists corresponding to the key, an empty one is created (in other words, this call
+// can't fail because a key doesn't exist).
+func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) error) error {
+	if x == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if x.Properties == nil {
+		return scerr.InvalidInstanceContentError("x.Properties", "cannot be nil")
+	}
+	if x.module == "" {
+		return scerr.InvalidInstanceContentError("x.module", "cannot be empty string")
+	}
+	if key == "" {
+		return scerr.InvalidParameterError("key", "cannot be empty string")
+	}
+	if alterer == nil {
+		return scerr.InvalidParameterError("alterer", "cannot be nil")
+	}
+
+	var (
+		item  *jsonProperty
+		found bool
+	)
+	x.Lock()
+	defer x.Unlock()
+
+	if item, found = x.Properties[key].(*jsonProperty); !found {
+		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+		item = &jsonProperty{
+			Shielded: concurrency.NewShielded(zeroValue),
+			module:   x.module,
+			key:      key,
+		}
+		x.Properties[key] = item
+	}
+	clone := item.Clone()
+
+	err := alterer(clone)
+	if err != nil {
+		return err
+	}
+
+	_ = item.Replace(clone)
+	return nil
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
-//
-// May panic; see scerr.OnPanic() to capture it.
-func (x *JSONProperties) SetModule(module string) {
-	if module != "" && x.module == module {
-		return
-	}
-	if x.module != "" {
-		panic("x.SetModule() cannot be changed if x.module is already set!")
+func (x *JSONProperties) SetModule(module string) error {
+	if x == nil {
+		return scerr.InvalidInstanceError()
 	}
 	if module == "" {
-		panic("module is empty!")
+		return scerr.InvalidParameterError("key", "can't be empty string")
 	}
+
 	x.Lock()
 	defer x.Unlock()
 
 	if x.module == "" {
 		x.module = module
 	}
+	return nil
 }
 
 // MarshalJSON implements json.Marshaller
 // Note: DO NOT LOCK property here, deadlock risk
 func (x *JSONProperties) MarshalJSON() ([]byte, error) {
+	if x == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if x.Properties == nil {
+		return nil, scerr.InvalidParameterError("x.Properties", "can't be nil")
+	}
+
 	return ToJSON(&(x.Properties))
 }
 
 // UnmarshalJSON implement json.Unmarshaller
 // Note: DO NOT LOCK property here, deadlock risk
 func (x *JSONProperties) UnmarshalJSON(b []byte) (err error) {
+	if x == nil {
+		return scerr.InvalidInstanceError()
+	}
+
 	defer scerr.OnPanic(&err)()
 
 	// Decode JSON data
@@ -259,11 +243,26 @@ func (x *JSONProperties) UnmarshalJSON(b []byte) (err error) {
 			return err
 		}
 		item := &jsonProperty{
-			Data:   zeroValue,
-			module: x.module,
-			key:    key,
+			Shielded: concurrency.NewShielded(zeroValue),
+			module:   x.module,
+			key:      key,
 		}
 		x.Properties[key] = item
 	}
 	return nil
+}
+
+// ToJSON serializes data into JSON
+func ToJSON(data interface{}) ([]byte, error) {
+	jsoned, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	return jsoned, nil
+}
+
+// FromJSON reads json code and restores data
+func FromJSON(buf []byte, data interface{}) error {
+	err := json.Unmarshal(buf, data)
+	return err
 }
