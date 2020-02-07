@@ -22,6 +22,14 @@ import "github.com/golang/protobuf/ptypes/empty/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 
+// Common
+
+message Reference{
+    string tenant_id = 1;
+    string id = 2;
+    string name = 3;
+}
+
 // Client Requests
 
 message ClientID {
@@ -37,7 +45,7 @@ message ClientRequest {
     google.protobuf.Timestamp timestamp = 2;
 }
 
-// Tenants
+// Tenant requests
 
 message Tenant{
     string name = 1;
@@ -48,33 +56,29 @@ message TenantList{
     repeated Tenant tenants = 1;
 }
 
+message TenantName{
+    string name = 1;
+}
+
+// VPL: not used ?
+// message TenantNameList{
+//     repeated string names = 1;
+// }
+
 service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
-    // rpc StorageList (google.protobuf.Empty) returns (TenantList){}
-    // rpc StorageSet (TenantNameList) returns (google.protobuf.Empty){}
-    // rpc StorageGet (google.protobuf.Empty) returns (TenantNameList){}
+    rpc Cleanup (TenantName) returns (google.protobuf.Empty){}
 }
+
+// Image
 
 message Image{
     string id = 1;
     string name = 2;
 }
 
-message Reference{
-    string tenant_id = 1;
-    string id = 2;
-    string name = 3;
-}
-
-message TenantName{
-    string name = 1;
-}
-
-message TenantNameList{
-    repeated string names = 1;
-}
 
 message ImageList{
     repeated Image images= 1;
@@ -198,26 +202,26 @@ message HostDefinition{
 }
 
 enum NetworkState {
-    UNKNOWNSTATE = 0;
-    PHASE1 = 1;
-    PHASE2 = 2;
-    READY = 3;
-    NETWORKERROR = 4;
+    NS_UNKNOWNSTATE = 0;
+    NS_PHASE1 = 1;
+    NS_PHASE2 = 2;
+    NS_READY = 3;
+    NS_NETWORKERROR = 4;
 }
 
 enum HostState {
     /*STOPPED host is stopped*/
-	STOPPED = 0;
+	HS_STOPPED = 0;
 	/*STARTING host is starting*/
-    STARTING = 1;
+    HS_STARTING = 1;
 	/*STARTED host is started*/
-	STARTED = 2;
+	HS_STARTED = 2;
 	/*STOPPING host is stopping*/
-	STOPPING = 3;
+	HS_STOPPING = 3;
 	/*ERROR host is in error state*/
-	ERROR = 4;
+	HS_ERROR = 4;
     /*UNKNOWN is unknown*/
-    UNKNOWN = 5;
+    HS_UNKNOWN = 5;
 }
 
 message Host{
@@ -242,7 +246,7 @@ message HostStatus {
 }
 
 message HostList{
-    repeated Host hosts= 1;
+    repeated Host hosts = 1;
 }
 
 message SshConfig{
@@ -300,9 +304,9 @@ service TemplateService{
 // safescale volume update v1 --speed="HDD" --size=1000
 
 enum VolumeSpeed{
-    COLD = 0;
-    HDD = 1;
-    SSD = 2;
+    VS_COLD = 0;
+    VS_HDD = 1;
+    VS_SSD = 2;
 }
 
 message VolumeDefinition{
@@ -395,10 +399,13 @@ service BucketService{
     rpc Inspect(Bucket) returns (BucketMountingPoint){}
 }
 
+// SSH requests
+
 message SshCommand{
     Reference host = 1;
     string command = 2;
 }
+
 message SshCopyCommand{
     string source = 1;
     string destination = 2;
@@ -469,6 +476,7 @@ service ShareService{
     rpc Inspect(Reference) returns (ShareMountList){}
 }
 
+// Job Management
 
 message JobDefinition{
     string uuid = 1;
@@ -482,4 +490,150 @@ message JobList{
 service JobService{
     rpc Stop(JobDefinition) returns (google.protobuf.Empty){}
     rpc List(google.protobuf.Empty) returns (JobList){}
+}
+
+// Cluster services
+
+enum ClusterState {
+	CS_UNKNOWN = 0;
+	CS_NOMINAL = 1;
+	CS_DEGRADED = 2;
+	CS_STOPPED = 3;
+	CS_INITIALIZING = 4;
+	CS_CREATED = 5;
+	CS_CREATING = 6;
+	CS_ERROR = 7;
+	CS_REMOVED = 8;
+	CS_STOPPING = 9;
+	CS_STARTING = 10;
+}
+
+message ClusterStateResponse {
+    ClusterState state = 1;
+}
+
+enum ClusterComplexity {
+    CC_UNKNOWN = 0;
+    CC_SMALL = 1;
+    CC_NORMAL = 2;
+    CC_LARGE = 3;
+}
+
+enum ClusterFlavor {
+    CF_UNKNOWN = 0;
+    CF_BOH = 1;
+    CF_K8S = 2;
+}
+
+message ClusterListResponse {
+    repeated ClusterResponse clusters = 1;
+}
+
+message ClusterCreateRequest {
+    string name = 1;
+    ClusterComplexity complexity = 2;
+    ClusterFlavor flavor = 3;
+    bool keep_on_failure = 4;
+    string cidr = 5;
+    repeated string disabled = 6;
+    string os = 7;
+    HostSizing global_sizing = 8;
+    HostSizing gateway_sizing = 9;
+    HostSizing master_sizing = 10;
+    HostSizing node_sizing = 11;
+}
+
+message ClusterResizeRequest {
+    Reference name = 1;
+    int32 count = 2;
+    HostSizing node_sizing = 3;
+    string image_id = 4;
+}
+
+message ClusterDeleteRequest  {
+    Reference name = 1;
+    bool force = 2;     // if true, force cluster deletion no matter what
+}
+
+message ClusterIdentity {
+    string name = 1;
+    ClusterComplexity complexity = 2;
+    ClusterFlavor flavor = 3;
+    SshConfig ssh_config = 4;
+    string admin_password = 5;
+}
+
+message ClusterResponse {
+    ClusterIdentity identity = 1;
+    repeated string properties = 2;
+}
+
+message ClusterNodeListResponse {
+    repeated Host nodes = 1;
+}
+
+message ClusterNodeRequest {
+    string cluster_name = 1;
+    Reference host = 2;     // on deletion, if not set, requests to delete last added node
+}
+
+service ClusterService{
+    rpc List(google.protobuf.Empty) returns (ClusterListResponse){}
+    rpc Inspect(Reference) returns (ClusterResponse){}
+    rpc Create(ClusterCreateRequest) returns (ClusterResponse){}
+    rpc Delete(ClusterDeleteRequest) returns (google.protobuf.Empty){}
+    rpc Start(Reference) returns (google.protobuf.Empty){}
+    rpc Stop(Reference) returns (google.protobuf.Empty){}
+    rpc State(Reference) returns (ClusterStateResponse){}
+    rpc Expand(ClusterResizeRequest) returns (HostList){}
+    rpc Shrink(ClusterResizeRequest) returns (HostList){}
+    rpc ListNodes(Reference) returns (ClusterNodeListResponse){}
+    rpc InspectNode(ClusterNodeRequest) returns (Host){}
+    rpc DeleteNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+    rpc StopNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+    rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+    rpc StateNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+    rpc ListMasters(Reference) returns (ClusterNodeListResponse){}
+    rpc InspectMaster(ClusterNodeRequest) returns (Host){}
+}
+
+// Feature services
+
+enum FeatureTargetType {
+    FT_ALL = 0;
+    FT_HOST = 1;
+    FT_CLUSTER = 2;
+}
+
+message FeatureListRequest {
+    FeatureTargetType target_type = 1;
+    Reference target_ref = 2;
+    bool installed_only = 3;
+}
+
+message FeatureResponse {
+    string name = 1;
+}
+
+message FeatureListResponse {
+    repeated FeatureResponse features = 1;
+}
+
+enum FeatureAction {
+    FA_CHECK = 0;
+    FA_ADD = 1;
+    FA_DELETE = 2;
+}
+
+message FeatureActionRequest {
+    FeatureAction action = 1;
+    FeatureTargetType target_type = 2;
+    Reference target_ref = 3;
+}
+
+service FeatureService {
+    rpc List(FeatureListRequest) returns (FeatureListResponse){}
+    rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
+    rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
+    rpc Delete(FeatureActionRequest) returns (google.protobuf.Empty){}
 }

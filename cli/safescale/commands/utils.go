@@ -24,11 +24,8 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // GenerateClientIdentity builds a string identifying the client
@@ -38,7 +35,7 @@ func GenerateClientIdentity() string {
 }
 
 // constructPBHostDefinitionFromCLI ...
-func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefinition, uint, error) {
+func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*protocol.HostDefinition, uint, error) {
 	var sizing string
 	if c.IsSet(key) {
 		if c.IsSet("cpu") || c.IsSet("cpufreq") || c.IsSet("gpu") || c.IsSet("ram") || c.IsSet("disk") {
@@ -73,7 +70,7 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 		Network: c.String("net"),
 		Public:  c.Bool("public"),
 		Force:   c.Bool("force"),
-		Sizing:  &pb.HostSizing{},
+		Sizing:  &protocol.HostSizing{},
 	}
 	if t, ok := tokens["cpu"]; ok {
 		min, max, err := t.Validate()

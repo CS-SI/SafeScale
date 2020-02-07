@@ -22,38 +22,78 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Features ...
-type Features struct {
+// ClusterInstalledFeature ...
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental/overriding fields
+type ClusterInstalledFeature struct {
+	RequiredBy []string `json:"required_by,omitempty"` // tells what feature(s) needs this one
+	Requires   []string `json:"requires,omitempty"`
+}
+
+// newClusterInstalledFeature ...
+func newClusterInstalledFeature() *ClusterInstalledFeature {
+	return &ClusterInstalledFeature{
+		RequiredBy: []string{},
+		Requires:   []string{},
+	}
+}
+
+// Clone ...
+// satisfies interface data.Clonable
+func (cif *ClusterInstalledFeature) Clone() data.Clonable {
+	return newClusterInstalledFeature().Replace(cif)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (cif *ClusterInstalledFeature) Replace(p data.Clonable) data.Clonable {
+	src := p.(*ClusterInstalledFeature)
+	cif.RequiredBy = make([]string, len(src.RequiredBy))
+	copy(cif.RequiredBy, src.RequiredBy)
+	cif.Requires = make([]string, len(src.Requires))
+	copy(cif.Requires, src.Requires)
+	return cif
+}
+
+// // Reset resets the content of the property
+// func (p *HostInstalledFeature) Reset() {
+// 	*p = HostInstalledFeature{
+// 		RequiredBy: []string{},
+// 		Requires:   []string{},
+// 	}
+// }
+
+// ClusterFeatures ...
+// not FROZEN yet
+type ClusterFeatures struct {
 	// Installed ...
-	Installed map[string]string `json:"installed"`
+	Installed map[string]*ClusterInstalledFeature `json:"installed"`
 	// Disabled keeps track of features normally automatically added with cluster creation,
 	// but explicitely disabled; if a disabled feature is added, must be removed from this property
 	Disabled map[string]struct{} `json:"disabled"`
 }
 
-func newFeatures() *Features {
-	return &Features{
-		Installed: map[string]string{},
+func newFeatures() *ClusterFeatures {
+	return &ClusterFeatures{
+		Installed: map[string]*ClusterInstalledFeature{},
 		Disabled:  map[string]struct{}{},
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (f *Features) Content() interface{} {
-	return f
-}
-
-// Clone ... (data.Clonable interface)
-func (f *Features) Clone() data.Clonable {
+// Clone ...
+// satisfies interface data.Clonable
+func (f *ClusterFeatures) Clone() data.Clonable {
 	return newFeatures().Replace(f)
 }
 
-// Replace ... (data.Clonable interface)
-func (f *Features) Replace(p data.Clonable) data.Clonable {
-	src := p.(*Features)
-	f.Installed = make(map[string]string, len(src.Installed))
+// Replace ...
+// satisfies interface data.Clonable
+func (f *ClusterFeatures) Replace(p data.Clonable) data.Clonable {
+	src := p.(*ClusterFeatures)
+	f.Installed = make(map[string]*ClusterInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
-		f.Installed[k] = v
+		f.Installed[k] = v.Clone().(*ClusterInstalledFeature)
 	}
 	f.Disabled = make(map[string]struct{}, len(src.Disabled))
 	for k, v := range src.Disabled {
@@ -63,5 +103,5 @@ func (f *Features) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.FeaturesV1, newFeatures())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.FeaturesV1, newFeatures())
 }

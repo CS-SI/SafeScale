@@ -40,10 +40,10 @@ func ResourceTimeoutError(resource, name string, dur time.Duration) *scerr.ErrTi
 	return scerr.TimeoutError(msgFinal, dur, nil)
 }
 
-// TimeoutError creates a ErrTimeout error
-func TimeoutError(message string, dur time.Duration) *scerr.ErrTimeout {
-	return scerr.TimeoutError(message, dur, nil)
-}
+// // TimeoutError creates a ErrTimeout error
+// func TimeoutError(message string, dur time.Duration) *scerr.ErrTimeout {
+// 	return scerr.TimeoutError(message, dur, nil)
+// }
 
 // ResourceNotAvailableError creates a ResourceNotAvailable error
 func ResourceNotAvailableError(resource, name string) *scerr.ErrNotAvailable {

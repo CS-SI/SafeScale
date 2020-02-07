@@ -21,10 +21,14 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
-	"github.com/sirupsen/logrus"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -95,7 +99,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 			MinFreq:     in.Gateway.Sizing.MinCpuFreq,
 		}
 	} else {
-		s := srvutils.FromPBHostSizing(*in.Gateway.Sizing)
+		s := srvutils.FromProtocolHostSizing(*in.Gateway.Sizing)
 		sizing = &s
 	}
 	if in.Gateway != nil {
@@ -125,7 +129,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	network := r.(*abstracts.Network)
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)
-	return conv.ToPBNetwork(network), nil
+	return conv.ToProtocolNetwork(network), nil
 }
 
 // List existing networks
@@ -172,7 +176,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	// Build response mapping abstracts.Network to protocol.Network
 	var pbnetworks []*protocol.Network
 	for _, network := range networks {
-		pbnetworks = append(pbnetworks, conv.ToPBNetwork(network))
+		pbnetworks = append(pbnetworks, conv.ToProtocolNetwork(network))
 	}
 	rv := &protocol.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -228,7 +232,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, scerr.NotFoundError(fmt.Sprintf("network '%s' not found", ref))
 	}
 
-	return conv.ToPBNetwork(network), nil
+	return conv.ToProtocolNetwork(network), nil
 }
 
 // Delete a network

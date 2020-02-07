@@ -8,12 +8,12 @@ all: generate
 
 generate:
 	@(cd enums && $(MAKE) $(@))
-	@(cd payloads && $(MAKE) $(@))
+	@(cd operations && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...
 
-clean: 
+clean:
 	@(cd enums && $(MAKE) $(@))
-	@(cd payloads && $(MAKE) $(@))
+	@(cd operations && $(MAKE) $(@))
 	@$(RM) rice-box.go

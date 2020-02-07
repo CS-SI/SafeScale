@@ -78,5 +78,5 @@ func (n *Nodes) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", clusterproperty.NodesV1, newNodes())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.NodesV1, newNodes())
 }

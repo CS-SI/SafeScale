@@ -47,19 +47,16 @@ const (
 
 // Cluster is the implementation of resources.Cluster interface
 type cluster struct {
-	// Identity ?.Identity ?
-	Name string
-	Flavor clusterflavor.Enum
-	Complexity clustercomplexity.Enum
+	Identity abstracts.ClusterIdentity
 
-	*operations.Core
+	*operations.Core `json:"-"`
 	properties     *serialize.JSONProperties
 
 	installMethods      map[uint8]installmethod.Enum
 	lastStateCollection time.Time
 	service iaas.Service
 	makers  Makers
-	concurrency.TaskedLock
+	concurrency.TaskedLock `json:"-"`
 }
 
 // New ...
@@ -99,43 +96,182 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 	defer scerr.OnExitLogError(tracer.TraceMessage("failed to create cluster infrastructure:"), &err)()
 	defer scerr.OnPanic(&err)()
 
-	state := clusterstate.Unknown
-	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		// VPL: For now, always disable addition of feature proxycache-client
-		innerErr := return c.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.Features' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			featuresV1.Disabled["proxycache"] = struct{}{}
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
+	finalState := clusterstate.Unknown
 
-		// Declare cluster state unknown
-		return props.Alter(clusterproperty.StateV1, func(clonable interface{}) error {
-			stateV1, ok := clonable.(*clusterpropsv1.State)
-			if !ok {
-				return scerr.InconsistentError("'*propsv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			stateV1.State = clusterstate.Creating
-			return nil
-		})
-	})
+	// Creates first metadata of cluster after initialization
+	err = c.firstLight(task, req)
 	if err != nil {
-		logrus.Errorf("failed to disable feature 'proxycache': %v", err)
 		return err
 	}
 
+	// Starting from here, delete metadata if exiting with error
 	defer func() {
-		if err != nil {
-			state = clusterstate.Error
-		} else {
-			state = clusterstate.Created
+		if err != nil && !req.KeepOnFailure {
+			derr := c.Core.Delete(task)
+			if derr != nil {
+				logrus.Errorf("after failure, cleanup failed to delete cluster metadata")
+			}
 		}
 	}()
+
+	// defer func() {
+	// 	if err != nil {
+	// 		finalState = clusterstate.Error
+	// 	} else {
+	// 		finalState = clusterstate.Created
+	// 	}
+	// }()
+
+	// Define the sizing requirements for cluster hosts
+	gatewaysDef, mastersDef, nodesDef := c.defineSizingRequirements(task, req)
+
+	// Create the network
+	network, err := c.createNetwork(task, req)
+	if err != nil {
+		return err
+	}
+	// req.NetworkID = network.ID()
+
+	defer func() {
+		if err != nil && !req.KeepOnFailure {
+			derr := network.Delete(task)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
+	// Creates and configures hosts
+	err = c.createHosts(task, req, network)
+	if err != nil {
+		return nil, err
+	}
+
+	// Starting from here, exiting with err deletes hosts if req.KeepOnFailure is false
+	defer func() {
+		if err != nil && !req.KeepOnFailure {
+			tg, tgerr := concurrency.NewTaskGroup(task)
+			if tgerr != nil {
+				err = scerr.AddConsequence(err, tgerr)
+			} else {
+				list, merr := c.ListMasterIDs(task)
+				if merr != nil {
+					err = scerr.AddConsequence(err, merr)
+				} else {
+					for _, v := range list {
+						tgerr = tg.StartInSubTask(taskDeleteHost, data.Map{"host": v})
+						if tgerr != nil {
+							err = scerr.AddConsequence(err, tgerr)
+						}
+					}
+				}
+
+				list, merr = c.ListNodeIDs(task)
+				if merr != nil {
+					err = scerr.AddConsequence(err, merr)
+				} else {
+					for _, v := range list {
+						tgerr = tg.StartInSubTask(taskDeleteHost, data.Map{"host": v})
+						if tgerr != nil {
+							err = scerr.AddConsequence(err, tgerr)
+						}
+					}
+				}
+
+				tgerr = tg.WaitFor(temporal.GetLongExecutionTimeout())
+				if tgerr != nil {
+					err = scerr.AddConsequence(err, tgerr)
+				}
+			}
+
+		}
+	}()
+
+	// At the end, configure cluster as a whole
+	err = c.configureCluster(task, data.Map{
+		"PrimaryGateway":   primaryGateway,
+		"SecondaryGateway": secondaryGateway,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// firstLight contains the code leading to cluster first metadata written
+func (c *cluster) firstLight(task concurrency.Task, req Request) error {
+	// Metadata is not yet written to object storage, we can go directly to properties
+	props, err := c.properties(task)
+	if err != nil {
+		return err
+	}
+	// finalState := clusterstate.Unknown
+
+	// VPL: For now, always disable addition of feature proxycache-client
+	err = return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
+		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+		if !ok {
+			return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		featuresV1.Disabled["proxycache"] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		return scerr.Wrap(err, "failed to disable feature 'proxycache'")
+	}
+	// ENDVPL
+
+	// Sets initial state of the new cluster and create metadata
+	err = props.Alter(clusterproperty.StateV1, func(clonable interface{}) error {
+		stateV1, ok := clonable.(*clusterpropsv1.State)
+		if !ok {
+			return scerr.InconsistentError("'*propsv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		stateV1.State = clusterstate.Creating
+		return nil
+	})
+	if err != nil {
+		return scerr.Wrap(err, "failed to set initial state of cluster")
+	}
+
+	// sets default sizing from req
+	err = props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+		defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
+		if !ok {
+			return scerr.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		defaultsV2.GatewaySizing = srvutils.FromProtocolHostSizing(*req.GatewaysDef.Sizing)
+		defaultsV2.MasterSizing = srvutils.FromProtocolHostSizing(*req.MastersDef.Sizing)
+		defaultsV2.NodeSizing = srvutils.FromProtocolHostSizing(*req.NodesDef.Sizing)
+		// FIXME: how to recover image ID from construct() ?
+		// defaultsV2.Image = imageID
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// FUTURE: sets the cluster composition (when we will be able to manage cluster spread on several tenants...)
+	err = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) error {
+		compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
+		if !ok {
+			return scerr.InconsistentError("'*propertiesv1.ClusterComposite' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		compositeV1.Tenants = []string{req.Tenant}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create a KeyPair for the user cladm
+	kpName = "cluster_" + req.Name + "_cladm_key"
+	kp, err = svc.CreateKeyPair(kpName)
+	if err != nil {
+		return err
+	}
+	c.Identity.Keypair = kp
 
 	// Generate needed password for account cladm
 	cladmPassword, err := utils.GeneratePassword(16)
@@ -143,8 +279,34 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 		return err
 	}
 
+	// Sets identity
+	c.Identity.Name = req.Name
+	c.Identity.Flavor = req.Flavor
+	c.Identity.Complexity = req.Complexity
+	c.Identity.AdminPassword = cladmPassword
+
+	// Links maker based on Flavor
+	err = c.Bootstrap()
+	if err != nil {
+		return err
+	}
+
+	// Writes the metadata for the first time
+	return c.Carry(task, c)
+}
+
+// defineSizings calculates the sizings needed for the hosts of the cluster
+func (c *cluster) defineSizingRequirements(
+	task concurrency.Task, req Request
+) (*resources.SizingRequirements, *resources.SizingRequirements, *resources.SizingRequirements, error) {
+	var (
+		gatewaysDefault *resources.SizingRequirements
+		mastersDefault *resources.SizingRequirements
+		nodesDefault *resources.SizingRequirements
+		imageID string
+	)
+
 	// Determine default image
-	var imageID string
 	if req.NodesDef != nil {
 		imageID = req.NodesDef.ImageId
 	}
@@ -156,7 +318,6 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 	}
 
 	// Determine Gateway sizing
-	var gatewaysDefault *resources.SizingRequirements
 	if c.makers.DefaultGatewaySizing != nil {
 		gatewaysDefault = complementSizingRequirements(nil, c.makers.DefaultGatewaySizing(task, c))
 	} else {
@@ -173,7 +334,6 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 	gatewaysDef := complementSizingRequirements(req.GatewaysDef, gatewaysDefault)
 
 	// Determine master sizing
-	var mastersDefault *resources.SizingRequirements
 	if c.makers.DefaultMasterSizing != nil {
 		mastersDefault = complementSizingRequirements(nil, c.makers.DefaultMasterSizing(task, c))
 	} else {
@@ -191,7 +351,6 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 	mastersDef := complementSizingRequirements(req.MastersDef, mastersDefault)
 
 	// Determine node sizing
-	var nodesDefault resources.SizingRequirements
 	if c.makers.DefaultNodeSizing != nil {
 		nodesDefault = complementSizingRequirements(nil, c.makers.DefaultNodeSizing(task, c))
 	} else {
@@ -207,19 +366,33 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 	nodesDefault.ImageId = imageID
 	nodesDef := complementSizingRequirements(req.NodesDef, nodesDefault)
 
-	// Initialize service to use
-	clientInstance := client.New()
-	tenant, err := clientInstance.Tenant.Get(temporal.GetExecutionTimeout())
+	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			defaultsV2.GatewaySizing = *gatewaysDef.Sizing
+			defaultsV2.MasterSizing = *mastersDef.Sizing
+			defaultsV2.NodeSizing = *nodesDef.Sizing
+			defaultsV2.Image = imageID
+			return nil
+		})
+		if innerErr != nil {
+			return innerErr
+		}
+	})
 	if err != nil {
-		return err
-	}
-	svc, err := iaas.UseService(tenant.Name)
-	if err != nil {
-		return err
+		nil, nil, nil, return err
 	}
 
+	return gatewaysDef, mastersDef, nodesDef, nil
+}
+
+// createNetwork creates the network for the cluster
+func (c *cluster) createNetwork(task, req) (resources.Network, error) {
 	// Determine if Gateway Failover must be set
-	caps := svc.Capabilities()
+	caps := c.service.Capabilities()
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {
@@ -239,149 +412,120 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 		Gateway:  &sizing,
 		FailOver: !gwFailoverDisabled,
 	}
-	clientNetwork := clientInstance.Network
-	network, err := clientNetwork.Create(def, temporal.GetExecutionTimeout())
+
+	network, err := networkfactory.New(task)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	logrus.Debugf("[cluster %s] network '%s' creation successful.", req.Name, networkName)
-	req.NetworkID = network.Id
+	err = network.Create(def, temporal.GetExecutionTimeout())
+	if err != nil {
+		return nil, err
+	}
 
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := clientNetwork.Delete([]string{network.Id}, temporal.GetExecutionTimeout())
+			derr := network.Delete(task, temporal.GetExecutionTimeout())
 			if derr != nil {
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
 
-	// Saving Cluster parameters, with status 'Creating'
-	var (
-		kp                               *resources.KeyPair
-		kpName                           string
-		primaryGateway, secondaryGateway *resources.Host
-	)
-
-	// Loads primary gateway metadata
-	// primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
-	// if err != nil {
-	// 	if _, ok := err.(*scerr.ErrNotFound); ok {
-	// 		if !ok {
-	// 			return err
-	// 		}
-	// 	}
-	// 	return err
-	// }
-	// primaryGateway, _, _, err = svc.InspectHost(network.GatewayId)
-	// if err != nil {
-	// 	return err
-	// }
-	err = clientInstance.SSH.WaitReady(network.GatewayId, temporal.GetExecutionTimeout())
-	if err != nil {
-		return client.DecorateError(err, "wait for remote ssh service to be ready", false)
-	}
-
-	// Loads secondary gateway metadata
-	if !gwFailoverDisabled {
-		// secondaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.SecondaryGatewayId)
-		// if err != nil {
-		// 	if _, ok := err.(*scerr.ErrNotFound); ok {
-		// 		if !ok {
-		// 			return err
-		// 		}
-		// 	}
-		// 	return err
-		// }
-		// secondaryGateway, err = secondaryGatewayMetadata.Get()
-		// if err != nil {
-		// 	return err
-		// }
-		err = clientInstance.SSH.WaitReady(network.SecondaryGatewayId, temporal.GetExecutionTimeout())
-		if err != nil {
-			return client.DecorateError(err, "wait for remote ssh service to be ready", false)
-		}
-	}
-
-	// Create a KeyPair for the user cladm
-	kpName = "cluster_" + req.Name + "_cladm_key"
-	kp, err = svc.CreateKeyPair(kpName)
-	if err != nil {
-		return err
-	}
-
-	// Saving Cluster metadata, with status 'Creating'
-	c.Name = req.Name
-	c.Flavor = req.Flavor
-	c.Complexity = req.Complexity
-	c.Keypair = kp
-	c.AdminPassword = cladmPassword
-
+	// Updates cluster metadata, propertiesv2.ClusterNetwork
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
-			// FIXME: validate cast
-			defaultsV2 := clonable.(*propertiesv2.ClusterDefaults)
-			defaultsV2.GatewaySizing = srvutils.FromProtocolHostSizing(*gatewaysDef.Sizing)
-			defaultsV2.MasterSizing = srvutils.FromProtocolHostSizing(*mastersDef.Sizing)
-			defaultsV2.NodeSizing = srvutils.FromProtocolHostSizing(*nodesDef.Sizing)
-			defaultsV2.Image = imageID
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
-
-		// CompositeV1 allows to store the different tenants where the cluster is spreading (there is no way today to do this...)
-		innerErr = c.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) error {
-			compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
-			if !ok {
-				return scerr.InconsistentError("'*clusterpropsv1.Composite' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			compositeV1.Tenants = []string{req.Tenant}
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
-
 		return props.Alter(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 			networkV2, ok := v.(*propertiesv2.ClusterNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			networkV2.NetworkID = req.NetworkID
+			primaryGateway, innerErr := network.PrimaryGateway()
+			if innerErr != nil {
+				return innerErr
+			}
+			var secondaryGateway resources.Host
+			if !gatewayFailoverDisabled {
+				secondaryGateway, innerErr = network.SecondaryGateway()
+				if innerErr != nil {
+					if _, ok := innerErr.(*scerr.ErrNotFound); !ok {
+						return innerErr
+					}
+				}
+			}
+			networkV2.NetworkID = network.ID()
 			networkV2.CIDR = req.CIDR
-			networkV2.GatewayID = primaryGateway.ID
-			networkV2.GatewayIP = primaryGateway.GetPrivateIP()
+			networkV2.GatewayID = primaryGateway.ID()
+			networkV2.GatewayIP = primaryGateway.PrivateIP()
 			if !gwFailoverDisabled {
-				networkV2.SecondaryGatewayID = secondaryGateway.ID
-				networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
-				networkV2.DefaultRouteIP = network.VirtualIp.PrivateIp
-				// VPL: no public IP on VIP yet...
-				// networkV2.EndpointIP = network.VirtualIp.PublicIp
-				networkV2.EndpointIP = primaryGateway.GetPublicIP()
-				networkV2.PrimaryPublicIP = primaryGateway.GetPublicIP()
-				networkV2.SecondaryPublicIP = secondaryGateway.GetPublicIP()
+				networkV2.SecondaryGatewayID = secondaryGateway.ID()
+				networkV2.SecondaryGatewayIP = secondaryGateway.PrivateIP()
+				networkV2.DefaultRouteIP = network.VirtualIp.PrivateIP
+				// VPL: no public IP on VIP yet... use the primary gateway public ip for now
+				// networkV2.EndpointIP = network.VirtualIP.PublicIP
+				networkV2.EndpointIP = primaryGateway.PublicIP()
+				networkV2.PrimaryPublicIP = networkV2.EndpointIP
+				networkV2.SecondaryPublicIP = secondaryGateway.PublicIP()
 			} else {
-				networkV2.DefaultRouteIP = primaryGateway.GetPrivateIP()
-				networkV2.EndpointIP = primaryGateway.GetPublicIP()
+				networkV2.DefaultRouteIP = primaryGateway.PrivateIP()
+				networkV2.EndpointIP = primaryGateway.PublicIP()
 				networkV2.PrimaryPublicIP = networkV2.EndpointIP
 			}
 			return nil
 		})
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			derr := c.core.Delete(task)
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
-			}
+	logrus.Debugf("[cluster %s] network '%s' creation successful.", req.Name, networkName)
+	return network, nil
+}
+
+// createHosts creates and configures hosts for the cluster
+func (c *cluster) createHosts(task concurrency.Task, req Request, network resources.Network) error {
+	primaryGateway, err := network.PrimaryGateway()
+	if err != nil {
+		return err
+	}
+	secondaryGateway, err := network.SecondaryGateway()
+	if err != nil {
+		if _, ok := err.(*scerr.ErrNotFound); !ok {
+			return err
 		}
-	}()
+	}
+
+	err = primaryGateway.WaitSSHReady(temporal.GetExecutionTimeout())
+	if err != nil {
+		return scerr.Wrap(err, "wait for remote ssh service to be ready")
+	}
+
+	// Loads secondary gateway metadata
+	if secondaryGateway != nil {
+		err = secondaryGateway.WaitSSHReady(temporal.GetExecutionTimeout())
+		if err != nil {
+			return scerr.Wrap(err, "wait for remote ssh service to be ready")
+		}
+	}
+
+	var (
+		mastersDef *abstracts.HostSizing
+		nodesDef *abstracts.HostSizing
+	)
+	props, err := c.pmake croperties(task)
+	if err != nil {
+		return err
+	}
+	err = props.Inspect(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+		defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
+		if !ok {
+			return scerr.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		mastersDef = defaultsV2.MasterSizing
+		nodesDef = defaultsV2.NodeSizing
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
 	masterCount, privateNodeCount, _ := c.determineRequiredNodes(task)
 	var (
@@ -393,12 +537,12 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 	)
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
-	primaryGatewayTask, err := task.StartInSubTask(b.taskInstallGateway, srvutils.ToPBHost(primaryGateway))
+	primaryGatewayTask, err := task.StartInSubTask(b.taskInstallGateway, primaryGateway)
 	if err != nil {
 		return err
 	}
-	if !gwFailoverDisabled {
-		secondaryGatewayTask, err = task.StartInSubTask(b.taskInstallGateway, srvutils.ToPBHost(secondaryGateway))
+	if secondaryGateway != nil {
+		secondaryGatewayTask, err = task.StartInSubTask(b.taskInstallGateway, secondaryGateway)
 		if err != nil {
 			return err
 		}
@@ -435,20 +579,18 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 		}
 		return primaryGatewayStatus
 	}
-	if !gwFailoverDisabled {
-		if secondaryGatewayTask != nil {
-			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
-			if secondaryGatewayStatus != nil {
-				abortMasterErr := mastersTask.Abort()
-				if abortMasterErr != nil {
-					secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortMasterErr)
-				}
-				abortNodesErr := privateNodesTask.Abort()
-				if abortNodesErr != nil {
-					secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortNodesErr)
-				}
-				return secondaryGatewayStatus
+	if secondaryGateway != nil && secondaryGatewayTask != nil {
+		_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
+		if secondaryGatewayStatus != nil {
+			abortMasterErr := mastersTask.Abort()
+			if abortMasterErr != nil {
+				secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortMasterErr)
 			}
+			abortNodesErr := privateNodesTask.Abort()
+			if abortNodesErr != nil {
+				secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortNodesErr)
+			}
+			return secondaryGatewayStatus
 		}
 	}
 
@@ -459,17 +601,22 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 			if merr != nil {
 				err = scerr.AddConsequence(err, merr)
 			} else {
-				values := make([]string, 0, len(list))
-				for _, v := range list {
-					values = append(values, v)
-				}
-				derr := client.New().Host.Delete(values, temporal.GetExecutionTimeout())
-				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
+				tg, err := concurrency.NewTaskGroup(task)
+				if tgerr != nil {
+					err = scerr.AddConsequence(err, tgerr)
+				} else {
+					for _, v := range list {
+						tg.StartInSubTask(taskDeleteHost, data.Map{"host": v})
+					}
+					derr := tg.WaitFor(temporal.GetLongExecutionTimeout())
+					if derr != nil {
+						err = scerr.AddConsequence(err, derr)
+					}
 				}
 			}
 		}
 	}()
+
 	_, mastersStatus = mastersTask.Wait()
 	if mastersStatus != nil {
 		abortNodesErr := privateNodesTask.Abort()
@@ -519,17 +666,23 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 		return mastersStatus
 	}
 
-	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			clientHost := clientInstance.Host
-			list, lerr := c.ListNodeIDs(task)
-			if lerr != nil {
-				err = scerr.AddConsequence(err, lerr)
+			list, merr := c.ListNodeIDs(task)
+			if merr != nil {
+				err = scerr.AddConsequence(err, merr)
 			} else {
-				derr := clientHost.Delete(list.Values(), temporal.GetExecutionTimeout())
-				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
+				tg, err := concurrency.NewTaskGroup(task)
+				if tgerr != nil {
+					err = scerr.AddConsequence(err, tgerr)
+				} else {
+					for _, v := range list {
+						tg.StartInSubTask(taskDeleteHost, data.Map{"host": v})
+					}
+					derr := tg.WaitFor(temporal.GetLongExecutionTimeout())
+					if derr != nil {
+						err = scerr.AddConsequence(err, derr)
+					}
 				}
 			}
 		}
@@ -546,15 +699,6 @@ func (c *cluster) Create(task concurrency.Task, req abstracts.ClusterRequest) (e
 	_, privateNodesStatus = task.RunInSubTask(c.taskConfigureNodes, nil)
 	if privateNodesStatus != nil {
 		return privateNodesStatus
-	}
-
-	// At the end, configure cluster as a whole
-	err = c.configureCluster(task, data.Map{
-		"PrimaryGateway":   primaryGateway,
-		"SecondaryGateway": secondaryGateway,
-	})
-	if err != nil {
-		return err
 	}
 
 	return nil
@@ -643,7 +787,9 @@ func (c *cluster) Bootstrap(task concurrency.Task) error {
 
 // Browse walks through cluster folder and executes a callback for each entry
 func (c *cluster) Browse(task concurrency.Task, callback func([]byte) error) error {
-	// Note: Allows to browse with an oc == nil by design
+	if c == nil {
+		return scerr.InvalidInstanceError()
+	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -651,177 +797,7 @@ func (c *cluster) Browse(task concurrency.Task, callback func([]byte) error) err
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	return c.core.Browse(task, callback)
-}
-
-// Create creates a new cluster and save its metadata
-func (c *cluster) Create(task concurrency.Task, req resources.ClusterRequest) (err error) {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
-	}
-
-	tracer := concurrency.NewTracer(nil, "", false).GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	// VPL: For now, always disable addition of feature proxycache-client
-	props, err := c.Properties(task)
-	if err != nil {
-		return err
-	}
-	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
-		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-		if !ok {
-			return scerr.InconsistentError("'*propertiesv1.Features' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		featuresV1.Disabled["proxycache"] = struct{}{}
-		return nil
-	})
-	if err != nil {
-		logrus.Errorf("failed to disable feature 'proxycache': %v", err)
-		return err
-	}
-	// ENDVPL
-
-	err = c.Bootstrap()
-	if err != nil {
-		return err
-	}
-	// FIXME: cluster and controller have been merged, define what to carry
-	// err = c.Carry(task, ctrl)
-	// if err != nil {
-	// 	return err
-	// }
-
-	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
-			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
-			if !ok {
-				return scerr.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			defaultsV2.GatewaySizing = srvutils.FromProtocolHostSizing(*req.GatewaysDef.Sizing)
-			defaultsV2.MasterSizing = srvutils.FromProtocolHostSizing(*req.MastersDef.Sizing)
-			defaultsV2.NodeSizing = srvutils.FromProtocolHostSizing(*req.NodesDef.Sizing)
-			// FIXME: how to recover image ID from construct() ?
-			// defaultsV2.Image = imageID
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
-
-		innerErr = props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
-			stateV1, ok := clonable.(*propertiesv1.ClusterState)
-			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			stateV1.State = clusterstate.Creating
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
-
-		return props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) error {
-			compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
-			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.ClusterComposite' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			compositeV1.Tenants = []string{req.Tenant}
-			return nil
-		})
-	})
-	if err != nil {
-		return err
-	}
-
-	// Starting from here, delete metadata if exiting with error
-	defer func() {
-		if err != nil {
-			derr := c.core.Delete(task)
-			if derr != nil {
-				logrus.Errorf("after failure, cleanup failed to delete cluster metadata")
-			}
-		}
-	}()
-
-	// Bootstrap the cluster based on flavor
-	c.Identity.Flavor = req.Flavor
-	err = c.Bootstrap()
-	if err != nil {
-		return nil, err
-	}
-
-	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		// Launch infrastructure construction
-		// err = ctrl.construct()
-		// if err != nil {
-		// 	return err
-		// }
-
-		// Updates metadata after cluster created successfully
-		objn, inErr := networkfactory.Load(task, c.service, req.NetworkID)
-		if inErr != nil {
-			return inErr
-		}
-		var (
-			objpgw, objsgw *Host
-		)
-		inErr = objn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-			rn, ok := clonable.(*abstracts.Network)
-			if !ok {
-				return scerr.InconsistentError("'*abstracts.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			var hostErr error
-			objpgw, hostErr = hostfactory.Load(task, c.service, rn.GatewayID)
-			if hostErr != nil {
-				return hostErr
-			}
-			if rn.SecondaryGatewayID != "" {
-				objpgw, hostErr = hostfactory.Load(task, c.service, rn.GatewayID)
-				if hostErr != nil {
-					return hostErr
-				}
-			}
-			return nil
-		})
-		if inErr != nil {
-			return inErr
-		}
-		return props.Alter(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
-			networkV2, ok := clonable.(*propertiesv2.Network)
-			if !ok {
-				return scerr.InconsistentError("'*propertiesv2.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			networkV2.NetworkID = req.NetworkID
-			networkV2.CIDR = req.CIDR
-			networkV2.GatewayID = objpgw.ID(task)
-			networkV2.GatewayIP = objpgw.PrivateIP(task)
-			if !gwFailoverDisabled {
-				networkV2.SecondaryGatewayID = secondaryGateway.ID
-				networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
-				networkV2.DefaultRouteIP = network.VirtualIp.PrivateIp
-				// VPL: no public IP on VIP yet...
-				// networkV2.EndpointIP = network.VirtualIp.PublicIp
-				networkV2.EndpointIP = primaryGateway.GetPublicIP()
-				networkV2.PrimaryPublicIP = primaryGateway.GetPublicIP()
-				networkV2.SecondaryPublicIP = secondaryGateway.GetPublicIP()
-			} else {
-				networkV2.DefaultRouteIP = primaryGateway.GetPrivateIP()
-				networkV2.EndpointIP = primaryGateway.GetPublicIP()
-				networkV2.PrimaryPublicIP = networkV2.EndpointIP
-			}
-			return nil
-		})
-	})
-	if err != nil {
-		return err
-	}
-
+	return c.Core.Browse(task, callback)
 }
 
 // Identity returns the identity of the cluster
@@ -1011,25 +987,25 @@ func (c *Cluster) NetworkConfig(task concurrency.Task) (config *propertiesv1.Net
 	return config, nil
 }
 
-// // Properties returns the extension of the cluster
-// //
-// // satisfies interface cluster.Controller
-// func (objc *Cluster) Properties(task concurrency.Task) (props *serialize.JSONProperties, err error) {
-// 	if objc == nil {
-// 		return nil, scerr.InvalidInstanceError()
-// 	}
-// 	if task == nil {
-// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
-// 	}
+// properties returns the extension of the cluster
+//
+// satisfies interface cluster.Controller
+func (c *Cluster) properties(task concurrency.Task) (props *serialize.JSONProperties, err error) {
+	if c == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
 
-// 	tracer := concurrency.NewTracer(nil, "", false).GoingIn()
-// 	defer tracer.OnExitTrace()()
-// 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer := concurrency.NewTracer(nil, "", false).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-// 	objc.lock.RLock(task)
-// 	defer objc.lock.RUnlock(task)
-// 	return nil, objc.properties
-// }
+	c.lock.RLock(task)
+	defer c.lock.RUnlock(task)
+	return nil, c.properties
+}
 
 // Start starts the cluster
 // satisfies interface cluster.cluster.Controller
@@ -2416,479 +2392,6 @@ func contains(list []*propertiesv2.Node, hostID string) (bool, int) {
 	return found, idx
 }
 
-// construct ...
-func (c *cluster) construct(task concurrency.Task, req Request) (err error) {
-	defer scerr.OnPanic(&err)()
-
-	tracer := concurrency.NewTracer(task, "", true).GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	// Wants to inform about the duration of the operation
-	defer temporal.NewStopwatch().OnExitLogInfo(
-		fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
-		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
-	)()
-
-	state := clusterstate.Unknown
-
-	defer func() {
-		if err != nil {
-			state = clusterstate.Error
-		} else {
-			state = clusterstate.Created
-		}
-
-		metaErr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-			// Cluster created and configured successfully
-			return props.Alter(clusterproperty.StateV1, func(clonable interface{}) error {
-				stateV1, ok := clonable.(*clusterpropsv1.State)
-				if !ok {
-					return scerr.InconsistentError("'*propsv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				stateV1.State = state
-				return nil
-			})
-		})
-		if metaErr != nil {
-			err = scerr.AddConsequence(err, metaErr)
-		}
-	}()
-
-	if task == nil {
-		task = concurrency.RootTask()
-	}
-
-	// Generate needed password for account cladm
-	cladmPassword, err := utils.GeneratePassword(16)
-	if err != nil {
-		return err
-	}
-
-	// Determine default image
-	var imageID string
-	if req.NodesDef != nil {
-		imageID = req.NodesDef.ImageId
-	}
-	if imageID == "" && c.makers.DefaultImage != nil {
-		imageID = b.makers.DefaultImage(task, c)
-	}
-	if imageID == "" {
-		imageID = "Ubuntu 18.04"
-	}
-
-	// Determine Gateway sizing
-	var gatewaysDefault *protocol.HostDefinition
-	if c.makers.DefaultGatewaySizing != nil {
-		gatewaysDefault = complementHostDefinition(nil, c.makers.DefaultGatewaySizing(task, c))
-	} else {
-		gatewaysDefault = &protocol.HostDefinition{
-			Sizing: &protocol.HostSizing{
-				MinCpuCount: 2,
-				MaxCpuCount: 4,
-				MinRamSize:  7.0,
-				MaxRamSize:  16.0,
-				MinDiskSize: 50,
-				GpuCount:    -1,
-			},
-		}
-	}
-	gatewaysDefault.ImageId = imageID
-	gatewaysDef := complementHostDefinition(req.GatewaysDef, *gatewaysDefault)
-
-	// Determine master sizing
-	var mastersDefault *protocol.HostDefinition
-	if c.DefaultMasterSizing != nil {
-		mastersDefault = complementHostDefinition(nil, c.makers.DefaultMasterSizing(task, c))
-	} else {
-		mastersDefault = &protocol.HostDefinition{
-			Sizing: &protocol.HostSizing{
-				MinCpuCount: 4,
-				MaxCpuCount: 8,
-				MinRamSize:  15.0,
-				MaxRamSize:  32.0,
-				MinDiskSize: 100,
-				GpuCount:    -1,
-			},
-		}
-	}
-	// Note: no way yet to define master sizing from cli...
-	mastersDefault.ImageId = imageID
-	mastersDef := complementHostDefinition(req.MastersDef, *mastersDefault)
-
-	// Determine node sizing
-	var nodesDefault *protocol.HostDefinition
-	if b.makers.DefaultNodeSizing != nil {
-		nodesDefault = complementHostDefinition(nil, c.makers.DefaultNodeSizing(task, c))
-	} else {
-		nodesDefault = &protocol.HostDefinition{
-			Sizing: &protocol.HostSizing{
-				MinCpuCount: 4,
-				MaxCpuCount: 8,
-				MinRamSize:  15.0,
-				MaxRamSize:  32.0,
-				MinDiskSize: 100,
-				GpuCount:    -1,
-			},
-		}
-	}
-	nodesDefault.ImageId = imageID
-	nodesDef := complementHostDefinition(req.NodesDef, *nodesDefault)
-
-	// Initialize service to use
-	clientInstance := client.New()
-	tenant, err := clientInstance.Tenant.Get(temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	svc, err := iaas.UseService(tenant.Name)
-	if err != nil {
-		return err
-	}
-
-	// Determine if Gateway Failover must be set
-	caps := svc.GetCapabilities()
-	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
-	for k := range req.DisabledDefaultFeatures {
-		if k == "gateway-failover" {
-			gwFailoverDisabled = true
-			break
-		}
-	}
-
-	// Creates network
-	logrus.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
-	req.Name = strings.ToLower(req.Name)
-	networkName := "net-" + req.Name
-	sizing := srvutils.FromProtocolHostDefinitionToProtocolGatewayDefinition(*gatewaysDef)
-	def := protocol.NetworkDefinition{
-		Name:     networkName,
-		Cidr:     req.CIDR,
-		Gateway:  &sizing,
-		FailOver: !gwFailoverDisabled,
-	}
-	clientNetwork := clientInstance.Network
-	network, err := clientNetwork.Create(def, temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	logrus.Debugf("[cluster %s] network '%s' creation successful.", req.Name, networkName)
-	req.NetworkID = network.Id
-
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			derr := clientNetwork.Delete([]string{network.Id}, temporal.GetExecutionTimeout())
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
-
-	// Saving Cluster parameters, with status 'Creating'
-	var (
-		kp                               *abstracts.KeyPair
-		kpName                           string
-		primaryGateway, secondaryGateway *abstracts.Host
-	)
-
-	// Loads primary gateway metadata
-	// primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
-	// if err != nil {
-	// 	if _, ok := err.(*scerr.ErrNotFound); ok {
-	// 		if !ok {
-	// 			return err
-	// 		}
-	// 	}
-	// 	return err
-	// }
-	// primaryGateway, _, _, err = svc.InspectHost(network.GatewayId)
-	// if err != nil {
-	// 	return err
-	// }
-	err = clientInstance.SSH.WaitReady(network.GatewayId, temporal.GetExecutionTimeout())
-	if err != nil {
-		return client.DecorateError(err, "wait for remote ssh service to be ready", false)
-	}
-
-	// Loads secondary gateway metadata
-	if !gwFailoverDisabled {
-		// secondaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.SecondaryGatewayId)
-		// if err != nil {
-		// 	if _, ok := err.(*scerr.ErrNotFound); ok {
-		// 		if !ok {
-		// 			return err
-		// 		}
-		// 	}
-		// 	return err
-		// }
-		// secondaryGateway, err = secondaryGatewayMetadata.Get()
-		// if err != nil {
-		// 	return err
-		// }
-		err = clientInstance.SSH.WaitReady(network.SecondaryGatewayId, temporal.GetExecutionTimeout())
-		if err != nil {
-			return client.DecorateError(err, "wait for remote ssh service to be ready", false)
-		}
-	}
-
-	// Create a KeyPair for the user cladm
-	kpName = "cluster_" + req.Name + "_cladm_key"
-	kp, err = svc.CreateKeyPair(kpName)
-	if err != nil {
-		return err
-	}
-
-	// Saving Cluster metadata, with status 'Creating'
-	c.Identity.Name = req.Name
-	c.Identity.Flavor = req.Flavor
-	c.Identity.Complexity = req.Complexity
-	c.Identity.Keypair = kp
-	c.Identity.AdminPassword = cladmPassword
-	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		err := props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
-			// FIXME: validate cast
-			defaultsV2 := v.(*clusterpropsv2.Defaults)
-			defaultsV2.GatewaySizing = srvutils.FromProtocolHostSizing(*gatewaysDef.Sizing)
-			defaultsV2.MasterSizing = srvutils.FromProtocolHostSizing(*mastersDef.Sizing)
-			defaultsV2.NodeSizing = srvutils.FromProtocolHostSizing(*nodesDef.Sizing)
-			defaultsV2.Image = imageID
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-
-		err = props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
-			// FIXME: validate cast
-			clonable.(*clusterpropsv1.State).State = clusterstate.Creating
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-
-		err = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) error {
-			// FIXME: validate cast
-			clonable.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-
-		return props.Alter(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
-			// FIXME: validate cast
-			networkV2 := clonable.(*clusterpropsv2.Network)
-			networkV2.NetworkID = req.NetworkID
-			networkV2.CIDR = req.CIDR
-			networkV2.GatewayID = primaryGateway.ID
-			networkV2.GatewayIP = primaryGateway.GetPrivateIP()
-			if !gwFailoverDisabled {
-				networkV2.SecondaryGatewayID = secondaryGateway.ID
-				networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
-				networkV2.DefaultRouteIP = network.VirtualIp.PrivateIp
-				// VPL: no public IP on VIP yet...
-				// networkV2.EndpointIP = network.VirtualIp.PublicIp
-				networkV2.EndpointIP = primaryGateway.GetPublicIP()
-				networkV2.PrimaryPublicIP = primaryGateway.GetPublicIP()
-				networkV2.SecondaryPublicIP = secondaryGateway.GetPublicIP()
-			} else {
-				networkV2.DefaultRouteIP = primaryGateway.GetPrivateIP()
-				networkV2.EndpointIP = primaryGateway.GetPublicIP()
-				networkV2.PrimaryPublicIP = networkV2.EndpointIP
-			}
-			return nil
-		})
-	})
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			derr := c.core.Delete(task)
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
-
-	masterCount, privateNodeCount, _ := b.determineRequiredNodes(task)
-	var (
-		primaryGatewayStatus   error
-		secondaryGatewayStatus error
-		mastersStatus          error
-		privateNodesStatus     error
-		secondaryGatewayTask   concurrency.Task
-	)
-
-	// Step 1: starts gateway installation plus masters creation plus nodes creation
-	primaryGatewayTask, err := task.StartInSubTask(b.taskInstallGateway, srvutils.ToProtocolHost(primaryGateway))
-	if err != nil {
-		return err
-	}
-	if !gwFailoverDisabled {
-		secondaryGatewayTask, err = task.StartInSubTask(b.taskInstallGateway, srvutils.ToProtocolHost(secondaryGateway))
-		if err != nil {
-			return err
-		}
-	}
-	mastersTask, err := task.StartInSubTask(b.taskCreateMasters, data.Map{
-		"count":     masterCount,
-		"masterDef": mastersDef,
-		"nokeep":    !req.KeepOnFailure,
-	})
-	if err != nil {
-		return err
-	}
-
-	privateNodesTask, err := task.StartInSubTask(b.taskCreateNodes, data.Map{
-		"count":   privateNodeCount,
-		"public":  false,
-		"nodeDef": nodesDef,
-		"nokeep":  !req.KeepOnFailure,
-	})
-	if err != nil {
-		return err
-	}
-
-	// Step 2: awaits gateway installation end and masters installation end
-	_, primaryGatewayStatus = primaryGatewayTask.Wait()
-	if primaryGatewayStatus != nil {
-		abortMasterErr := mastersTask.Abort()
-		if abortMasterErr != nil {
-			primaryGatewayStatus = scerr.AddConsequence(primaryGatewayStatus, abortMasterErr)
-		}
-		abortNodesErr := privateNodesTask.Abort()
-		if abortNodesErr != nil {
-			primaryGatewayStatus = scerr.AddConsequence(primaryGatewayStatus, abortNodesErr)
-		}
-		return primaryGatewayStatus
-	}
-	if !gwFailoverDisabled {
-		if secondaryGatewayTask != nil {
-			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
-			if secondaryGatewayStatus != nil {
-				abortMasterErr := mastersTask.Abort()
-				if abortMasterErr != nil {
-					secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortMasterErr)
-				}
-				abortNodesErr := privateNodesTask.Abort()
-				if abortNodesErr != nil {
-					secondaryGatewayStatus = scerr.AddConsequence(secondaryGatewayStatus, abortNodesErr)
-				}
-				return secondaryGatewayStatus
-			}
-		}
-	}
-
-	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			list, merr := c.ListMasterIDs(task)
-			if merr != nil {
-				err = scerr.AddConsequence(err, merr)
-			} else {
-				values := make([]string, 0, len(list))
-				for _, v := range list {
-					values = append(values, v)
-				}
-				derr := client.New().Host.Delete(values, temporal.GetExecutionTimeout())
-				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
-				}
-			}
-		}
-	}()
-	_, mastersStatus = mastersTask.Wait()
-	if mastersStatus != nil {
-		abortNodesErr := privateNodesTask.Abort()
-		if abortNodesErr != nil {
-			mastersStatus = scerr.AddConsequence(mastersStatus, abortNodesErr)
-		}
-		return mastersStatus
-	}
-
-	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
-	// Configure Gateway(s) and waits for the result
-	primaryGatewayTask, err = task.StartInSubTask(c.taskConfigureGateway, srvutils.ToProtocolHost(primaryGateway))
-	if err != nil {
-		return err
-	}
-	if !gwFailoverDisabled {
-		secondaryGatewayTask, err = task.StartInSubTask(c.taskConfigureGateway, srvutils.ToProtocolHost(secondaryGateway))
-		if err != nil {
-			return err
-		}
-	}
-	_, primaryGatewayStatus = primaryGatewayTask.Wait()
-	if primaryGatewayStatus != nil {
-		if !gwFailoverDisabled {
-			if secondaryGatewayTask != nil {
-				secondaryGatewayErr := secondaryGatewayTask.Abort()
-				if secondaryGatewayErr != nil {
-					primaryGatewayStatus = scerr.AddConsequence(primaryGatewayStatus, secondaryGatewayErr)
-				}
-			}
-		}
-		return primaryGatewayStatus
-	}
-
-	if !gwFailoverDisabled {
-		if secondaryGatewayTask != nil {
-			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
-			if secondaryGatewayStatus != nil {
-				return secondaryGatewayStatus
-			}
-		}
-	}
-
-	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
-	_, mastersStatus = task.RunInSubTask(c.taskConfigureMasters, nil)
-	if mastersStatus != nil {
-		return mastersStatus
-	}
-
-	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			clientHost := clientInstance.Host
-			list, lerr := c.ListNodeIDs(task)
-			if lerr != nil {
-				err = scerr.AddConsequence(err, lerr)
-			} else {
-				derr := clientHost.Delete(list.Values(), temporal.GetExecutionTimeout())
-				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
-				}
-			}
-		}
-	}()
-
-	// Step 5: awaits nodes creation
-	_, privateNodesStatus = privateNodesTask.Wait()
-	if privateNodesStatus != nil {
-		return privateNodesStatus
-	}
-
-	// Step 6: Starts nodes configuration, if all masters and nodes
-	// have been created and gateway has been configured with success
-	_, privateNodesStatus = task.RunInSubTask(c.taskConfigureNodes, nil)
-	if privateNodesStatus != nil {
-		return privateNodesStatus
-	}
-
-	// At the end, configure cluster as a whole
-	err = c.configureCluster(task, data.Map{
-		"PrimaryGateway":   primaryGateway,
-		"SecondaryGateway": secondaryGateway,
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // unconfigureMaster executes what has to be done to remove Master from Cluster
 func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *protocol.Host) error {

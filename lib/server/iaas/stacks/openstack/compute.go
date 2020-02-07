@@ -43,14 +43,16 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -422,25 +424,32 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost gathers host information from provider
-func (s *Stack) InspectHost(hostParam interface{}) (*abstracts.Host, *propertiesv1.HostSizing, *propertiesv1.HostNetwork, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (
+	*abstracts.Host,
+	*propertiesv2.HostSizing,
+	*propertiesv1.HostNetwork,
+	*propertiesv1.HostDescription,
+	error,
+) {
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
+	host := abstracts.NewHost()
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+			return nil, nil, nil, nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
-		host = abstracts.NewHost()
 		host.ID = hostParam
-	case *resources.Host:
+	case *abstracts.Host:
 		if hostParam == nil {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+			return nil, nil, nil, nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
 		}
 		host = hostParam
 	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, nil, nil, nil, scerr.InvalidParameterError("hostParam", "must be a non-empty string or a *abstracts.Host")
 	}
 	hostRef := host.Name
 	if hostRef == "" {
@@ -451,18 +460,18 @@ func (s *Stack) InspectHost(hostParam interface{}) (*abstracts.Host, *properties
 
 	server, err := s.queryServer(host.ID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	hsV1, hnV1, err := s.complementHost(host, server)
+	hsV2, hnV1, hdV1, err := s.complementHost(host, server)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	if !host.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
-	return host, hsV1, hnV1, nil
+	return host, hsV2, hnV1, hdV1, nil
 }
 
 func (s *Stack) queryServer(id string) (*servers.Server, error) {
@@ -514,7 +523,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 	)
 	if retryErr != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
-			return nil, abstracts.TimeoutError(fmt.Sprintf("failed to get '%s' '%s' information after %s", "host", id, timeout), timeout)
+			return nil, abstracts.ResourceTimeoutError("host", id, timeout)
 		}
 		return nil, retryErr
 	}
@@ -585,16 +594,22 @@ func (s *Stack) interpretAddresses(
 }
 
 // complementHost complements Host data with content of server parameter
-func (s *Stack) complementHost(host *abstracts.Host, server *servers.Server) (hsV1 *propertiesv1.HostSizing, hnV1 *propertiesv1.HostNetwork, err error) {
+func (s *Stack) complementHost(host *abstracts.Host, server *servers.Server) (
+	hsV2 *propertiesv2.HostSizing,
+	hnV1 *propertiesv1.HostNetwork,
+	hdV1 *propertiesv1.HostDescription,
+	err error,
+) {
+
 	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	defer scerr.OnPanic(&err)()
 
 	networks, addresses, ipv4, ipv6, err := s.interpretAddresses(server.Addresses)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Updates intrinsic data of host if needed
@@ -610,133 +625,86 @@ func (s *Stack) complementHost(host *abstracts.Host, server *servers.Server) (hs
 		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
 	}
 
-	// FIXME: move this Alter to resources.Host implementation
-	// Updates Host Property propsv1.HostDescription
-	return host.Alter(func(_clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(hostproperty.DescriptionV1, (func(clonable data.Clonable) error {
-			hpDescriptionV1 := clonable.(*propsv1.HostDescription)
-			hpDescriptionV1.Created = server.Created
-			hpDescriptionV1.Updated = server.Updated
-			return nil
-		})
-		if innerErr != nil {
-			return err
+	hdV1 = propertiesv1.NewHostDescription()
+	hdV1.Created = server.Created
+	hdV1.Updated = server.Updated
+
+	hsV2 = propertiesv2.NewHostSizing()
+	hsV2.AllocatedSize = s.toHostSize(server.Flavor)
+
+	var errors []error
+	hnV1 = propertiesv1.NewHostNetwork()
+	hnV1.PublicIPv4 = ipv4
+	hnV1.PublicIPv6 = ipv6
+	networksByID := map[string]string{}
+	ipv4Addresses := map[string]string{}
+	ipv6Addresses := map[string]string{}
+
+	// Parse networks and fill fields
+	for _, netname := range networks {
+		// Ignore ProviderNetwork
+		if s.cfgOpts.ProviderNetwork == netname {
+			continue
 		}
 
-		// Updates Host Property propsv1.HostSizing
-		innerErr = props.Alter(func(clonable data.Clonable) error {
-			hpSizingV1 := clonable.(*propsv1.HostSizing)
-			if hpSizingV1.AllocatedSize == nil {
-				hpSizingV1.AllocatedSize = s.toHostSize(server.Flavor)
-			}
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
+		net, err := s.GetNetworkByName(netname)
+		if err != nil {
+			logrus.Debugf("failed to get data for network '%s'", netname)
+			errors = append(errors, err)
+			continue
+		}
+		networksByID[net.ID] = ""
+
+		if ip, ok := addresses[ipversion.IPv4][netname]; ok {
+			ipv4Addresses[net.ID] = ip
+		} else {
+			ipv4Addresses[net.ID] = ""
 		}
 
-		var errors []error
-		// Updates Host Property propsv1.HostNetwork
-		innerErr = props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-			if hostNetworkV1.PublicIPv4 == "" {
-				hostNetworkV1.PublicIPv4 = ipv4
-			}
-			if hostNetworkV1.PublicIPv6 == "" {
-				hostNetworkV1.PublicIPv6 = ipv6
-			}
-			// networks contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
-			// indexed on network ID. Tries to convert if possible, if we already have correspondance
-			// between network ID and network Name in Host definition
-			if len(hostNetworkV1.NetworksByID) > 0 {
-				ipv4Addresses := map[string]string{}
-				ipv6Addresses := map[string]string{}
-				for netid, netname := range hostNetworkV1.NetworksByID {
-					if ip, ok := addresses[ipversion.IPv4][netname]; ok {
-						ipv4Addresses[netid] = ip
-					} else {
-						ipv4Addresses[netid] = ""
-					}
-
-					if ip, ok := addresses[ipversion.IPv6][netname]; ok {
-						ipv6Addresses[netid] = ip
-					} else {
-						ipv6Addresses[netid] = ""
-					}
-				}
-				hostNetworkV1.IPv4Addresses = ipv4Addresses
-				hostNetworkV1.IPv6Addresses = ipv6Addresses
-			} else {
-				networksByID := map[string]string{}
-				ipv4Addresses := map[string]string{}
-				ipv6Addresses := map[string]string{}
-				// Parse networks and fill fields
-				for _, netname := range networks {
-					// Ignore ProviderNetwork
-					if s.cfgOpts.ProviderNetwork == netname {
-						continue
-					}
-
-					net, err := s.GetNetworkByName(netname)
-					if err != nil {
-						logrus.Debugf("failed to get data for network '%s'", netname)
-						errors = append(errors, err)
-						continue
-					}
-					networksByID[net.ID] = ""
-
-					if ip, ok := addresses[ipversion.IPv4][netname]; ok {
-						ipv4Addresses[net.ID] = ip
-					} else {
-						ipv4Addresses[net.ID] = ""
-					}
-
-					if ip, ok := addresses[ipversion.IPv6][netname]; ok {
-						ipv6Addresses[net.ID] = ip
-					} else {
-						ipv6Addresses[net.ID] = ""
-					}
-				}
-				hostNetworkV1.NetworksByID = networksByID
-				// IPvxAddresses are here indexed by names... At least we have them...
-				hostNetworkV1.IPv4Addresses = ipv4Addresses
-				hostNetworkV1.IPv6Addresses = ipv6Addresses
-			}
-
-			// Updates network name and relationships if needed
-			config := s.GetConfigurationOptions()
-			for netid, netname := range hostNetworkV1.NetworksByID {
-				if netname == "" {
-					net, err := s.GetNetwork(netid)
-					if err != nil {
-						switch err.(type) {
-						case *scerr.ErrNotFound:
-							logrus.Errorf(err.Error())
-							errors = append(errors, err)
-						default:
-							logrus.Errorf("failed to get network '%s': %v", netid, err)
-							errors = append(errors, err)
-						}
-						continue
-					}
-					if net.Name == config.ProviderNetwork {
-						continue
-					}
-					hostNetworkV1.NetworksByID[netid] = net.Name
-					hostNetworkV1.NetworksByName[net.Name] = netid
-				}
-			}
-		})
-
-		if len(errors) > 0 {
-			return scerr.ErrListError(errors)
+		if ip, ok := addresses[ipversion.IPv6][netname]; ok {
+			ipv6Addresses[net.ID] = ip
+		} else {
+			ipv6Addresses[net.ID] = ""
 		}
+	}
+	hnV1.NetworksByID = networksByID
+	hnV1.IPv4Addresses = ipv4Addresses
+	hnV1.IPv6Addresses = ipv6Addresses
 
-		return nil
-	})
+	// Updates network name and relationships if needed
+	config := s.GetConfigurationOptions()
+	for netid, netname := range hnV1.NetworksByID {
+		if netname == "" {
+			net, err := s.GetNetwork(netid)
+			if err != nil {
+				switch err.(type) {
+				case *scerr.ErrNotFound:
+					logrus.Errorf(err.Error())
+					errors = append(errors, err)
+				default:
+					logrus.Errorf("failed to get network '%s': %v", netid, err)
+					errors = append(errors, err)
+				}
+				continue
+			}
+			if net.Name == config.ProviderNetwork {
+				continue
+			}
+			hnV1.NetworksByID[netid] = net.Name
+			hnV1.NetworksByName[net.Name] = netid
+		}
+	}
+	if len(errors) > 0 {
+		return nil, nil, nil, scerr.ErrListError(errors)
+	}
+
+	return hsV2, hnV1, hdV1, nil
 }
 
 // GetHostByName returns the host using the name passed as parameter
+// returns id of the host if found
+// returns abstracts.ErrResourceNotFound if not found
+// returns abstracts.ErrResourceNotAvailable if provider doesn't provide the id of the host in its response
 func (s *Stack) GetHostByName(name string) (string, error) {
 	if s == nil {
 		return "", scerr.InvalidInstanceError()
@@ -764,27 +732,28 @@ func (s *Stack) GetHostByName(name string) (string, error) {
 				continue
 			}
 			if entry["name"].(string) == name {
-				host := abstracts.NewHost()
-				host.ID = entry["id"].(string)
-				host.Name = name
-				return s.InspectHost(host)
+				if hostID, ok := entry["id"].(string); ok {
+					return hostID, nil
+				}
+				return "", abstracts.ResourceNotAvailableError("host", name)
 			}
 		}
 	}
-	return nil, abstracts.ResourceNotFoundError("host", name)
+	return "", abstracts.ResourceNotFoundError("host", name)
 }
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request abstracts.HostRequest) (
 	host *abstracts.Host,
-	hsV1 *propertiesv1.HostSizing,
+	hsV2 *propertiesv2.HostSizing,
 	hnV1 *propertiesv1.HostNetwork,
+	hdV1 *propertiesv1.HostDescription,
 	userData *userdata.Content,
 	err error,
 ) {
 
 	if s == nil {
-		return nil, nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -796,7 +765,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, userData, abstracts.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
+		return nil, nil, nil, nil, userData, abstracts.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// The Default Network is the first of the provided list, by convention
@@ -831,7 +800,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
 			logrus.Debugf(utils.Capitalize(msg))
-			return nil, nil, nil, userData, fmt.Errorf(msg)
+			return nil, nil, nil, nil, userData, fmt.Errorf(msg)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
@@ -839,13 +808,13 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
 			logrus.Debugf(utils.Capitalize(msg))
-			return nil, nil, nil, userData, fmt.Errorf(msg)
+			return nil, nil, nil, nil, userData, fmt.Errorf(msg)
 		}
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, nil, nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, nil, nil, nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
@@ -857,25 +826,25 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		logrus.Debugf(utils.Capitalize(msg))
-		return nil, nil, nil, userData, fmt.Errorf(msg)
+		return nil, nil, nil, nil, userData, fmt.Errorf(msg)
 	}
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, nil, nil, userData, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
+		return nil, nil, nil, nil, userData, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
 	}
 
 	// Select usable availability zone, the first one in the list
 	azone, err := s.SelectedAvailabilityZone()
 	if err != nil {
-		return nil, nil, nil, userData, err
+		return nil, nil, nil, nil, userData, err
 	}
 
 	// Sets provider parameters to create host
 	userDataPhase1, err := userData.Generate("phase1")
 	if err != nil {
-		return nil, nil, nil, userData, err
+		return nil, nil, nil, nil, userData, err
 	}
 	srvOpts := servers.CreateOpts{
 		Name:             request.ResourceName,
@@ -893,32 +862,16 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
-	// FIXME: move this Alter to resources.Host
-	err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-			hostNetworkV1.DefaultNetworkID = defaultNetworkID
-			hostNetworkV1.DefaultGatewayID = defaultGatewayID
-			hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
-			hostNetworkV1.IsGateway = isGateway
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
+	hnV1 = propertiesv1.NewHostNetwork()
+	hnV1.DefaultNetworkID = defaultNetworkID
+	hnV1.DefaultGatewayID = defaultGatewayID
+	hnV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
+	hnV1.IsGateway = isGateway
 
-		// Adds Host property SizingV1
-		return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
-			hostSizingV1 := clonable.(*propsv1.HostSizing)
-			// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-			hostSizingV1.Template = request.TemplateID
-			hostSizingV1.AllocatedSize = converters.ModelHostTemplateToPropertyHostSize(template)
-			return nil
-		})
-	})
-	if err != nil {
-		return nil, userData, err
-	}
+	hsV2 = propertiesv2.NewHostSizing()
+	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
+	hsV2.Template = request.TemplateID
+	hsV2.AllocatedSize = converters.HostTemplateToPropertyHostSize(template)
 
 	// --- query provider for host creation ---
 
@@ -970,7 +923,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, userData, scerr.Wrap(retryErr, fmt.Sprintf("error creating host: timeout"))
+		return nil, nil, nil, nil, userData, scerr.Wrap(retryErr, fmt.Sprintf("error creating host: timeout"))
 	}
 	logrus.Debugf("host resource created.")
 
@@ -994,9 +947,9 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 		}
 	}()
 
-	hsV1, hnV1, err = s.complementHost(host, server)
+	hsV2, hnV1, hdV1, err = s.complementHost(host, server)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// if Floating IP are used and public address is requested
@@ -1006,7 +959,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 			Pool: s.authOpts.FloatingIPPool,
 		}).Extract()
 		if err != nil {
-			return nil, nil, nil, userData, scerr.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
+			return nil, nil, nil, nil, userData, scerr.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -1027,25 +980,26 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 		}).ExtractErr()
 		if err != nil {
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-			return nil, nil, nil, userData, scerr.Wrap(err, msg)
+			return nil, nil, nil, nil, userData, scerr.Wrap(err, msg)
 		}
 
-		// FIXME: move this Alter to resources.Host implementation
-		err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
-			return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-				hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-				if ipversion.IPv4.Is(ip.IP) {
-					hostNetworkV1.PublicIPv4 = ip.IP
-				} else if ipversion.IPv6.Is(ip.IP) {
-					hostNetworkV1.PublicIPv6 = ip.IP
-				}
-				userData.PublicIP = ip.IP
-				return nil
-			})
-		})
-		if err != nil {
-			return nil, nil, nil, userData, err
-		}
+		// // FIXME: move this Alter to resources.Host implementation
+		// err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
+		// 	return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
+		// 		if ipversion.IPv4.Is(ip.IP) {
+		// 			hostNetworkV1.PublicIPv4 = ip.IP
+		// 		} else if ipversion.IPv6.Is(ip.IP) {
+		// 			hostNetworkV1.PublicIPv6 = ip.IP
+		// 		}
+		// 		userData.PublicIP = ip.IP
+		// 		return nil
+		// 	})
+		// })
+		// if err != nil {
+		// 	return nil, nil, nil, userData, err
+		// }
+
 		if ipversion.IPv4.Is(ip.IP) {
 			hnV1.PublicIPv4 = ip.IP
 		} else if ipversion.IPv6.Is(ip.IP) {
@@ -1055,7 +1009,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (
 	}
 
 	logrus.Infoln(msgSuccess)
-	return host, hsV1, hnV1, userData, nil
+	return host, hsV2, hnV1, hdV1, userData, nil
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
@@ -1133,7 +1087,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*ab
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, _, _, err := s.InspectHost(host)
+			hostTmp, _, _, _, err := s.InspectHost(host)
 			if err != nil {
 				return err
 			}
@@ -1164,7 +1118,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 
 	defer concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
 
-	host, _, _, err := s.InspectHost(hostParam)
+	host, _, _, _, err := s.InspectHost(hostParam)
 	if err != nil {
 		return hoststate.ERROR, err
 	}
@@ -1189,7 +1143,7 @@ func (s *Stack) ListHosts() ([]*abstracts.Host, error) {
 
 		for _, srv := range list {
 			h := abstracts.NewHost()
-			_, _, err := s.complementHost(h, &srv)
+			_, _, _, err := s.complementHost(h, &srv)
 			if err != nil {
 				return false, err
 			}

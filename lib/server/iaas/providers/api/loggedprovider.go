@@ -25,8 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propsv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -180,7 +180,7 @@ func (w LoggedProvider) DeleteNetwork(id string) error {
 }
 
 // CreateGateway ...
-func (w LoggedProvider) CreateGateway(req abstracts.GatewayRequest) (*abstracts.Host, *propsv2.HostSizing, *propsv1.HostNetwork, *userdata.Content, error) {
+func (w LoggedProvider) CreateGateway(req abstracts.GatewayRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *userdata.Content, error) {
 	defer w.prepare(w.trace("CreateGateway"))
 	return w.InnerProvider.CreateGateway(req)
 }
@@ -204,7 +204,7 @@ func (w LoggedProvider) AddPublicIPToVIP(vip *abstracts.VIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w LoggedProvider) BindHostToVIP(vip **abstracts.VIP, hostID string) error {
+func (w LoggedProvider) BindHostToVIP(vip *abstracts.VIP, hostID string) error {
 	defer w.prepare(w.trace("BindHostToVIP"))
 	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
@@ -222,13 +222,13 @@ func (w LoggedProvider) DeleteVIP(vip *abstracts.VIP) error {
 }
 
 // CreateHost ...
-func (w LoggedProvider) CreateHost(request abstracts.HostRequest) (*abstracts.Host, *propsv2.HostSizing, *propsv1.HostNetwork, *userdata.Content, error) {
+func (w LoggedProvider) CreateHost(request abstracts.HostRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *propertiesv1.HostDescription, *userdata.Content, error) {
 	defer w.prepare(w.trace("CreateHost"))
 	return w.InnerProvider.CreateHost(request)
 }
 
 // InspectHost ...
-func (w LoggedProvider) InspectHost(something interface{}) (*abstracts.Host, *propsv2.HostSizing, *propsv1.HostNetwork, error) {
+func (w LoggedProvider) InspectHost(something interface{}) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, error) {
 	defer w.prepare(w.trace("InspectHost"))
 	return w.InnerProvider.InspectHost(something)
 }

@@ -23,6 +23,7 @@ import (
 )
 
 // ClusterNode describes a Node in the cluster
+// !!! FROZEN !!!
 type ClusterNode struct {
 	ID          string `json:"id"`         // ID of the node
 	NumericalID uint   `json:"intid"`      // Numerical (unsigned integer) ID of the node
@@ -32,6 +33,7 @@ type ClusterNode struct {
 }
 
 // ClusterNodes contains all the nodes created in the cluster
+// !!! FROZEN !!!
 type ClusterNodes struct {
 	Masters          []*ClusterNode `json:"masters"`                 // Masters contains the ID of the masters
 	PublicNodes      []*ClusterNode `json:"public_nodes,omitempty"`  // PublicNodes is a slice of IDs of the public cluster nodes
@@ -51,17 +53,14 @@ func newClusterNodes() *ClusterNodes {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (n *ClusterNodes) Content() interface{} {
-	return n
-}
-
-// Clone ... (data.Clonable interface)
+// Clone ...
+// satisfies interface data.Clonable
 func (n *ClusterNodes) Clone() data.Clonable {
 	return newClusterNodes().Replace(n)
 }
 
-// Replace ... (data.Clonable interface)
+// Replace ...
+// satisfies interface data.Clonable
 func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 	src := p.(*ClusterNodes)
 	*n = *src
@@ -75,5 +74,5 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", string(clusterproperty.NodesV2), newClusterNodes())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", string(clusterproperty.NodesV2), newClusterNodes())
 }

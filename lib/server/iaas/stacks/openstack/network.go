@@ -33,11 +33,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -319,9 +319,17 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.Host, hsV1 *propertiesv1.HostSizing, hnV1 *propertiesv1.HostNetwork, userData *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
+	host *abstracts.Host,
+	hsV2 *propertiesv2.HostSizing,
+	hnV1 *propertiesv1.HostNetwork,
+	hdV1 *propertiesv1.HostDescription,
+	userData *userdata.Content,
+	err error,
+) {
+
 	if s == nil {
-		return nil, nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -331,7 +339,7 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.Hos
 
 	// Ensure network exists
 	if req.Network == nil {
-		return nil, nil, nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+		return nil, nil, nil, nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {
@@ -340,7 +348,7 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.Hos
 
 	password, err := utils.GeneratePassword(16)
 	if err != nil {
-		return nil, nil, nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+		return nil, nil, nil, nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
 	}
 	hostReq := abstracts.HostRequest{
 		ImageID:      req.ImageID,
@@ -351,9 +359,9 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.Hos
 		PublicIP:     true,
 		Password:     password,
 	}
-	host, hsV1, hnV1, userData, err = s.CreateHost(hostReq)
+	host, hsV2, hnV1, hdV1, userData, err = s.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
+		return nil, nil, nil, nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
 	}
 
 	// delete the host when found problem starting from here
@@ -385,7 +393,7 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.Hos
 	// if err != nil {
 	// 	return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
 	// }
-	return host, hsV1, hnV1, userData, nil
+	return host, hsV2, hnV1, hdV1, userData, nil
 }
 
 // DeleteGateway delete the public gateway of a private network
@@ -901,8 +909,8 @@ func (s *Stack) DeleteVIP(vip *abstracts.VIP) error {
 		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
 
-	for _, h := range vip.Hosts {
-		err := s.UnbindHostFromVIP(vip, h)
+	for _, v := range vip.Hosts {
+		err := s.UnbindHostFromVIP(vip, v.ID)
 		if err != nil {
 			return err
 		}
