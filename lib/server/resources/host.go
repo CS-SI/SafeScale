@@ -21,6 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -67,6 +68,8 @@ type Host interface {
 	PushStringToFile(task concurrency.Task, content string, filename string, owner, group, rights string) error
 	// DefaultNetwork returns the resources.Network object corresponding to the default network of the host
 	DefaultNetwork(task concurrency.Task) (Network, error)
+	// State returns the current state of the host
+	State(task concurrency.Task) (hoststate.Enum, error)
 
-	ToProtocolHost() *protocol.Host
+	ToProtocol() *protocol.Host // Converts a host to equivalent gRPC message
 }

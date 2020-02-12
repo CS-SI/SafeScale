@@ -202,67 +202,6 @@ func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
 	return hc
 }
 
-// // GetAccessIP returns the IP to reach the host
-// func (h *HostCore) GetAccessIP() string {
-// 	ip := h.GetPublicIP()
-// 	if ip == "" {
-// 		ip = h.GetPrivateIP()
-// 	}
-// 	return ip
-// }
-
-// // GetPublicIP computes public IP of the host
-// func (h *HostCore) GetPublicIP() (pubIp string) {
-// 	var ip string
-
-// 	defer func() {
-// 		if x := recover(); x != nil {
-// 			logrus.Warnf("runtime panic occurred: %+v", x)
-// 			pubIp = ""
-// 		}
-// 	}()
-
-// 	err := h.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(value interface{}) error {
-// 		hostNetworkV1 := value.(*propsv1.HostNetwork)
-// 		ip = hostNetworkV1.PublicIPv4
-// 		if ip == "" {
-// 			ip = hostNetworkV1.PublicIPv6
-// 		}
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		return ""
-// 	}
-// 	return ip
-// }
-
-// // GetPrivateIP ...
-// func (h *HostCore) GetPrivateIP() (privateIp string) {
-// 	var ip string
-
-// 	defer func() {
-// 		if x := recover(); x != nil {
-// 			logrus.Warnf("runtime panic occurred: %+v", x)
-// 			privateIp = ""
-// 		}
-// 	}()
-
-// 	err := h.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
-// 		hostNetworkV1 := v.(*propsv1.HostNetwork)
-// 		if len(hostNetworkV1.IPv4Addresses) > 0 {
-// 			ip = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
-// 			if ip == "" {
-// 				ip = hostNetworkV1.IPv6Addresses[hostNetworkV1.DefaultNetworkID]
-// 			}
-// 		}
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		return ""
-// 	}
-// 	return ip
-// }
-
 // Serialize serializes Host instance into bytes (output json code)
 func (hc *HostCore) Serialize() ([]byte, error) {
 	return serialize.ToJSON(hc)
@@ -271,16 +210,7 @@ func (hc *HostCore) Serialize() ([]byte, error) {
 // Deserialize reads json code and reinstantiates an Host
 func (hc *HostCore) Deserialize(buf []byte) (err error) {
 	defer scerr.OnPanic(&err)()
-
-	// if h.Properties == nil {
-	// 	h.Properties = serialize.NewJSONProperties("resources.host")
-	// }
-	err = serialize.FromJSON(buf, hc)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return serialize.FromJSON(buf, hc)
 }
 
 // HostNetwork contains network information related to Host

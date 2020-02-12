@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/asaskevich/govalidator"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -29,12 +30,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostListener host service server grpc
@@ -249,7 +252,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	// build response mapping abstracts.Host to protocol.Host
 	var pbhost []*protocol.Host
 	for _, host := range hosts {
-		pbhost = append(pbhost, srvutils.ToProtocolHost(host))
+		pbhost = append(pbhost, converters.HostFromAbstractsToProtocol(host))
 	}
 	rv := &protocol.HostList{Hosts: pbhost}
 	return rv, nil
@@ -291,19 +294,19 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	var sizing *abstracts.SizingRequirements
+	var sizing *abstracts.HostSizingRequirements
 	if in.Sizing == nil {
-		sizing = &abstracts.SizingRequirements{
+		sizing = &abstracts.HostSizingRequirements{
 			MinCores:    int(in.GetCpuCount()),
 			MaxCores:    int(in.GetCpuCount()),
 			MinRAMSize:  in.GetRam(),
 			MaxRAMSize:  in.GetRam(),
 			MinDiskSize: int(in.GetDisk()),
 			MinGPU:      int(in.GetGpuCount()),
-			MinFreq:     in.GetCpuFreq(),
+			MinCPUFreq:  in.GetCpuFreq(),
 		}
 	} else {
-		s := srvutils.FromProtocolHostSizing(*in.Sizing)
+		s := converters.HostSizingRequirementsFromProtocolToAbstracts(*in.Sizing)
 		sizing = &s
 	}
 
@@ -312,22 +315,27 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, err
 	}
 
+	hostReq := abstracts.HostRequest{
+		ResourceName: name,
+		ImageID:      in.GetImageId(),
+		PublicIP:     in.GetPublic(),
+	}
+	err = network.Inspect(job.Task(), func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		networkCore, ok := clonable.(*abstracts.Network)
+		if !ok {
+			return scerr.InconsistentError("'*abstracts.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		hostReq.Networks = []*abstracts.Network{networkCore}
+		return nil
+	})
+
 	handler := handlers.NewHostHandler(job)
-	host, err := handler.Create(
-		abstracts.HostRequest{
-			ResourceName: name,
-			Networks:     []*resources.Network{network},
-			ImageID:      in.GetImageId(),
-			PublicIP:     in.GetPublic(),
-		},
-		*sizing,
-		in.Force,
-	)
+	host, err := handler.Create(hostReq, *sizing, in.Force)
 	if err != nil {
 		return nil, err
 	}
 	logrus.Infof("Host '%s' created", name)
-	return srvutils.ToProtocolHost(host), nil
+	return converters.HostFromAbstractsToProtocol(host), nil
 }
 
 // Resize an host
@@ -379,7 +387,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, err
 	}
 	tracer.Trace("Host '%s' successfully resized", name)
-	return srvutils.ToProtocolHost(host), nil
+	return converters.HostFromAbstractsTProtocol(host), nil
 }
 
 // Status returns the status of a host (running or stopped mainly)
@@ -427,7 +435,11 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	if err != nil {
 		return nil, err
 	}
-	return srvutils.ToHostStatus(host), nil
+	state, err := host.State(job.Task)
+	if err != nil {
+		return nil, err
+	}
+	return converters.HostStatusFromAbstractsToProtocol(state), nil
 }
 
 // Inspect an host

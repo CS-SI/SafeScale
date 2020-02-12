@@ -155,15 +155,15 @@ func (w *worker) ConcernsCluster() bool {
 // CanProceed tells if the combination Feature/Target can work
 func (w *worker) CanProceed(s resources.FeatureSettings) error {
 	switch w.target.TargetType() {
-	case "cluster":
+	case featuretargettype.CLUSTER:
 		err := w.validateContextForCluster()
 		if err == nil && !s.SkipSizingRequirements {
 			err = w.validateClusterSizing()
 		}
 		return err
-	case "node":
+	case featuretargettype.NODE:
 		return nil
-	case "host":
+	case featuretargettype.HOST:
 		return w.validateContextForHost()
 	}
 	return nil

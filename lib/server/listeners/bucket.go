@@ -26,7 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -79,7 +79,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 		return nil, err
 	}
 
-	return conv.ToProtocolBucketList(buckets), nil
+	return converters.BucketListFromAbstractsToProtocol(buckets), nil
 }
 
 // Create a new bucket
@@ -219,7 +219,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	if resp == nil {
 		return nil, scerr.NotFoundError(fmt.Sprintf("bucket '%s' not found", bucketName))
 	}
-	return conv.ToProtocolBucketMountPoint(resp), nil
+	return converters.BucketMountPointFromAbstractsToProtocol(resp), nil
 }
 
 // Mount a bucket on the filesystem of the host

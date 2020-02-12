@@ -39,8 +39,6 @@ import (
 	templatefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstracts/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
@@ -54,13 +52,13 @@ import (
 type Service interface {
 	// --- from service ---
 
-	CreateHostWithKeyPair(abstracts.HostRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *propertiesv1.HostDescription, *userdata.Content, *abstracts.KeyPair, error)
+	CreateHostWithKeyPair(abstracts.HostRequest) (*abstracts.HostFull, *userdata.Content, *abstracts.KeyPair, error)
 	FilterImages(string) ([]abstracts.Image, error)
 	GetMetadataKey() *crypt.Key
 	GetMetadataBucket() objectstorage.Bucket
-	ListHostsByName() (map[string]*abstracts.Host, error)
+	ListHostsByName() (map[string]*abstracts.HostFull, error)
 	SearchImage(string) (*abstracts.Image, error)
-	SelectTemplatesBySize(abstracts.SizingRequirements, bool) ([]*abstracts.HostTemplate, error)
+	SelectTemplatesBySize(abstracts.HostSizingRequirements, bool) ([]*abstracts.HostTemplate, error)
 	SelectTemplateByName(string) (*abstracts.HostTemplate, error)
 	WaitHostState(string, hoststate.Enum, time.Duration) error
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstracts.Volume, error)
@@ -148,17 +146,17 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 	var err error
 
 	timer := time.After(timeout)
-	host := abstracts.NewHost()
-	host.ID = hostID
+	host := abstracts.NewHostFull()
+	host.Core.ID = hostID
 	for {
-		host, _, _, _, err = svc.InspectHost(host)
+		host, err = svc.InspectHost(host)
 		if err != nil {
 			return err
 		}
-		if host.LastState == state {
+		if host.Core.LastState == state {
 			return nil
 		}
-		if host.LastState == hoststate.ERROR {
+		if host.Core.LastState == hoststate.ERROR {
 			return scerr.NotAvailableError("host in error state")
 		}
 		select {
@@ -274,7 +272,7 @@ func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
 
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, force bool) (selectedTpls []*abstracts.HostTemplate, err error) {
+func (svc *service) SelectTemplatesBySize(sizing abstracts.HostSizingRequirements, force bool) (selectedTpls []*abstracts.HostTemplate, err error) {
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -290,7 +288,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, f
 	}
 
 	// FIXME Prevent GPUs when user sends a 0
-	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinFreq != 0
+	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinCPUFreq != 0
 	if askedForSpecificScannerInfo {
 		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
@@ -299,16 +297,16 @@ func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, f
 				logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 			} else {
 				var noHostError string
-				if sizing.MinFreq <= 0 {
+				if sizing.MinCPUFreq <= 0 {
 					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
 				} else {
-					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 				}
 				logrus.Error(noHostError)
 				return nil, fmt.Errorf(noHostError)
 			}
 		} else {
-			authOpts, err := svc.GetAuthenticationOptions()
+			authOpts, err := svc.AuthenticationOptions()
 			if err != nil {
 				return nil, err
 			}
@@ -316,7 +314,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, f
 			if !ok {
 				return nil, fmt.Errorf("region value unset")
 			}
-			folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+			folder := fmt.Sprintf("images/%s/%s", svc.Name(), region)
 
 			imageList, err := db.ReadAll(folder)
 			if err != nil {
@@ -324,10 +322,10 @@ func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, f
 					logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 				} else {
 					var noHostError string
-					if sizing.MinFreq <= 0 {
+					if sizing.MinCPUFreq <= 0 {
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 					}
 					logrus.Error(noHostError)
 					return nil, fmt.Errorf(noHostError)
@@ -349,7 +347,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, f
 						continue
 					}
 
-					if imageFound.CPUFrequency < float64(sizing.MinFreq) {
+					if imageFound.CPUFrequency < float64(sizing.MinCPUFreq) {
 						continue
 					}
 
@@ -358,10 +356,10 @@ func (svc *service) SelectTemplatesBySize(sizing abstracts.SizingRequirements, f
 
 				if !force && (len(images) == 0) {
 					var noHostError string
-					if sizing.MinFreq <= 0 {
+					if sizing.MinCPUFreq <= 0 {
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinFreq)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinCPUFreq)
 					}
 					logrus.Error(noHostError)
 					return nil, fmt.Errorf(noHostError)
@@ -562,34 +560,31 @@ func (svc *service) SearchImage(osname string) (*abstracts.Image, error) {
 
 // CreateHostWithKeyPair creates an host
 func (svc *service) CreateHostWithKeyPair(request abstracts.HostRequest) (
-	*abstracts.Host,
-	*propertiesv2.HostSizing,
-	*propertiesv1.HostNetwork,
-	*propertiesv1.HostDescription,
+	*abstracts.HostFull,
 	*userdata.Content,
 	*abstracts.KeyPair,
 	error,
 ) {
 
 	if svc == nil {
-		return nil, nil, nil, nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	_, err := svc.GetHostByName(request.ResourceName)
 	if err == nil {
-		return nil, nil, nil, nil, nil, nil, abstracts.ResourceDuplicateError("Host", request.ResourceName)
+		return nil, nil, nil, abstracts.ResourceDuplicateError("Host", request.ResourceName)
 	}
 
 	// Create temporary key pair
 	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	kpName := kpNameuuid.String()
 	kp, err := svc.CreateKeyPair(kpName)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Create host
@@ -604,26 +599,26 @@ func (svc *service) CreateHostWithKeyPair(request abstracts.HostRequest) (
 		DefaultGateway: request.DefaultGateway,
 		TemplateID:     request.TemplateID,
 	}
-	host, hsV2, hnV1, hdV1, userData, err := svc.CreateHost(hostReq)
+	host, userData, err := svc.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
-	return host, hsV2, hnV1, hdV1, userData, kp, nil
+	return host, userData, kp, nil
 }
 
 // ListHostsByName list hosts by name
-func (svc *service) ListHostsByName() (map[string]*abstracts.Host, error) {
+func (svc *service) ListHostsByName(details bool) (map[string]*abstracts.HostFull, error) {
 	if svc == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	hosts, err := svc.ListHosts()
+	hosts, err := svc.ListHosts(details)
 	if err != nil {
 		return nil, err
 	}
-	hostMap := make(map[string]*abstracts.Host)
+	hostMap := make(map[string]*abstracts.HostFull)
 	for _, host := range hosts {
-		hostMap[host.Name] = host
+		hostMap[host.Core.Name] = host
 	}
 	return hostMap, nil
 }
@@ -730,7 +725,7 @@ func SimilarityScore(ref string, s string) float64 {
 
 // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
 func InitializeBucket(svc *service, location objectstorage.Location) error {
-	cfg, err := svc.Provider.GetConfigurationOptions()
+	cfg, err := svc.Provider.ConfigurationOptions()
 	if err != nil {
 		return fmt.Errorf("failed to get client options: %s", err.Error())
 	}

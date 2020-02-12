@@ -34,10 +34,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -146,7 +148,7 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (*Host, error) {
 // }
 
 // Browse walks through host folder and executes a callback for each entries
-func (objh *Host) Browse(task concurrency.Task, callback func(*abstracts.Host) error) (err error) {
+func (objh *Host) Browse(task concurrency.Task, callback func(*abstracts.HostCore) error) (err error) {
 	if objh == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -158,7 +160,7 @@ func (objh *Host) Browse(task concurrency.Task, callback func(*abstracts.Host) e
 	}
 
 	return objh.Core.BrowseFolder(task, func(buf []byte) error {
-		host := abstracts.NewHost()
+		host := abstracts.NewHostCore()
 		err = host.Deserialize(buf)
 		if err != nil {
 			return err
@@ -167,9 +169,29 @@ func (objh *Host) Browse(task concurrency.Task, callback func(*abstracts.Host) e
 	})
 }
 
+func (objh *Host) State(task concurrency.Task) (hoststate.Enum, error) {
+	if objh == nil {
+		return hoststate.UNKNOWN, scerr.InvalidInstanceError()
+	}
+	state := hoststate.UNKNOWN
+	err := objh.Reload(task)
+	if err != nil {
+		return state, err
+	}
+	err = objh.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		core, ok := clonable.(*abstracts.HostCore)
+		if !ok {
+			return scerr.InconsistentError("'*abstracts.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		state = core.LastState
+		return nil
+	})
+	return state, err
+}
+
 // Create creates a new host and its metadata
 // If the metadata is already carrying a host, returns scerr.ErrNotAvailable
-func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, hostDef abstracts.SizingRequirements) error {
+func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, hostDef abstracts.HostSizingRequirements) error {
 	if objh == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -198,21 +220,12 @@ func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, h
 	)
 
 	if len(hostReq.Networks) > 0 {
+		// By convention, default network is the first of the list
 		rn := hostReq.Networks[0]
 		objn, err = networkfactory.Load(task, svc, rn.ID)
 		if err != nil {
 			return err
 		}
-		// objpgw, err = objn.Gateway(task, true)
-		// if err != nil {
-		// 	return err
-		// }
-		// objsgw, err = objn.Gateway(task, false)
-		// if err != nil {
-		// 	if _, ok := err.(*scerr.ErrNotFound); !ok {
-		// 		return err
-		// 	}
-		// }
 	} else {
 		objn, _, err = getOrCreateDefaultNetwork(task, svc)
 		if err != nil {
@@ -277,7 +290,7 @@ func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, h
 	hostReq.ImageID = img.ID
 	hostReq.TemplateID = template.ID
 
-	rh, hsV2, hnV1, hdV1, userDataContent, err := svc.CreateHost(hostReq)
+	hf, userDataContent, err := svc.CreateHost(hostReq)
 	if err != nil {
 		if _, ok := err.(scerr.ErrInvalidRequest); ok {
 			return err
@@ -287,94 +300,70 @@ func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, h
 
 	defer func() {
 		if err != nil {
-			derr := svc.DeleteHost(rh.ID)
+			derr := svc.DeleteHost(hf.Core.ID)
 			if derr != nil {
-				logrus.Errorf("after failure, failed to cleanup by deleting host '%s': %v", rh.Name, derr)
+				logrus.Errorf("after failure, failed to cleanup by deleting host '%s': %v", hf.Core.Name, derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
 
-	// Creates metadata
-	err = objh.Carry(task, rh)
-	if err != nil {
-		return nil, err
-	}
-	err = props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) error {
-		hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-		if !ok {
-			return scerr.InconsistentError(fmt.Sprintf("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String()))
-		}
-		_ = hostSizingV2.Replace(hsV2)
-		hostSizingV2.RequestedSize = &hostDef
-		return nil
-	})
+	// Creates metadata early to "reserve" host name
+	err = objh.Carry(task, hf.Core)
 	if err != nil {
 		return err
 	}
 
-	// Starting from here, delete host metadata if exiting with error
-	defer func() {
-		if err != nil {
-			derr := objh.Core.Delete(task)
-			if derr != nil {
-				logrus.Errorf("After failure, failed to cleanup by removing host metadata")
+	// Updates properties in metadata
+	err = objh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		innerErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) error {
+			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+			if !ok {
+				return scerr.InconsistentError(fmt.Sprintf("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String()))
 			}
+			hostSizingV2.AllocatedSize = converters.HostEffectiveSizingAbstractsToProperty(hf.Sizing)
+			hostSizingV2.RequestedSize = converters.HostSizingRequirementsAbstractsToProperty(hostDef)
+			return nil
+		})
+		if innerErr != nil {
+			return innerErr
 		}
-	}()
 
-	// "Augment" host to become an object
-	err = props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) error {
-		hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-		if !ok {
-			return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		_ = hostSizingV2.Replace(hsV2)
-		hostSizingV2.RequestedSize = &hostDef
-		return nil
-	})
-	if inErr != nil {
-		return inErr
-	}
-
-	// Sets host extension DescriptionV1
-	err = props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
-		hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-		if !ok {
-			return scerr.InconsistentError(fmt.Sprintf("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String()))
-		}
-		_ = hostDescriptionV1.Replace(hdV1)
-		creator := ""
-		hostname, _ := os.Hostname()
-		if curUser, err := user.Current(); err == nil {
-			creator := curUser.Username
-			if hostname != "" {
-				creator += "@" + hostname
+		// Starting from here, delete host metadata if exiting with error
+		defer func() {
+			if innerErr != nil {
+				derr := objh.Core.Delete(task)
+				if derr != nil {
+					logrus.Errorf("After failure, failed to cleanup by removing host metadata")
+				}
 			}
-			if curUser.Name != "" {
-				creator += " (" + curUser.Name + ")"
-			}
-		} else {
-			creator = "unknown@" + hostname
-		}
-		hostDescriptionV1.Creator = creator
-		return nil
-	})
-	if err != nil {
-		return err
-	}
+		}()
 
-		inErr = props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
+		// Sets host extension DescriptionV1
+		innerErr = props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return scerr.InconsistentError(fmt.Sprintf("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String()))
 			}
-			_ = hostDescriptionV1.Replace(hdV1)
+			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractsToProperty(hf.Description))
+			creator := ""
+			hostname, _ := os.Hostname()
+			if curUser, err := user.Current(); err == nil {
+				creator := curUser.Username
+				if hostname != "" {
+					creator += "@" + hostname
+				}
+				if curUser.Name != "" {
+					creator += " (" + curUser.Name + ")"
+				}
+			} else {
+				creator = "unknown@" + hostname
+			}
 			hostDescriptionV1.Creator = creator
 			return nil
 		})
-		if err != nil {
-			return err
+		if innerErr != nil {
+			return innerErr
 		}
 
 		// Updates host property propertiesv1.HostNetwork
@@ -387,7 +376,7 @@ func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, h
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			_ = hostNetworkV1.Replace(hnV1)
+			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractsToProperty(hf.Network))
 			hostNetworkV1.DefaultNetworkID = objn.ID()
 			if objn.Name() != abstracts.SingleHostNetworkName {
 				hostNetworkV1.IsGateway = (hostReq.DefaultRouteIP == "")
@@ -398,12 +387,6 @@ func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, h
 			return nil
 		})
 	})
-	if err != nil {
-		return err
-	}
-
-	// Writes metadata
-	err = objh.Carry(task, rh)
 	if err != nil {
 		return err
 	}
@@ -448,7 +431,7 @@ func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, h
 
 	// -- Updates host link with networks --
 	for _, rn := range hostReq.Networks {
-		err := updateNetwork(task, svc, rn.ID, objh.ID(), objh.Name())
+		err := objh.updateNetwork(task, rn.ID)
 		if err != nil {
 			return err
 		}
@@ -513,31 +496,23 @@ func (objh *Host) waitInstallPhase(task concurrency.Task, phase string) (string,
 		return "", err
 	}
 
-	// TODO configurable timeout here
-	ctx, err := task.Context()
-	if err != nil {
-		return "", err
-	}
-	status, err := sshCfg.WaitServerReady(ctx, phase, time.Duration(sshDefaultTimeout)*time.Minute)
+	// TODO: configurable timeout here
+	status, err := sshCfg.WaitServerReady(task, phase, time.Duration(sshDefaultTimeout)*time.Minute)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrTimeout); ok {
 			return status, scerr.Wrap(err, "Timeout creating a host")
 		}
 		if abstracts.IsProvisioningError(err) {
 			logrus.Errorf("%+v", err)
-			return status, scerr.Wrapf(err, "error creating the host [%s], error provisioning the new host, please check safescaled logs", objh.Name())
+			return status, scerr.Wrap(err, "error creating the host [%s], error provisioning the new host, please check safescaled logs", objh.Name())
 		}
 		return status, err
 	}
 	return status, nil
 }
 
-func updateNetwork(task concurrency.Task, svc iaas.Service, networkID string, hostID, hostName string) error {
-	objn, err := NewNetwork(svc)
-	if err != nil {
-		return err
-	}
-	err = objn.Read(task, networkID)
+func (objh *Host) updateNetwork(task concurrency.Task, networkID string) error {
+	objn, err := networkfactory.Load(task, objh.Core.Service(), networkID)
 	if err != nil {
 		return err
 	}
@@ -547,8 +522,8 @@ func updateNetwork(task concurrency.Task, svc iaas.Service, networkID string, ho
 			if !ok {
 				return scerr.InconsistentError(fmt.Sprintf("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String()))
 			}
-			networkHostsV1.ByName[hostName] = hostID
-			networkHostsV1.ByID[hostID] = hostName
+			networkHostsV1.ByName[objh.Name()] = objh.ID()
+			networkHostsV1.ByID[objh.ID()] = objh.Name()
 			return nil
 		})
 	})
@@ -563,23 +538,17 @@ func (objh *Host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (st
 		return "", scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	ctx, err := task.Context()
-	if err != nil {
-		return "", err
-	}
-
 	sshCfg, err := objh.SSHConfig(task)
 	if err != nil {
 		return "", err
 	}
-
-	return sshCfg.WaitServerReady(ctx, "ready", timeout)
+	return sshCfg.WaitServerReady(task, "ready", timeout)
 }
 
 // getOrCreateDefaultNetwork gets network abstracts.SingleHostNetworkName or create it if necessary
 // We don't want metadata on this network, so we use directly provider api instead of services
 func getOrCreateDefaultNetwork(task concurrency.Task, svc iaas.Service) (resources.Network, resources.Host, error) {
-	if objn, err := LoadNetwork(task, svc, abstracts.SingleHostNetworkName); err == nil {
+	if objn, err := networkfactory.Load(task, svc, abstracts.SingleHostNetworkName); err == nil {
 		objpgw, err := objn.Gateway(task, true)
 		if err != nil {
 			return nil, nil, err
@@ -587,7 +556,7 @@ func getOrCreateDefaultNetwork(task concurrency.Task, svc iaas.Service) (resourc
 		return objn, objpgw, nil
 	}
 
-	objn, err := NewNetwork(svc)
+	objn, err := networkfactory.New(svc)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1150,10 +1119,10 @@ func (objh *Host) Push(task concurrency.Task, source, target, owner, mode string
 	}
 	cmd := ""
 	if owner != "" {
-		cmd += "chown "+owner+` '`+target+`' ;`
+		cmd += "chown " + owner + ` '` + target + `' ;`
 	}
 	if mode != "" {
-		cmd += "chmod "+mode+` '`+target+`'`
+		cmd += "chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
 		retcode, stdout, stderr, err = ssh.Run(runCtx, cmd)
@@ -1416,7 +1385,7 @@ func (objh *Host) DeleteFeature(
 // Type returns the type of the target
 //
 // satisfies install.Targetable interface
-func (objh *Host) Type() string {
+func (objh *Host) TargetType() string {
 	return "host"
 }
 

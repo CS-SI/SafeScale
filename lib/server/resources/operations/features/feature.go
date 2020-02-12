@@ -492,11 +492,11 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 			msgHead := fmt.Sprintf("Checking requirements of feature '%s'", f.Name())
 			var msgTail string
 			switch t.TargetType() {
-			case "host":
+			case featuretargettype.HOST:
 				msgTail = fmt.Sprintf("on host '%s'", t.(data.Identifyable).Name())
-			case "node":
+			case featuretargettype.NODE:
 				msgTail = fmt.Sprintf("on cluster node '%s'", t.(data.Identifyable).Name())
-			case "cluster":
+			case featuretargettype.CLUSTER:
 				msgTail = fmt.Sprintf("on cluster '%s'", t.(data.Identifyable).Name())
 			}
 			logrus.Debugf("%s %s...", msgHead, msgTail)
