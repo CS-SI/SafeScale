@@ -6,6 +6,7 @@ all: generate
 
 generate: clean
 	@(cd providers && $(MAKE) $(@))
+	@(cd userdata && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...
