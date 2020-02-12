@@ -25,8 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -34,7 +32,7 @@ import (
 type LoggedProvider WrappedProvider
 
 // WaitHostReady ...
-func (w LoggedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstracts.Host, error) {
+func (w LoggedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstracts.HostCore, error) {
 	defer w.prepare(w.trace("WaitHostReady"))
 	return w.InnerProvider.WaitHostReady(hostParam, timeout)
 }
@@ -59,46 +57,46 @@ func (w LoggedProvider) ListTemplates(all bool) ([]abstracts.HostTemplate, error
 	return w.InnerProvider.ListTemplates(all)
 }
 
-// GetAuthenticationOptions ...
-func (w LoggedProvider) GetAuthenticationOptions() (providers.Config, error) {
-	defer w.prepare(w.trace("GetAuthenticationOptions"))
-	return w.InnerProvider.GetAuthenticationOptions()
+// AuthenticationOptions ...
+func (w LoggedProvider) AuthenticationOptions() (providers.Config, error) {
+	defer w.prepare(w.trace("AuthenticationOptions"))
+	return w.InnerProvider.AuthenticationOptions()
 }
 
-// GetConfigurationOptions ...
-func (w LoggedProvider) GetConfigurationOptions() (providers.Config, error) {
-	defer w.prepare(w.trace("GetConfigurationOptions"))
-	return w.InnerProvider.GetConfigurationOptions()
+// ConfigurationOptions ...
+func (w LoggedProvider) ConfigurationOptions() (providers.Config, error) {
+	defer w.prepare(w.trace("ConfigurationOptions"))
+	return w.InnerProvider.ConfigurationOptions()
 }
 
-// GetName ...
-func (w LoggedProvider) GetName() string {
-	defer w.prepare(w.trace("GetName"))
-	return w.InnerProvider.GetName()
+// Name ...
+func (w LoggedProvider) Name() string {
+	defer w.prepare(w.trace("Name"))
+	return w.InnerProvider.Name()
 }
 
-// GetTenantParameters ...
-func (w LoggedProvider) GetTenantParameters() map[string]interface{} {
-	defer w.prepare(w.trace("GetTenantParameters"))
-	return w.InnerProvider.GetTenantParameters()
+// TenantParameters ...
+func (w LoggedProvider) TenantParameters() map[string]interface{} {
+	defer w.prepare(w.trace("TenantParameters"))
+	return w.InnerProvider.TenantParameters()
 }
 
 // Stack specific functions
 
 // trace ...
 func (w LoggedProvider) trace(s string) (string, time.Time) {
-	logrus.Tracef("stacks.%s::%s() called", w.Name, s)
+	logrus.Tracef("stacks.%s::%s() called", w.Label, s)
 	return s, time.Now()
 }
 
 // prepare ...
 func (w LoggedProvider) prepare(s string, startTime time.Time) {
-	logrus.Tracef("stacks.%s::%s() done in [%s]", w.Name, s, temporal.FormatDuration(time.Since(startTime)))
+	logrus.Tracef("stacks.%s::%s() done in [%s]", w.Label, s, temporal.FormatDuration(time.Since(startTime)))
 }
 
 // NewLoggedProvider ...
 func NewLoggedProvider(innerProvider Provider, name string) *LoggedProvider {
-	return &LoggedProvider{InnerProvider: innerProvider, Name: name}
+	return &LoggedProvider{InnerProvider: innerProvider, Label: name}
 }
 
 // ListAvailabilityZones ...
@@ -180,7 +178,7 @@ func (w LoggedProvider) DeleteNetwork(id string) error {
 }
 
 // CreateGateway ...
-func (w LoggedProvider) CreateGateway(req abstracts.GatewayRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *userdata.Content, error) {
+func (w LoggedProvider) CreateGateway(req abstracts.GatewayRequest) (*abstracts.HostFull, *userdata.Content, error) {
 	defer w.prepare(w.trace("CreateGateway"))
 	return w.InnerProvider.CreateGateway(req)
 }
@@ -192,43 +190,43 @@ func (w LoggedProvider) DeleteGateway(networkID string) error {
 }
 
 // CreateVIP ...
-func (w LoggedProvider) CreateVIP(networkID string, description string) (*abstracts.VIP, error) {
+func (w LoggedProvider) CreateVIP(networkID string, description string) (*abstracts.VirtualIP, error) {
 	defer w.prepare(w.trace("CreateVIP"))
 	return w.InnerProvider.CreateVIP(networkID, description)
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (w LoggedProvider) AddPublicIPToVIP(vip *abstracts.VIP) error {
+func (w LoggedProvider) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
 	defer w.prepare(w.trace("AddPublicIPToVIP"))
 	return w.InnerProvider.AddPublicIPToVIP(vip)
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w LoggedProvider) BindHostToVIP(vip *abstracts.VIP, hostID string) error {
+func (w LoggedProvider) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) error {
 	defer w.prepare(w.trace("BindHostToVIP"))
 	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (w LoggedProvider) UnbindHostFromVIP(vip *abstracts.VIP, hostID string) error {
+func (w LoggedProvider) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error {
 	defer w.prepare(w.trace("UnbindHostFromVIP"))
 	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (w LoggedProvider) DeleteVIP(vip *abstracts.VIP) error {
+func (w LoggedProvider) DeleteVIP(vip *abstracts.VirtualIP) error {
 	defer w.prepare(w.trace("DeleteVIP"))
 	return w.InnerProvider.DeleteVIP(vip)
 }
 
 // CreateHost ...
-func (w LoggedProvider) CreateHost(request abstracts.HostRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *propertiesv1.HostDescription, *userdata.Content, error) {
+func (w LoggedProvider) CreateHost(request abstracts.HostRequest) (*abstracts.HostFull, *userdata.Content, error) {
 	defer w.prepare(w.trace("CreateHost"))
 	return w.InnerProvider.CreateHost(request)
 }
 
 // InspectHost ...
-func (w LoggedProvider) InspectHost(something interface{}) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, error) {
+func (w LoggedProvider) InspectHost(something interface{}) (*abstracts.HostFull, error) {
 	defer w.prepare(w.trace("InspectHost"))
 	return w.InnerProvider.InspectHost(something)
 }
@@ -246,9 +244,9 @@ func (w LoggedProvider) GetHostState(something interface{}) (hoststate.Enum, err
 }
 
 // ListHosts ...
-func (w LoggedProvider) ListHosts() ([]*abstracts.Host, error) {
+func (w LoggedProvider) ListHosts(details bool) ([]*abstracts.HostFull, error) {
 	defer w.prepare(w.trace("ListHosts"))
-	return w.InnerProvider.ListHosts()
+	return w.InnerProvider.ListHosts(details)
 }
 
 // DeleteHost ...
@@ -276,7 +274,7 @@ func (w LoggedProvider) RebootHost(id string) error {
 }
 
 // ResizeHost ...
-func (w LoggedProvider) ResizeHost(id string, request abstracts.SizingRequirements) (*abstracts.Host, error) {
+func (w LoggedProvider) ResizeHost(id string, request abstracts.HostSizingRequirements) (*abstracts.HostFull, error) {
 	defer w.prepare(w.trace("ResizeHost"))
 	return w.InnerProvider.ResizeHost(id, request)
 }
@@ -329,8 +327,8 @@ func (w LoggedProvider) DeleteVolumeAttachment(serverID, id string) error {
 	return w.InnerProvider.DeleteVolumeAttachment(serverID, id)
 }
 
-// GetCapabilities returns the capabilities of the provider
-func (w LoggedProvider) GetCapabilities() providers.Capabilities {
-	defer w.prepare(w.trace("Getcapabilities"))
-	return w.InnerProvider.GetCapabilities()
+// Capabilities returns the capabilities of the provider
+func (w LoggedProvider) Capabilities() providers.Capabilities {
+	defer w.prepare(w.trace("Capabilities"))
+	return w.InnerProvider.Capabilities()
 }

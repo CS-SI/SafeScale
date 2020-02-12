@@ -20,8 +20,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // VolumeRequest represents a volume request
@@ -38,21 +36,18 @@ type Volume struct {
 	Size  int              `json:"size,omitempty"`
 	Speed volumespeed.Enum `json:"speed,omitempty"`
 	State volumestate.Enum `json:"state,omitempty"`
-	// Properties *serialize.JSONProperties `json:"properties,omitempty"`
 }
 
 // NewVolume ...
 func NewVolume() *Volume {
-	return &Volume{
-		// Properties: serialize.NewJSONProperties("resources.volume"),
-	}
+	return &Volume{}
 }
 
 // Clone ...
 //
 // satisfies interface data.Clonable
 func (v *Volume) Clone() data.Clonable {
-	return NewHost().Replace(v)
+	return NewVolume().Replace(v)
 }
 
 // Replace ...
@@ -72,28 +67,6 @@ func (v Volume) OK() bool {
 	result = result && v.Size != 0
 	// result = result && v.Properties != nil
 	return result
-}
-
-// Serialize serializes Host instance into bytes (output json code)
-func (v *Volume) Serialize() ([]byte, error) {
-	return serialize.ToJSON(v)
-}
-
-// Deserialize reads json code and restores an Host
-func (v *Volume) Deserialize(buf []byte) (err error) {
-	defer scerr.OnPanic(&err)()
-
-	// if v.Properties == nil {
-	// 	v.Properties = serialize.NewJSONProperties("resources.volume")
-	// } else {
-	// 	v.Properties.SetModule("resources.volume")
-	// }
-	err = serialize.FromJSON(buf, v)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // VolumeAttachmentRequest represents a volume attachment request

@@ -54,7 +54,7 @@ import (
 type Service interface {
 	// --- from service ---
 
-	CreateHostWithKeyPair(abstracts.HostRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *userdata.Content, *abstracts.KeyPair, error)
+	CreateHostWithKeyPair(abstracts.HostRequest) (*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork, *propertiesv1.HostDescription, *userdata.Content, *abstracts.KeyPair, error)
 	FilterImages(string) ([]abstracts.Image, error)
 	GetMetadataKey() *crypt.Key
 	GetMetadataBucket() objectstorage.Bucket
@@ -151,7 +151,7 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 	host := abstracts.NewHost()
 	host.ID = hostID
 	for {
-		host, _, _, err = svc.InspectHost(host)
+		host, _, _, _, err = svc.InspectHost(host)
 		if err != nil {
 			return err
 		}
@@ -562,31 +562,34 @@ func (svc *service) SearchImage(osname string) (*abstracts.Image, error) {
 
 // CreateHostWithKeyPair creates an host
 func (svc *service) CreateHostWithKeyPair(request abstracts.HostRequest) (
-	*abstracts.Host, *propertiesv2.HostSizing, *propertiesv1.HostNetwork,
+	*abstracts.Host,
+	*propertiesv2.HostSizing,
+	*propertiesv1.HostNetwork,
+	*propertiesv1.HostDescription,
 	*userdata.Content,
 	*abstracts.KeyPair,
 	error,
 ) {
 
 	if svc == nil {
-		return nil, nil, nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	_, err := svc.GetHostByName(request.ResourceName)
 	if err == nil {
-		return nil, nil, nil, nil, nil, abstracts.ResourceDuplicateError("Host", request.ResourceName)
+		return nil, nil, nil, nil, nil, nil, abstracts.ResourceDuplicateError("Host", request.ResourceName)
 	}
 
 	// Create temporary key pair
 	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 
 	kpName := kpNameuuid.String()
 	kp, err := svc.CreateKeyPair(kpName)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 
 	// Create host
@@ -601,11 +604,11 @@ func (svc *service) CreateHostWithKeyPair(request abstracts.HostRequest) (
 		DefaultGateway: request.DefaultGateway,
 		TemplateID:     request.TemplateID,
 	}
-	host, hsV2, hnV1, userData, err := svc.CreateHost(hostReq)
+	host, hsV2, hnV1, hdV1, userData, err := svc.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
-	return host, hsV2, hnV1, userData, kp, nil
+	return host, hsV2, hnV1, hdV1, userData, kp, nil
 }
 
 // ListHostsByName list hosts by name

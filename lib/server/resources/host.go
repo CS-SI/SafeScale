@@ -32,9 +32,9 @@ type Host interface {
 	Targetable
 
 	// Browse ...
-	Browse(task concurrency.Task, callback func(*abstracts.Host) error) error
+	Browse(task concurrency.Task, callback func(*abstracts.HostFull) error) error
 	// Create creates a new host and its metadata
-	Create(task concurrency.Task, hostReq abstracts.HostRequest, hostDef abstracts.SizingRequirements) error
+	Create(task concurrency.Task, hostReq abstracts.HostRequest, hostDef abstracts.HostSizingRequirements) error
 	// WaitSSHReady ...
 	WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err error)
 	// SSHConfig loads SSH configuration for host from metadata
@@ -44,7 +44,7 @@ type Host interface {
 	// Pull downloads a file from host
 	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, error)
 	// Push uploads a file to ho
-	Push(task concurrency.Task, source, target string, timeout time.Duration) (int, string, string, error)
+	Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, error)
 	// Share returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	Share(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, error)
 	// Start starts the host
@@ -54,7 +54,7 @@ type Host interface {
 	// Reboot reboots the host
 	Reboot(task concurrency.Task) error
 	// Resize ...
-	Resize(hostSize abstracts.SizingRequirements) error
+	Resize(hostSize abstracts.HostSizingRequirements) error
 	// PublicIP returns the public IP address of the host
 	PublicIP(task concurrency.Task) (ip string, err error)
 	// PrivateIP ...
@@ -65,6 +65,7 @@ type Host interface {
 	IsClusterMember(task concurrency.Task) (bool, error)
 	// PushStringToFile creates a file 'filename' on remote 'host' with the content 'content'
 	PushStringToFile(task concurrency.Task, content string, filename string, owner, group, rights string) error
+	// DefaultNetwork returns the resources.Network object corresponding to the default network of the host
 	DefaultNetwork(task concurrency.Task) (Network, error)
 
 	ToProtocolHost() *protocol.Host

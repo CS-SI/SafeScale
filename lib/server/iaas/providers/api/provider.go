@@ -38,18 +38,18 @@ type Provider interface {
 	// Host templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates(all bool) ([]abstracts.HostTemplate, error)
 
-	// GetAuthenticationOptions returns authentication options as a Config
-	GetAuthenticationOptions() (providers.Config, error)
+	// AuthenticationOptions returns authentication options as a Config
+	AuthenticationOptions() (providers.Config, error)
 
-	// GetConfigurationfgOpts returns configuration options as a Config
-	GetConfigurationOptions() (providers.Config, error)
+	// ConfigurationfgOpts returns configuration options as a Config
+	ConfigurationOptions() (providers.Config, error)
 
-	// GetName returns the provider name
-	GetName() string
+	// Name returns the provider name
+	Name() string
 
-	// GetCapabilities returns the capabilities of the provider
-	GetCapabilities() providers.Capabilities
+	// Capabilities returns the capabilities of the provider
+	Capabilities() providers.Capabilities
 
-	// GetTenantParameters returns the tenant parameters as read
-	GetTenantParameters() map[string]interface{}
+	// TenantParameters returns the tenant parameters as read
+	TenantParameters() map[string]interface{}
 }

@@ -97,7 +97,7 @@ func (t *Token) Validate() (string, string, error) {
 	switch operator {
 	case "~":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+			return "", "", scerr.InvalidRequestError("'count' can only use '='")
 		}
 
 		// "~" means "[<value>-<value*2>]"
@@ -116,17 +116,17 @@ func (t *Token) Validate() (string, string, error) {
 				value = value[1 : len(value)-1]
 				splitted := strings.Split(value, "-")
 				if len(splitted) != 2 {
-					return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of '%s' token isn't a valid interval", value, keyword))
+					return "", "", scerr.InvalidRequestError("value '%s' of '%s' token isn't a valid interval", value, keyword)
 				}
 				min := splitted[0]
 				_, err := strconv.ParseFloat(min, 64)
 				if err != nil {
-					return "", "", scerr.InvalidRequestError(fmt.Sprintf("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error()))
+					return "", "", scerr.InvalidRequestError("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error())
 				}
 				max := splitted[1]
 				_, err = strconv.ParseFloat(max, 64)
 				if err != nil {
-					return "", "", scerr.InvalidRequestError(fmt.Sprintf("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error()))
+					return "", "", scerr.InvalidRequestError("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error())
 				}
 				return min, max, nil
 			}
@@ -146,7 +146,7 @@ func (t *Token) Validate() (string, string, error) {
 		fallthrough
 	case "<":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+			return "", "", scerr.InvalidRequestError("'count' can only use '='")
 		}
 
 		vali, err := strconv.Atoi(value)
@@ -163,7 +163,7 @@ func (t *Token) Validate() (string, string, error) {
 		fallthrough
 	case "<=":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+			return "", "", scerr.InvalidRequestError("'count' can only use '='")
 		}
 
 		_, err := strconv.Atoi(value)
@@ -179,7 +179,7 @@ func (t *Token) Validate() (string, string, error) {
 		fallthrough
 	case ">":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+			return "", "", scerr.InvalidRequestError("'count' can only use '='")
 		}
 
 		vali, err := strconv.Atoi(value)
@@ -196,7 +196,7 @@ func (t *Token) Validate() (string, string, error) {
 		fallthrough
 	case ">=":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' must be > 0")
+			return "", "", scerr.InvalidRequestError("'count' can only use '='")
 		}
 
 		_, err := strconv.Atoi(value)

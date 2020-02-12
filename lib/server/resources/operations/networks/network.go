@@ -48,6 +48,8 @@ const (
 type Network struct {
 	*resources.Core
 	properties *serialize.JSONProperties
+
+	hasVIP bool
 }
 
 // NewNetwork creates an instance of Network
@@ -81,7 +83,13 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (*Network, error)
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	return networks.Load(task, svc, ref)
+	network, err := networks.Load(task, svc, ref)
+	if err != nil {
+		return nil, err
+	}
+	err = network.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Inspect(networkproperty.)
+	})
 }
 
 // // Properties returns the extensions of the host
@@ -233,7 +241,7 @@ func (objn *Network) Create(task concurrency.Task, req resources.NetworkRequest,
 		}
 	}()
 
-	var template *resources.HostTemplate
+	var template *abstracts.HostTemplate
 	tpls, err := svc.SelectTemplatesBySize(*gwSizing, false)
 	if err != nil {
 		return scerr.Wrap(err, "failed to find appropriate template")
@@ -1259,4 +1267,18 @@ func (objn *Network) EndpointIP(task concurrency.Task) (ip string, err error) {
 		return "", err
 	}
 	return ip, nil
+}
+
+// HasVirtualIP tells if the network uses a VIP a default route
+func (n *network) HasVirtualIP(task concurrency.Task) (vip bool) {
+	vip = false
+	err := n.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		core, ok := clonable.(*abstracts.Network)
+		if !ok {
+			return scerr.InconsistentError("'*abstracts.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		vip = core.VIP != nil
+		return nil
+	})
+	return vip
 }

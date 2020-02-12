@@ -28,11 +28,11 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusters/flavors"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusters/flavors/boh/enums/errorcode"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
@@ -49,12 +49,6 @@ var (
 		// The name "inc" is what the function will be called in the template text.
 		"inc": func(i int) int {
 			return i + 1
-		},
-		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.StringMap[msg]; ok {
-				return int(code)
-			}
-			return 1023
 		},
 	}
 
@@ -96,8 +90,8 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 	return masterNodeCount, privateNodeCount, 0, nil
 }
 
-func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstracts.SizingRequirements {
-	return abstracts.SizingRequirements{
+func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstracts.HostSizingRequirements {
+	return abstracts.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
 		MinRAMSize:  7.0,
@@ -107,8 +101,8 @@ func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstracts.SizingR
 	}
 }
 
-func nodeSizing(task concurrency.Task, _ resources.Cluster) abstracts.SizingRequirements {
-	return abstracts.SizingRequirements{
+func nodeSizing(task concurrency.Task, _ resources.Cluster) abstracts.HostSizingRequirements {
+	return abstracts.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
 		MinRAMSize:  15.0,

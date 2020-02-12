@@ -64,7 +64,7 @@ func (tm *taskedLock) RLock(task Task) error {
 	tracer := NewTracer(task, "", Trace.Locks)
 	defer tracer.GoingIn().OnExitTrace()()
 
-	tid, err := task.GetID()
+	tid, err := task.ID()
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (tm *taskedLock) RUnlock(task Task) error {
 		return scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.GetID()
+	tid, err := task.ID()
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (tm *taskedLock) Lock(task Task) error {
 		return scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.GetID()
+	tid, err := task.ID()
 	if err != nil {
 		return err
 	}
@@ -151,8 +151,8 @@ func (tm *taskedLock) Lock(task Task) error {
 	}
 	// If already lock for read, returns an error
 	if _, ok := tm.readLocks[tid]; ok {
-		tracer.Trace("Can't Lock, already RLocked")
-		taskID, _ := task.GetID()
+		tracer.Trace("Cannot Lock, already RLocked")
+		taskID, _ := task.ID()
 		return fmt.Errorf("cannot Lock task '%s': already RLocked", taskID)
 	}
 	// registers lock for read for the task and actively lock the RWMutex
@@ -171,7 +171,7 @@ func (tm *taskedLock) Unlock(task Task) error {
 		return scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.GetID()
+	tid, err := task.ID()
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func (tm *taskedLock) IsRLocked(task Task) (bool, error) {
 		return false, scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.GetID()
+	tid, err := task.ID()
 	if err != nil {
 		return false, err
 	}
@@ -225,7 +225,7 @@ func (tm *taskedLock) IsLocked(task Task) (bool, error) {
 		return false, scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.GetID()
+	tid, err := task.ID()
 	if err != nil {
 		return false, err
 	}

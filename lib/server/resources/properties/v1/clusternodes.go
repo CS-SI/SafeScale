@@ -22,55 +22,50 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Node ...
-type Node struct {
+// ClusterNode ...
+type ClusterNode struct {
 	ID        string `json:"id"`         // ID of the node
 	Name      string `json:"name"`       // Name of the node
 	PublicIP  string `json:"public_ip"`  // public ip of the node
 	PrivateIP string `json:"private_ip"` // private ip of the node
 }
 
-// Nodes ...
-type Nodes struct {
-	Masters          []*Node `json:"masters"`                 // Masters contains the ID of the masters
-	PublicNodes      []*Node `json:"public_nodes,omitempty"`  // PublicNodes is a slice of IDs of the public cluster nodes
-	PrivateNodes     []*Node `json:"private_nodes,omitempty"` // PrivateNodes is a slice of IDs of the private cluster nodes
-	MasterLastIndex  int     `json:"master_last_index"`       // MasterLastIndex
-	PrivateLastIndex int     `json:"private_last_index"`      // PrivateLastIndex
-	PublicLastIndex  int     `json:"public_last_index"`       // PublicLastIndex
+// ClusterNodes ...
+type ClusterNodes struct {
+	Masters          []*ClusterNode `json:"masters"`                 // Masters contains the ID of the masters
+	PublicNodes      []*ClusterNode `json:"public_nodes,omitempty"`  // PublicNodes is a slice of IDs of the public cluster nodes
+	PrivateNodes     []*ClusterNode `json:"private_nodes,omitempty"` // PrivateNodes is a slice of IDs of the private cluster nodes
+	MasterLastIndex  int            `json:"master_last_index"`       // MasterLastIndex
+	PrivateLastIndex int            `json:"private_last_index"`      // PrivateLastIndex
+	PublicLastIndex  int            `json:"public_last_index"`       // PublicLastIndex
 }
 
-func newNodes() *Nodes {
-	return &Nodes{
-		Masters:      []*Node{},
-		PublicNodes:  []*Node{},
-		PrivateNodes: []*Node{},
+func newClusterNodes() *ClusterNodes {
+	return &ClusterNodes{
+		Masters:      []*ClusterNode{},
+		PublicNodes:  []*ClusterNode{},
+		PrivateNodes: []*ClusterNode{},
 	}
-}
-
-// Content ... (data.Clonable interface)
-func (n *Nodes) Content() interface{} {
-	return n
 }
 
 // Clone ... (data.Clonable interface)
-func (n *Nodes) Clone() data.Clonable {
-	return newNodes().Replace(n)
+func (n *ClusterNodes) Clone() data.Clonable {
+	return newClusterNodes().Replace(n)
 }
 
 // Replace ... (data.Clonable interface)
-func (n *Nodes) Replace(p data.Clonable) data.Clonable {
-	src := p.(*Nodes)
+func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
+	src := p.(*ClusterNodes)
 	*n = *src
-	n.Masters = make([]*Node, len(src.Masters))
-	n.PublicNodes = make([]*Node, len(src.PublicNodes))
-	n.PrivateNodes = make([]*Node, len(src.PrivateNodes))
+	n.Masters = make([]*ClusterNode, len(src.Masters))
 	for k, v := range src.Masters {
 		n.Masters[k] = v
 	}
+	n.PublicNodes = make([]*ClusterNode, len(src.PublicNodes))
 	for k, v := range src.PublicNodes {
 		n.PublicNodes[k] = v
 	}
+	n.PrivateNodes = make([]*ClusterNode, len(src.PrivateNodes))
 	for k, v := range src.PrivateNodes {
 		n.PrivateNodes[k] = v
 	}
@@ -78,5 +73,5 @@ func (n *Nodes) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.NodesV1, newNodes())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.NodesV1, newClusterNodes())
 }

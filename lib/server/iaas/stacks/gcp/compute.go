@@ -35,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -220,7 +219,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host, template *abstracts.HostTemplate, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.HostFull, template *abstracts.HostTemplate, userData *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
@@ -342,11 +341,11 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 		return nil, nil, userData, err
 	}
 
-	// --- Initializes abstracts.Host ---
+	// --- Initializes abstracts.HostCore ---
 
-	host = abstracts.NewHost()
-	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
-	host.Password = request.Password
+	hostCore := abstracts.NewHostCore()
+	hostCore.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
+	hostCore.Password = request.Password
 
 	//VPL: moved to objects.Host.Create()
 	// err = host.Properties.Alter(HostProperty.NetworkV1, func(v interface{}) error {
@@ -415,13 +414,13 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 				return fmt.Errorf("failed to create server")
 			}
 
-			host.ID = server.ID
-			host.Name = server.Name
+			hostCore.ID = server.ID
+			hostCore.Name = server.Name
 
 			// Wait that Host is ready, not just that the build is started
 			_, err = s.WaitHostReady(host, temporal.GetLongOperationTimeout())
 			if err != nil {
-				killErr := s.DeleteHost(host.ID)
+				killErr := s.DeleteHost(hostCore.ID)
 				if killErr != nil {
 					switch killErr.(type) {
 					case *scerr.ErrTimeout:
@@ -443,73 +442,77 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 	if desistError != nil {
 		return nil, nil, userData, abstracts.ResourceForbiddenError(request.ResourceName, fmt.Sprintf("error creating host: %s", desistError.Error()))
 	}
-
 	logrus.Debugf("host resource created.")
 
-	newHost := host
+	newHost := abstracts.NewHostFull()
+	newHost.Core = hostCore
+
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			logrus.Infof("Cleanup, deleting host '%s'", newHost.Name)
-			derr := s.DeleteHost(newHost.ID)
+			logrus.Infof("Cleanup, deleting host '%s'", hostCore.Name)
+			derr := s.DeleteHost(hostCore.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case *scerr.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", hostCore.Name, derr)
 				case *scerr.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", hostCore.Name, derr)
 				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", hostCore.Name, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
 
-	if host == nil {
-		return nil, nil, nil, fmt.Errorf("unexpected nil host")
+	if !newHost.OK() {
+		logrus.Warnf("Missing data in host: %s", spew.Sdump(newHost))
 	}
 
-	if !host.OK() {
-		logrus.Warnf("Missing data in host: %s", spew.Sdump(host))
-	}
-
-	return host, template, userData, nil
+	return newHost, template, userData, nil
 }
 
 // WaitHostReady waits an host achieve ready state
-// hostParam can be an ID of host, or an instance of *abstracts.Host; any other type will return an utils.ErrInvalidParameter.
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstracts.Host, err error) {
+// hostParam can be an ID of host, or an instance of *abstracts.HostCore; any other type will return an utils.ErrInvalidParameter.
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstracts.HostFull, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	var host *abstracts.Host
+	var hostCore *abstracts.HostCore
 	switch hostParam := hostParam.(type) {
 	case string:
-		host = abstracts.NewHost()
-		host.ID = hostParam
-	case *abstracts.Host:
-		host = hostParam
+		hostCore = abstracts.NewHostCore()
+		hostCore.ID = hostParam
+	case *abstracts.HostCore:
+		hostCore = hostParam
+		if hostCore == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a non-empty string or a *abstracts.HostCore")
 	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *abstracts.Host")
+	hostRef := hostCore.Name
+	if hostRef == "" {
+		hostRef = hostCore.ID
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostCore.ID), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	var hostComplete *abstracts.HostFull
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, _, _, err := s.InspectHost(host)
-			if err != nil {
-				return err
+			var innerErr error
+			hostComplete, innerErr = s.InspectHost(hostCore)
+			if innerErr != nil {
+				return innerErr
 			}
 
-			host = hostTmp
-			if host.LastState != hoststate.STARTED {
-				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
+			if hostComplete.Core.LastState != hoststate.STARTED {
+				return fmt.Errorf("not in ready state (current state: %s)", hostComplete.Core.LastState.String())
 			}
 			return nil
 		},
@@ -518,11 +521,11 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return host, abstracts.TimeoutError(fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.Name, timeout), timeout)
+			return nil, abstracts.ResourceTimeoutError("host", hostCore.Name, timeout)
 		}
-		return host, retryErr
+		return nil, retryErr
 	}
-	return host, nil
+	return hostComplete, nil
 }
 
 func publicAccess(isPublic bool) []*compute.AccessConfig {
@@ -539,7 +542,20 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 }
 
 // buildGcpMachine ...
-func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *abstracts.HostTemplate) (*abstracts.Host, error) {
+func buildGcpMachine(
+	service *compute.Service,
+	projectID string,
+	instanceName string,
+	imageID string,
+	region string,
+	zone string,
+	network string,
+	subnetwork string,
+	userdata string,
+	isPublic bool,
+	template *abstracts.HostTemplate,
+) (*abstracts.HostCore, error) {
+
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
 	imageURL := imageID
@@ -624,53 +640,54 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 		logrus.Warnf("Instance not modified since insert.")
 	}
 
-	host := abstracts.NewHost()
-	host.ID = strconv.FormatUint(inst.Id, 10)
-	host.Name = inst.Name
+	hostCore := abstracts.NewHostCore()
+	hostCore.ID = strconv.FormatUint(inst.Id, 10)
+	hostCore.Name = inst.Name
 
-	return host, nil
+	return hostCore, nil
 }
 
-// InspectHost returns the host identified by ref (name or id) or by a *abstracts.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, hnV1 *propertiesv1.HostNetwork, hsV1 *propertiesv1.HostSizing, err error) {
+// InspectHost returns the host identified by ref (name or id) or by a *abstracts.HostFull containing an id
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.HostFull, err error) {
 	if s == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	defer scerr.OnPanic(&err)()
 
+	hostComplete := abstracts.NewHostFull()
+
 	switch hostParam := hostParam.(type) {
 	case string:
-		host = abstracts.NewHost()
-		host.ID = hostParam
-	case *abstracts.Host:
-		host = hostParam
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be empty string")
+		}
+		hostComplete.Core.ID = hostParam
+	case *abstracts.HostCore:
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
+		hostComplete.Core = hostParam
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a non-empty string or a *abstracts.HostCore")
 	}
-
-	if host == nil {
-		return nil, nil, nil, scerr.InvalidParameterError("hostParam", "must be a string or a *abstracts.Host")
-	}
-
-	hostRef := host.Name
+	hostRef := hostComplete.Core.Name
 	if hostRef == "" {
-		hostRef = host.ID
-	}
-
-	if utils.IsEmpty(host) {
-		return nil, nil, nil, abstracts.ResourceNotFoundError("host", hostRef)
+		hostRef = hostComplete.Core.ID
 	}
 
 	gcpHost, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostRef).Do()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
-
-	host.LastState, err = stateConvert(gcpHost.Status)
+	_ = &compute.Instance{}
+	hostComplete.Core.LastState, err = stateConvert(gcpHost.Status)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
-	var subnets []IPInSubnet
+	hostComplete.Core.Name = gcpHost.Hostname
 
+	var subnets []IPInSubnet
 	for _, nit := range gcpHost.NetworkInterfaces {
 		snet := genURL(nit.Subnetwork)
 		if !utils.IsEmpty(snet) {
@@ -725,62 +742,26 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, hnV1 *
 		}
 	}
 
-	// VPL: Moved in objects.Host
-	// err = host.Properties.Alter(HostProperty.NetworkV1, func(v interface{}) error {
-	// 	hostNetworkV1 := v.(*propertiesv1.HostNetwork)
-	// 	hostNetworkV1.IPv4Addresses = ip4bynetid
-	// 	hostNetworkV1.IPv6Addresses = make(map[string]string)
-	// 	hostNetworkV1.NetworksByID = netnamebyid
-	// 	hostNetworkV1.NetworksByName = netidbyname
-	// 	if hostNetworkV1.PublicIPv4 == "" {
-	// 		hostNetworkV1.PublicIPv4 = ipv4
-	// 	}
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
+	hostComplete.Network.IPv4Addresses = ip4bynetid
+	hostComplete.Network.NetworksByID = netnamebyid
+	hostComplete.Network.NetworksByName = netidbyname
+	hostComplete.Network.PublicIPv4 = ipv4
+
+	hostComplete.Sizing = fromMachineTypeToAllocatedSize(gcpHost.MachineType)
+
+	// if !hostComplete.OK() {
+	// 	logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	// }
-	hnV1 = &propertiesv1.HostNetwork{
-		IPv4Addresses:  ip4bynetid,
-		NetworksByID:   netnamebyid,
-		NetworksByName: netidbyname,
-		PublicIPv4:     ipv4,
-	}
 
-	allocated := fromMachineTypeToAllocatedSize(gcpHost.MachineType)
-
-	// VPL: Moved to objects.Host
-	// err = host.Properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
-	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
-	// 	hostSizingV1.AllocatedSize.Cores = allocated.Cores
-	// 	hostSizingV1.AllocatedSize.RAMSize = allocated.RAMSize
-	// 	hostSizingV1.AllocatedSize.DiskSize = allocated.DiskSize
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
-	// }
-	hsV1 = &propertiesv1.HostSizing{
-		AllocatedSize: &propertiesv1.HostSize{
-			Cores:    allocated.Cores,
-			RAMSize:  allocated.RAMSize,
-			DiskSize: allocated.DiskSize,
-		},
-	}
-
-	if !host.OK() {
-		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
-	}
-
-	return host, hnV1, hsV1, nil
+	return hostComplete, nil
 }
 
-func fromMachineTypeToAllocatedSize(machineType string) propertiesv1.HostSize {
-	hz := propertiesv1.HostSize{}
+func fromMachineTypeToAllocatedSize(machineType string) *abstracts.HostEffectiveSizing {
+	hz := abstracts.HostEffectiveSizing{}
 
-	// FIXME Implement mapping
+	// FIXME: Implement mapping
 
-	return hz
+	return &hz
 }
 
 func stateConvert(gcpHostStatus string) (hoststate.Enum, error) {
@@ -809,7 +790,7 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, error) {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstracts.Host, error) {
+func (s *Stack) GetHostByName(name string) (*abstracts.HostCore, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -817,14 +798,14 @@ func (s *Stack) GetHostByName(name string) (*abstracts.Host, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	hosts, err := s.ListHosts()
+	hosts, err := s.ListHosts(false)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, host := range hosts {
-		if host.Name == name {
-			return host, nil
+		if host.Core.Name == name {
+			return host.Core, nil
 		}
 	}
 
@@ -882,20 +863,18 @@ func (s *Stack) DeleteHost(id string) (err error) {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request abstracts.SizingRequirements) (*abstracts.Host, error) {
-	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
+func (s *Stack) ResizeHost(id string, request abstracts.HostSizingRequirements) (abstracts.HostList, error) {
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*abstracts.Host, error) {
+func (s *Stack) ListHosts(detailed bool) (abstracts.HostList, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
+	var hostList abstracts.HostList
 	compuService := s.ComputeService
-
-	var hostList []*abstracts.Host
-
 	token := ""
 	for paginate := true; paginate; {
 		resp, err := compuService.Instances.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
@@ -903,13 +882,24 @@ func (s *Stack) ListHosts() ([]*abstracts.Host, error) {
 			return hostList, fmt.Errorf("cannot list hosts: %v", err)
 		}
 		for _, instance := range resp.Items {
-			nhost := abstracts.NewHost()
+			nhost := abstracts.NewHostCore()
 			nhost.ID = strconv.FormatUint(instance.Id, 10)
 			nhost.Name = instance.Name
 			nhost.LastState, _ = stateConvert(instance.Status)
 
+			var hostFull *abstracts.HostFull
+			if detailed {
+				hostFull, err = s.InspectHost(nhost)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				hostFull = abstracts.NewHostFull()
+				hostFull.Core.Replace(nhost)
+			}
+
 			// FIXME Populate host, what's missing ?
-			hostList = append(hostList, nhost)
+			hostList = append(hostList, hostFull)
 		}
 		token := resp.NextPageToken
 		paginate = token != ""
@@ -1022,12 +1012,12 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 		return hoststate.ERROR, scerr.InvalidInstanceError()
 	}
 
-	host, _, _, err := s.InspectHost(hostParam)
+	host, err := s.InspectHost(hostParam)
 	if err != nil {
 		return hoststate.ERROR, err
 	}
 
-	return host.LastState, nil
+	return host.Core.LastState, nil
 }
 
 //-------------Provider Infos-------------------------------------------------------------------------------------------

@@ -776,7 +776,7 @@ func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, 
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
-	ctx, _, err := task.GetContext()
+	ctx, _, err := task.Context()
 	if err != nil {
 		return nil, err
 	}

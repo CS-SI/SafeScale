@@ -17,17 +17,27 @@
 package features
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/prometheus/common/log"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -63,11 +73,11 @@ func (sr stepResult) ErrorMessage() string {
 	return ""
 }
 
-// StepResults contains the errors of the step for each host target
-type StepResults map[string]stepResult
+// stepResults contains the errors of the step for each host target
+type stepResults map[string]stepResult
 
 // ErrorMessages returns a string containing all the errors registered
-func (s StepResults) ErrorMessages() string {
+func (s stepResults) ErrorMessages() string {
 	output := ""
 	for h, k := range s {
 		val := k.ErrorMessage()
@@ -80,7 +90,7 @@ func (s StepResults) ErrorMessages() string {
 
 // UncompletedEntries returns an array of string of all keys where the script
 // to run action wasn't completed
-func (s StepResults) UncompletedEntries() []string {
+func (s stepResults) UncompletedEntries() []string {
 	var output []string
 	for k, v := range s {
 		if !v.Completed() {
@@ -91,7 +101,7 @@ func (s StepResults) UncompletedEntries() []string {
 }
 
 // Successful tells if all the steps have been successful
-func (s StepResults) Successful() bool {
+func (s stepResults) Successful() bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -104,7 +114,7 @@ func (s StepResults) Successful() bool {
 }
 
 // Completed tells if all the scripts corresponding to action have been completed.
-func (s StepResults) Completed() bool {
+func (s stepResults) Completed() bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -258,8 +268,8 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(hosts []*protocol.Host, v Variables, s Settings) (results StepResults, err error) {
-	results = StepResults{}
+func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, err error) {
+	outcomes = unitResults{}
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
@@ -268,17 +278,20 @@ func (is *step) Run(hosts []*protocol.Host, v Variables, s Settings) (results St
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, utils.Plural(nHosts)),
 		fmt.Sprintf("Ending step '%s' on %d host%s", is.Name, len(hosts), utils.Plural(nHosts)),
-		log.DebugLevel,
+		logrus.DebugLevel,
 	)()
 
 	if is.Serial || s.Serialize {
 
 		for _, h := range hosts {
-			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.Name(), is.Name, h.Name)
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			cloneV["HostIP"] = h.PrivateIp
+			cloneV["HostIP"], err = h.PrivateIP(is.Worker.feature.task)
+			if err != nil {
+				return nil, err
+			}
 			cloneV["Hostname"] = h.Name
 			cloneV, err = realizeVariables(cloneV)
 			if err != nil {
@@ -288,38 +301,44 @@ func (is *step) Run(hosts []*protocol.Host, v Variables, s Settings) (results St
 			if err != nil {
 				return nil, err
 			}
-			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
-			results[h.Name] = result.(stepResult)
+			outcome, err := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
+			if err != nil {
+				return nil, err
+			}
+			outcomes.AddSingle(h.Name(), outcome.(resources.UnitResult))
 			subtask.Close()
 			// err = subtask.Reset()
 			// if err != nil {
 			// 	return nil, err
 			// }
 
-			if !results[h.Name].Successful() {
+			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
 					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present: %s",
-						is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						is.Worker.action.String(), is.Worker.feature.Name(), is.Name, h.Name,
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				} else { // other steps are expected to succeed
 					tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
-						is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						is.Worker.action.String(), is.Worker.feature.Name(), is.Name, h.Name,
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				}
 			} else {
 				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
-					is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
+					is.Worker.action.String(), is.Worker.feature.Name(), is.Name, h.Name,
 					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	} else {
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
-			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.Name(), is.Name, h.Name)
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			cloneV["HostIP"] = h.PrivateIp
+			cloneV["HostIP"], err = h.PrivateIP(is.Worker.feature.task)
+			if err != nil {
+				return nil, err
+			}
 			cloneV["Hostname"] = h.Name
 			cloneV, err = realizeVariables(cloneV)
 			if err != nil {
@@ -338,40 +357,40 @@ func (is *step) Run(hosts []*protocol.Host, v Variables, s Settings) (results St
 				return nil, err
 			}
 
-			subtasks[h.Name] = subtask
+			subtasks[h.Name()] = subtask
 		}
 		for k, s := range subtasks {
-			result, err := s.Wait()
+			outcome, err := s.Wait()
 			if err != nil {
 				log.Warn(tracer.TraceMessage(": %s(%s):step(%s)@%s finished after %s, but failed to recover result",
-					is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
+					is.Worker.action.String(), is.Worker.feature.Name(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
 				continue
 			}
-			results[k] = result.(stepResult)
+			outcomes.AddSingle(k, outcome.(resources.UnitResult))
 
-			if !results[k].Successful() {
+			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
 					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present: %s",
-						is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, k,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						is.Worker.action.String(), is.Worker.feature.Name(), is.Name, k,
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				} else { // other steps are expected to succeed
 					tracer.Trace(": %s(%s):step(%s)@%s failed in %s: %s",
-						is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, k,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
+						is.Worker.action.String(), is.Worker.feature.Name(), is.Name, k,
+						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				}
 			} else {
 				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
-					is.Worker.installaction.String(), is.Worker.feature.DisplayName(), is.Name, k,
+					is.Worker.action.String(), is.Worker.feature.Name(), is.Name, k,
 					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	}
-	return results, nil
+	return outcomes, nil
 }
 
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
-// func (is *step) runOnHost(host *protocol.Host, v Variables) stepResult {
+// func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
 func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		p  = data.Map{}
@@ -379,18 +398,18 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	)
 	if params != nil {
 		if p, ok = params.(data.Map); !ok {
-			return nil, scerr.InvalidParameterError("params", "must be a data.Map")
+			return nil, scerr.InvalidParameterError("params", "must be a 'data.Map'")
 		}
 	}
 
 	// Get parameters
-	host, ok := p["host"].(*protocol.Host)
+	host, ok := p["host"].(resources.Host)
 	if !ok {
-		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'host' of type '*Host'")
+		return nil, scerr.InvalidParameterError("params['host']", "must be a 'resources.Host'")
 	}
-	variables, ok := p["variables"].(Variables)
+	variables, ok := p["variables"].(data.Map)
 	if !ok {
-		return nil, scerr.InvalidParameterError("params", "must be a data.Map with a key 'variables' of type 'Variables'")
+		return nil, scerr.InvalidParameterError("params['variables'", "must be a 'data.Map'")
 	}
 
 	// Updates variables in step script
@@ -401,7 +420,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
-		err := UploadStringToRemoteFile(is.OptionsFileContent, host, utils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
+		err := UploadStringToRemoteFile(is.OptionsFileContent, host, utils.TempFolder+"/options.json", "cladm:safescale", "ug+rw-x,o-rwx")
 		if err != nil {
 			return stepResult{err: err}, nil
 		}
@@ -416,8 +435,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Uploads then executes command
-	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
-	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
+	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.Name(), strings.ToLower(is.Action.String()), is.Name)
+	err = UploadStringToRemoteFile(command, host, filename, "", "")
 	if err != nil {
 		return stepResult{err: err}, nil
 	}
@@ -429,7 +448,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Executes the script on the remote host
-	retcode, outrun, _, err := client.New().SSH.Run(task, host.Name, command, Outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, err := client.New().SSH.Run(task, host.Name(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{err: err, output: outrun}, nil
 	}
@@ -477,4 +496,166 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 	}
 
 	return nil
+}
+
+// UploadFile uploads a file to remote host
+func UploadFile(localpath string, host resources.Host, remotepath, owner, mode string) (err error) {
+	if localpath == "" {
+		return scerr.InvalidParameterError("localpath", "cannot be empty string")
+	}
+	if host == nil {
+		return scerr.InvalidParameterError("host", "cannot be nil")
+	}
+	if remotepath == "" {
+		return scerr.InvalidParameterError("remotepath", "cannot be empty string")
+	}
+
+	voidtask, err := concurrency.NewTask()
+	if err != nil {
+		return err
+	}
+	tracer := concurrency.NewTracer(voidtask, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			retcode, _, _, err := host.Push(voidtask, localpath, remotepath, "", "", temporal.GetExecutionTimeout())
+			if err != nil {
+				return err
+			}
+			if retcode != 0 {
+				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
+				if retcode == 1 {
+					// File may exist on target, try to remote it
+					_, _, _, err = host.Run(voidtask, fmt.Sprintf("sudo rm -f %s", remotepath), temporal.GetBigDelay(), temporal.GetExecutionTimeout())
+					if err == nil {
+						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
+					}
+					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
+					return retry.StopRetryError("an unrecoverable network error has occurred", err)
+				}
+				if system.IsSCPRetryable(retcode) {
+					err = fmt.Errorf("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", localpath, host.Name(), remotepath, retcode, system.SCPErrorString(retcode))
+					return err
+				}
+				return nil
+			}
+			return nil
+		},
+		temporal.GetDefaultDelay(),
+		temporal.GetLongOperationTimeout(),
+	)
+	if retryErr != nil {
+		switch realErr := retryErr.(type) { // nolint
+		case *retry.ErrStopRetry:
+			return scerr.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.Name())
+		case *retry.ErrTimeout:
+			return scerr.Wrap(realErr, "timeout trying to copy temporary file to '%s:%s'", host.Name(), remotepath)
+		}
+		return retryErr
+	}
+
+	cmd := ""
+	if owner != "" {
+		cmd += `sudo chown ` + owner + ` "` + remotepath + `";`
+	}
+	if mode != "" {
+		cmd += `sudo chmod ` + mode + ` "` + remotepath + `"`
+	}
+
+	var innerErr error
+	retryErr = retry.WhileUnsuccessful(
+		func() error {
+			var retcode int
+			retcode, _, _, innerErr = host.Run(voidtask, cmd, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
+			if innerErr != nil {
+				return innerErr
+			}
+			if retcode != 0 {
+				innerErr = scerr.NewError(fmt.Sprintf("failed to change rights of file '%s:%s' (retcode=%d)", host.Name(), remotepath, retcode), nil, nil)
+				return nil
+			}
+			return nil
+		},
+		temporal.GetMinDelay(),
+		temporal.GetContextTimeout(),
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			return scerr.Wrap(innerErr, "timeout trying to change rights of file '%s' on host '%s'", remotepath, host.Name())
+		default:
+			return scerr.Wrap(retryErr, "failed to change rights of file '%s' on host '%s'", remotepath, host.Name())
+		}
+	}
+	return nil
+}
+
+// UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
+func UploadStringToRemoteFile(content string, host resources.Host, filename string, owner, mode string) error {
+	if content == "" {
+		return scerr.InvalidParameterError("content", "cannot be empty string")
+	}
+	if host == nil {
+		return scerr.InvalidParameterError("host", "cannot be nil")
+	}
+	if filename == "" {
+		return scerr.InvalidParameterError("filename", "cannot be empty string")
+	}
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
+		partials := strings.Split(filename, "/")
+		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
+
+		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
+		if err != nil {
+			logrus.Warnf("[TRACE] Forensics error creating %s", dumpName)
+		}
+	}
+
+	f, err := system.CreateTempFileFromString(content, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %s", err.Error())
+	}
+
+	err = UploadFile(f.Name(), host, filename, owner, mode)
+	_ = os.Remove(f.Name())
+	return err
+}
+
+// realizeVariables replaces in every variable any template
+func realizeVariables(variables data.Map) (data.Map, error) {
+	cloneV := variables.Clone()
+
+	for k, v := range cloneV {
+		if variable, ok := v.(string); ok {
+			varTemplate, err := template.New("realize_var").Parse(variable)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing variable '%s': %s", k, err.Error())
+			}
+			buffer := bytes.NewBufferString("")
+			err = varTemplate.Execute(buffer, variables)
+			if err != nil {
+				return nil, err
+			}
+			cloneV[k] = buffer.String()
+		}
+	}
+
+	return cloneV, nil
+}
+
+func replaceVariablesInString(text string, v data.Map) (string, error) {
+	tmpl, err := template.New("text").Parse(text)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse: %s", err.Error())
+	}
+	dataBuffer := bytes.NewBufferString("")
+	err = tmpl.Execute(dataBuffer, v)
+	if err != nil {
+		return "", fmt.Errorf("failed to replace variables: %s", err.Error())
+	}
+	return dataBuffer.String(), nil
 }

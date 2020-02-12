@@ -35,7 +35,7 @@ type Stack struct {
 }
 
 // WaitHostReady ...
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstracts.Host, error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstracts.HostCore, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
@@ -115,7 +115,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway stub
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (*abstracts.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (*abstracts.HostFull, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
 
@@ -125,47 +125,47 @@ func (s *Stack) DeleteGateway(string) error {
 }
 
 // CreateVIP stub
-func (s *Stack) CreateVIP(networkID string, description string) (*abstracts.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*abstracts.VirtualIP, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
 // AddPublicIPToVIP stub
-func (s *Stack) AddPublicIPToVIP(vip *abstracts.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 
 // BindHostToVIP stub
-func (s *Stack) BindHostToVIP(vip *abstracts.VIP, host *abstracts.Host) (string, string, error) {
+func (s *Stack) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) (string, string, error) {
 	return "", "", fmt.Errorf(errorStr)
 }
 
 // UnbindHostFromVIP stub
-func (s *Stack) UnbindHostFromVIP(vip *abstracts.VIP, host *abstracts.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
 
 // DeleteVIP stub
-func (s *Stack) DeleteVIP(vip *abstracts.VIP) error {
+func (s *Stack) DeleteVIP(vip *abstracts.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 
 // CreateHost stub
-func (s *Stack) CreateHost(request abstracts.HostRequest) (*abstracts.Host, *userdata.Content, error) {
+func (s *Stack) CreateHost(request abstracts.HostRequest) (*abstracts.HostFull, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
 
 // ResizeHost stub
-func (s *Stack) ResizeHost(id string, request abstracts.SizingRequirements) (*abstracts.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstracts.HostSizingRequirements) (*abstracts.HostFull, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
 // InspectHost stub
-func (s *Stack) InspectHost(interface{}) (*abstracts.Host, error) {
+func (s *Stack) InspectHost(interface{}) (*abstracts.HostFull, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
 // GetHostByName stub
-func (s *Stack) GetHostByName(string) (*abstracts.Host, error) {
+func (s *Stack) GetHostByName(string) (*abstracts.HostCore, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
@@ -175,7 +175,7 @@ func (s *Stack) GetHostState(interface{}) (hoststate.Enum, error) {
 }
 
 // ListHosts stub
-func (s *Stack) ListHosts() ([]*abstracts.Host, error) {
+func (s *Stack) ListHosts(details bool) ([]*abstracts.HostFull, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 

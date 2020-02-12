@@ -34,7 +34,7 @@ func TestChildrenWaitingGame(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.GetID()
+	theID, err := overlord.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -48,7 +48,7 @@ func TestChildrenWaitingGame(t *testing.T) {
 		}
 	}
 
-	res, err := overlord.Wait()
+	res, err := overlord.WaitGroup()
 
 	require.Nil(t, err)
 	require.NotEmpty(t, res)
@@ -59,7 +59,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.GetID()
+	theID, err := overlord.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -78,7 +78,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 		}
 	}
 
-	res, err := overlord.Wait()
+	res, err := overlord.WaitGroup()
 	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 
@@ -97,7 +97,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.GetID()
+	theID, err := overlord.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -116,7 +116,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 		}
 	}
 
-	res, err := overlord.Wait()
+	res, err := overlord.WaitGroup()
 	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 }
@@ -126,7 +126,7 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.GetID()
+	theID, err := overlord.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -146,7 +146,7 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 	}
 
 	begin := time.Now()
-	waited, res, err := overlord.TryWait()
+	waited, res, err := overlord.TryWaitGroup()
 	end := time.Since(begin)
 
 	if end >= (time.Millisecond * 200) {
@@ -163,7 +163,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.GetID()
+	theID, err := overlord.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -193,7 +193,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	c := make(chan struct{})
 	go func() {
-		res, err = overlord.Wait()
+		res, err = overlord.WaitGroup()
 		if err != nil {
 			t.Errorf("It shouldn't happen")
 		}
@@ -225,7 +225,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.GetID()
+	theID, err := overlord.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -242,7 +242,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	}
 
 	begin := time.Now()
-	waited, _, err := overlord.WaitFor(time.Duration(10) * 10 * time.Millisecond)
+	waited, _, err := overlord.WaitGroupFor(time.Duration(10) * 10 * time.Millisecond)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrTimeout); !ok {
 			t.Errorf("Unexpected group wait: %s", err)

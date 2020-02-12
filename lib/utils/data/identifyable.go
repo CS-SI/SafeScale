@@ -18,8 +18,8 @@ package data
 
 //go:generate mockgen -destination=../mocks/mock_identifyable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Identifyable
 
-// Identifyable ...
+// Identifyable proposes methods to identify a struct
 type Identifyable interface {
-	GetName() string
-	GetID() string
+	Name() string // Returns the name
+	ID() string   // Returns the ID
 }

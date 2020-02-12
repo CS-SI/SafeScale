@@ -23,45 +23,43 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propsv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/sirupsen/logrus"
 )
 
 // ValidatedProvider ...
 type ValidatedProvider WrappedProvider
 
-func (w ValidatedProvider) CreateVIP(netID string, name string) (*abstracts.VIP, error) {
+func (w ValidatedProvider) CreateVIP(netID string, name string) (*abstracts.VirtualIP, error) {
 	// FIXME: Add OK method to vip, then check return value
 	return w.InnerProvider.CreateVIP(netID, name)
 }
 
-func (w ValidatedProvider) AddPublicIPToVIP(vip *abstracts.VIP) error {
+func (w ValidatedProvider) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.AddPublicIPToVIP(vip)
 }
 
-func (w ValidatedProvider) BindHostToVIP(vip *abstracts.VIP, hostID string) error {
+func (w ValidatedProvider) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) UnbindHostFromVIP(vip *abstracts.VIP, hostID string) error {
+func (w ValidatedProvider) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error {
 	// FIXME:  Add OK method to vip
 	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) DeleteVIP(vip *abstracts.VIP) error {
+func (w ValidatedProvider) DeleteVIP(vip *abstracts.VirtualIP) error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.DeleteVIP(vip)
 }
 
-func (w ValidatedProvider) GetCapabilities() providers.Capabilities {
-	return w.InnerProvider.GetCapabilities()
+func (w ValidatedProvider) Capabilities() providers.Capabilities {
+	return w.InnerProvider.Capabilities()
 }
 
-func (w ValidatedProvider) GetTenantParameters() map[string]interface{} {
-	return w.InnerProvider.GetTenantParameters()
+func (w ValidatedProvider) TenantParameters() map[string]interface{} {
+	return w.InnerProvider.TenantParameters()
 }
 
 // Provider specific functions
@@ -94,23 +92,23 @@ func (w ValidatedProvider) ListTemplates(all bool) (res []abstracts.HostTemplate
 	return res, err
 }
 
-func (w ValidatedProvider) GetAuthenticationOptions() (providers.Config, error) {
-	return w.InnerProvider.GetAuthenticationOptions()
+func (w ValidatedProvider) AuthenticationOptions() (providers.Config, error) {
+	return w.InnerProvider.AuthenticationOptions()
 }
 
-func (w ValidatedProvider) GetConfigurationOptions() (providers.Config, error) {
-	return w.InnerProvider.GetConfigurationOptions()
+func (w ValidatedProvider) ConfigurationOptions() (providers.Config, error) {
+	return w.InnerProvider.ConfigurationOptions()
 }
 
-func (w ValidatedProvider) GetName() string {
-	return w.InnerProvider.GetName()
+func (w ValidatedProvider) Name() string {
+	return w.InnerProvider.Name()
 }
 
 // Stack specific functions
 
 // NewValidatedProvider ...
 func NewValidatedProvider(innerProvider Provider, name string) *ValidatedProvider {
-	return &ValidatedProvider{InnerProvider: innerProvider, Name: name}
+	return &ValidatedProvider{InnerProvider: innerProvider, Label: name}
 }
 
 // ListAvailabilityZones ...
@@ -242,8 +240,8 @@ func (w ValidatedProvider) DeleteNetwork(id string) (err error) {
 }
 
 // CreateGateway ...
-func (w ValidatedProvider) CreateGateway(req abstracts.GatewayRequest) (res *abstracts.Host, hsV2 *propsv2.HostSizing, hnV1 *propsv1.HostNetwork, data *userdata.Content, err error) {
-	res, hsV2, hnV1, data, err = w.InnerProvider.CreateGateway(req)
+func (w ValidatedProvider) CreateGateway(req abstracts.GatewayRequest) (res *abstracts.HostFull, data *userdata.Content, err error) {
+	res, data, err = w.InnerProvider.CreateGateway(req)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -256,7 +254,7 @@ func (w ValidatedProvider) CreateGateway(req abstracts.GatewayRequest) (res *abs
 			}
 		}
 	}
-	return res, hsV2, hnV1, data, err
+	return res, data, err
 }
 
 // DeleteGateway ...
@@ -265,8 +263,8 @@ func (w ValidatedProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateHost ...
-func (w ValidatedProvider) CreateHost(request abstracts.HostRequest) (res *abstracts.Host, hsV2 *propsv2.HostSizing, hnV1 *propsv1.HostNetwork, hdV1 *propsv1.HostDescription, ud *userdata.Content, err error) {
-	res, hsV2, hnV1, hdV1, ud, err = w.InnerProvider.CreateHost(request)
+func (w ValidatedProvider) CreateHost(request abstracts.HostRequest) (res *abstracts.HostFull, ud *userdata.Content, err error) {
+	res, ud, err = w.InnerProvider.CreateHost(request)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -279,12 +277,12 @@ func (w ValidatedProvider) CreateHost(request abstracts.HostRequest) (res *abstr
 			}
 		}
 	}
-	return res, hsV2, hnV1, hdV1, ud, err
+	return res, ud, err
 }
 
 // InspectHost ...
-func (w ValidatedProvider) InspectHost(something interface{}) (res *abstracts.Host, hsV2 *propsv2.HostSizing, hnV1 *propsv1.HostNetwork, err error) {
-	res, hsV2, hnV1, err = w.InnerProvider.InspectHost(something)
+func (w ValidatedProvider) InspectHost(something interface{}) (res *abstracts.HostFull, err error) {
+	res, err = w.InnerProvider.InspectHost(something)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -292,11 +290,11 @@ func (w ValidatedProvider) InspectHost(something interface{}) (res *abstracts.Ho
 			}
 		}
 	}
-	return res, hsV2, hnV1, err
+	return res, err
 }
 
 // WaitHostReady ...
-func (w ValidatedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstracts.Host, err error) {
+func (w ValidatedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstracts.HostCore, err error) {
 	res, err = w.InnerProvider.WaitHostReady(hostParam, timeout)
 	if err != nil {
 		if res != nil {
@@ -325,8 +323,8 @@ func (w ValidatedProvider) GetHostState(something interface{}) (res hoststate.En
 }
 
 // ListHosts ...
-func (w ValidatedProvider) ListHosts() (res []*abstracts.Host, err error) {
-	res, err = w.InnerProvider.ListHosts()
+func (w ValidatedProvider) ListHosts(details bool) (res []*abstracts.HostFull, err error) {
+	res, err = w.InnerProvider.ListHosts(details)
 	if err != nil {
 		for _, item := range res {
 			if item != nil {
@@ -360,7 +358,7 @@ func (w ValidatedProvider) RebootHost(id string) (err error) {
 }
 
 // ResizeHost ...
-func (w ValidatedProvider) ResizeHost(id string, request abstracts.SizingRequirements) (res *abstracts.Host, err error) {
+func (w ValidatedProvider) ResizeHost(id string, request abstracts.HostSizingRequirements) (res *abstracts.HostFull, err error) {
 	res, err = w.InnerProvider.ResizeHost(id, request)
 	if err != nil {
 		if res != nil {

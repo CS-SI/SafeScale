@@ -265,8 +265,8 @@ func (e *errCore) ToGRPCStatus() error {
 }
 
 // Wrap creates a new error with a message 'message' and a causer error 'causer'
-func Wrap(cause error, format, a ...string) Error {
-	newErr := &errCore{message: fmt.Sprintf(format, a), causer: cause, consequences: []error{}}
+func Wrap(cause error, msg ...interface{}) Error {
+	newErr := &errCore{message: formatMessage(msg...)(), causer: cause, consequences: []error{}}
 	if casted, ok := cause.(*errCore); ok {
 		newErr.grpcCode = casted.GRPCCode()
 	} else {
@@ -276,12 +276,12 @@ func Wrap(cause error, format, a ...string) Error {
 }
 
 // NewError creates a new error with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
-func NewError(cause error, consequences []error, format, a ...string) Error {
+func NewError(msg string, cause error, consequences []error) Error {
 	if consequences == nil {
 		consequences = []error{}
 	}
 	return &errCore{
-		message:      fmt.Sprintf(format, a),
+		message:      msg,
 		causer:       cause,
 		consequences: consequences,
 		fields:       make(fields),
@@ -342,6 +342,13 @@ func Cause(err error) (resp error) {
 	return resp
 }
 
+func formatMessage(msg ...interface{}) func() string {
+	if len(msg) > 1 {
+		return func() string { return fmt.Sprintf(msg[0].(string), msg[1:]...) }
+	}
+	return func() string { return fmt.Sprint(msg[0].(string)) }
+}
+
 // ErrTimeout defines a Timeout error
 type ErrTimeout struct {
 	*errCore
@@ -362,6 +369,7 @@ func TimeoutError(msg string, timeout time.Duration, cause error) *ErrTimeout {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrTimeout) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -387,10 +395,11 @@ type ErrNotFound struct {
 }
 
 // NotFoundError creates a ErrNotFound error
-func NotFoundError(format, a ...string) *ErrNotFound {
+func NotFoundError(msg ...interface{}) *ErrNotFound {
+
 	return &ErrNotFound{
 		errCore: &errCore{
-			message:      fmt.Sprintf(format, a),
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -425,10 +434,10 @@ type ErrNotAvailable struct {
 }
 
 // NotAvailableError creates a NotAvailable error
-func NotAvailableError(msg string) *ErrNotAvailable {
+func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
 	return &ErrNotAvailable{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -437,6 +446,7 @@ func NotAvailableError(msg string) *ErrNotAvailable {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrNotAvailable) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -462,10 +472,10 @@ type ErrDuplicate struct {
 }
 
 // DuplicateError creates a ErrDuplicate error
-func DuplicateError(msg string) *ErrDuplicate {
+func DuplicateError(msg ...interface{}) *ErrDuplicate {
 	return &ErrDuplicate{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -474,6 +484,7 @@ func DuplicateError(msg string) *ErrDuplicate {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrDuplicate) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -499,10 +510,10 @@ type ErrInvalidRequest struct {
 }
 
 // InvalidRequestError creates a ErrInvalidRequest error
-func InvalidRequestError(msg string) *ErrInvalidRequest {
+func InvalidRequestError(msg ...interface{}) *ErrInvalidRequest {
 	return &ErrInvalidRequest{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -511,6 +522,7 @@ func InvalidRequestError(msg string) *ErrInvalidRequest {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -536,10 +548,10 @@ type ErrSyntax struct {
 }
 
 // SyntaxError creates a ErrSyntax error
-func SyntaxError(msg string) *ErrSyntax {
+func SyntaxError(msg ...interface{}) *ErrSyntax {
 	return &ErrSyntax{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -574,10 +586,10 @@ type ErrNotAuthenticated struct {
 }
 
 // NotAuthenticatedError creates a ErrNotAuthenticated error
-func NotAuthenticatedError(msg string) *ErrNotAuthenticated {
+func NotAuthenticatedError(msg ...interface{}) *ErrNotAuthenticated {
 	return &ErrNotAuthenticated{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -586,6 +598,7 @@ func NotAuthenticatedError(msg string) *ErrNotAuthenticated {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -611,10 +624,10 @@ type ErrForbidden struct {
 }
 
 // ForbiddenError creates a ErrForbidden error
-func ForbiddenError(msg string) *ErrForbidden {
+func ForbiddenError(msg ...interface{}) *ErrForbidden {
 	return &ErrForbidden{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -623,6 +636,7 @@ func ForbiddenError(msg string) *ErrForbidden {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrForbidden) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -663,6 +677,7 @@ func AbortedError(msg string, err error) *ErrAborted {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrAborted) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -709,7 +724,7 @@ func OverflowError(msg string, limit uint, err error) *ErrOverflow {
 	}
 }
 
-// ErrOverload when action reaches a limit (ie too many requests occured in a given time).
+// AddConsequence ...
 func (e *ErrOverflow) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -735,10 +750,10 @@ type ErrOverload struct {
 }
 
 // OverloadError creates a ErrOverload error
-func OverloadError(msg string) *ErrOverload {
+func OverloadError(msg ...interface{}) *ErrOverload {
 	return &ErrOverload{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -747,6 +762,7 @@ func OverloadError(msg string) *ErrOverload {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrOverload) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -772,10 +788,10 @@ type ErrNotImplemented struct {
 }
 
 // NotImplementedError creates a ErrNotImplemented error
-func NotImplementedError(what string) *ErrNotImplemented {
+func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
 	return &ErrNotImplemented{
 		errCore: &errCore{
-			message:      decorateWithCallTrace("not implemented yet:", what, ""),
+			message:      decorateWithCallTrace("not implemented yet:", formatMessage(msg...)(), ""),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -784,6 +800,7 @@ func NotImplementedError(what string) *ErrNotImplemented {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrNotImplemented) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -834,6 +851,7 @@ func ErrListError(errors []error) error {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrList) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -863,10 +881,10 @@ type ErrRuntimePanic struct {
 }
 
 // RuntimePanicError creates a ErrRuntimePanic error
-func RuntimePanicError(msg string) *ErrRuntimePanic {
+func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
 	return &ErrRuntimePanic{
 		errCore: &errCore{
-			message:      msg,
+			message:      formatMessage(msg...)(),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -875,6 +893,7 @@ func RuntimePanicError(msg string) *ErrRuntimePanic {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -912,6 +931,7 @@ func InvalidInstanceError() *ErrInvalidInstance {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -949,6 +969,7 @@ func InvalidParameterError(what, why string) *ErrInvalidParameter {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -1021,6 +1042,7 @@ func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
 	}
 }
 
+// AddConsequence ...
 func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
@@ -1046,10 +1068,10 @@ type ErrInconsistent struct {
 }
 
 // InconsistentError creates a ErrInconsistent error
-func InconsistentError(format, a ...string) *ErrInconsistent {
+func InconsistentError(msg ...interface{}) *ErrInconsistent {
 	return &ErrInconsistent{
 		errCore: &errCore{
-			message:      decorateWithCallTrace(fmt.Sprintf(format, a), "", ""),
+			message:      decorateWithCallTrace(formatMessage(msg...)(), "", ""),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),

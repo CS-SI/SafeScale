@@ -28,22 +28,22 @@ import (
 // !!! DEPRECATED !!! superseded by propertiesv2.ClusterDefaults
 type ClusterDefaults struct {
 	// GatewaySizing keeps the default node definition
-	GatewaySizing abstracts.HostDefinition `json:"gateway_sizing"`
+	GatewaySizing abstracts.HostEffectiveSizing `json:"gateway_sizing"`
 	// MasterSizing keeps the default node definition
-	MasterSizing abstracts.HostDefinition `json:"master_sizing"`
+	MasterSizing abstracts.HostEffectiveSizing `json:"master_sizing"`
 	// NodeSizing keeps the default node definition
-	NodeSizing abstracts.HostDefinition `json:"node_sizing"`
+	NodeSizing abstracts.HostEffectiveSizing `json:"node_sizing"`
 	// Image keeps the default Linux image to use
 	Image string `json:"image"`
 }
 
-func newDefaults() *ClusterDefaults {
+func newClusterDefaults() *ClusterDefaults {
 	return &ClusterDefaults{}
 }
 
 // Clone ... (data.Clonable interface)
 func (d *ClusterDefaults) Clone() data.Clonable {
-	return newDefaults().Replace(d)
+	return newClusterDefaults().Replace(d)
 }
 
 // Replace ... (data.Clonable interface)

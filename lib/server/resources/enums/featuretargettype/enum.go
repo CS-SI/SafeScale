@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package installcontext
+package featuretargettype
 
 //go:generate stringer -type=Enum
 
-// Enum is the type of a context
-type Enum uint8
+// Enum represents the state of an host
+type Enum uint
 
 const (
 	_ Enum = iota
 
-	// Host indicates the context of feature addition is on host
-	Host
-	// Cluster indicates the context of feature addition is on cluster
-	Cluster
+	HOST
+	CLUSTER
+	NODE
 )

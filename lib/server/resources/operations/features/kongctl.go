@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"text/template"
 
@@ -28,11 +29,13 @@ import (
 	safescale "github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -71,42 +74,21 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 	if err != nil {
 		return nil, err
 	}
-	rp, err := NewEmbeddedFeature(voidtask, "edgeproxy4network")
+	rp, err := NewEmbedded(voidtask, "edgeproxy4network")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find a feature called 'edgeproxy4network'")
 	}
-	var addressedGateway resources.Host
-	if addressPrimaryGateway {
-		addressedGateway, err := resources.LoadHost(svc, network.GatewayID)
-		if err != nil {
-			return nil, err
-		}
-		if addressedGateway == nil {
-			return nil, fmt.Errorf("error getting data of primary gateway")
-		}
-	} else {
-		if network.SecondaryGatewayID == "" {
-			return nil, fmt.Errorf("cannot address secondary gateway, doesn't exist")
-		}
-		addressedGateway, err := resources.LoadHost(svc, network.SecondaryGatewayID)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if addressedGateway == nil { // Defensive code, should not happen
-		return nil, fmt.Errorf("error getting data of secondary gateway")
+	addressedGateway, err := network.Gateway(voidtask, addressPrimaryGateway)
+	if err != nil {
+		return nil, err
 	}
 
 	present := false
-	if anon, ok := kongProxyCheckedCache.Get(network.Name); ok {
+	if anon, ok := kongProxyCheckedCache.Get(network.Name()); ok {
 		present = anon.(bool)
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(network.Name(), func() (interface{}, error) {
-			target, err := NewNodeTarget(srvutils.ToProtocolHost(addressedGateway))
-			if err != nil {
-				return false, err
-			}
-			results, err := rp.Check(target, Variables{}, Settings{})
+			results, err := rp.Check(addressedGateway, data.Map{}, resources.FeatureSettings{})
 			if err != nil {
 				return false, fmt.Errorf("failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s", err.Error(), addressedGateway.Name)
 			}
@@ -125,22 +107,26 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 		return nil, fmt.Errorf("'edgeproxy4network' feature isn't installed on gateway '%s'", addressedGateway.Name)
 	}
 
-	ctrl := KongController{
+	ctrl := &KongController{
 		network: network,
 		// host:      host,
-		safescale:        safescale.New(),
-		gateway:          addressedGateway,
-		gatewayPrivateIP: addressedGateway.PrivateIP(),
-		gatewayPublicIP:  addressedGateway.GetPublicIP(),
+		safescale: safescale.New(),
+		gateway:   addressedGateway,
+	}
+	if ctrl.gatewayPrivateIP, err = addressedGateway.PrivateIP(voidtask); err != nil {
+		return nil, err
+	}
+	if ctrl.gatewayPublicIP, err = addressedGateway.PublicIP(voidtask); err != nil {
+		return nil, err
 	}
 
-	return &ctrl, nil
+	return ctrl, nil
 }
 
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
 // Returns rule name and error
-func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variables) (string, error) {
+func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Map) (string, error) {
 	ruleType, ok := rule["type"].(string)
 	if !ok {
 		return "", scerr.InvalidParameterError("rule['type']", "is not a string")
@@ -158,15 +144,30 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	if k.network.VIP != nil {
-		// VPL: for now, no public IP on VIP, so uses the IP of the first Gateway
-		// (*values)["EndpointIP"] = k.network.VIP.PublicIP
-		(*values)["EndpointIP"] = k.gatewayPublicIP
-		(*values)["DefaultRouteIP"] = k.network.VIP.PrivateIP
-	} else {
-		(*values)["EndpointIP"] = k.gatewayPublicIP
-		(*values)["DefaultRouteIP"] = k.gatewayPrivateIP
+	voidtask, err := concurrency.NewTask()
+	if err != nil {
+		return "", err
 	}
+	err = k.network.Inspect(voidtask, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		core, ok := clonable.(*abstracts.Network)
+		if !ok {
+			return scerr.InconsistentError("'*abstracts.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		if core.VIP != nil {
+			// VPL: for now, no public IP on VIP, so uses the IP of the first Gateway
+			// (*values)["EndpointIP"] = core.VIP.PublicIP
+			(*values)["EndpointIP"] = k.gatewayPublicIP
+			(*values)["DefaultRouteIP"] = core.VIP.PrivateIP
+		} else {
+			(*values)["EndpointIP"] = k.gatewayPublicIP
+			(*values)["DefaultRouteIP"] = k.gatewayPrivateIP
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
 	// Legacy...
 	(*values)["PublicIP"] = (*values)["EndpointIP"]
 	(*values)["GatewayIP"] = (*values)["DefaultRouteIP"]
@@ -264,7 +265,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 	}
 }
 
-func (k *KongController) realizeRuleData(content string, v Variables) (string, error) {
+func (k *KongController) realizeRuleData(content string, v data.Map) (string, error) {
 	contentTmpl, err := template.New("proxy_content").Parse(content)
 	if err != nil {
 		return "", fmt.Errorf("error preparing rule: %s", err.Error())
@@ -277,7 +278,7 @@ func (k *KongController) realizeRuleData(content string, v Variables) (string, e
 	return dataBuffer.String(), nil
 }
 
-func (k *KongController) createUpstream(name string, options data.Map, v *Variables) error {
+func (k *KongController) createUpstream(name string, options data.Map, v *data.Map) error {
 	jsoned, _ := json.Marshal(&options)
 	response, _, err := k.put(name, "upstreams/"+name, string(jsoned), v, true)
 	if response == nil && err != nil {
@@ -289,7 +290,12 @@ func (k *KongController) createUpstream(name string, options data.Map, v *Variab
 	return nil
 }
 
-func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *Variables) error {
+func (k *KongController) addSourceControl(
+	ruleName, url, resourceType, resourceID string,
+	sourceControl map[string]interface{},
+	v *data.Map,
+) error {
+
 	if sourceControl == nil {
 		return nil
 	}
@@ -354,7 +360,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 	if err != nil {
 		return nil, "", err
 	}
-	retcode, stdout, _, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, _, err := safescale.New().SSH.Run(task, k.gateway.Name(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -370,13 +376,13 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 }
 
 // post creates a rule
-func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) post(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
 	}
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -398,13 +404,13 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 }
 
 // put updates or creates a rule
-func (k *KongController) put(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) put(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
 	}
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}
@@ -426,13 +432,13 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 }
 
 // patch updates an existing rule
-func (k *KongController) patch(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, string, error) {
+func (k *KongController) patch(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
 	task, err := concurrency.NewTask()
 	if err != nil {
 		return nil, "", err
 	}
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name, cmd, Outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, err := safescale.New().SSH.Run(task, k.gateway.Name(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, "", err
 	}

@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/sirupsen/logrus"
 )
 
 // genericPackager is an object implementing the OS package management
@@ -21,12 +22,12 @@ type genericPackager struct {
 }
 
 // Check checks if the feature is installed
-func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".check"
-	if !f.specs.IsSet(yamlKey) {
+	if !f.Specs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
+		return nil, fmt.Errorf(msg, f.Name(), f.DisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
@@ -35,29 +36,29 @@ func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (
 	}
 	err = worker.CanProceed(s)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Println(err.Error())
 		return nil, err
 	}
 	return worker.Proceed(v, s)
 }
 
 // Add installs the feature using apt
-func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".add"
-	if !f.specs.IsSet(yamlKey) {
+	if !f.Specs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
+		return nil, fmt.Errorf(msg, f.Name(), f.DisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, g.method, installaction.Add, g.addCommand)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Println(err.Error())
 		return nil, err
 	}
 	err = worker.CanProceed(s)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Println(err.Error())
 		return nil, err
 	}
 
@@ -65,12 +66,12 @@ func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Re
 }
 
 // Remove uninstalls the feature using the RemoveScript script
-func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".remove"
-	if !f.specs.IsSet(yamlKey) {
+	if !f.Specs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
+		return nil, fmt.Errorf(msg, f.Name(), f.DisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)
@@ -79,7 +80,7 @@ func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) 
 	}
 	err = worker.CanProceed(s)
 	if err != nil {
-		log.Println(err.Error())
+		logrus.Println(err.Error())
 		return nil, err
 	}
 	return worker.Proceed(v, s)

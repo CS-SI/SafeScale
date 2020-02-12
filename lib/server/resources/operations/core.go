@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -105,7 +106,7 @@ func (c *Core) Name() string {
 }
 
 // Inspect protects the data for shared read
-func (c *Core) Inspect(task concurrency.Task, callback func(data.Clonable, *serialize.JSONProperties) error) (err error) {
+func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -139,7 +140,7 @@ func (c *Core) Inspect(task concurrency.Task, callback func(data.Clonable, *seri
 }
 
 // Alter protects the data for exclusive write
-func (c *Core) Alter(task concurrency.Task, callback func(data.Clonable, *serialize.JSONProperties) error) (err error) {
+func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -267,7 +268,7 @@ func (c *Core) Read(task concurrency.Task, ref string) error {
 				if _, ok := inErr.(scerr.ErrNotFound); ok {
 					return inErr
 				}
-				return retry.AbortedError("", inErr)
+				return retry.StopRetryError("", inErr)
 			}
 			return nil
 		},
@@ -278,7 +279,7 @@ func (c *Core) Read(task concurrency.Task, ref string) error {
 		case retry.ErrTimeout:
 			logrus.Debugf("timeout reading metadata of %s '%s'", c.kind, ref)
 			return scerr.NotFoundError(fmt.Sprintf("failed to load metadata of %s '%s'", c.kind, ref))
-		case retry.ErrAborted:
+		case retry.ErrStopRetry:
 			// return err.Cause()
 			return err
 		default:

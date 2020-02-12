@@ -22,11 +22,12 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/features"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	featureops "github.com/CS-SI/SafeScale/lib/server/resources/operations/features"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // List lists all features suitable for hosts
@@ -50,7 +51,7 @@ func List() ([]interface{}, error) {
 			}
 		}
 	}
-	for _, feat := range features.GetAllEmbeddedMap() {
+	for _, feat := range featureops.GetAllEmbeddedMap() {
 		yamlKey := "feature.suitableFor.host"
 
 		if !captured.Contains(feat.GetName()) {
@@ -72,37 +73,46 @@ func List() ([]interface{}, error) {
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(task concurrency.Task, svc iaas.Service, name string) (Feature, error) {
+func New(task concurrency.Task, name string) (resources.Feature, error) {
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if svc == nil {
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+	}
 	if name == "" {
 		return nil, utils.InvalidParameterError("name", "can't be empty string!")
 	}
-	assumeEmbed := false
-	if task == nil {
-		assumeEmbed = true
-	}
-	if svc == nil {
-		assumeEmbed = true
-	}
 
-	if assumeEmbed {
+	feat, err := featureops.New(task, name)
+	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); !ok {
+			return nil, srvutils.ThrowErr(err)
+		}
+
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		feat, err = features.NewEmbedded(name)
+		feat, err = featureops.NewEmbedded(name)
 		if err != nil {
-			return utils.NotFoundError(err.Error()), nil
-		}
-	} else {
-		feat, err := features.New(task, svc, name)
-		if err != nil {
-			if _, ok := err.(utils.ErrNotFound); !ok {
-				return nil, srvutils.ThrowErr(err)
-			}
-
-			// Failed to find a spec file on filesystem, trying with embedded ones
-			feat, err = features.NewEmbedded(name)
-			if err != nil {
-				return nil, utils.NotFoundError(err.Error())
-			}
+			return nil, utils.NotFoundError(err.Error())
 		}
 	}
+	return feat, nil
+}
+
+// NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
+// with its content
+func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) {
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if name == "" {
+		return nil, scerr.InvalidParameterError("name", "canno't be empty string!")
+	}
+
+	feat, err := featureops.NewEmbedded(task, name)
+	if err != nil {
+		return nil, err
+	}
+
 	return feat, nil
 }

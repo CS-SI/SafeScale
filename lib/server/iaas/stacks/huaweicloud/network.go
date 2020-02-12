@@ -644,7 +644,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (*abstracts.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (*abstracts.HostFull, *userdata.Content, error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -687,7 +687,7 @@ func (s *Stack) DeleteGateway(id string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VirtualIP, error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -700,7 +700,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VIP, error)
 	if err != nil {
 		return nil, err
 	}
-	vip := abstracts.VIP{
+	vip := abstracts.VirtualIP{
 		ID:        port.ID,
 		Name:      name,
 		NetworkID: networkID,

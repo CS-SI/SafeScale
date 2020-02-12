@@ -17,6 +17,8 @@
 package abstracts
 
 import (
+	"time"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -25,22 +27,22 @@ import (
 
 // KeyPair represents a SSH key pair
 type KeyPair struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	PrivateKey string `json:"private_key,omitempty"`
-	PublicKey  string `json:"public_key,omitempty"`
+	ID         string
+	Name       string
+	PrivateKey string
+	PublicKey  string
 }
 
-// SizingRequirements represents host sizing requirements to fulfil
-type SizingRequirements struct {
-	MinCores    int     `json:"min_cores,omitempty"`
-	MaxCores    int     `json:"max_cores,omitempty"`
-	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
-	MaxRAMSize  float32 `json:"max_ram_size,omitempty"`
-	MinDiskSize int     `json:"min_disk_size,omitempty"`
-	MinGPU      int     `json:"min_gpu,omitempty"`
-	MinFreq     float32 `json:"min_freq,omitempty"`
-	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
+// HostSizingRequirements represents host sizing requirements to fulfil
+type HostSizingRequirements struct {
+	MinCores    int
+	MaxCores    int
+	MinRAMSize  float32
+	MaxRAMSize  float32
+	MinDiskSize int
+	MinGPU      int
+	MinCPUFreq  float32
+	Replaceable bool // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
 }
 
 // StoredCPUInfo ...
@@ -79,6 +81,15 @@ type Image struct {
 	URL  string
 }
 
+// OK ...
+func (i Image) OK() bool {
+	result := true
+	result = result && i.ID != ""
+	result = result && i.Name != ""
+	result = result && i.URL != ""
+	return result
+}
+
 // HostRequest represents requirements to create host
 type HostRequest struct {
 	// ResourceName contains the name of the compute resource
@@ -90,7 +101,7 @@ type HostRequest struct {
 	// DefaultRouteIP is the IP used as default route
 	DefaultRouteIP string
 	// DefaultGateway is the host used as default gateway
-	DefaultGateway *Host
+	DefaultGateway *HostCore
 	// PublicIP a flag telling if the host must have a public IP
 	PublicIP bool
 	// TemplateID is the UUID of the template used to size the host (see SelectTemplates)
@@ -105,8 +116,8 @@ type HostRequest struct {
 	DiskSize int
 }
 
-// HostDefinition ...
-type HostDefinition struct {
+// HostEffectiveSizing ...
+type HostEffectiveSizing struct {
 	Cores     int     `json:"cores,omitempty"`
 	RAMSize   float32 `json:"ram_size,omitempty"`
 	DiskSize  int     `json:"disk_size,omitempty"`
@@ -116,6 +127,11 @@ type HostDefinition struct {
 	ImageID   string  `json:"image_id,omitempty"`
 	//TODO: implement the handling of this field (will need to introduce provider capabilities to know if a specific provider allows this kind of host)
 	Replaceable bool `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
+}
+
+// NewHostEffectiveSizing ...
+func NewHostEffectiveSizing() *HostEffectiveSizing {
+	return &HostEffectiveSizing{}
 }
 
 // HostTemplate ...
@@ -130,64 +146,6 @@ type HostTemplate struct {
 	Name      string  `json:"name,omitempty"`
 }
 
-// Host contains the information about a host
-type Host struct {
-	ID         string         `json:"id,omitempty"`
-	Name       string         `json:"name,omitempty"`
-	LastState  hoststate.Enum `json:"state,omitempty"`
-	PrivateKey string         `json:"private_key,omitempty"`
-	Password   string         `json:"password,omitempty"`
-	// Properties *serialize.JSONProperties `json:"properties,omitempty"`
-}
-
-// NewHost ...
-func NewHost() *Host {
-	return &Host{
-		// Properties: serialize.NewJSONProperties("resources.host"),
-		LastState: hoststate.UNKNOWN,
-	}
-}
-
-// IsConsistent tells if host struct is consistent
-func (h *Host) IsConsistent() bool {
-	result := true
-	result = result && h.ID != ""
-	result = result && h.Name != ""
-	// result = result && h.PrivateKey != ""
-	// result = result && h.Password != ""
-	// result = result && h.Properties != nil
-	return result
-}
-
-// OK ...
-func (h *Host) OK() bool {
-	return h.IsConsistent()
-}
-
-// Clone does a deep-copy of the Host
-//
-// satisfies interface data.Clonable
-func (h *Host) Clone() data.Clonable {
-	return NewHost().Replace(h)
-}
-
-// Replace ...
-//
-// satisfies interface data.Clonable
-func (h *Host) Replace(p data.Clonable) data.Clonable {
-	*h = *p.(*Host)
-	return h
-}
-
-// OK ...
-func (i Image) OK() bool {
-	result := true
-	result = result && i.ID != ""
-	result = result && i.Name != ""
-	result = result && i.URL != ""
-	return result
-}
-
 // OK ...
 func (ht HostTemplate) OK() bool {
 	result := true
@@ -196,8 +154,56 @@ func (ht HostTemplate) OK() bool {
 	return result
 }
 
+// HostCore contains the core information about a host
+type HostCore struct {
+	ID         string         `json:"id,omitempty"`
+	Name       string         `json:"name,omitempty"`
+	LastState  hoststate.Enum `json:"state,omitempty"`
+	PrivateKey string         `json:"private_key,omitempty"`
+	Password   string         `json:"password,omitempty"`
+	// Properties *serialize.JSONProperties `json:"properties,omitempty"`
+}
+
+// NewHostCore ...
+func NewHostCore() *HostCore {
+	return &HostCore{
+		LastState: hoststate.UNKNOWN,
+	}
+}
+
+// IsConsistent tells if host struct is consistent
+func (hc *HostCore) IsConsistent() bool {
+	result := true
+	result = result && hc.ID != ""
+	result = result && hc.Name != ""
+	// result = result && h.PrivateKey != ""
+	// result = result && h.Password != ""
+	// result = result && h.Properties != nil
+	return result
+}
+
+// OK ...
+func (hc *HostCore) OK() bool {
+	return hc.IsConsistent()
+}
+
+// Clone does a deep-copy of the Host
+//
+// satisfies interface data.Clonable
+func (hc *HostCore) Clone() data.Clonable {
+	return NewHostCore().Replace(hc)
+}
+
+// Replace ...
+//
+// satisfies interface data.Clonable
+func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
+	*hc = *p.(*HostCore)
+	return hc
+}
+
 // // GetAccessIP returns the IP to reach the host
-// func (h *Host) GetAccessIP() string {
+// func (h *HostCore) GetAccessIP() string {
 // 	ip := h.GetPublicIP()
 // 	if ip == "" {
 // 		ip = h.GetPrivateIP()
@@ -206,7 +212,7 @@ func (ht HostTemplate) OK() bool {
 // }
 
 // // GetPublicIP computes public IP of the host
-// func (h *Host) GetPublicIP() (pubIp string) {
+// func (h *HostCore) GetPublicIP() (pubIp string) {
 // 	var ip string
 
 // 	defer func() {
@@ -231,7 +237,7 @@ func (ht HostTemplate) OK() bool {
 // }
 
 // // GetPrivateIP ...
-// func (h *Host) GetPrivateIP() (privateIp string) {
+// func (h *HostCore) GetPrivateIP() (privateIp string) {
 // 	var ip string
 
 // 	defer func() {
@@ -258,21 +264,78 @@ func (ht HostTemplate) OK() bool {
 // }
 
 // Serialize serializes Host instance into bytes (output json code)
-func (h *Host) Serialize() ([]byte, error) {
-	return serialize.ToJSON(h)
+func (hc *HostCore) Serialize() ([]byte, error) {
+	return serialize.ToJSON(hc)
 }
 
 // Deserialize reads json code and reinstantiates an Host
-func (h *Host) Deserialize(buf []byte) (err error) {
+func (hc *HostCore) Deserialize(buf []byte) (err error) {
 	defer scerr.OnPanic(&err)()
 
 	// if h.Properties == nil {
 	// 	h.Properties = serialize.NewJSONProperties("resources.host")
 	// }
-	err = serialize.FromJSON(buf, h)
+	err = serialize.FromJSON(buf, hc)
 	if err != nil {
 		return err
 	}
 
 	return nil
 }
+
+// HostNetwork contains network information related to Host
+type HostNetwork struct {
+	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
+	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the Default Gateway
+	DefaultGatewayPrivateIP string            `json:"default_gateway_private_ip,omitempty"` // DEPRECATED: contains the private IP of the default gateway
+	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the ID of the default Network
+	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network binded to the host (indexed by ID)
+	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the ID of each network binded to the host (indexed by Name)
+	PublicIPv4              string            `json:"public_ip_v4,omitempty"`
+	PublicIPv6              string            `json:"public_ip_v6,omitempty"`
+	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
+	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
+}
+
+// HostDescription contains description information for the host
+type HostDescription struct {
+	Created time.Time `json:"created,omitempty"`  // tells when the host has been created
+	Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of a host
+	Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified
+	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host
+	Tenant  string    `json:"tenant"`             // contains the tenant name used to create the host
+}
+
+// HostFull groups information about host coming from provider
+type HostFull struct {
+	Core        *HostCore
+	Sizing      *HostEffectiveSizing
+	Network     *HostNetwork
+	Description *HostDescription
+}
+
+// NewHostFull ...
+func NewHostFull() *HostFull {
+	return &HostFull{
+		Core:        NewHostCore(),
+		Sizing:      NewHostEffectiveSizing(),
+		Network:     &HostNetwork{},
+		Description: &HostDescription{},
+	}
+}
+
+// IsConsistent returns true if the struct is consistent
+func (hc *HostFull) IsConsistent() bool {
+	return hc != nil && hc.Core.OK() //&& hc.Description.OK() && hc.Sizing.OK() && hc.Network.OK()
+}
+
+// OK is a synonym to IsConsistent
+func (hc *HostFull) OK() bool {
+	if hc == nil {
+		return false
+	}
+	return hc.IsConsistent()
+}
+
+// HostList contains a list of HostFull
+type HostList []*HostFull

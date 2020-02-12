@@ -38,7 +38,7 @@ require (
 	github.com/gopherjs/gopherjs v0.0.0-20191106031601-ce3c9ade29de // indirect
 	github.com/gorilla/websocket v1.4.0
 	github.com/gostaticanalysis/analysisutil v0.0.3 // indirect
-	github.com/graymeta/stow v0.2.3
+	github.com/graymeta/stow v0.2.4
 	github.com/gregoryv/gocyclo v0.1.0
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/huandu/xstrings v1.3.0 // indirect
@@ -67,6 +67,7 @@ require (
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
+	github.com/prometheus/common v0.4.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/securego/gosec v0.0.0-20200129084146-17df5b370244 // indirect
 	github.com/sethvargo/go-password v0.1.1
@@ -91,7 +92,7 @@ require (
 	google.golang.org/api v0.15.0
 	google.golang.org/appengine v1.6.5
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
-	google.golang.org/grpc v1.26.0
+	google.golang.org/grpc v1.27.1
 	gopkg.in/ini.v1 v1.51.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.4.1 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect

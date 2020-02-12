@@ -55,29 +55,40 @@ type TaskResult interface{}
 // TaskAction ...
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
-// Task ...
-type Task interface {
+// TaskGuard ...
+type TaskGuard interface {
+	TryWait() (bool, TaskResult, error)
+	Wait() (TaskResult, error)
+}
+
+// TaskCore is the interface of methods to control task and taskgroup
+type TaskCore interface {
 	Abort() error
 	Aborted() bool
 	Abortable() bool
 	IgnoreAbortSignal(bool) error
 	ForceID(string) error
-	GetID() (string, error)
-	GetSignature() (string, error)
-	GetStatus() (TaskStatus, error)
-	GetContext() (context.Context, context.CancelFunc, error)
-	Reset() error
+	ID() (string, error)
+	Signature() (string, error)
+	Status() (TaskStatus, error)
+	Context() (context.Context, context.CancelFunc, error)
+	// Reset() error
 	Run(TaskAction, TaskParameters) (TaskResult, error)
-	RunInSubTask(TaskAction, TaskParameters) (TaskResult, error)
+	RunInSubtask(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
 	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, error)
-	StartInSubTask(TaskAction, TaskParameters) (Task, error)
-	TryWait() (bool, TaskResult, error)
-	Wait() (TaskResult, error)
+	StartInSubtask(TaskAction, TaskParameters) (Task, error)
+
 	Close()
 }
 
-// task is a structure allowing to identify (indirectly) goroutines
+// Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
+type Task interface {
+	TaskCore
+	TaskGuard
+}
+
+// task is the implementation of Task
 type task struct {
 	mu     sync.Mutex
 	id     string
@@ -101,8 +112,20 @@ type task struct {
 
 var globalTask atomic.Value
 
+// // TaskFromContext returns the task contained in the context
+//func TaskFromContext(ctx context.Context) (Task, error) {
+//	if ctx == nil {
+//		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+//	}
+//	task := ctx.Value(TaskValue{})
+//	if task == nil {
+//		return nil, scerr.NotFoundError("task")
+//	}
+//	return task.(Task), nil
+//}
+
 // RootTask is the "task to rule them all"
-func RootTask() Task {
+func RootTask() (Task, error) {
 	anon := globalTask.Load()
 	if anon == nil {
 		newT, _ := newTask(nil, nil, nil)
@@ -110,7 +133,7 @@ func RootTask() Task {
 		globalTask.Store(newT)
 		anon = globalTask.Load()
 	}
-	return anon.(Task)
+	return anon.(Task), nil
 }
 
 // NewTask creates a new instance of struct task
@@ -212,7 +235,7 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 
 // taskCancelReceiver captures cancel signal if it arrives and abort the task
 func (t *task) taskCancelReceiver() {
-	sig, _ := t.GetSignature()
+	sig, _ := t.Signature()
 	finish := false
 	for !finish {
 		select {
@@ -228,8 +251,8 @@ func (t *task) taskCancelReceiver() {
 	close(t.closeCh)
 }
 
-// GetID returns an unique id for the task
-func (t *task) GetID() (string, error) {
+// ID returns an unique id for the task
+func (t *task) ID() (string, error) {
 	if t == nil {
 		return "", scerr.InvalidInstanceError()
 	}
@@ -240,9 +263,9 @@ func (t *task) GetID() (string, error) {
 	return t.id, nil
 }
 
-// GetSignature builds the "signature" of the task passed as parameter,
+// Signature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
-func (t *task) GetSignature() (string, error) {
+func (t *task) Signature() (string, error) {
 	if t == nil {
 		return "", scerr.InvalidInstanceError()
 	}
@@ -250,8 +273,8 @@ func (t *task) GetSignature() (string, error) {
 	return t.sig, nil
 }
 
-// GetStatus returns the current task status
-func (t *task) GetStatus() (TaskStatus, error) {
+// Status returns the current task status
+func (t *task) Status() (TaskStatus, error) {
 	if t == nil {
 		return 0, scerr.InvalidInstanceError()
 	}
@@ -261,8 +284,8 @@ func (t *task) GetStatus() (TaskStatus, error) {
 	return t.status, nil
 }
 
-// GetContext returns the context associated to the task
-func (t *task) GetContext() (context.Context, context.CancelFunc, error) {
+// Context returns the context associated to the task
+func (t *task) Context() (context.Context, context.CancelFunc, error) {
 	if t == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -301,9 +324,12 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 // If timeout happens, error returned will be ErrTimeout
 // This function is useful when you know at the time you use it there will be a timeout to apply.
 func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, err := t.ID()
+	if err != nil {
+		return nil, err
+	}
 
-	status, err := t.GetStatus()
+	status, err := t.Status()
 	if err != nil {
 		return t, err
 	}
@@ -326,8 +352,8 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	return t, nil
 }
 
-// StartInSubTask runs in a subtask goroutine the function with parameters
-func (t *task) StartInSubTask(action TaskAction, params TaskParameters) (Task, error) {
+// StartInSubtask runs in a subtask goroutine the function with parameters
+func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -344,8 +370,7 @@ func (t *task) StartInSubTask(action TaskAction, params TaskParameters) (Task, e
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
 	go t.run(action, params)
 
-	sig, _ := t.GetSignature() // FIXME Later
-
+	sig, _ := t.Signature() // If we arrive here, no need to check again for an error impossible to happen
 	// tracer := NewTracer(true, t, "")
 	finish := false
 
@@ -462,8 +487,8 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error)
 	return t.Wait()
 }
 
-// RunInSubTask starts a subtask, waits its completion then return the error code
-func (t *task) RunInSubTask(action TaskAction, params TaskParameters) (TaskResult, error) {
+// RunInSubtask starts a subtask, waits its completion then return the error code
+func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResult, error) {
 	if t == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -484,12 +509,12 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
+	tid, err := t.ID()
 	if err != nil {
 		return nil, err
 	}
 
-	status, err := t.GetStatus()
+	status, err := t.Status()
 	if err != nil {
 		return nil, err
 	}
@@ -524,12 +549,12 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
+	tid, err := t.ID()
 	if err != nil {
 		return false, nil, err
 	}
 
-	status, err := t.GetStatus()
+	status, err := t.Status()
 	if err != nil {
 		return false, nil, err
 	}
@@ -560,12 +585,12 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
+	tid, err := t.ID()
 	if err != nil {
 		return false, nil, err
 	}
 
-	status, err := t.GetStatus()
+	status, err := t.Status()
 	if err != nil {
 		return false, nil, err
 	}
@@ -601,12 +626,12 @@ func (t *task) Reset() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
+	tid, err := t.ID()
 	if err != nil {
 		return err
 	}
 
-	status, err := t.GetStatus()
+	status, err := t.Status()
 	if err != nil {
 		return err
 	}
@@ -632,11 +657,11 @@ func (t *task) Abort() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	status, err := t.GetStatus()
+	status, err := t.Status()
 	if err != nil {
 		return err
 	}
-	id, err := t.GetID()
+	id, err := t.ID()
 	if err != nil {
 		return err
 	}
@@ -669,7 +694,7 @@ func (t *task) Abort() (err error) {
 
 // Aborted tells if task has been aborted
 func (t *task) Aborted() bool {
-	status, err := t.GetStatus()
+	status, err := t.Status()
 	if err != nil {
 		return false
 	}
