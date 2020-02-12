@@ -16,10 +16,6 @@
 
 package serialize
 
-import (
-	"encoding/json"
-)
-
 //go:generate mockgen -destination=../mocks/mock_serializable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/serialize Serializable
 
 // Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize())
@@ -27,19 +23,4 @@ import (
 type Serializable interface {
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error
-}
-
-// ToJSON serializes data into JSON
-func ToJSON(data interface{}) ([]byte, error) {
-	jsoned, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	return jsoned, nil
-}
-
-// FromJSON reads json code and restores data
-func FromJSON(buf []byte, data interface{}) error {
-	err := json.Unmarshal(buf, data)
-	return err
 }

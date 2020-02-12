@@ -25,7 +25,7 @@ import (
 
 func init() {
 
-	allEmbedded = []*Feature{
+	allEmbedded = []*feature{
 		dockerFeature(),
 		// dockerComposeFeature(),
 		ntpServerFeature(),
@@ -60,22 +60,20 @@ func init() {
 
 	for _, item := range allEmbedded {
 		// allEmbeddedMap[item.BaseFilename()] = item
-		allEmbeddedMap[item.DisplayName()] = item
+		allEmbeddedMap[item.Name()] = item
 		installers := item.specs.GetStringMap("feature.install")
 		for k := range installers {
 			meth, err := installmethod.Parse(k)
 			if err != nil {
-				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install method '%s' is unknown!", item.DisplayName(), item.DisplayFilename(), k))
+				logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s)! install method '%s' is unknown!", item.Name(), item.DisplayFilename(), k))
 				continue
 			}
 			if _, found := availableEmbeddedMap[meth]; !found {
-				availableEmbeddedMap[meth] = map[string]*Feature{
-					item.DisplayName(): item,
-					// item.BaseFilename(): item,
+				availableEmbeddedMap[meth] = map[string]*feature{
+					item.Name(): item,
 				}
 			} else {
-				availableEmbeddedMap[meth][item.DisplayName()] = item
-				// availableEmbeddedMap[meth][item.BaseFilename()] = item
+				availableEmbeddedMap[meth][item.Name()] = item
 			}
 		}
 	}

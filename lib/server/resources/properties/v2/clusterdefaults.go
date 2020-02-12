@@ -17,42 +17,37 @@
 package propertiesv2
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Defaults ...
+// ClusterDefaults ...
 // !!! FROZEN !!!
-type Defaults struct {
-	// GatewaySizing keeps the default node definition
-	GatewaySizing abstracts.SizingRequirements `json:"gateway_sizing"`
-	// MasterSizing keeps the default node definition
-	MasterSizing abstracts.SizingRequirements `json:"master_sizing"`
-	// NodeSizing keeps the default node definition
-	NodeSizing abstracts.SizingRequirements `json:"node_sizing"`
-	// Image keeps the default Linux image to use
-	Image string `json:"image"`
+type ClusterDefaults struct {
+	GatewaySizing HostSizingRequirements `json:"gateway_sizing"` // GatewaySizing keeps the default node definition
+	MasterSizing  HostSizingRequirements `json:"master_sizing"`  // MasterSizing keeps the default node definition
+	NodeSizing    HostSizingRequirements `json:"node_sizing"`    // NodeSizing keeps the default node definition
+	Image         string                 `json:"image"`          // Image keeps the default Linux image to use
 }
 
-func newDefaults() *Defaults {
-	return &Defaults{}
+func newClusterDefaults() *ClusterDefaults {
+	return &ClusterDefaults{}
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (d *Defaults) Clone() data.Clonable {
-	return newDefaults().Replace(d)
+func (d *ClusterDefaults) Clone() data.Clonable {
+	return newClusterDefaults().Replace(d)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (d *Defaults) Replace(p data.Clonable) data.Clonable {
-	*d = *p.(*Defaults)
-	return d
+func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
+	*cd = *p.(*ClusterDefaults)
+	return cd
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV2, &Defaults{})
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV2, newClusterDefaults())
 }

@@ -17,17 +17,27 @@
 package features
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"text/template"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
+	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -46,32 +56,60 @@ const (
 	yamlSerialKeyword  = "serialized"
 )
 
+const (
+	featureScriptTemplateContent = `#!/bin/bash -x
+
+set -u -o pipefail
+
+print_error() {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"` + "`" + `sed "${line}q;d" "$file"` + "`" + `"}" >&2
+}
+trap print_error ERR
+
+set +x
+rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+exec 1<&-
+exec 2<&-
+exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+exec 2>&1
+set -x
+
+{{ .reserved_BashLibrary }}
+
+{{ .reserved_Content }}
+`
+)
+
+// var featureScriptTemplate *template.Template
+var featureScriptTemplate atomic.Value
+
 type alterCommandCB func(string) string
 
 type worker struct {
-	feature   *Feature
-	target    Target
+	feature   *feature
+	target    resources.Targetable
 	method    installmethod.Enum
 	action    installaction.Enum
-	variables Variables
-	settings  Settings
+	variables data.Map
+	settings  resources.FeatureSettings
 	startTime time.Time
 
-	host    *protocol.Host
+	host    resources.Host
 	node    bool
 	cluster resources.Cluster
 
-	availableMaster  *protocol.Host
-	availableNode    *protocol.Host
-	availableGateway *protocol.Host
+	availableMaster  resources.Host
+	availableNode    resources.Host
+	availableGateway resources.Host
 
-	allMasters  []*protocol.Host
-	allNodes    []*protocol.Host
-	allGateways []*protocol.Host
+	allMasters  []resources.Host
+	allNodes    []resources.Host
+	allGateways []resources.Host
 
-	concernedMasters  []*protocol.Host
-	concernedNodes    []*protocol.Host
-	concernedGateways []*protocol.Host
+	concernedMasters  []resources.Host
+	concernedNodes    []resources.Host
+	concernedGateways []resources.Host
 
 	rootKey string
 	// function to alter the content of 'run' key of specification file
@@ -81,31 +119,29 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(f *Feature, t Target, m installmethod.Enum, a installaction.Enum, cb alterCommandCB) (*worker, error) {
+func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum, a installaction.Enum, cb alterCommandCB) (*worker, error) {
 	w := worker{
-		feature:   f,
+		feature:   f.(*feature),
 		target:    t,
 		method:    m,
 		action:    a,
 		commandCB: cb,
 	}
-	hT, cT, nT := determineContext(t)
-	if cT != nil {
-		w.cluster = cT.cluster
-	}
-	if hT != nil {
-		w.host = hT.host
-	}
-	if nT != nil {
-		w.host = nT.host
+	switch t.TargetType() {
+	case featuretargettype.CLUSTER:
+		w.cluster = t.(resources.Cluster)
+	case featuretargettype.NODE:
 		w.node = true
+		fallthrough
+	case featuretargettype.HOST:
+		w.host = t.(resources.Host)
 	}
 
 	w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
-	if !f.specs.IsSet(w.rootKey) {
+	if !f.Specs().IsSet(w.rootKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), w.rootKey)
+		return nil, fmt.Errorf(msg, f.Name(), f.DisplayFilename(), w.rootKey)
 	}
 
 	return &w, nil
@@ -117,8 +153,8 @@ func (w *worker) ConcernsCluster() bool {
 }
 
 // CanProceed tells if the combination Feature/Target can work
-func (w *worker) CanProceed(s Settings) error {
-	switch w.target.Type() {
+func (w *worker) CanProceed(s resources.FeatureSettings) error {
+	switch w.target.TargetType() {
 	case "cluster":
 		err := w.validateContextForCluster()
 		if err == nil && !s.SkipSizingRequirements {
@@ -135,16 +171,13 @@ func (w *worker) CanProceed(s Settings) error {
 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) identifyAvailableMaster() (*protocol.Host, error) {
+func (w *worker) identifyAvailableMaster() (resources.Host, error) {
 	if w.cluster == nil {
 		return nil, abstracts.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		node, err := w.cluster.FindAvailableMaster(w.feature.task)
-		if err != nil {
-			return nil, err
-		}
-		w.availableMaster, err = client.New().Host.Inspect(node.ID, temporal.GetExecutionTimeout())
+		var err error
+		w.availableMaster, err = w.cluster.FindAvailableMaster(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
@@ -153,29 +186,25 @@ func (w *worker) identifyAvailableMaster() (*protocol.Host, error) {
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode() (*protocol.Host, error) {
+func (w *worker) identifyAvailableNode() (resources.Host, error) {
 	if w.cluster == nil {
 		return nil, abstracts.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		node, err := w.cluster.FindAvailableNode(w.feature.task)
+		var err error
+		w.availableNode, err = w.cluster.FindAvailableNode(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
-		host, err := client.New().Host.Inspect(node.ID, temporal.GetExecutionTimeout())
-		if err != nil {
-			return nil, err
-		}
-		w.availableNode = host
 	}
 	return w.availableNode, nil
 }
 
 // identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyConcernedMasters() ([]*protocol.Host, error) {
+func (w *worker) identifyConcernedMasters() ([]resources.Host, error) {
 	if w.cluster == nil {
-		return []*protocol.Host{}, nil
+		return []resources.Host{}, nil
 	}
 	if w.concernedMasters == nil {
 		hosts, err := w.identifyAllMasters()
@@ -194,23 +223,17 @@ func (w *worker) identifyConcernedMasters() ([]*protocol.Host, error) {
 // extractHostsFailingCheck identifies from the list passed as parameter which
 // hosts fail feature check.
 // The checks are done in parallel.
-func (w *worker) extractHostsFailingCheck(hosts []*protocol.Host) ([]*protocol.Host, error) {
-	var concernedHosts []*protocol.Host
-	dones := map[*protocol.Host]chan error{}
-	results := map[*protocol.Host]chan Results{}
+func (w *worker) extractHostsFailingCheck(hosts []resources.Host) ([]resources.Host, error) {
+	var concernedHosts []resources.Host
+	dones := map[resources.Host]chan error{}
+	results := map[resources.Host]chan resources.Results{}
 	for _, h := range hosts {
 		d := make(chan error)
-		r := make(chan Results)
+		r := make(chan resources.Results)
 		dones[h] = d
 		results[h] = r
-		go func(host *protocol.Host, res chan Results, done chan error) {
-			nodeTarget, err := NewNodeTarget(host)
-			if err != nil {
-				res <- nil
-				done <- err
-				return
-			}
-			results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
+		go func(host resources.Host, res chan resources.Results, done chan error) {
+			results, err := w.feature.Check(host, w.variables, w.settings)
 			if err != nil {
 				res <- nil
 				done <- err
@@ -235,19 +258,18 @@ func (w *worker) extractHostsFailingCheck(hosts []*protocol.Host) ([]*protocol.H
 
 // identifyAllMasters returns a list of all the hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyAllMasters() ([]*protocol.Host, error) {
+func (w *worker) identifyAllMasters() ([]resources.Host, error) {
 	if w.cluster == nil {
-		return []*protocol.Host{}, nil
+		return []resources.Host{}, nil
 	}
 	if w.allMasters == nil || len(w.allMasters) == 0 {
-		w.allMasters = []*protocol.Host{}
-		safescale := client.New().Host
+		w.allMasters = []resources.Host{}
 		masters, err := w.cluster.ListMasterIDs(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
 		for _, i := range masters {
-			host, err := safescale.Inspect(i, temporal.GetExecutionTimeout())
+			host, err := hostfactory.Load(w.feature.task, w.cluster.Service(), i)
 			if err != nil {
 				return nil, err
 			}
@@ -259,9 +281,9 @@ func (w *worker) identifyAllMasters() ([]*protocol.Host, error) {
 
 // identifyConcernedNodes returns a list of all the hosts acting nodes and keep this list
 // during all the install session
-func (w *worker) identifyConcernedNodes() ([]*protocol.Host, error) {
+func (w *worker) identifyConcernedNodes() ([]resources.Host, error) {
 	if w.cluster == nil {
-		return []*protocol.Host{}, nil
+		return []resources.Host{}, nil
 	}
 
 	if w.concernedNodes == nil {
@@ -280,20 +302,19 @@ func (w *worker) identifyConcernedNodes() ([]*protocol.Host, error) {
 
 // identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the install session
-func (w *worker) identifyAllNodes() ([]*protocol.Host, error) {
+func (w *worker) identifyAllNodes() ([]resources.Host, error) {
 	if w.cluster == nil {
-		return []*protocol.Host{}, nil
+		return []resources.Host{}, nil
 	}
 
 	if w.allNodes == nil {
-		hostClt := client.New().Host
-		var allHosts []*protocol.Host
+		var allHosts []resources.Host
 		list, err := w.cluster.ListNodeIDs(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
 		for _, i := range list {
-			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
+			host, err := hostfactory.Load(w.feature.task, w.cluster.Service(), i)
 			if err != nil {
 				return nil, err
 			}
@@ -307,14 +328,41 @@ func (w *worker) identifyAllNodes() ([]*protocol.Host, error) {
 // identifyAvailableGateway finds a gateway available, and keep track of it
 // for all the life of the action (prevent to request too often)
 // For now, only one gateway is allowed, but in the future we may have 2 for High Availability
-func (w *worker) identifyAvailableGateway() (*protocol.Host, error) {
-	if w.cluster == nil {
-		return gatewayFromHost(w.host), nil
+func (w *worker) identifyAvailableGateway() (resources.Host, error) {
+	if w.availableGateway != nil {
+		return w.availableGateway, nil
 	}
-	if w.availableGateway == nil {
-		netCfg, err := w.cluster.GetNetworkConfig(w.feature.task)
+
+	// Not in cluster context
+	if w.cluster == nil {
+		network, err := w.host.DefaultNetwork(w.feature.task)
+		if err != nil {
+			return nil, err
+		}
+
+		gw, err := network.Gateway(w.feature.task, true)
 		if err == nil {
-			w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, temporal.GetExecutionTimeout())
+			_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+		}
+
+		if err != nil {
+			gw, err = network.Gateway(w.feature.task, false)
+			if err == nil {
+				_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+			}
+		}
+
+		if err != nil {
+			return nil, scerr.NotAvailableError("no gateway available")
+		}
+
+		w.availableGateway = gw
+	} else {
+		// FIXME: secondary gateway not tried if the primary doesn't respond in time
+		// In cluster context
+		netCfg, err := w.cluster.NetworkConfig(w.feature.task)
+		if err == nil {
+			w.availableGateway, err = hostfactory.Load(w.feature.task, w.cluster.Service(), netCfg.GatewayID)
 		}
 		if err != nil {
 			return nil, err
@@ -324,13 +372,16 @@ func (w *worker) identifyAvailableGateway() (*protocol.Host, error) {
 }
 
 // identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
-//  and keep this list during all the install session
-func (w *worker) identifyConcernedGateways() ([]*protocol.Host, error) {
-	var hosts []*protocol.Host
+// and keep this list during all the install session
+func (w *worker) identifyConcernedGateways() ([]resources.Host, error) {
+	var hosts []resources.Host
 
 	if w.host != nil {
-		host := gatewayFromHost(w.host)
-		hosts = []*protocol.Host{host}
+		host, err := gatewayFromHost(w.feature.task, w.host)
+		if err != nil {
+			return nil, err
+		}
+		hosts = []resources.Host{host}
 	} else if w.cluster != nil {
 		var err error
 		hosts, err = w.identifyAllGateways()
@@ -349,45 +400,60 @@ func (w *worker) identifyConcernedGateways() ([]*protocol.Host, error) {
 
 // identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
 // during all the install session
-func (w *worker) identifyAllGateways() ([]*protocol.Host, error) {
+func (w *worker) identifyAllGateways() ([]resources.Host, error) {
 	if w.allGateways != nil {
 		return w.allGateways, nil
 	}
 
 	var (
+		list    []resources.Host
+		network resources.Network
 		err     error
-		results []*protocol.Host
 	)
 
-	netCfg, err := w.cluster.GetNetworkConfig(w.feature.task)
-	if err != nil {
-		return nil, err
-	}
-	gw, err := client.New().Host.Inspect(netCfg.GatewayID, temporal.GetExecutionTimeout())
-	if err != nil {
-		return nil, err
-	}
-
-	results = append(results, w.allGateways...)
-	results = append(results, gw)
-
-	if netCfg.SecondaryGatewayID != "" {
-		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, temporal.GetExecutionTimeout())
+	if w.cluster != nil {
+		netCfg, err := w.cluster.NetworkConfig(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, gw)
+		network, err = networkfactory.Load(w.feature.task, w.cluster.Service(), netCfg.DefaultNetworkID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		network, err = w.host.DefaultNetwork(w.feature.task)
+		if err != nil {
+			return nil, err
+		}
 	}
-	w.allGateways = results
-	return results, nil
+
+	gw, err := network.Gateway(w.feature.task, true)
+	if err == nil {
+		_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+		if err == nil {
+			list = append(list, gw)
+		}
+	}
+	gw, err = network.Gateway(w.feature.task, false)
+	if err == nil {
+		_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+		if err == nil {
+			list = append(list, gw)
+		}
+	}
+	if len(list) <= 0 {
+		return nil, scerr.NotAvailableError("no gateways currently available")
+	}
+	w.allGateways = list
+	return list, nil
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
+func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes resources.Results, err error) {
 	w.variables = v
 	w.settings = s
 
-	results = Results{}
+	outcomes = resources.Results{}
 
 	// 'pace' tells the order of execution
 	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
@@ -419,7 +485,7 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-			return results, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey)
+			return outcomes, fmt.Errorf(msg, w.feature.Name(), w.feature.DisplayFilename(), stepKey)
 		}
 		params := data.Map{
 			"stepName":  k,
@@ -428,22 +494,21 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 			"variables": v,
 		}
 
-		subtask, err := w.feature.task.StartInSubTask(w.taskLaunchStep, params)
+		subtask, err := w.feature.task.StartInSubtask(w.taskLaunchStep, params)
 		if err != nil {
-			return results, err
+			return outcomes, err
 		}
 
-		var result *StepResults
 		tr, err := subtask.Wait()
 		if tr != nil {
-			result = tr.(*StepResults)
-			results[k] = *result
+			outcome := tr.(resources.UnitResults)
+			outcomes.Add(k, outcome)
 		}
 		if err != nil {
-			return results, err
+			return outcomes, err
 		}
 	}
-	return results, nil
+	return outcomes, nil
 }
 
 // taskLaunchStep starts the step
@@ -459,7 +524,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		anon              interface{}
 		stepName, stepKey string
 		stepMap           map[string]interface{}
-		vars              Variables
+		vars              data.Map
 		ok                bool
 	)
 	p := params.(data.Map)
@@ -491,17 +556,17 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if _, ok = p["variables"]; !ok {
 		return nil, scerr.InvalidParameterError("params[variables]", "is missing")
 	}
-	if vars, ok = p["variables"].(Variables); !ok {
+	if vars, ok = p["variables"].(data.Map); !ok {
 		return nil, scerr.InvalidParameterError("params[variables]", "must be a data.Map")
 	}
 	if vars == nil {
 		return nil, scerr.InvalidParameterError("params[variables]", "cannot be nil")
 	}
 
-	defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.installaction.String(), stepName), &err)()
+	defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)()
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
-		fmt.Sprintf("Starting execution of step '%s::%s'...", w.installaction.String(), stepName),
-		fmt.Sprintf("Ending execution of step '%s::%s'", w.installaction.String(), stepName),
+		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
+		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
 		logrus.DebugLevel,
 	)()
 
@@ -512,8 +577,8 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	)
 
 	// Determine list of hosts concerned by the step
-	var hostsList []*protocol.Host
-	if w.target.Type() == "node" {
+	var hostsList []resources.Host
+	if w.target.TargetType() == featuretargettype.NODE {
 		hostsList, err = w.identifyHosts(map[string]string{"hosts": "1"})
 	} else {
 		anon, ok = stepMap[yamlTargetsKeyword]
@@ -532,7 +597,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		} else {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
+			return nil, fmt.Errorf(msg, w.feature.Name(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
 		}
 
 		hostsList, err = w.identifyHosts(stepT)
@@ -563,7 +628,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlRunKeyword)
+		return nil, fmt.Errorf(msg, w.feature.Name(), w.feature.DisplayFilename(), stepKey, yamlRunKeyword)
 	}
 
 	// If there is an options file (for now specific to DCOS), upload it to the remote host
@@ -578,17 +643,21 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			ok      bool
 			content interface{}
 		)
-		c := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
+		complexity, err := w.cluster.Complexity(w.feature.task)
+		if err != nil {
+			return nil, err
+		}
+		c := strings.ToLower(complexity.String())
 		for k, anon := range options {
 			avails[strings.ToLower(k)] = anon
 		}
 		if content, ok = avails[c]; !ok {
-			if c == strings.ToLower(complexity.Large.String()) {
-				c = complexity.Normal.String()
+			if c == strings.ToLower(clustercomplexity.Large.String()) {
+				c = clustercomplexity.Normal.String()
 			}
-			if c == strings.ToLower(complexity.Normal.String()) {
+			if c == strings.ToLower(clustercomplexity.Normal.String()) {
 				if content, ok = avails[c]; !ok {
-					content, ok = avails[complexity.Small.String()]
+					content, ok = avails[clustercomplexity.Small.String()]
 				}
 			}
 		}
@@ -615,10 +684,10 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, err := normalizeScript(Variables{
-		"reserved_Name":    w.feature.DisplayName(),
+	templateCommand, err := normalizeScript(data.Map{
+		"reserved_Name":    w.feature.Name(),
 		"reserved_Content": runContent,
-		"reserved_Action":  strings.ToLower(w.installaction.String()),
+		"reserved_Action":  strings.ToLower(w.action.String()),
 		"reserved_Step":    stepName,
 	})
 	if err != nil {
@@ -657,11 +726,11 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if !r.Successful() {
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
-			logrus.Warnf(fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.installaction.String(), stepName, r.UncompletedEntries()))
+			logrus.Warnf(fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.Uncompleted()))
 			return &r, fmt.Errorf(r.ErrorMessages())
 		}
 		// not successful but completed, if action is check means the feature is not install, it's an information not a failure
-		if strings.Contains(w.installaction.String(), "Check") {
+		if strings.Contains(w.action.String(), "Check") {
 			return &r, nil
 		}
 
@@ -676,20 +745,23 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
 func (w *worker) validateContextForCluster() error {
-	clusterFlavor := w.cluster.GetIdentity(w.feature.task).Flavor
+	clusterFlavor, err := w.cluster.Flavor(w.feature.task)
+	if err != nil {
+		return err
+	}
 
 	yamlKey := "feature.suitableFor.cluster"
 	if w.feature.specs.IsSet(yamlKey) {
-		flavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
-		for _, k := range flavors {
+		yamlFlavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
+		for _, k := range yamlFlavors {
 			k = strings.ToLower(k)
-			e, err := flavor.Parse(k)
+			e, err := clusterflavor.Parse(k)
 			if (err == nil && clusterFlavor == e) || (err != nil && k == "all") {
 				return nil
 			}
 		}
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.DisplayName(), clusterFlavor.String())
+	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.Name(), clusterFlavor.String())
 	return fmt.Errorf(msg)
 }
 
@@ -707,13 +779,17 @@ func (w *worker) validateContextForHost() error {
 	if ok {
 		return nil
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.DisplayName())
+	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.Name())
 	// logrus.Println(msg)
 	return fmt.Errorf(msg)
 }
 
 func (w *worker) validateClusterSizing() error {
-	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(w.cluster.GetIdentity(w.feature.task).Flavor.String())
+	clusterFlavor, err := w.cluster.Flavor(w.feature.task)
+	if err != nil {
+		return err
+	}
+	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(clusterFlavor.String())
 	if !w.feature.specs.IsSet(yamlKey) {
 		return nil
 	}
@@ -780,26 +856,22 @@ func (w *worker) setReverseProxy() (err error) {
 		return scerr.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
 	}
 
-	svc := w.cluster.GetService(w.feature.task)
-	netprops, err := w.cluster.GetNetworkConfig(w.feature.task)
+	svc := w.cluster.Service()
+	netprops, err := w.cluster.NetworkConfig(w.feature.task)
 	if err != nil {
 		return err
 	}
-	mn, err := resources.LoadNetwork(svc, netprops.NetworkID)
+	network, err := networkfactory.Load(w.feature.task, svc, netprops.NetworkID)
 	if err != nil {
 		return err
 	}
 
-	network, err := mn.Get()
-	if err != nil {
-		return err
-	}
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
 		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
 	}
 	var secondaryKongController *KongController
-	if network.SecondaryGatewayID != "" {
+	if network.HasVirtualIP() {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
 			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
@@ -808,7 +880,7 @@ func (w *worker) setReverseProxy() (err error) {
 
 	// Now submits all the rules to reverse proxy
 	primaryGatewayVariables := w.variables.Clone()
-	var secondaryGatewayVariables Variables
+	var secondaryGatewayVariables data.Map
 	if secondaryKongController != nil {
 		secondaryGatewayVariables = w.variables.Clone()
 	}
@@ -841,26 +913,30 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 		hosts, err := w.identifyHosts(targets)
 		if err != nil {
-			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
+			return scerr.Wrap(err, "failed to apply proxy rules: %s")
 		}
 
 		for _, h := range hosts {
-			primaryGatewayVariables["HostIP"] = h.PrivateIp
+			if primaryGatewayVariables["HostIP"], err = h.PrivateIP(w.feature.task); err != nil {
+				return err
+			}
 			primaryGatewayVariables["Hostname"] = h.Name
-			tP, err := w.feature.task.StartInSubTask(asyncApplyProxyRule, data.Map{
+			tP, err := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 				"ctrl": primaryKongController,
 				"rule": rule,
 				"vars": &primaryGatewayVariables,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
+				return scerr.Wrap(err, "failed to apply proxy rules")
 			}
 
 			var errS error
 			if secondaryKongController != nil {
-				secondaryGatewayVariables["HostIP"] = h.PrivateIp
+				if secondaryGatewayVariables["HostIP"], err = h.PrivateIP(w.feature.task); err != nil {
+					return err
+				}
 				secondaryGatewayVariables["Hostname"] = h.Name
-				tS, errOp := w.feature.task.StartInSubTask(asyncApplyProxyRule, data.Map{
+				tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 					"ctrl": secondaryKongController,
 					"rule": rule,
 					"vars": &secondaryGatewayVariables,
@@ -892,11 +968,10 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 	if !ok {
 		return nil, scerr.InvalidParameterError("rule", "is not a map")
 	}
-	vars, ok := params.(data.Map)["vars"].(*Variables)
+	vars, ok := params.(data.Map)["vars"].(*data.Map)
 	if !ok {
-		return nil, scerr.InvalidParameterError("vars", "is not a *Variables")
+		return nil, scerr.InvalidParameterError("vars", "is not a '*data.Map'")
 	}
-
 	hostName, ok := (*vars)["Hostname"].(string)
 	if !ok {
 		return nil, scerr.InvalidParameterError("Hostname", "is not a string")
@@ -918,15 +993,15 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 }
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
-func (w *worker) identifyHosts(targets stepTargets) ([]*protocol.Host, error) {
+func (w *worker) identifyHosts(targets stepTargets) ([]resources.Host, error) {
 	hostT, masterT, nodeT, gwT, err := targets.parse()
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		hostsList []*protocol.Host
-		all       []*protocol.Host
+		hostsList []resources.Host
+		all       []resources.Host
 	)
 
 	if w.cluster == nil {
@@ -993,4 +1068,46 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*protocol.Host, error) {
 		hostsList = append(hostsList, all...)
 	}
 	return hostsList, nil
+}
+
+// normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
+// and ensures BashLibrary are there
+func normalizeScript(params map[string]interface{}) (string, error) {
+	var (
+		err         error
+		tmplContent string
+	)
+
+	anon := featureScriptTemplate.Load()
+	if anon == nil {
+		if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
+			tmplContent = strings.Replace(featureScriptTemplateContent, "set -u -o pipefail", "set -Eeuxo pipefail", 1)
+		} else {
+			tmplContent = featureScriptTemplateContent
+		}
+
+		// parse then execute the template
+		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
+		result, err := template.New("normalize_script").Parse(tmpl)
+		if err != nil {
+			return "", fmt.Errorf("error parsing bash template: %s", err.Error())
+		}
+		featureScriptTemplate.Store(result)
+		anon = featureScriptTemplate.Load()
+	}
+
+	// Configures BashLibrary template var
+	bashLibrary, err := system.GetBashLibrary()
+	if err != nil {
+		return "", err
+	}
+	params["reserved_BashLibrary"] = bashLibrary
+
+	dataBuffer := bytes.NewBufferString("")
+	err = anon.(*template.Template).Execute(dataBuffer, params)
+	if err != nil {
+		return "", err
+	}
+
+	return dataBuffer.String(), nil
 }

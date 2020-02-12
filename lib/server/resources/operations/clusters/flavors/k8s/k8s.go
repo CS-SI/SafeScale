@@ -26,12 +26,11 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
-	featurefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/feature"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusters/flavors"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/features"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -77,11 +76,11 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 		masterCount = 5
 		privateNodeCount = 6
 	}
-	return 0, masterCount, privateNodeCount, publicNodeCount
+	return masterCount, privateNodeCount, publicNodeCount, nil
 }
 
-func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstracts.SizingRequirements {
-	return abstracts.SizingRequirements{
+func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstracts.HostSizingRequirements {
+	return abstracts.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
 		MinRAMSize:  7.0,
@@ -91,8 +90,8 @@ func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstracts.SizingR
 	}
 }
 
-func nodeSizing(task concurrency.Task, _ resources.Cluster) abstracts.SizingRequirements {
-	return abstracts.SizingRequirements{
+func nodeSizing(task concurrency.Task, _ resources.Cluster) abstracts.HostSizingRequirements {
+	return abstracts.HostSizingRequirements{
 		MinCores:    4,
 		MaxCores:    8,
 		MinRAMSize:  15.0,
@@ -106,15 +105,16 @@ func defaultImage(task concurrency.Task, _ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
 
-func configureCluster(task concurrency.Task, c clusterops.Cluster) error {
+func configureCluster(task concurrency.Task, c resources.Cluster) error {
 	clusterName := c.Name()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	feat, err := featurefactory.NewFeature(task, "kubernetes")
-	if err != nil {
-		return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error())
-	}
-	results, err := feat.Add(c, data.Map{}, features.Settings{})
+	// feat, err := featurefactory.New(task, c.Service(), "kubernetes")
+	// if err != nil {
+	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error())
+	// }
+	// results, err := feat.Add(c, data.Map{}, resources.FeatureSettings{})
+	results, err := c.AddFeature(task, "kubernetes", data.Map{}, resources.FeatureSettings{})
 	if err != nil {
 		return scerr.Wrap(err, fmt.Sprintf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error()))
 	}

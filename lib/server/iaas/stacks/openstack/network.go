@@ -32,8 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -319,17 +317,9 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
-	host *abstracts.Host,
-	hsV2 *propertiesv2.HostSizing,
-	hnV1 *propertiesv1.HostNetwork,
-	hdV1 *propertiesv1.HostDescription,
-	userData *userdata.Content,
-	err error,
-) {
-
+func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.HostFull, userData *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
@@ -339,7 +329,7 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
 
 	// Ensure network exists
 	if req.Network == nil {
-		return nil, nil, nil, nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {
@@ -348,7 +338,7 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
 
 	password, err := utils.GeneratePassword(16)
 	if err != nil {
-		return nil, nil, nil, nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+		return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
 	}
 	hostReq := abstracts.HostRequest{
 		ImageID:      req.ImageID,
@@ -359,24 +349,24 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
 		PublicIP:     true,
 		Password:     password,
 	}
-	host, hsV2, hnV1, hdV1, userData, err = s.CreateHost(hostReq)
+	host, userData, err = s.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, nil, nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
+		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
 	}
 
 	// delete the host when found problem starting from here
 	newHost := host
 	defer func() {
 		if err != nil {
-			derr := s.DeleteHost(newHost.ID)
+			derr := s.DeleteHost(newHost.Core.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case *scerr.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Core.Name, derr)
 				case *scerr.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Core.Name, derr)
 				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Core.Name, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			}
@@ -393,7 +383,7 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
 	// if err != nil {
 	// 	return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
 	// }
-	return host, hsV2, hnV1, hdV1, userData, nil
+	return host, userData, nil
 }
 
 // DeleteGateway delete the public gateway of a private network
@@ -673,7 +663,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				if _, ok := err.(*scerr.ErrNotAvailable); ok {
 					return err
 				}
-				return abstracts.TimeoutError(fmt.Sprintf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), err), temporal.GetContextTimeout())
+				return abstracts.ResourceTimeoutError("network", id, temporal.GetContextTimeout())
 			}
 		}
 		return fmt.Errorf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), retryErr)
@@ -792,7 +782,7 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VirtualIP, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -809,7 +799,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VIP, error)
 	if err != nil {
 		return nil, err
 	}
-	vip := abstracts.VIP{
+	vip := abstracts.VirtualIP{
 		ID:        port.ID,
 		PrivateIP: port.FixedIPs[0].IPAddress,
 	}
@@ -817,7 +807,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VIP, error)
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *abstracts.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -826,7 +816,7 @@ func (s *Stack) AddPublicIPToVIP(vip *abstracts.VIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstracts.VIP, hostID string) error {
+func (s *Stack) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -863,7 +853,7 @@ func (s *Stack) BindHostToVIP(vip *abstracts.VIP, hostID string) error {
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstracts.VIP, hostID string) error {
+func (s *Stack) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -901,7 +891,7 @@ func (s *Stack) UnbindHostFromVIP(vip *abstracts.VIP, hostID string) error {
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstracts.VIP) error {
+func (s *Stack) DeleteVIP(vip *abstracts.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}

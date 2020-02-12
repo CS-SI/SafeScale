@@ -81,3 +81,50 @@ func (m Map) Values() []interface{} {
 	}
 	return values
 }
+
+// IndexedListOfStrings contains a list of string (being ID, IP, ...) of nodes indexed by node Numerical ID.
+type IndexedListOfStrings map[uint]string
+
+// KeysAndValues returns a slice with keys and a slice with values from map[uint]string
+func (ilos IndexedListOfStrings) KeysAndValues() ([]uint, []string) {
+	length := len(ilos)
+	if length <= 0 {
+		return []uint{}, []string{}
+	}
+
+	keys := make([]uint, 0, length)
+	values := make([]string, 0, length)
+	for k, v := range ilos {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	return keys, values
+}
+
+// Keys returns a slice with keys from map[uint]string
+func (ilos IndexedListOfStrings) Keys() []uint {
+	length := len(ilos)
+	if length <= 0 {
+		return []uint{}
+	}
+
+	keys := make([]uint, 0, length)
+	for k := range ilos {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Values returns a slice with values from map[uint]string
+func (ilos IndexedListOfStrings) Values() []string {
+	length := len(ilos)
+	if length <= 0 {
+		return []string{}
+	}
+
+	values := make([]string, 0, length)
+	for _, v := range ilos {
+		values = append(values, v)
+	}
+	return values
+}

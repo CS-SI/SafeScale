@@ -17,7 +17,6 @@
 package abstracts
 
 import (
-	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -42,11 +41,11 @@ type ClusterRequest struct {
 	// KeepOnFailure is set to True to keep resources on cluster creation failure
 	KeepOnFailure bool
 	// GatewaysDef count
-	GatewaysDef *protocol.HostDefinition
+	GatewaysDef *HostSizingRequirements
 	// NodesDef count
-	MastersDef *protocol.HostDefinition
+	MastersDef *HostSizingRequirements
 	// NodesDef count
-	NodesDef *protocol.HostDefinition
+	NodesDef *HostSizingRequirements
 	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
 	DisabledDefaultFeatures map[string]struct{}
 }
@@ -67,17 +66,14 @@ func NewClusterIdentity() *ClusterIdentity {
 	return &ClusterIdentity{}
 }
 
-// Content ... (data.Clonable interface)
-func (i *ClusterIdentity) Content() interface{} {
-	return i
-}
-
-// Clone ... (data.Clonable interface)
+// Clone ...
+// satisfies interface data.Clonable
 func (i *ClusterIdentity) Clone() data.Clonable {
 	return NewClusterIdentity().Replace(i)
 }
 
-// Replace ... (data.Clonable interface)
+// Replace ...
+// satisfies interface data.Clonable
 func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 	src := p.(*ClusterIdentity)
 	*i = *src

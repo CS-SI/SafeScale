@@ -44,12 +44,15 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"golang.org/x/crypto/ssh"
 )
@@ -673,7 +676,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstracts.Host, er
 		})
 
 		if innerErr != nil {
-			return nil, scerr.Wrap(err, "failed to update hostproperty.DescriptionV1)
+			return nil, scerr.Wrap(err, "failed to update hostproperty.DescriptionV1")
 		}
 
 		innerErr = props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
@@ -803,7 +806,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.HostFull, userData *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -1012,93 +1015,75 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 		return nil, userData, fmt.Errorf(fmt.Sprintf("Can't find domain %s : %s", resourceName, err.Error()))
 	}
 
-	host, err = s.getHostFromDomain(domain)
+	hostCore, err := s.getHostFromDomain(domain)
 	if err != nil {
 		return nil, userData, fmt.Errorf(fmt.Sprintf("failed to get host %s from domain : %s", resourceName, err.Error()))
 	}
 
-	host.PrivateKey = keyPair.PrivateKey
-	host.Password = request.Password
+	hostCore.PrivateKey = keyPair.PrivateKey
+	hostCore.Password = request.Password
 
-	// FIXME: move this Alter to resources.Host
-	err = host.Alter(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-
-			if bridgedVMs {
-				var vmInfo VMInfo
-				if publicIP {
-					vmInfo = <-vmInfoChannel
-					hostNetworkV1.PublicIPv4 = vmInfo.publicIP
-					userData.PublicIP = vmInfo.publicIP
-				}
-			}
-
-			hostNetworkV1.DefaultNetworkID = request.Networks[0].ID
-			hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName
-			if request.DefaultGateway != nil {
-				hostNetworkV1.DefaultGatewayID = request.DefaultGateway.ID
-
-				gateway, err := s.InspectHost(request.DefaultGateway)
-				if err != nil {
-					return fmt.Errorf("failed to get gateway host : %s", err.Error())
-				}
-
-				hostNetworkV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
-			}
-
-			return nil
-		})
-		if err != nil {
-			return nil, userData, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
+	hostNetwork := abstracts.NewHostNetwork()
+	if bridgedVMs {
+		var vmInfo VMInfo
+		if publicIP {
+			vmInfo = <-vmInfoChannel
+			hnV1.PublicIPv4 = vmInfo.publicIP
+			userData.PublicIP = vmInfo.publicIP
 		}
-
-		return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
-			hostSizingV1, ok := clonable.(*propsv1.HostSizing)
-			if !ok {
-				return scerr.InconsistentError("expecting '*propsv1.HostSizing', providing '%s'", reflect.TypeOf(clonable).String())
-			}
-
-			hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
-			hostSizingV1.RequestedSize.Cores = template.Cores
-			hostSizingV1.RequestedSize.DiskSize = template.DiskSize
-			// TODO GPU not implemented
-			hostSizingV1.RequestedSize.GPUNumber = template.GPUNumber
-			hostSizingV1.RequestedSize.GPUType = template.GPUType
-
-			return nil
-		})
-	})
-	if err != nil {
-		return nil, userData, err
 	}
 
+	hostNetwork.DefaultNetworkID = request.Networks[0].ID
+	hostNetwork.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstracts.SingleHostNetworkName
+	if request.DefaultGateway != nil {
+		hostNetwork.DefaultGatewayID = request.DefaultGateway.ID
+
+		gateway, err := s.InspectHost(request.DefaultGateway)
+		if err != nil {
+			return nil, nil, scerr.Wrap(err, "failed to get gateway host"
+		}
+
+		hnV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
+	}
+
+	hostSizing := abstracts.NewHostEffectiveSizing()
+	hostSizing.RAMSize = float32(template.RAMSize * 1024)
+	hostSizing.Cores = template.Cores
+	hostSizing.DiskSize = template.DiskSize
+	// TODO GPU not implemented
+	hostSizing.GPUNumber = template.GPUNumber
+	hostSizing.GPUType = template.GPUType
+
+	host := abstracts.NewHostFull()
+	host.Core = hostCore
+	host.Network = hostNetwork
+	host.Sizing = hostSizing
 	return host, userData, nil
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *abstracts.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.HostFull, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
+	host = abstracts.NewHostFull()
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
-		host = abstracts.NewHost()
-		host.ID = hostParam
-	case *abstracts.Host:
+		host.Core.ID = hostParam
+	case *abstracts.HostCore:
 		if hostParam == nil {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
 		}
-		host = hostParam
+		host.Core = hostParam
 	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *abstracts.Host")
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *abstracts.HostCore")
 	}
 
-	newHost, _, err := s.getHostAndDomainFromRef(host.ID)
+	newHost, _, err := s.getHostAndDomainFromRef(host.Core.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -1115,12 +1100,16 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err er
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstracts.Host, error) {
+func (s *Stack) GetHostByName(name string) (*abstracts.HostCore, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	return s.InspectHost(name)
+	host, err := s.InspectHost(name)
+	if err != nil {
+		return nil, err
+	}
+	return host.Core, nil
 }
 
 // DeleteHost deletes the host identified by id

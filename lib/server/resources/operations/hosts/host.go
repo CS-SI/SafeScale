@@ -324,33 +324,39 @@ func (objh *Host) Create(task concurrency.Task, hostReq abstracts.HostRequest, h
 	}()
 
 	// "Augment" host to become an object
-	err = objh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		inErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) error {
-			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-			if !ok {
-				return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			_ = hostSizingV2.Replace(hsV2)
-			hostSizingV2.RequestedSize = &hostDef
-			return nil
-		})
-		if inErr != nil {
-			return inErr
+	err = props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) error {
+		hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+		if !ok {
+			return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		if curUser.Name != "" {
-			creator += " (" + curUser.Name + ")"
-		}
-	} else {
-		creator = "unknown@" + hostname
+		_ = hostSizingV2.Replace(hsV2)
+		hostSizingV2.RequestedSize = &hostDef
+		return nil
+	})
+	if inErr != nil {
+		return inErr
 	}
 
+	// Sets host extension DescriptionV1
 	err = props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
 		hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 		if !ok {
 			return scerr.InconsistentError(fmt.Sprintf("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String()))
 		}
 		_ = hostDescriptionV1.Replace(hdV1)
-		// hostDescriptionV1.Created = time.Now()
+		creator := ""
+		hostname, _ := os.Hostname()
+		if curUser, err := user.Current(); err == nil {
+			creator := curUser.Username
+			if hostname != "" {
+				creator += "@" + hostname
+			}
+			if curUser.Name != "" {
+				creator += " (" + curUser.Name + ")"
+			}
+		} else {
+			creator = "unknown@" + hostname
+		}
 		hostDescriptionV1.Creator = creator
 		return nil
 	})
@@ -548,7 +554,7 @@ func updateNetwork(task concurrency.Task, svc iaas.Service, networkID string, ho
 	})
 }
 
-// WaitSSHReady ...
+// WaitSSHReady waits until SSH responds successfully
 func (objh *Host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err error) {
 	if objh == nil {
 		return "", scerr.InvalidInstanceError()
@@ -1111,7 +1117,7 @@ func (objh *Host) Pull(task concurrency.Task, target, source string, timeout tim
 }
 
 // Push uploads a file to host
-func (objh *Host) Push(task concurrency.Task, source, target string, timeout time.Duration) (int, string, string, error) {
+func (objh *Host) Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, error) {
 	if objh == nil {
 		return 0, "", "", scerr.InvalidInstanceError()
 	}
@@ -1138,7 +1144,21 @@ func (objh *Host) Push(task concurrency.Task, source, target string, timeout tim
 	runCtx, cancelCtx := context.WithTimeout(taskCtx, timeout)
 	defer cancelCtx()
 
-	return ssh.Copy(runCtx, target, source, true)
+	retcode, stdout, stderr, err := ssh.Copy(runCtx, target, source, true)
+	if err != nil {
+		return retcode, stdout, stderr, err
+	}
+	cmd := ""
+	if owner != "" {
+		cmd += "chown "+owner+` '`+target+`' ;`
+	}
+	if mode != "" {
+		cmd += "chmod "+mode+` '`+target+`'`
+	}
+	if cmd != "" {
+		retcode, stdout, stderr, err = ssh.Run(runCtx, cmd)
+	}
+	return retcode, stdout, stderr, err
 }
 
 // Share returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'

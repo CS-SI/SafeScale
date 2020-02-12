@@ -52,7 +52,7 @@ func IsLogActive(key string) bool {
 func NewTracer(t Task, message string, enabled bool) *Tracer {
 	tracer := Tracer{}
 	if t != nil {
-		tracer.taskSig, _ = t.GetSignature()
+		tracer.taskSig, _ = t.Signature()
 	}
 	tracer.enabled = enabled
 

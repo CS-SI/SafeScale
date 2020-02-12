@@ -26,7 +26,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/install"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	featurefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/feature"
+	// "github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -429,11 +431,11 @@ var hostAddFeatureCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
-		feature, err := install.NewFeature(task, featureName)
+		feat, err := featurefactory.New(task, featureName)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
-		if feature == nil {
+		if feat == nil {
 			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
@@ -446,7 +448,7 @@ var hostAddFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := install.Settings{}
+		settings := resources.InstallSettings{}
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		// Wait for SSH service on remote host first

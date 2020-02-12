@@ -24,6 +24,4 @@ type Clonable interface {
 	Clone() Clonable
 	// Replace allows to replace a Clonable with data from another one
 	Replace(Clonable) Clonable
-	// // Content returns the content of the Clonable
-	// Content() data.Clonable
 }

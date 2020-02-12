@@ -59,23 +59,14 @@ func (hn *HostNetwork) Reset() {
 	}
 }
 
-// Content ...
-//
-// Follow data.Clonable interface
-func (hn *HostNetwork) Content() interface{} {
-	return hn
-}
-
 // Clone ...
-//
-// Follow data.Clonable interface
+// satisfies interface data.Clonable
 func (hn *HostNetwork) Clone() data.Clonable {
 	return NewHostNetwork().Replace(hn)
 }
 
 // Replace ...
-//
-// Follow data.Clonable interface
+// satisfies interface data.Clonable
 func (hn *HostNetwork) Replace(p data.Clonable) data.Clonable {
 	src := p.(*HostNetwork)
 	*hn = *src

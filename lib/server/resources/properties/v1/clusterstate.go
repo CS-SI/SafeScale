@@ -25,34 +25,31 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// State contains the bare minimum information about a cluster
-type State struct {
+// ClusterState contains the bare minimum information about a cluster
+type ClusterState struct {
 	// State of the cluster
 	State clusterstate.Enum
 	// StateCollectInterval in seconds
 	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`
 }
 
-func newState() *State {
-	return &State{}
+func newClusterState() *ClusterState {
+	return &ClusterState{}
 }
 
-// Content ... (data.Clonable interface)
-func (s *State) Content() interface{} {
-	return s
+// Clone ...
+// satisfies interface data.Clonable
+func (s *ClusterState) Clone() data.Clonable {
+	return newClusterState().Replace(s)
 }
 
-// Clone ... (data.Clonable interface)
-func (s *State) Clone() data.Clonable {
-	return newState().Replace(s)
-}
-
-// Replace ... (data.Clonable interface)
-func (s *State) Replace(p data.Clonable) data.Clonable {
-	*s = *p.(*State)
+// Replace ...
+// satisfies interface data.Clonable
+func (s *ClusterState) Replace(p data.Clonable) data.Clonable {
+	*s = *p.(*ClusterState)
 	return s
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.StateV1, &State{})
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.StateV1, newClusterState())
 }

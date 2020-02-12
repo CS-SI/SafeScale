@@ -34,9 +34,9 @@ var (
 	templateBox *rice.Box
 	// emptyParams = map[string]interface{}{}
 
-	availableEmbeddedMap = map[installmethod.Enum]map[string]*Feature{}
-	allEmbeddedMap       = map[string]*Feature{}
-	allEmbedded          []*Feature
+	availableEmbeddedMap = map[installmethod.Enum]map[string]*feature{}
+	allEmbeddedMap       = map[string]*feature{}
+	allEmbedded          []*feature
 )
 
 // loadSpecFile returns the content of the spec file of the feature named 'name'
@@ -75,13 +75,13 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 }
 
 // dockerFeature ...
-func dockerFeature() *Feature {
+func dockerFeature() *feature {
 	name := "docker"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -90,13 +90,13 @@ func dockerFeature() *Feature {
 }
 
 // // dockerComposeFeature ...
-// func dockerComposeFeature() *Feature {
+// func dockerComposeFeature() *feature {
 // 	name := "docker-compose"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
 // 		panic(err.Error())
 // 	}
-// 	return &Feature{
+// 	return &feature{
 // 		displayName: name,
 // 		fileName:    filename,
 // 		embedded:    true,
@@ -105,13 +105,13 @@ func dockerFeature() *Feature {
 // }
 
 // ntpServerFeature ...
-func ntpServerFeature() *Feature {
+func ntpServerFeature() *feature {
 	name := "ntpserver"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -120,13 +120,13 @@ func ntpServerFeature() *Feature {
 }
 
 // ntpServerFeature ...
-func ntpClientFeature() *Feature {
+func ntpClientFeature() *feature {
 	name := "ntpclient"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -135,13 +135,13 @@ func ntpClientFeature() *Feature {
 }
 
 // ansibleFeature from official repos ...
-func ansibleFeature() *Feature {
+func ansibleFeature() *feature {
 	name := "ansible"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -150,13 +150,13 @@ func ansibleFeature() *Feature {
 }
 
 // postgresql4platformFeature feature. ...
-func postgresql4platformFeature() *Feature {
+func postgresql4platformFeature() *feature {
 	name := "postgresql4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -165,13 +165,13 @@ func postgresql4platformFeature() *Feature {
 }
 
 // nVidiaDockerFeature ...
-func nVidiaDockerFeature() *Feature {
+func nVidiaDockerFeature() *feature {
 	name := "nvidiadocker"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -180,13 +180,13 @@ func nVidiaDockerFeature() *Feature {
 }
 
 // kubernetesFeature ...
-func kubernetesFeature() *Feature {
+func kubernetesFeature() *feature {
 	name := "kubernetes"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -195,13 +195,13 @@ func kubernetesFeature() *Feature {
 }
 
 // nexusFeature ...
-func nexusFeature() *Feature { // nolint
+func nexusFeature() *feature { // nolint
 	name := "nexus3"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -210,13 +210,13 @@ func nexusFeature() *Feature { // nolint
 }
 
 // elasticsearchFeature ...
-func elasticsearchFeature() *Feature {
+func elasticsearchFeature() *feature {
 	name := "elasticsearch"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -225,13 +225,13 @@ func elasticsearchFeature() *Feature {
 }
 
 // logstashFeature ...
-func logstashFeature() *Feature {
+func logstashFeature() *feature {
 	name := "logstash"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -240,13 +240,13 @@ func logstashFeature() *Feature {
 }
 
 // k8shelm2Feature ...
-func k8shelm2Feature() *Feature {
+func k8shelm2Feature() *feature {
 	name := "k8s.helm2"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -255,13 +255,13 @@ func k8shelm2Feature() *Feature {
 }
 
 // sparkmaster4platformFeature ...
-func sparkmaster4platformFeature() *Feature {
+func sparkmaster4platformFeature() *feature {
 	name := "sparkmaster4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -270,13 +270,13 @@ func sparkmaster4platformFeature() *Feature {
 }
 
 // remoteDesktopFeature ...
-func remoteDesktopFeature() *Feature {
+func remoteDesktopFeature() *feature {
 	name := "remotedesktop"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -285,13 +285,13 @@ func remoteDesktopFeature() *Feature {
 }
 
 // mpichOsPkgFeature ...
-func mpichOsPkgFeature() *Feature {
+func mpichOsPkgFeature() *feature {
 	name := "mpich-ospkg"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -300,13 +300,13 @@ func mpichOsPkgFeature() *Feature {
 }
 
 // mpichBuildFeature ...
-func mpichBuildFeature() *Feature {
+func mpichBuildFeature() *feature {
 	name := "mpich-build"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -315,13 +315,13 @@ func mpichBuildFeature() *Feature {
 }
 
 // ohpcSlurmMasterFeature ...
-func ohpcSlurmMasterFeature() *Feature {
+func ohpcSlurmMasterFeature() *feature {
 	name := "ohpc-slurm-master"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -330,13 +330,13 @@ func ohpcSlurmMasterFeature() *Feature {
 }
 
 // ohpcSlurmNodeFeature ...
-func ohpcSlurmNodeFeature() *Feature {
+func ohpcSlurmNodeFeature() *feature {
 	name := "ohpc-slurm-node"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -345,13 +345,13 @@ func ohpcSlurmNodeFeature() *Feature {
 }
 
 // proxycacheServerFeature ...
-func proxycacheServerFeature() *Feature {
+func proxycacheServerFeature() *feature {
 	name := "proxycache-server"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -360,13 +360,13 @@ func proxycacheServerFeature() *Feature {
 }
 
 // proxycacheClientFeature ...
-func proxycacheClientFeature() *Feature {
+func proxycacheClientFeature() *feature {
 	name := "proxycache-client"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -375,13 +375,13 @@ func proxycacheClientFeature() *Feature {
 }
 
 // apacheIgniteFeature ...
-func apacheIgniteFeature() *Feature {
+func apacheIgniteFeature() *feature {
 	name := "apache-ignite"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -390,13 +390,13 @@ func apacheIgniteFeature() *Feature {
 }
 
 // metricbeatFeature ...
-func metricbeatFeature() *Feature {
+func metricbeatFeature() *feature {
 	name := "metricbeat"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -405,13 +405,13 @@ func metricbeatFeature() *Feature {
 }
 
 // filebeatFeature ...
-func filebeatFeature() *Feature {
+func filebeatFeature() *feature {
 	name := "filebeat"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -420,13 +420,13 @@ func filebeatFeature() *Feature {
 }
 
 // postgres4gatewayFeature ...
-func postgres4gatewayFeature() *Feature {
+func postgres4gatewayFeature() *feature {
 	name := "postgres4gateway"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -435,13 +435,13 @@ func postgres4gatewayFeature() *Feature {
 }
 
 // edgeproxy4networkFeature ...
-func edgeproxy4networkFeature() *Feature {
+func edgeproxy4networkFeature() *feature {
 	name := "edgeproxy4network"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -450,13 +450,13 @@ func edgeproxy4networkFeature() *Feature {
 }
 
 // keycloak4platformFeature ...
-func keycloak4platformFeature() *Feature {
+func keycloak4platformFeature() *feature {
 	name := "keycloak4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -465,13 +465,13 @@ func keycloak4platformFeature() *Feature {
 }
 
 // kibanaFeature ...
-func kibanaFeature() *Feature {
+func kibanaFeature() *feature {
 	name := "kibana"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -480,13 +480,13 @@ func kibanaFeature() *Feature {
 }
 
 // elassandraFeature ...
-func elassandraFeature() *Feature {
+func elassandraFeature() *feature {
 	name := "elassandra"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -495,13 +495,13 @@ func elassandraFeature() *Feature {
 }
 
 // consul4platformFeature ...
-func consul4platformFeature() *Feature {
+func consul4platformFeature() *feature {
 	name := "consul4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -510,13 +510,13 @@ func consul4platformFeature() *Feature {
 }
 
 // monitoring4platformFeature ...
-func monitoring4platformFeature() *Feature {
+func monitoring4platformFeature() *feature {
 	name := "monitoring4platform"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,
@@ -525,13 +525,13 @@ func monitoring4platformFeature() *Feature {
 }
 
 // geoserverFeature ...
-func geoserverFeature() *Feature {
+func geoserverFeature() *feature {
 	name := "geoserver"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
+	return &feature{
 		displayName: name,
 		fileName:    filename,
 		embedded:    true,

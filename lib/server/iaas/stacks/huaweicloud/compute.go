@@ -43,6 +43,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -254,7 +255,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 // CreateHost creates a new host
 // On success returns an instance of abstracts.Host, and a string containing the script to execute to finalize host installation
-func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.HostFull, userData *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -286,18 +287,18 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		// FIXME: defaultGatewayPrivateIP and defaultGatewayID must come by request
-		err := defaultGateway.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) error {(
-			return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-				hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-				defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
-				defaultGatewayID = defaultGateway.ID
-				return nil
-			})
-		})
-		if err != nil {
-			return nil, userData, err
-		}
+		// // FIXME: defaultGatewayPrivateIP and defaultGatewayID must come by request
+		// err := defaultGateway.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) error {
+		// 	return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
+		// 		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
+		defaultGatewayID = defaultGateway.ID
+		// 		return nil
+		// 	})
+		// })
+		// if err != nil {
+		// 	return nil, nil, nil, nil, userData, err
+		// }
 	}
 
 	var nets []servers.Network
@@ -398,39 +399,48 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 		return nil, userData, fmt.Errorf("failed to build query to create host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 	}
 
-	// --- Initializes abstracts.Host ---
+	// --- Initializes abstracts.HostFull ---
 
-	host = abstracts.NewHost()
-	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
-	host.Password = request.Password
+	host = abstracts.NewHostFull()
+	host.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
+	host.Core.Password = request.Password
 
-	// FIXME: move this Alter to resources.Host.Create() implementation
-	err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			hostNetworkV1 := v.(*propertiesv1.HostNetwork)
-			hostNetworkV1.IsGateway = isGateway
-			hostNetworkV1.DefaultNetworkID = defaultNetworkID
-			hostNetworkV1.DefaultGatewayID = defaultGatewayID
-			hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
+	// // FIXME: move this Alter to resources.Host.Create() implementation
+	// err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
+	// 	innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+	// 		// FIXME: validate cast
+	// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
+	// 	hostNetworkV1.IsGateway = isGateway
+	// 	hostNetworkV1.DefaultNetworkID = defaultNetworkID
+	// 	hostNetworkV1.DefaultGatewayID = defaultGatewayID
+	// 	hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
+	// 	return nil
+	// })
+	// if innerErr != nil {
+	// 	return innerErr
+	// }
 
-		// Adds Host property SizingV1
-		// template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
-		return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
-			hostSizingV1 := clonable.(*propsv1.HostSizing)
-			// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-			hostSizingV1.Template = request.TemplateID
-			hostSizingV1.AllocatedSize = converters.ModelHostTemplateToPropertyHostSize(template)
-			return nil
-		})
-	})
-	if err != nil {
-		return nil, userData, err
-	}
+	host.Network.IsGateway = isGateway
+	host.Network.DefaultNetworkID = defaultNetworkID
+	host.Network.DefaultGatewayID = defaultGatewayID
+	host.Network.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
+
+	// // Adds Host property SizingV1
+	// // template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
+	// return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
+	// 	hostSizingV1 := clonable.(*propertiesv1.HostSizing)
+	// 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
+	// 	hostSizingV1.Template = request.TemplateID
+	// 	hostSizingV1.AllocatedSize = operations.ModelHostTemplateToPropertyHostSize(template)
+	// 	return nil
+	// })
+	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
+	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+
+	// })
+	// if err != nil {
+	// 	return nil, nil, nil, nil, userData, err
+	// }
 
 	// --- query provider for host creation ---
 
@@ -470,7 +480,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 				}
 			}
 
-			host.ID = server.ID
+			host.Core.ID = server.ID
 
 			// Wait that host is ready, not just that the build is started
 			host, err = s.WaitHostReady(host, temporal.GetHostTimeout())
@@ -498,15 +508,15 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			derr := s.DeleteHost(newHost.ID)
+			derr := s.DeleteHost(newHost.Core.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case *scerr.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Core.Name, derr)
 				case *scerr.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Core.Name, derr)
 				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Core.Name, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			}
@@ -515,7 +525,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 
 	if request.PublicIP {
 		var fip *FloatingIP
-		fip, err = s.attachFloatingIP(host)
+		fip, err = s.attachFloatingIP(host.Core)
 		if err != nil {
 			spew.Dump(err)
 			return nil, userData, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
@@ -535,23 +545,30 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.Host,
 			}
 		}()
 
-		// FIXME: move this Alter to resources.Host.Create() implementation
-		// Updates Host property NetworkV1 in host instance
-		err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
-			return props.Alter(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-				hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-				if ipversion.IPv4.Is(fip.PublicIPAddress) {
-					hostNetworkV1.PublicIPv4 = fip.PublicIPAddress
-				} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
-					hostNetworkV1.PublicIPv6 = fip.PublicIPAddress
-				}
-				userData.PublicIP = fip.PublicIPAddress
-				return nil
-			})
-		})
-		if err != nil {
-			return nil, userData, err
+		// // FIXME: move this Alter to resources.Host.Create() implementation
+		// // Updates Host property NetworkV1 in host instance
+		// err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
+		// 	return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		// 		// FIXME: validate cast
+		// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
+		// 		if ipversion.IPv4.Is(fip.PublicIPAddress) {
+		// 			hostNetworkV1.PublicIPv4 = fip.PublicIPAddress
+		// 		} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
+		// 			hostNetworkV1.PublicIPv6 = fip.PublicIPAddress
+		// 		}
+		// 		userData.PublicIP = fip.PublicIPAddress
+		// 		return nil
+		// 	})
+		// })
+		// if err != nil {
+		// 	return nil, nil, nil, nil, userData, err
+		// }
+		if ipversion.IPv4.Is(fip.PublicIPAddress) {
+			host.Network.PublicIPv4 = fip.PublicIPAddress
+		} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
+			host.Network.PublicIPv6 = fip.PublicIPAddress
 		}
+		userData.PublicIP = fip.PublicIPAddress
 
 		if defaultGateway == nil && defaultNetwork.Name != abstracts.SingleHostNetworkName {
 			err = s.enableHostRouterMode(host)
@@ -588,7 +605,7 @@ func validatehostName(req abstracts.HostRequest) (bool, error) {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.HostFull, err error) {
 	var (
 		server   *servers.Server
 		notFound bool
@@ -598,25 +615,27 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err er
 		return nil, scerr.InvalidInstanceError()
 	}
 
+	host = abstracts.NewHostFull()
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
-		host = resources.NewHost()
-		host.ID = hostParam
-	case *abstracts.Host:
+		host.Core.ID = hostParam
+	case *abstracts.HostCore:
 		if hostParam == nil {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
 		}
-		host = hostParam
+		host.Core = hostParam
 	default:
 		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *abstracts.Host")
 	}
+	hostRef := host.Core.ID
 
+	var hostCore *abstracts.HostCore
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			server, err = servers.Get(s.Stack.ComputeClient, host.ID).Extract()
+			server, err = servers.Get(s.Stack.ComputeClient, hostRef).Extract()
 			if err != nil {
 				switch err.(type) {
 				case gophercloud.ErrDefault404:
@@ -630,7 +649,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err er
 					return err
 				default:
 					// Any other error stops the retry
-					err = fmt.Errorf("error getting host '%s': %s", host.ID, openstack.ProviderErrorToString(err))
+					err = fmt.Errorf("error getting host '%s': %s", hostRef, openstack.ProviderErrorToString(err))
 					logrus.Warn(err)
 					return nil
 				}
@@ -641,9 +660,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err er
 				return err
 			}
 
-			host.LastState = toHostState(server.Status)
-			if host.LastState != hoststate.ERROR && host.LastState != hoststate.STARTING {
-				logrus.Infof("host status of '%s' is '%s'", host.ID, server.Status)
+			hostCore = abstracts.NewHostCore()
+			hostCore.ID = server.ID
+			hostCore.Name = server.Name
+			host.Core.LastState = toHostState(server.Status)
+			if host.Core.LastState != hoststate.ERROR && host.Core.LastState != hoststate.STARTING {
+				logrus.Infof("host status of '%s' is '%s'", server.Name, server.Status)
 				err = nil
 				return nil
 			}
@@ -655,14 +677,14 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err er
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			msg := "failed to get host"
-			if host != nil {
-				msg += fmt.Sprintf(" '%s'", host.Name)
+			if hostCore != nil {
+				msg += fmt.Sprintf(" '%s'", hostCore.Name)
 			}
 			msg += fmt.Sprintf(" information after %v", temporal.GetHostTimeout())
 			if err != nil {
 				msg += fmt.Sprintf(": %v", err)
 			}
-			return nil, abstracts.TimeoutError(msg, temporal.GetHostTimeout())
+			return nil, abstracts.ResourceTimeoutError("host", hostCore.Name, temporal.GetHostTimeout())
 		}
 		return nil, retryErr
 	}
@@ -670,13 +692,13 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err er
 		return nil, err
 	}
 	if notFound {
-		return nil, abstracts.ResourceNotFoundError("host", host.ID)
+		return nil, abstracts.ResourceNotFoundError("host", hostRef)
 	}
 	if server == nil {
-		return nil, abstracts.ResourceNotFoundError("host", host.ID)
+		return nil, abstracts.ResourceNotFoundError("host", hostRef)
 	}
 
-	if err = s.complementHost(host, server); err != nil {
+	if host, err = s.complementHost(hostCore, server); err != nil {
 		return nil, err
 	}
 
@@ -688,12 +710,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstracts.Host, err er
 }
 
 // complementHost complements Host data with content of server parameter
-func (s *Stack) complementHost(host *abstracts.Host, server *servers.Server) (err error) {
+func (s *Stack) complementHost(host *abstracts.HostCore, server *servers.Server) (completedHost *abstracts.HostFull, err error) {
 	defer scerr.OnPanic(&err)()
 
 	networks, addresses, ipv4, ipv6, err := s.collectAddresses(host)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Updates intrinsic data of host if needed
@@ -705,105 +727,88 @@ func (s *Stack) complementHost(host *abstracts.Host, server *servers.Server) (er
 	}
 	host.LastState = toHostState(server.Status)
 
-	// FIXME: move this Alter to resources.Host implementation
-	return host.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		// Updates Host Property propsv1.HostDescription
-		innerErr props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
-			hostDescriptionV1 := clonable.(*propsv1.HostDescription)
-			hostDescriptionV1.Created = server.Created
-			hostDescriptionV1.Updated = server.Updated
-			return nil
-		})
-		if innerErr != nil {
-			return innerErr
-		}
+	completedHost.Core = host
+	completedHost.Description.Created = server.Created
+	completedHost.Description.Updated = server.Updated
 
-		// Updates Host Property HostNetwork
-		return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			var errors []error
-
-			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-			if hostNetworkV1.PublicIPv4 == "" {
-				hostNetworkV1.PublicIPv4 = ipv4
-			}
-			if hostNetworkV1.PublicIPv6 == "" {
-				hostNetworkV1.PublicIPv6 = ipv6
-			}
-
-			if len(hostNetworkV1.NetworksByID) > 0 {
-				ipv4Addresses := map[string]string{}
-				ipv6Addresses := map[string]string{}
-				for netid, netname := range hostNetworkV1.NetworksByID {
-					if ip, ok := addresses[ipversion.IPv4][netid]; ok {
-						ipv4Addresses[netid] = ip
-					} else if ip, ok := addresses[ipversion.IPv4][netname]; ok {
-						ipv4Addresses[netid] = ip
-					} else {
-						ipv4Addresses[netid] = ""
-					}
-
-					if ip, ok := addresses[ipversion.IPv6][netid]; ok {
-						ipv6Addresses[netid] = ip
-					} else if ip, ok := addresses[ipversion.IPv6][netname]; ok {
-						ipv6Addresses[netid] = ip
-					} else {
-						ipv6Addresses[netid] = ""
-					}
-				}
-				hostNetworkV1.IPv4Addresses = ipv4Addresses
-				hostNetworkV1.IPv6Addresses = ipv6Addresses
+	if completedHost.Network.PublicIPv4 == "" {
+		completedHost.Network.PublicIPv4 = ipv4
+	}
+	if completedHost.Network.PublicIPv6 == "" {
+		completedHost.Network.PublicIPv6 = ipv6
+	}
+	if len(completedHost.Network.NetworksByID) > 0 {
+		ipv4Addresses := map[string]string{}
+		ipv6Addresses := map[string]string{}
+		for netid, netname := range completedHost.Network.NetworksByID {
+			if ip, ok := addresses[ipversion.IPv4][netid]; ok {
+				ipv4Addresses[netid] = ip
+			} else if ip, ok := addresses[ipversion.IPv4][netname]; ok {
+				ipv4Addresses[netid] = ip
 			} else {
-				networksByID := map[string]string{}
-				ipv4Addresses := map[string]string{}
-				ipv6Addresses := map[string]string{}
-				for _, netid := range networks {
-					networksByID[netid] = ""
-
-					if ip, ok := addresses[ipversion.IPv4][netid]; ok {
-						ipv4Addresses[netid] = ip
-					} else {
-						ipv4Addresses[netid] = ""
-					}
-
-					if ip, ok := addresses[ipversion.IPv6][netid]; ok {
-						ipv6Addresses[netid] = ip
-					} else {
-						ipv6Addresses[netid] = ""
-					}
-				}
-				hostNetworkV1.NetworksByID = networksByID
-				// IPvxAddresses are here indexed by names... At least we have them...
-				hostNetworkV1.IPv4Addresses = ipv4Addresses
-				hostNetworkV1.IPv6Addresses = ipv6Addresses
+				ipv4Addresses[netid] = ""
 			}
 
-			// Updates network name and relationships if needed
-			for netid, netname := range hostNetworkV1.NetworksByID {
-				if netname == "" {
-					network, err := s.GetNetwork(netid)
-					if err != nil {
-						log.Errorf("failed to get network '%s'", netid)
-						errors = append(errors, err)
-						continue
-					}
-					hostNetworkV1.NetworksByID[netid] = network.Name
-					hostNetworkV1.NetworksByName[network.Name] = netid
-				}
+			if ip, ok := addresses[ipversion.IPv6][netid]; ok {
+				ipv6Addresses[netid] = ip
+			} else if ip, ok := addresses[ipversion.IPv6][netname]; ok {
+				ipv6Addresses[netid] = ip
+			} else {
+				ipv6Addresses[netid] = ""
+			}
+		}
+		completedHost.Network.IPv4Addresses = ipv4Addresses
+		completedHost.Network.IPv6Addresses = ipv6Addresses
+	} else {
+		networksByID := map[string]string{}
+		ipv4Addresses := map[string]string{}
+		ipv6Addresses := map[string]string{}
+		for _, netid := range networks {
+			networksByID[netid] = ""
+
+			if ip, ok := addresses[ipversion.IPv4][netid]; ok {
+				ipv4Addresses[netid] = ip
+			} else {
+				ipv4Addresses[netid] = ""
 			}
 
-			if len(errors) > 0 {
-				return scerr.ErrListError(errors)
+			if ip, ok := addresses[ipversion.IPv6][netid]; ok {
+				ipv6Addresses[netid] = ip
+			} else {
+				ipv6Addresses[netid] = ""
 			}
+		}
+		completedHost.Network.NetworksByID = networksByID
+		// IPvxAddresses are here indexed by names... At least we have them...
+		completedHost.Network.IPv4Addresses = ipv4Addresses
+		completedHost.Network.IPv6Addresses = ipv6Addresses
+	}
 
-			return nil
-		})
-	})
+	// Updates network name and relationships if needed
+	var errors []error
+	for netid, netname := range completedHost.Network.NetworksByID {
+		if netname == "" {
+			network, err := s.GetNetwork(netid)
+			if err != nil {
+				logrus.Errorf("failed to get network '%s'", netid)
+				errors = append(errors, err)
+				continue
+			}
+			completedHost.Network.NetworksByID[netid] = network.Name
+			completedHost.Network.NetworksByName[network.Name] = netid
+		}
+	}
+	if len(errors) > 0 {
+		return nil, scerr.ErrListError(errors)
+	}
+
+	return completedHost, nil
 }
 
 // collectAddresses converts adresses returned by the OpenStack driver
 // Returns string slice containing the name of the networks, string map of IP addresses
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s *Stack) collectAddresses(host *abstracts.Host) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
+func (s *Stack) collectAddresses(host *abstracts.HostCore) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
 	var (
 		networks      []string
 		addrs         = map[ipversion.Enum]map[string]string{}
@@ -852,13 +857,13 @@ func (s *Stack) collectAddresses(host *abstracts.Host) ([]string, map[ipversion.
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*abstracts.Host, error) {
+func (s *Stack) ListHosts(details bool) (abstracts.HostList, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
 	pager := servers.List(s.Stack.ComputeClient, servers.ListOpts{})
-	var hosts []*abstracts.Host
+	var hostList abstracts.HostList
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := servers.ExtractServers(page)
 		if err != nil {
@@ -866,20 +871,26 @@ func (s *Stack) ListHosts() ([]*abstracts.Host, error) {
 		}
 
 		for _, srv := range list {
-			h := abstracts.NewHost()
+			h := abstracts.NewHostCore()
 			h.ID = srv.ID
-			err := s.complementHost(h, &srv)
-			if err != nil {
-				return false, err
+			var ah *abstracts.HostFull
+			if details {
+				ah, err = s.complementHost(h, &srv)
+				if err != nil {
+					return false, err
+				}
+			} else {
+				ah = abstracts.NewHostFull()
+				ah.Core = h
 			}
-			hosts = append(hosts, h)
+			hostList = append(hostList, ah)
 		}
 		return true, nil
 	})
-	if len(hosts) == 0 && err != nil {
+	if len(hostList) == 0 && err != nil {
 		return nil, fmt.Errorf("error listing hosts: %s", openstack.ProviderErrorToString(err))
 	}
-	return hosts, nil
+	return hostList, nil
 }
 
 // DeleteHost deletes the host identified by id
@@ -953,7 +964,8 @@ func (s *Stack) DeleteHost(id string) error {
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
-					return abstracts.TimeoutError(fmt.Sprintf("host '%s' not deleted after %v", id, temporal.GetContextTimeout()), temporal.GetContextTimeout())
+					return scerr.Wrap(abstracts.ResourceTimeoutError("host", id, temporal.GetContextTimeout()),
+						fmt.Sprintf("host '%s' not deleted after %v", id, temporal.GetContextTimeout()))
 				}
 				return innerRetryErr
 			}
@@ -1004,7 +1016,7 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, err
 }
 
 // attachFloatingIP creates a Floating IP and attaches it to an host
-func (s *Stack) attachFloatingIP(host *abstracts.Host) (*FloatingIP, error) {
+func (s *Stack) attachFloatingIP(host *abstracts.HostCore) (*FloatingIP, error) {
 	fip, err := s.CreateFloatingIP()
 	if err != nil {
 		return nil, fmt.Errorf("failed to attach Floating IP on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
@@ -1022,7 +1034,7 @@ func (s *Stack) attachFloatingIP(host *abstracts.Host) (*FloatingIP, error) {
 }
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
-func (s *Stack) enableHostRouterMode(host *abstracts.Host) error {
+func (s *Stack) enableHostRouterMode(host *abstracts.HostFull) error {
 	var (
 		portID *string
 		err    error
@@ -1043,7 +1055,7 @@ func (s *Stack) enableHostRouterMode(host *abstracts.Host) error {
 		temporal.GetBigDelay(),
 	)
 	if retryErr != nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': %v", host.Name, retryErr)
+		return fmt.Errorf("failed to enable Router Mode on host '%s': %v", host.Core.Name, retryErr)
 	}
 
 	pairs := []ports.AddressPair{
@@ -1054,25 +1066,25 @@ func (s *Stack) enableHostRouterMode(host *abstracts.Host) error {
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
 	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Core.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
 
 // DisableHostRouterMode disables the host to act as a router/gateway.
-func (s *Stack) disableHostRouterMode(host *abstracts.Host) error {
+func (s *Stack) disableHostRouterMode(host *abstracts.HostFull) error {
 	portID, err := s.getOpenstackPortID(host)
 	if err != nil {
-		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Core.Name, openstack.ProviderErrorToString(err))
 	}
 	if portID == nil {
-		return fmt.Errorf("failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name)
+		return fmt.Errorf("failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Core.Name)
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Core.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -1087,11 +1099,11 @@ func (s *Stack) listInterfaces(hostID string) pagination.Pager {
 
 // getOpenstackPortID returns the port ID corresponding to the first private IP address of the host
 // returns nil,nil if not found
-func (s *Stack) getOpenstackPortID(host *abstracts.Host) (*string, error) {
-	ip := host.GetPrivateIP()
+func (s *Stack) getOpenstackPortID(host *abstracts.HostFull) (*string, error) {
+	ip := host.Network.IPv4Addresses[host.Network.DefaultNetworkID]
 	found := false
 	nic := nics.Interface{}
-	pager := s.listInterfaces(host.ID)
+	pager := s.listInterfaces(host.Core.ID)
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := nics.ExtractInterfaces(page)
 		if err != nil {
@@ -1109,16 +1121,16 @@ func (s *Stack) getOpenstackPortID(host *abstracts.Host) (*string, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error browsing Openstack Interfaces of host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("error browsing Openstack Interfaces of host '%s': %s", host.Core.Name, openstack.ProviderErrorToString(err))
 	}
 	if found {
 		return &nic.PortID, nil
 	}
-	return nil, abstracts.ResourceNotFoundError("Port ID corresponding to host", host.Name)
+	return nil, abstracts.ResourceNotFoundError("Port ID corresponding to host", host.Core.Name)
 }
 
-// toHostSize converts flavor attributes returned by OpenStack driver into abstracts.hostproperty.v1.HostSize
-func (s *Stack) toHostSize(flavor map[string]interface{}) *propertiesv1.HostSize {
+// toHostSizing converts flavor attributes returned by OpenStack driver into abstracts.HostEffectiveSizing
+func (s *Stack) toHostSizing(flavor map[string]interface{}) *abstracts.HostEffectiveSizing {
 	if i, ok := flavor["id"]; ok {
 		fid, ok := i.(string)
 		if !ok {
@@ -1128,16 +1140,16 @@ func (s *Stack) toHostSize(flavor map[string]interface{}) *propertiesv1.HostSize
 		if err != nil {
 			return nil
 		}
-		return converters.ModelHostTemplateToPropertyHostSize(tpl)
+		return converters.HostTemplateToHostEffectiveSizing(tpl)
 	}
-	hostSize := propertiesv1.NewHostSize()
+	hostSizing := &abstracts.HostEffectiveSizing{}
 	if _, ok := flavor["vcpus"]; ok {
-		hostSize.Cores, _ = flavor["vcpus"].(int)
-		hostSize.DiskSize, _ = flavor["disk"].(int)
-		hostSize.RAMSize, _ = flavor["ram"].(float32)
-		hostSize.RAMSize /= 1000.0
+		hostSizing.Cores, _ = flavor["vcpus"].(int)
+		hostSizing.DiskSize, _ = flavor["disk"].(int)
+		hostSizing.RAMSize, _ = flavor["ram"].(float32)
+		hostSizing.RAMSize /= 1000.0
 	}
-	return hostSize
+	return hostSizing
 }
 
 // toHostState converts host status returned by FlexibleEngine driver into HostState enum
@@ -1158,27 +1170,44 @@ func toHostState(status string) hoststate.Enum {
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstracts.Host; any other type will return an utils.ErrInvalidParameter.
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstracts.Host, error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstracts.HostCore, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	var (
-		host        *abstracts.Host
-		hostInError bool
-		err         error
-	)
+	var host *abstracts.HostCore
+	switch hostParam := hostParam.(type) {
+	case string:
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be empty string")
+		}
+		host = abstracts.NewHostCore()
+		host.ID = hostParam
+	case *abstracts.HostCore:
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "canot be nil")
+		}
+		host = hostParam
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a non-empty string or a *abstracts.HostCore")
+	}
+	hostRef := host.Name
+	if hostRef == "" {
+		hostRef = host.ID
+	}
+
+	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			host, err = s.InspectHost(hostParam)
-			if err != nil {
-				return err
+			hostTmp, innerErr := s.InspectHost(hostRef)
+			if innerErr != nil {
+				return innerErr
 			}
-			if host.LastState == hoststate.ERROR {
-				hostInError = true
-				return nil
+			if hostTmp.Core.LastState == hoststate.ERROR {
+				return retry.StopRetryError(fmt.Sprintf("host '%s' in error state", hostRef), nil)
 			}
+			host = hostTmp.Core
 			if host.LastState != hoststate.STARTED {
 				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
 			}
@@ -1188,23 +1217,13 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*ab
 		timeout,
 	)
 	if retryErr != nil {
-		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			msg := "timeout waiting to get host"
-			if host != nil {
-				msg += fmt.Sprintf(" '%s'", host.Name)
-			}
-			msg += fmt.Sprintf("information after %v", timeout)
-			if err != nil {
-				msg += fmt.Sprintf(": %v", err)
-			}
-			return nil, abstracts.TimeoutError(msg, timeout)
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return nil, abstracts.ResourceNotAvailableError("host", "hostRef")
+		case *retry.ErrTimeout:
+			return host, abstracts.ResourceTimeoutError("host", hostRef, timeout)
 		}
-		return nil, retryErr
+		return host, retryErr
 	}
-	// If hoste state is ERROR, returns the error
-	if hostInError {
-		return nil, abstracts.ResourceNotAvailableError("host", "")
-	}
-
-	return host, err
+	return host, nil
 }

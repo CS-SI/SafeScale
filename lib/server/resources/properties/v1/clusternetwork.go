@@ -33,19 +33,14 @@ type ClusterNetwork struct {
 	CIDR      string `json:"cidr"`       // the network CIDR
 }
 
-func newNetwork() *ClusterNetwork {
+func newClusterNetwork() *ClusterNetwork {
 	return &ClusterNetwork{}
 }
-
-// // Content ... (data.Clonable interface)
-// func (n *ClusterNetwork) Content() interface{} {
-// 	return n
-// }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (n *ClusterNetwork) Clone() data.Clonable {
-	return newNetwork().Replace(n)
+	return newClusterNetwork().Replace(n)
 }
 
 // Replace ...

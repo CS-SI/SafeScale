@@ -19,6 +19,7 @@ package flavors
 import (
 	rice "github.com/GeertJohan/go.rice"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
@@ -26,29 +27,28 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
-
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers      func(task concurrency.Task, c resources.Cluster) (uint, uint, uint, error)   // returns masterCount, privateNodeCount, publicNodeCount
-	DefaultGatewaySizing        func(task concurrency.Task, c resources.Cluster) abstracts.SizingRequirements // sizing of Gateway(s)
-	DefaultMasterSizing         func(task concurrency.Task, c resources.Cluster) abstracts.SizingRequirements // default sizing of master(s)
-	DefaultNodeSizing           func(task concurrency.Task, c resources.Cluster) abstracts.SizingRequirements // default sizing of node(s)
-	DefaultImage                func(task concurrency.Task, c resources.Cluster) string                      // default image of server(s)
+	MinimumRequiredServers      func(task concurrency.Task, c resources.Cluster) (uint, uint, uint, error)        // returns masterCount, privateNodeCount, publicNodeCount
+	DefaultGatewaySizing        func(task concurrency.Task, c resources.Cluster) abstracts.HostSizingRequirements // sizing of Gateway(s)
+	DefaultMasterSizing         func(task concurrency.Task, c resources.Cluster) abstracts.HostSizingRequirements // default sizing of master(s)
+	DefaultNodeSizing           func(task concurrency.Task, c resources.Cluster) abstracts.HostSizingRequirements // default sizing of node(s)
+	DefaultImage                func(task concurrency.Task, c resources.Cluster) string                           // default image of server(s)
 	GetNodeInstallationScript   func(task concurrency.Task, c resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map)
 	GetGlobalSystemRequirements func(task concurrency.Task, c resources.Cluster) (string, error)
 	GetTemplateBox              func() (*rice.Box, error)
 	ConfigureGateway            func(task concurrency.Task, c resources.Cluster) error
 	CreateMaster                func(task concurrency.Task, c resources.Cluster, index uint) error
-	ConfigureMaster             func(task concurrency.Task, c resources.Cluster, index uint, host *abstracts.Host) error
-	UnconfigureMaster           func(task concurrency.Task, c resources.Cluster, pbHost *abstracts.Host) error
-	CreateNode                  func(task concurrency.Task, c resources.Cluster, index uint, host *abstracts.Host) error
-	ConfigureNode               func(task concurrency.Task, c resources.Cluster, index uint, host *abstracts.Host) error
-	UnconfigureNode             func(task concurrency.Task, c resources.Cluster, host *abstracts.Host, selectedMasterID string) error
+	ConfigureMaster             func(task concurrency.Task, c resources.Cluster, index uint, host resources.Host) error
+	UnconfigureMaster           func(task concurrency.Task, c resources.Cluster, host resources.Host) error
+	CreateNode                  func(task concurrency.Task, c resources.Cluster, index uint, host resources.Host) error
+	ConfigureNode               func(task concurrency.Task, c resources.Cluster, index uint, host resources.Host) error
+	UnconfigureNode             func(task concurrency.Task, c resources.Cluster, host resources.Host, selectedMaster resources.Host) error
 	ConfigureCluster            func(task concurrency.Task, c resources.Cluster) error
 	UnconfigureCluster          func(task concurrency.Task, c resources.Cluster) error
-	JoinMasterToCluster         func(task concurrency.Task, c resources.Cluster, host *abstracts.Host) error
-	JoinNodeToCluster           func(task concurrency.Task, c resources.Cluster, host *abstracts.Host) error
-	LeaveMasterFromCluster      func(task concurrency.Task, c resources.Cluster, host *abstracts.Host) error
-	LeaveNodeFromCluster        func(task concurrency.Task, c resources.Cluster, host *abstracts.Host, selectedMaster string) error
+	JoinMasterToCluster         func(task concurrency.Task, c resources.Cluster, host resources.Host) error
+	JoinNodeToCluster           func(task concurrency.Task, c resources.Cluster, host resources.Host) error
+	LeaveMasterFromCluster      func(task concurrency.Task, c resources.Cluster, host resources.Host) error
+	LeaveNodeFromCluster        func(task concurrency.Task, c resources.Cluster, host resources.Host, selectedMaster resources.Host) error
 	GetState                    func(task concurrency.Task, c resources.Cluster) (clusterstate.Enum, error)
 }

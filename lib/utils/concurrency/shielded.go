@@ -69,7 +69,7 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 		return scerr.InvalidParameterError("inspector", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
+		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
 	err = d.lock.RLock(task)
@@ -106,7 +106,7 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 // 	return &protector{shielded: d, readLock: false}, nil
 // }
 
-// Alter allows to update a clonable using a write lock
+// Alter allows to update a cloneable using a write lock
 func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) (err error) {
 	if d == nil {
 		return scerr.InvalidInstanceError()

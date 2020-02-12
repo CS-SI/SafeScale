@@ -21,7 +21,7 @@ type Enum string
 
 const (
 	// DescriptionV1 specifies optional additional info describing volume (purpose, ...)
-	DescriptionV1 Enum = "1"
+	DescriptionV1 = "1"
 	// AttachedV1 contains additional information about hosts attaching the volume
-	AttachedV1 Enum = "2"
+	AttachedV1 = "2"
 )

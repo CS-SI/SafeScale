@@ -22,33 +22,33 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Composite ...
-type Composite struct {
+// ClusterComposite ...
+type ClusterComposite struct {
 	// Array of tenants hosting a multu-tenant cluster (multi starting from 1)
 	Tenants []string `json:"tenants"`
 }
 
-func newComposite() *Composite {
-	return &Composite{
+func newClusterComposite() *ClusterComposite {
+	return &ClusterComposite{
 		Tenants: []string{},
 	}
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (c *Composite) Clone() data.Clonable {
-	return newComposite().Replace(c)
+func (c *ClusterComposite) Clone() data.Clonable {
+	return newClusterComposite().Replace(c)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (c *Composite) Replace(p data.Clonable) data.Clonable {
-	src := p.(*Composite)
+func (c *ClusterComposite) Replace(p data.Clonable) data.Clonable {
+	src := p.(*ClusterComposite)
 	c.Tenants = make([]string, len(src.Tenants))
 	copy(c.Tenants, src.Tenants)
 	return c
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.CompositeV1, newComposite())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.CompositeV1, newClusterComposite())
 }

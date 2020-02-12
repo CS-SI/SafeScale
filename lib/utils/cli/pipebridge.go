@@ -82,7 +82,7 @@ type PipeBridgeController struct {
 	bridges      []PipeBridge
 	displayTask  concurrency.Task
 	displayCh    chan outputItem
-	readersGroup concurrency.Task
+	readersGroup concurrency.TaskGroup
 }
 
 // NewPipeBridgeController creates a new controller of bridges of pipe
@@ -127,7 +127,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) error {
 	var err error
 
 	// First starts the "displayer" routine...
-	pbc.displayTask, err = concurrency.NewTask()
+	pbc.displayTask, err = concurrency.NewTaskWithParent(task)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) error {
 		return err
 	}
 	for _, v := range pbc.bridges {
-		_, err = taskGroup.Start(taskRead, data.Map{
+		_, err = taskGroup.(concurrency.Task).Start(taskRead, data.Map{
 			"bridge":    v,
 			"displayCh": pbc.displayCh,
 		})
@@ -250,7 +250,7 @@ func (pbc *PipeBridgeController) Wait() error {
 	if pbc.readersGroup == nil {
 		return scerr.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
-	_, err := pbc.readersGroup.Wait()
+	_, err := pbc.readersGroup.WaitGroup()
 	close(pbc.displayCh)
 	if err != nil {
 		return err
@@ -273,7 +273,7 @@ func (pbc *PipeBridgeController) Stop() error {
 	}
 
 	// Try to wait the end of the task group
-	ok, _, err := pbc.readersGroup.TryWait()
+	ok, _, err := pbc.readersGroup.TryWaitGroup()
 	if err != nil {
 		return err
 	}

@@ -43,4 +43,6 @@ const (
 	NetworkV2 = "10"
 	// NodesV2 contains optional additional info describing Nodes inside the cluster
 	NodesV2 = "11"
+	// ControlPlaneV1 contains optional additional info describing control plane settings inside the cluster
+	ControlPlaneV1 = "12"
 )

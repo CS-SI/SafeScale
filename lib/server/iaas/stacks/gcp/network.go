@@ -429,7 +429,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (_ *abstracts.Host, _ *abstracts.HostTemplate, _ *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (_ *abstracts.HostFull, _ *abstracts.HostTemplate, _ *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
@@ -484,26 +484,26 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstracts.VIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*abstracts.VirtualIP, error) {
 	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *abstracts.VIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
 	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstracts.VIP, host *abstracts.Host) (string, string, error) {
-	return "", "", scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) error {
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstracts.VIP, host *abstracts.Host) error {
+func (s *Stack) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error {
 	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstracts.VIP) error {
+func (s *Stack) DeleteVIP(vip *abstracts.VirtualIP) error {
 	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
