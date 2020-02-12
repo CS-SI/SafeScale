@@ -41,5 +41,10 @@ make install
 [ $? -ne 0 ] && echo "Install failure" && return 1
 
 echo "Export"
-CIBIN=/export make installci
+export CIBIN=/exported
+mkdir -p /exported
+
+CIBIN=/exported make installci
 [ $? -ne 0 ] && echo "Export failure" && return 1
+
+return 0
