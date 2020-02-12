@@ -24,10 +24,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -148,7 +148,7 @@ func UseService(tenantName string) (newService Service, err error) {
 		if err != nil {
 			return nil, fmt.Errorf("error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
-		serviceCfg, err := providerInstance.GetConfigurationOptions()
+		serviceCfg, err := providerInstance.ConfigurationOptions()
 		if err != nil {
 			return nil, err
 		}
@@ -302,7 +302,7 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 		if err != nil {
 			return nil, fmt.Errorf("error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
-		serviceCfg, err := providerInstance.GetConfigurationOptions()
+		serviceCfg, err := providerInstance.ConfigurationOptions()
 		if err != nil {
 			return nil, err
 		}

@@ -107,7 +107,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		task:        task,
 		cancel:      cancel,
 		service:     svc,
-		tenant:      svc.GetName(),
+		tenant:      svc.Name(),
 		startTime:   time.Now(),
 	}
 	err = register(&nj)

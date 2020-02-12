@@ -483,7 +483,7 @@ func (s *Stack) CreateHost(request abstracts.HostRequest) (host *abstracts.HostF
 			host.Core.ID = server.ID
 
 			// Wait that host is ready, not just that the build is started
-			host, err = s.WaitHostReady(host, temporal.GetHostTimeout())
+			host.Core, err = s.WaitHostReady(host, temporal.GetHostTimeout())
 			if err != nil {
 				switch err.(type) {
 				case *scerr.ErrNotAvailable:
