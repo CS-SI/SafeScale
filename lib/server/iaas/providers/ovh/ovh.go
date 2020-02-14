@@ -232,6 +232,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
+	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("AlternateApiConsumerKey", alternateAPIApplicationKey)
 	cfg.Set("AlternateApiApplicationSecret", alternateAPIApplicationSecret)
 	cfg.Set("AlternateApiConsumerKey", alternateAPIConsumerKey)

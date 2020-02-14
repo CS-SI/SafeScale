@@ -25,9 +25,11 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var clientRPCUUID uuid.UUID
-var uuidSet bool
-var mutexContextManager sync.Mutex
+var (
+	clientRPCUUID uuid.UUID
+	uuidSet bool
+	mutexContextManager sync.Mutex
+)
 
 //--------------------- CLIENT ---------------------------------
 

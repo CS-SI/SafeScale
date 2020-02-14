@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -64,20 +65,6 @@ func GetTenants() ([]interface{}, error) {
 		return nil, err
 	}
 	return tenants, err
-}
-
-// UseStorages return the storageService build around storages referenced in tenantNames
-func UseStorages(tenantNames []string) (*StorageServices, error) {
-	storageServices := NewStorageService()
-
-	for _, tenantName := range tenantNames {
-		err := storageServices.RegisterStorage(tenantName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register storage tenant %s : %s", tenantName, err.Error())
-		}
-	}
-
-	return &storageServices, nil
 }
 
 // UseService return the service referenced by the given name.
@@ -169,9 +156,16 @@ func UseService(tenantName string) (newService Service, err error) {
 		}
 
 		// Initializes Object Storage
-		var objectStorageLocation objectstorage.Location
+		var (
+			objectStorageLocation objectstorage.Location
+			authOpts providers.Config
+		)
 		if tenantObjectStorageFound {
-			objectStorageConfig, err := initObjectStorageLocationConfig(tenant)
+			authOpts, err = providerInstance.GetAuthenticationOptions()
+			if err != nil {
+				return nil, err
+			}
+			objectStorageConfig, err := initObjectStorageLocationConfig(authOpts, tenant)
 			if err != nil {
 				return nil, err
 			}
@@ -189,8 +183,8 @@ func UseService(tenantName string) (newService Service, err error) {
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			// FIXME This requires tunning too
-			metadataLocationConfig, err := initMetadataLocationConfig(tenant)
+			// FIXME: This requires tuning too
+			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, tenant)
 			if err != nil {
 				return nil, err
 			}
@@ -290,8 +284,9 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 	return nil
 }
 
+
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
-func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -310,7 +305,9 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 			if config.Domain, ok = compute["Domain"].(string); !ok {
 				if config.Domain, ok = compute["DomainName"].(string); !ok {
 					if config.Domain, ok = identity["Domain"].(string); !ok {
-						config.Domain, _ = identity["DomainName"].(string)
+						if config.Domain, ok = identity["DomainName"].(string); !ok {
+							config.Domain = authOpts.GetString("DomainName")
+						}
 					}
 				}
 			}
@@ -322,7 +319,9 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 		if config.Tenant, ok = ostorage["ProjectName"].(string); !ok {
 			if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
 				if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-					config.Tenant, _ = compute["ProjectID"].(string)
+					if config.Tenant, ok = compute["ProjectID"].(string); !ok {
+						config.Tenant = authOpts.GetString("ProjectName")
+					}
 				}
 			}
 		}
@@ -365,7 +364,7 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
 	}
 
-	// FIXME Remove google custom code
+	// FIXME: Remove google custom code
 	if config.Type == "google" {
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
@@ -400,7 +399,7 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -424,7 +423,9 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 					if config.Domain, ok = compute["Domain"].(string); !ok {
 						if config.Domain, ok = compute["DomainName"].(string); !ok {
 							if config.Domain, ok = identity["Domain"].(string); !ok {
-								config.Domain, _ = identity["DomainName"].(string)
+								if config.Domain, ok = identity["DomainName"].(string); !ok {
+									config.Domain = authOpts.GetString("DomainName")
+								}
 							}
 						}
 					}
