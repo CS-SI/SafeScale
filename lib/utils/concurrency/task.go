@@ -274,16 +274,18 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// Abort signal received
 				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
-				t.status = ABORTED
-				t.err = scerr.AbortedError("", nil)
+				if t.status != TIMEOUT {
+					t.status = ABORTED
+					t.err = scerr.AbortedError("", nil)
+				}
 				t.lock.Unlock()
 				finish = true
 			case <-time.After(timeout):
 				t.lock.Lock()
 				t.status = TIMEOUT
 				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+				t.abortCh <- true
 				t.lock.Unlock()
-				finish = true
 			}
 		}
 	} else {
@@ -294,8 +296,6 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// tracer.Trace("receiving signal from context, aborting task...")
 				t.abortCh <- true
 			case <-t.doneCh:
-				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
-				// tracer.Trace("receiving done signal from go routine")
 				t.lock.Lock()
 				t.status = DONE
 				t.lock.Unlock()
