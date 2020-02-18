@@ -1,16 +1,17 @@
 package propertiesv2
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNetwork_Clone(t *testing.T) {
-	ct := newNetwork()
+	ct := newClusterNetwork()
 	ct.GatewayID = "None"
 
-	clonedCt, ok := ct.Clone().(*Network)
+	clonedCt, ok := ct.Clone().(*ClusterNetwork)
 	if !ok {
 		t.Fail()
 	}

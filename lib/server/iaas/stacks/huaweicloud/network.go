@@ -35,7 +35,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -186,7 +186,7 @@ func (s *Stack) DeleteVPC(id string) error {
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (network *abstracts.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -232,7 +232,7 @@ func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (network *abstracts.
 		}
 	}()
 
-	network = abstracts.NewNetwork()
+	network = abstract.NewNetwork()
 	network.ID = subnet.ID
 	network.Name = subnet.Name
 	network.CIDR = subnet.CIDR
@@ -242,7 +242,7 @@ func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (network *abstracts.
 }
 
 // validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
-func validateNetworkName(req abstracts.NetworkRequest) (bool, error) {
+func validateNetworkName(req abstract.NetworkRequest) (bool, error) {
 	s := check.Struct{
 		"Name": check.Composite{
 			check.NonEmpty{},
@@ -264,7 +264,7 @@ func validateNetworkName(req abstracts.NetworkRequest) (bool, error) {
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstracts.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -279,7 +279,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstracts.Network, error) {
 	})
 	if r.Err != nil {
 		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
-			return nil, abstracts.ResourceForbiddenError("network", name)
+			return nil, abstract.ResourceForbiddenError("network", name)
 		}
 		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
 	}
@@ -295,11 +295,11 @@ func (s *Stack) GetNetworkByName(name string) (*abstracts.Network, error) {
 		}
 		return s.GetNetwork(id)
 	}
-	return nil, abstracts.ResourceNotFoundError("network", name)
+	return nil, abstract.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*abstracts.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 	subnet, err := s.getSubnet(id)
 	if err != nil {
 		spew.Dump(err)
@@ -308,10 +308,10 @@ func (s *Stack) GetNetwork(id string) (*abstracts.Network, error) {
 		}
 	}
 	if subnet == nil || subnet.ID == "" {
-		return nil, abstracts.ResourceNotFoundError("subnet", id)
+		return nil, abstract.ResourceNotFoundError("subnet", id)
 	}
 
-	newNet := abstracts.NewNetwork()
+	newNet := abstract.NewNetwork()
 	newNet.ID = subnet.ID
 	newNet.Name = subnet.Name
 	newNet.CIDR = subnet.CIDR
@@ -320,14 +320,14 @@ func (s *Stack) GetNetwork(id string) (*abstracts.Network, error) {
 }
 
 // ListNetworks lists networks
-func (s *Stack) ListNetworks() ([]*abstracts.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	subnetList, err := s.listSubnets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get networks list: %s", openstack.ProviderErrorToString(err))
 	}
-	var networkList []*abstracts.Network
+	var networkList []*abstract.Network
 	for _, subnet := range *subnetList {
-		newNet := abstracts.NewNetwork()
+		newNet := abstract.NewNetwork()
 		newNet.ID = subnet.ID
 		newNet.Name = subnet.Name
 		newNet.CIDR = subnet.CIDR
@@ -626,7 +626,7 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 		}
 	}
 	if !found {
-		return nil, abstracts.ResourceNotFoundError("subnet", name)
+		return nil, abstract.ResourceNotFoundError("subnet", name)
 	}
 	return &subnet, nil
 }
@@ -644,7 +644,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (*abstracts.HostFull, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -660,12 +660,12 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (*abstracts.HostFull
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gwname), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	hostReq := abstracts.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*abstracts.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 	}
 	host, userData, err := s.CreateHost(hostReq)
@@ -687,7 +687,7 @@ func (s *Stack) DeleteGateway(id string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -700,7 +700,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VirtualIP, 
 	if err != nil {
 		return nil, err
 	}
-	vip := abstracts.VirtualIP{
+	vip := abstract.VirtualIP{
 		ID:        port.ID,
 		Name:      name,
 		NetworkID: networkID,

@@ -27,7 +27,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -59,7 +59,7 @@ var shareCreate = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: abstracts.DefaultShareExportedPath,
+			Value: abstract.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
 		cli.BoolFlag{
@@ -197,7 +197,7 @@ var shareMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: abstracts.DefaultShareMountPath,
+			Value: abstract.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
 		cli.BoolFlag{

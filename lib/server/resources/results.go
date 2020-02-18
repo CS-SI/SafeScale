@@ -35,13 +35,13 @@ type UnitResults interface {
 
 // Results ...
 type Results interface {
-	Add(string, UnitResults) err
-	AddUnit(string, string, UnitResult) err
+	Add(string, UnitResults) error
+	AddUnit(string, string, UnitResult) error
 	Successful() bool
 	AllErrorMessages() string
 	ErrorMessagesOfUnit(name string) string
 	ErrorMessagesOfKey(name string) string
-	ResultsOfKey(key string) resources.UnitResults
+	ResultsOfKey(key string) UnitResults
 	// ResultsOfUnit(unitKey string) UnitResults
 	Keys() []string
 }

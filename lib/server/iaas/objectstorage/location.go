@@ -102,8 +102,8 @@ func (l *location) connect() error {
 	return err
 }
 
-// GetType returns the type of ObjectStorage
-func (l location) GetType() string {
+// ObjectStorageProtocol returns the type of ObjectStorage
+func (l location) ObjectStorageProtocol() string {
 	return l.config.Type
 }
 
@@ -165,7 +165,7 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 }
 
 // GetBucket ...
-func (l *location) GetBucket(bucketName string) (Bucket, error) {
+func (l *location) Bucket(bucketName string) (Bucket, error) {
 	if l == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -227,8 +227,8 @@ func (l *location) DeleteBucket(bucketName string) error {
 	return nil
 }
 
-// GetObject ...
-func (l *location) GetObject(bucketName string, objectName string) (Object, error) {
+// Object ...
+func (l *location) Object(bucketName string, objectName string) (Object, error) {
 	if l == nil {
 		return nil, scerr.InvalidInstanceError()
 	}

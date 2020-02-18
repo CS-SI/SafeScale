@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package factory
+package volume
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/volumes"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -29,7 +29,7 @@ func New(svc iaas.Service) (resources.Volume, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
-	return volumes.New(svc)
+	return operations.New(svc)
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
@@ -47,7 +47,7 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Volu
 	//FIXME: tracer...
 	// defer scerr.OnPanic(&err)()
 
-	objv, err := volumes.New(svc)
+	objv, err := operations.New(svc)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,7 @@ import (
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
 
 // provider is the provider implementation of the local provider
@@ -95,12 +95,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	compute, _ := params["compute"].(map[string]interface{})
 
-	operatorUsername := abstracts.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstracts.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 	config.OperatorUsername = operatorUsername
@@ -142,14 +142,14 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 // GetAuthOpts returns authentication options as a Config
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
-	cfg := abstracts.ConfigMap{}
+	cfg := abstract.ConfigMap{}
 	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
-	config := abstracts.ConfigMap{}
+	config := abstract.ConfigMap{}
 
 	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
 	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
@@ -165,12 +165,12 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates ...
-func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	return p.Stack.ListTemplates()
 }
 

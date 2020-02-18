@@ -21,12 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	conv "github.com/CS-SI/SafeScale/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
-
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
@@ -188,7 +186,7 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	sshCfg := conv.ToSystemSSHConfig(pbSSHCfg)
+	sshCfg := converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
 	// if err == nil {
 	// 	nerr := sshCfgCache.Set(name, sshCfg)
 	// 	if nerr != nil {

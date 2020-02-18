@@ -18,21 +18,14 @@ package handlers
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers NetworkAPI
@@ -64,7 +57,7 @@ func NewNetworkHandler(job server.Job) NetworkHandler {
 // Create creates a network
 func (handler *networkHandler) Create(
 	name string, cidr string, ipVersion ipversion.Enum,
-	sizing abstracts.SizingRequirements, theos string, gwname string,
+	sizing abstract.SizingRequirements, theos string, gwname string,
 	failover bool,
 ) (network resources.Network, err error) {
 
@@ -94,7 +87,7 @@ func (handler *networkHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	req := abstracts.NetworkRequest{
+	req := abstract.NetworkRequest{
 		Name:      name,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
@@ -107,7 +100,7 @@ func (handler *networkHandler) Create(
 }
 
 // List returns the network list
-func (handler *networkHandler) List(all bool) (netList []*abstracts.Network, err error) {
+func (handler *networkHandler) List(all bool) (netList []*abstract.Network, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -125,7 +118,7 @@ func (handler *networkHandler) List(all bool) (netList []*abstracts.Network, err
 		return nil, err
 	}
 
-	err = objn.Browse(task, func(rn *abstracts.Network) error {
+	err = objn.Browse(task, func(rn *abstract.Network) error {
 		netList = append(netList, rn)
 		return nil
 	})

@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -94,7 +95,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, conv.ToProtocolVolume(&volume))
+		pbvolumes = append(pbvolumes, converters.VolumeFromAbstractToProtocol(&volume))
 	}
 	rv := &protocol.VolumeList{Volumes: pbvolumes}
 	return rv, nil
@@ -145,7 +146,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefiniti
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return conv.ToProtocolVolume(vol), nil
+	return converters.VolumeFromAbstractsToProtocol(vol), nil
 }
 
 // Attach a volume to an host and create a mount point
@@ -174,7 +175,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		}
 	}
 
-	volumeRef := srvutils.GetReference(in.GetVolume())
+	volumeRef := srvutils.GetReference(in.Volume())
 	if volumeRef == "" {
 		return empty, scerr.InvalidRequestError("neither name nor id given as reference for volume")
 	}
@@ -239,7 +240,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 		}
 	}
 
-	volumeRef := srvutils.GetReference(in.GetVolume())
+	volumeRef := srvutils.GetReference(in.Volume())
 	if volumeRef == "" {
 		return empty, scerr.InvalidRequestError("neither name nor id given as reference for volume")
 	}
@@ -369,5 +370,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, scerr.NotFoundError(fmt.Sprintf("volume '%s' not found", ref))
 	}
 
-	return conv.ToProtocolVolumeInfo(volume, mounts), nil
+	return conv.VolumeInfoFromAbstractsToProtocol(volume, mounts), nil
 }

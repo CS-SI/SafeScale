@@ -132,7 +132,7 @@ func Test_GetKeyPair(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.GetKeyPair(t)
+	tt.KeyPair(t)
 }
 
 func Test_ListKeyPairs(t *testing.T) {

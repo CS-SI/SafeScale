@@ -30,7 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -67,7 +67,7 @@ type Subnet struct {
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (newNet *abstracts.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -120,7 +120,7 @@ func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (newNet *abstracts.N
 		}
 	}()
 
-	newNet = abstracts.NewNetwork()
+	newNet = abstract.NewNetwork()
 	newNet.ID = network.ID
 	newNet.Name = network.Name
 	newNet.CIDR = subnet.Mask
@@ -129,7 +129,7 @@ func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (newNet *abstracts.N
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstracts.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -146,7 +146,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstracts.Network, error) {
 	})
 	if r.Err != nil {
 		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
-			return nil, abstracts.ResourceForbiddenError("network", name)
+			return nil, abstract.ResourceForbiddenError("network", name)
 		}
 		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
 	}
@@ -162,11 +162,11 @@ func (s *Stack) GetNetworkByName(name string) (*abstracts.Network, error) {
 		}
 		return s.GetNetwork(id)
 	}
-	return nil, abstracts.ResourceNotFoundError("network", name)
+	return nil, abstract.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*abstracts.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -197,7 +197,7 @@ func (s *Stack) GetNetwork(id string) (*abstracts.Network, error) {
 		// if err != nil {
 		// 	return nil, fmt.Errorf("bad configuration, no gateway associated to this network")
 		// }
-		newNet := abstracts.NewNetwork()
+		newNet := abstract.NewNetwork()
 		newNet.ID = network.ID
 		newNet.Name = network.Name
 		newNet.CIDR = sn.Mask
@@ -207,13 +207,13 @@ func (s *Stack) GetNetwork(id string) (*abstracts.Network, error) {
 	}
 
 	// At this point, no network has been found with given reference
-	errNotFound := abstracts.ResourceNotFoundError("network(GetNetwork)", id)
+	errNotFound := abstract.ResourceNotFoundError("network(GetNetwork)", id)
 	logrus.Debug(errNotFound)
 	return nil, errNotFound
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstracts.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -221,7 +221,7 @@ func (s *Stack) ListNetworks() ([]*abstracts.Network, error) {
 	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
-	var netList []*abstracts.Network
+	var netList []*abstract.Network
 	pager := networks.List(s.NetworkClient, networks.ListOpts{})
 	err := pager.EachPage(
 		func(page pagination.Page) (bool, error) {
@@ -243,7 +243,7 @@ func (s *Stack) ListNetworks() ([]*abstracts.Network, error) {
 				}
 				sn := sns[0]
 
-				newNet := abstracts.NewNetwork()
+				newNet := abstract.NewNetwork()
 				newNet.ID = n.ID
 				newNet.Name = n.Name
 				newNet.CIDR = sn.Mask
@@ -317,7 +317,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.HostFull, userData *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostFull, userData *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -340,12 +340,12 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (host *abstracts.Hos
 	if err != nil {
 		return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
 	}
-	hostReq := abstracts.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*abstracts.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 		Password:     password,
 	}
@@ -641,7 +641,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				case "SubnetInUse":
 					msg := fmt.Sprintf("hosts or services are still attached")
 					logrus.Warnf(utils.Capitalize(msg))
-					return abstracts.ResourceNotAvailableError("subnet", id)
+					return abstract.ResourceNotAvailableError("subnet", id)
 				default:
 					logrus.Debugf("NeutronError: type = %s", neutronError["type"])
 				}
@@ -663,7 +663,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				if _, ok := err.(*scerr.ErrNotAvailable); ok {
 					return err
 				}
-				return abstracts.ResourceTimeoutError("network", id, temporal.GetContextTimeout())
+				return abstract.ResourceTimeoutError("network", id, temporal.GetContextTimeout())
 			}
 		}
 		return fmt.Errorf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), retryErr)
@@ -782,7 +782,7 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -799,7 +799,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VirtualIP, 
 	if err != nil {
 		return nil, err
 	}
-	vip := abstracts.VirtualIP{
+	vip := abstract.VirtualIP{
 		ID:        port.ID,
 		PrivateIP: port.FixedIPs[0].IPAddress,
 	}
@@ -807,7 +807,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstracts.VirtualIP, 
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -816,27 +816,27 @@ func (s *Stack) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) error {
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (string, string, error) {
 	if s == nil {
-		return scerr.InvalidInstanceError()
+		return "", "", scerr.InvalidInstanceError()
 	}
 	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
+		return "", "", scerr.InvalidParameterError("vip", "cannot be nil")
 	}
 	if hostID == "" {
-		return scerr.InvalidParameterError("host", "cannot be empty string")
+		return "", "", scerr.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	hostPorts, err := s.listPorts(ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	addressPair := ports.AddressPair{
 		MACAddress: vipPort.MACAddress,
@@ -846,14 +846,14 @@ func (s *Stack) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) error {
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
 		_, err = ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
 		if err != nil {
-			return err
+			return "", "", err
 		}
 	}
-	return nil
+	return vip.PrivateIP, "", nil
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error {
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -891,7 +891,7 @@ func (s *Stack) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstracts.VirtualIP) error {
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}

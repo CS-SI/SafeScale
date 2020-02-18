@@ -19,12 +19,13 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -63,7 +64,14 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 		}
 	}
 
-	host := in.GetHost().GetName()
+	hostRef := in.GetHost().Name()
+	if hostRef == "" {
+		hostRef = in.GetHost().ID()
+	}
+	if hostRef == "" {
+		return nil, scerr.InvalidParameterError("in.Host", "host reference is missing")
+	}
+
 	command := in.GetCommand()
 
 	job, err := PrepareJob(ctx, "", "ssh run")
@@ -72,13 +80,17 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', <command>)", host), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', <command>)", hostRef), true).WithStopwatch().GoingIn()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := handlers.NewSSHHandler(job)
-	retcode, stdout, stderr, err := handler.Run(host, command)
+	host, err := hostfactory.Load(job.Task(), job.Service(), hostRef)
+	if err != nil {
+		return nil, err
+	}
+
+	retcode, stdout, stderr, err := host.Run(job.Task(), command)
 	if err != nil {
 		return nil, err
 	}
@@ -127,8 +139,48 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := handlers.NewSSHHandler(job)
-	retcode, stdout, stderr, err := handler.Copy(source, dest)
+	var (
+		pull                bool
+		hostRef             string
+		hostPath, localPath string
+		retcode             int
+		stdout, stderr      string
+	)
+
+	// If source contains remote host, we pull
+	parts := strings.Split(source, ":")
+	if len(parts) > 1 {
+		pull = true
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		localPath = source
+	}
+
+	// if destination contains remote host, we push (= !pull)
+	parts = strings.Split(dest, ":")
+	if len(parts) > 1 {
+		if pull {
+			return nil, scerr.InvalidRequestError("file copy from one remote host to another one is not supported")
+		}
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		if !pull {
+			return nil, scerr.InvalidRequestError("failed to find a remote host in the request")
+		}
+		localPath = destination
+	}
+
+	host, err := hostfactory.Load(job.Task(), job.Service(), hostRef)
+	if err != nil {
+		return nil, err
+	}
+	if pull {
+		retcode, stdout, stderr, err = host.Pull(hostPath, localPath)
+	} else {
+		retcode, stdout, stderr, err = host.Push(localPath, hostPath, in.Owner, in.Mode)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -133,7 +133,7 @@ func (tg *taskGroup) ForceID(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	return tg.task.ForceID(id)
+	return tg.task.SetID(id)
 }
 
 // Start runs in goroutine the function with parameters
@@ -164,7 +164,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 	if err != nil {
 		return nil, err
 	}
-	err = subtask.ForceID(tg.task.id + "-" + strconv.Itoa(int(tg.last)))
+	err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last)))
 	if err != nil {
 		return nil, err
 	}

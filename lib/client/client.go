@@ -138,8 +138,9 @@ func IsTimeoutError(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }
 
-// IsProvisioningError detects provisioning errors
-func IsProvisioningError(err error) bool {
-	errText := err.Error()
-	return strings.Contains(errText, "PROVISIONING_ERROR:")
-}
+// VPL: moved in abstract package
+// // IsProvisioningError detects provisioning errors
+// func IsProvisioningError(err error) bool {
+// 	errText := err.Error()
+// 	return strings.Contains(errText, "PROVISIONING_ERROR:")
+// }

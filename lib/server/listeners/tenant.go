@@ -46,7 +46,7 @@ var GetCurrentTenant = getCurrentTenant
 // getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		tenants, err := iaas.GetTenantNames()
+		tenants, err := iaas.TenantNames()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
@@ -99,7 +99,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	tenants, err := iaas.GetTenantNames()
+	tenants, err := iaas.TenantNames()
 	if err != nil {
 		return nil, err
 	}
@@ -188,21 +188,21 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	}
 	defer task.Close()
 
-	name := in.GetName()
+	name := in.Name()
 
 	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if currentTenant != nil && currentTenant.name == in.GetName() {
+	if currentTenant != nil && currentTenant.name == in.Name() {
 		return empty, nil
 	}
 
-	service, err := iaas.UseService(in.GetName())
+	service, err := iaas.UseService(in.Name())
 	if err != nil {
 		return empty, err
 	}
-	currentTenant = &Tenant{name: in.GetName(), Service: service}
+	currentTenant = &Tenant{name: in.Name(), Service: service}
 	return empty, nil
 }
 
@@ -226,7 +226,7 @@ var GetCurrentStorageTenants = getCurrentStorageTenants
 func getCurrentStorageTenants() *StorageTenants {
 	//TODO-AJ should we select all tenants with storage, or still auto selecting tenant only when there is only one available tenant?
 	if currentStorageTenants == nil {
-		tenants, err := iaas.GetTenantNames()
+		tenants, err := iaas.TenantNames()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
@@ -271,7 +271,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Emp
 		defer srvutils.JobDeregister(ctx)
 	}
 
-	tenants, err := iaas.GetTenants()
+	tenants, err := iaas.Tenants()
 	if err != nil {
 		return nil, scerr.Wrap(err, "cannot list storage tenants").ToGRPCStatus()
 	}

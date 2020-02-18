@@ -24,7 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -169,7 +169,7 @@ var volumeAttach = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: abstracts.DefaultVolumeMountPoint,
+			Value: abstract.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
 		cli.StringFlag{
@@ -245,7 +245,7 @@ type volumeDisplayable struct {
 func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInfo) *volumeInfoDisplayable {
 	return &volumeInfoDisplayable{
 		volumeInfo.GetId(),
-		volumeInfo.GetName(),
+		volumeInfo.Name(),
 		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 		srvutils.GetReference(volumeInfo.GetHost()),
@@ -258,7 +258,7 @@ func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInfo) *volumeInfoDisplay
 func toDisplayableVolume(volumeInfo *protocol.Volume) *volumeDisplayable {
 	return &volumeDisplayable{
 		volumeInfo.GetId(),
-		volumeInfo.GetName(),
+		volumeInfo.Name(),
 		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 	}

@@ -123,7 +123,7 @@ var networkInspect = cli.Command{
 		sgwID := network.GetSecondaryGatewayId()
 
 		// Added operation status
-		opState := network.GetState()
+		opState := network.State()
 		mapped["state"] = opState.String()
 
 		pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())

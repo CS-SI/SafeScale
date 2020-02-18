@@ -27,7 +27,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	convert "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -69,7 +69,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		}
 	}
 
-	shareName := in.GetName()
+	shareName := in.Name()
 	hostRef := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
 	shareType := in.GetType()
@@ -84,8 +84,12 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := handlers.NewShareHandler(job)
-	share, err := handler.Create(
+	share, err := sharefactory.New(job.Service())
+	if err != nil {
+		return nil, err
+	}
+	err = share.Create(
+		job.Task(),
 		shareName,
 		hostRef, sharePath,
 		in.GetSecurityModes(),
@@ -100,7 +104,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	if err != nil {
 		return nil, err
 	}
-	return convert.ToProtocolShare(in.GetName(), share), err
+	return share.ToProtocol()
 }
 
 // Delete call share service deletion
@@ -129,7 +133,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		}
 	}
 
-	shareName := in.GetName()
+	shareName := in.Name()
 
 	job, err := PrepareJob(ctx, "", "share delete")
 	if err != nil {
@@ -141,13 +145,11 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := handlers.NewShareHandler(job)
-	_, err = handler.Inspect(shareName)
+	share, err := sharefactory.Load(job.Task(), job.Service(), shareName)
 	if err != nil {
 		return empty, err
 	}
-
-	err = handler.Delete(shareName)
+	err = share.Delete(job.Task())
 	if err != nil {
 		return empty, err
 	}
@@ -195,7 +197,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	var pbshares []*protocol.ShareDefinition
 	for k, item := range shares {
 		for _, share := range item {
-			pbshares = append(pbshares, convert.ToProtocolShare(k, share))
+			pbshares = append(pbshares, converters.ToProtocolShare(k, share))
 		}
 	}
 	list := &protocol.ShareList{ShareList: pbshares}
@@ -246,7 +248,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	if err != nil {
 		return nil, err
 	}
-	return convert.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
+	return converters.ShareMountFromAbstractsToProtocol(in.GetShare().Name(), in.GetHost().Name(), mount), nil
 }
 
 // Unmount unmounts share from the given host
@@ -347,7 +349,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	}
 	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if host == nil {
-		return nil, abstracts.ResourceNotFoundError("share", shareRef)
+		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
 	return convert.ToProtocolShareMountList(host.Name, share, mounts), nil

@@ -1,17 +1,18 @@
 package propertiesv1
 
 import (
-	"github.com/magiconair/properties/assert"
 	"reflect"
 	"testing"
+
+	"github.com/magiconair/properties/assert"
 )
 
-func TestComposite_Clone(t *testing.T) {
-	ct := newComposite()
+func TestClusterComposite_Clone(t *testing.T) {
+	ct := newClusterComposite()
 	ct.Tenants = append(ct.Tenants, "google")
 	ct.Tenants = append(ct.Tenants, "amazon")
 
-	clonedCt, ok := ct.Clone().(*Composite)
+	clonedCt, ok := ct.Clone().(*ClusterComposite)
 	if !ok {
 		t.Fail()
 	}

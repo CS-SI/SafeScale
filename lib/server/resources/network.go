@@ -18,7 +18,7 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
@@ -28,13 +28,13 @@ type Network interface {
 	Metadata
 	data.Identifyable
 
-	Browse(task concurrency.Task, callback func(*abstracts.Network) error) error                                                 // Browse ...
-	Create(task concurrency.Task, req abstracts.NetworkRequest, gwname string, gwSizing *abstracts.HostSizingRequirements) error // Create creates a network
-	AttachHost(task concurrency.Task, host Host) error                                                                           // AttachHost links host ID to the network
-	DetachHost(task concurrency.Task, hostID string) error                                                                       // DetachHost unlinks host ID from network
-	ListHosts(task concurrency.Task) ([]Host, error)                                                                             // ListHosts returns the list of Host attached to the network (excluding gateway)
-	Gateway(task concurrency.Task, primary bool) (Host, error)                                                                   // Gateway returns the gateway related to network
-	DefaultRouteIP(task concurrency.Task) (string, error)                                                                        // Returns the IP of the default route of the network
-	EndpointIP(task concurrency.Task) (string, error)                                                                            // Returns the IP address corresponding to the default route
-	HasVirtualIP() bool                                                                                                          // Tells if the network is using a VIP a default route
+	Browse(task concurrency.Task, callback func(*abstract.Network) error) error                                                // Browse ...
+	Create(task concurrency.Task, req abstract.NetworkRequest, gwname string, gwSizing *abstract.HostSizingRequirements) error // Create creates a network
+	AttachHost(task concurrency.Task, host Host) error                                                                         // AttachHost links host ID to the network
+	DetachHost(task concurrency.Task, hostID string) error                                                                     // DetachHost unlinks host ID from network
+	ListHosts(task concurrency.Task) ([]Host, error)                                                                           // ListHosts returns the list of Host attached to the network (excluding gateway)
+	Gateway(task concurrency.Task, primary bool) (Host, error)                                                                 // Gateway returns the gateway related to network
+	DefaultRouteIP(task concurrency.Task) (string, error)                                                                      // Returns the IP of the default route of the network
+	EndpointIP(task concurrency.Task) (string, error)                                                                          // Returns the IP address corresponding to the default route
+	HasVirtualIP(task concurrency.Task) bool                                                                                   // Tells if the network is using a VIP a default route
 }

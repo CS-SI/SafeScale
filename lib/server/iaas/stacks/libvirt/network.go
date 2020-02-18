@@ -31,7 +31,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -60,7 +60,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 			re := regexp.MustCompile("[0-9]+")
 			errCode, _ := strconv.Atoi(re.FindString(err.Error()))
 			if errCode == 43 {
-				return nil, abstracts.ResourceNotFoundError("network", ref)
+				return nil, abstract.ResourceNotFoundError("network", ref)
 			}
 			return nil, fmt.Errorf(fmt.Sprintf("failed to fetch network from ref : %s", err.Error()))
 		}
@@ -69,7 +69,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 	return libvirtNetwork, nil
 }
 
-func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstracts.Network, error) {
+func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Network, error) {
 	libvirtNetworkXML, err := libvirtNetwork.GetXMLDesc(0)
 	if err != nil {
 		return nil, fmt.Errorf(fmt.Sprintf("failed get network's xml description  : %s", err.Error()))
@@ -111,7 +111,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstracts.N
 		cidr = networkDescription.IPv6
 	}
 
-	network := abstracts.NewNetwork()
+	network := abstract.NewNetwork()
 	network.ID = networkDescription.UUID
 	network.Name = networkDescription.Name
 	network.CIDR = cidr
@@ -123,7 +123,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstracts.N
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (*abstracts.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	name := req.Name
@@ -199,7 +199,7 @@ func (s *Stack) CreateNetwork(req abstracts.NetworkRequest) (*abstracts.Network,
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstracts.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
@@ -226,16 +226,16 @@ func (s *Stack) GetNetwork(ref string) (*abstracts.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstracts.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
 	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 	return s.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstracts.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	defer concurrency.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
-	var networks []*abstracts.Network
+	var networks []*abstract.Network
 
 	libvirtNetworks, err := s.LibvirtService.ListAllNetworks(3)
 	if err != nil {
@@ -282,8 +282,8 @@ func (s *Stack) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
-	*abstracts.Host,
+func (s *Stack) CreateGateway(req abstract.GatewayRequest) (
+	*abstract.Host,
 	*propertiesv2.HostSizing,
 	*propertiesv1.HostNetwork,
 	*propertiesv1.HostDescription,
@@ -304,19 +304,19 @@ func (s *Stack) CreateGateway(req abstracts.GatewayRequest) (
 		return nil, nil, err
 	}
 	if gwName == "" {
-		name, err := networkLibvirt.GetName()
+		name, err := networkLibvirt.Name()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get network name : %s", err.Error())
 		}
 		gwName = "gw-" + name
 	}
 
-	hostReq := abstracts.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      imageID,
 		KeyPair:      keyPair,
 		ResourceName: gwName,
 		TemplateID:   templateID,
-		Networks:     []*abstracts.Network{network},
+		Networks:     []*abstract.Network{network},
 		PublicIP:     true,
 	}
 
@@ -337,26 +337,26 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstracts.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
+	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstracts.VirtualIP, host *abstracts.Host) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, host *abstract.Host) (string, string, error) {
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstracts.VirtualIP, host *abstracts.Host) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, host *abstract.Host) error {
+	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstracts.VirtualIP) error {
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
 	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
 }

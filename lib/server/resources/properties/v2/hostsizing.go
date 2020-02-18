@@ -33,7 +33,7 @@ type HostSizingRequirements struct {
 	MaxRAMSize  float32 `json:"max_ram_size,omitempty"`
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 	MinGPU      int     `json:"min_gpu,omitempty"`
-	MinFreq     float32 `json:"min_freq,omitempty"`
+	MinCPUFreq  float32 `json:"min_freq,omitempty"`
 	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
 }
 

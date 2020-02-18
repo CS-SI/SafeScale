@@ -121,13 +121,13 @@ func TestMock_GetGpuTemplate_Mock(t *testing.T) {
 		// TODO Make it return a NVIDIA 1080 TI only for mocks
 		// TODO Create HostTemplateGenerator
 		amok.EXPECT().ListTemplates(false).Return(nil, nil)
-		amok.EXPECT().GetTemplate("g3-120")
+		amok.EXPECT().Template("g3-120")
 	}
 
 	tpls, err := cli.Service.ListTemplates(false)
 	assert.NoError(t, err)
 
-	_, err = cli.Service.GetTemplate("g3-120")
+	_, err = cli.Service.Template("g3-120")
 
 	if err == nil {
 		for _, tpl := range tpls {
@@ -198,7 +198,7 @@ func TestMock_GetKeyPair_Mock(t *testing.T) {
 	// TODO use Mock object
 	_ = amok
 
-	cli.GetKeyPair(t)
+	cli.KeyPair(t)
 }
 
 func TestMock_ListKeyPairs_Mock(t *testing.T) {

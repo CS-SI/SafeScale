@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package factory
+package share
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/shares"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -28,7 +29,7 @@ func New(svc iaas.Service) (resources.Share, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
-	return shares.New(svc)
+	return operations.NewShare(svc)
 }
 
 // Load loads the metadata of a share and returns an instance of resources.Share
@@ -43,10 +44,5 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Share,
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	objs, err := shares.New(svc)
-	if err != nil {
-		return nil, err
-	}
-
-	return objs, objs.Read(task, ref)
+	return operations.LoadShare(task, svc, ref)
 }

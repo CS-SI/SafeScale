@@ -23,8 +23,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	featureops "github.com/CS-SI/SafeScale/lib/server/resources/operations/features"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	featureops "github.com/CS-SI/SafeScale/lib/server/resources/operations/feature"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -54,7 +53,7 @@ func List() ([]interface{}, error) {
 	for _, feat := range featureops.GetAllEmbeddedMap() {
 		yamlKey := "feature.suitableFor.host"
 
-		if !captured.Contains(feat.GetName()) {
+		if !captured.Contains(feat.Name()) {
 			ok := false
 			if feat.GetSpecs().IsSet(yamlKey) {
 				value := strings.ToLower(feat.GetSpecs().GetString(yamlKey))
@@ -64,7 +63,7 @@ func List() ([]interface{}, error) {
 				cfgFiles.Add(feat.GetFilename())
 			}
 
-			captured.Add(feat.GetName())
+			captured.Add(feat.Name())
 		}
 	}
 
@@ -87,13 +86,13 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 	feat, err := featureops.New(task, name)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); !ok {
-			return nil, srvutils.ThrowErr(err)
+			return nil, err
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
 		feat, err = featureops.NewEmbedded(name)
 		if err != nil {
-			return nil, utils.NotFoundError(err.Error())
+			return nil, err
 		}
 	}
 	return feat, nil
@@ -109,10 +108,5 @@ func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) 
 		return nil, scerr.InvalidParameterError("name", "canno't be empty string!")
 	}
 
-	feat, err := featureops.NewEmbedded(task, name)
-	if err != nil {
-		return nil, err
-	}
-
-	return feat, nil
+	return featureops.NewEmbedded(task, name)
 }

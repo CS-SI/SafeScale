@@ -23,8 +23,8 @@ import (
 
 	"github.com/graymeta/stow"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // bucket describes a Bucket
@@ -54,8 +54,8 @@ func (b *bucket) CreateObject(objectName string) (Object, error) {
 	return newObject(b, objectName)
 }
 
-// GetObject ...
-func (b *bucket) GetObject(objectName string) (Object, error) {
+// Object ...
+func (b *bucket) Object(objectName string) (Object, error) {
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", objectName), concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
@@ -234,14 +234,14 @@ func (b *bucket) WriteMultiPartObject(
 	return o, nil
 }
 
-// GetName returns the name of the Bucket
-func (b *bucket) GetName() string {
+// Name returns the name of the Bucket
+func (b *bucket) Name() string {
 	return b.Name
 }
 
-// GetCount returns the count of objects in the Bucket
+// Count returns the count of objects in the Bucket
 // 'path' corresponds to stow prefix, and 'prefix' allows to filter what to count
-func (b *bucket) GetCount(path, prefix string) (int64, error) {
+func (b *bucket) Count(path, prefix string) (int64, error) {
 	if b == nil {
 		return 0, scerr.InvalidInstanceError()
 	}
@@ -268,8 +268,8 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 	return count, nil
 }
 
-// GetSize returns the total size of the Objects inside the Bucket
-func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
+// Size returns the total size of the Objects inside the Bucket
+func (b *bucket) Size(path, prefix string) (int64, string, error) {
 	if b == nil {
 		return 0, "", scerr.InvalidInstanceError()
 	}

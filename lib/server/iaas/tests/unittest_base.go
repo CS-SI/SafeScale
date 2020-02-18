@@ -32,7 +32,6 @@ import (
 	libvirt "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
@@ -133,14 +132,14 @@ func (tester *ServiceTester) GetKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("unit_test_kp")
 	require.Nil(t, err)
 
-	kp2, err := tester.Service.GetKeyPair("unit_test_kp")
+	kp2, err := tester.Service.KeyPair("unit_test_kp")
 	require.Nil(t, err)
 
 	assert.Equal(t, kp.ID, kp2.ID)
 	assert.Equal(t, kp.Name, kp2.Name)
 	assert.Equal(t, kp.PublicKey, kp2.PublicKey)
 	assert.Equal(t, "", kp2.PrivateKey)
-	_, err = tester.Service.GetKeyPair("notfound")
+	_, err = tester.Service.KeyPair("notfound")
 	assert.NotNil(t, err)
 
 	defer func() {
@@ -167,7 +166,7 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 	assert.Nil(t, err)
 	assert.EqualValues(t, nbKP+2, len(lst))
 	for _, kpe := range lst {
-		var kpr abstracts.KeyPair
+		var kpr abstract.KeyPair
 		switch kpe.ID {
 		case kp.ID:
 			kpr = *kp
@@ -184,16 +183,16 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 }
 
 //CreateNetwork creates a test network
-func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*abstracts.Network, *abstracts.Host) {
+func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*abstract.Network, *abstract.Host) {
 
-	network, err := tester.Service.CreateNetwork(abstracts.NetworkRequest{
+	network, err := tester.Service.CreateNetwork(abstract.NetworkRequest{
 		Name:      name,
 		IPVersion: ipversion.IPv4,
 		CIDR:      cidr,
 	})
 	require.NoError(t, err)
 
-	tpls, err := tester.Service.SelectTemplatesBySize(abstracts.SizingRequirements{
+	tpls, err := tester.Service.SelectTemplatesBySize(abstract.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 0,
@@ -204,14 +203,14 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 	keypair, err := tester.Service.CreateKeyPair("kp_" + network.Name)
 	require.Nil(t, err)
 
-	gwRequest := abstracts.GatewayRequest{
+	gwRequest := abstract.GatewayRequest{
 		ImageID:    img.ID,
 		Network:    network,
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 	}
 
-	var gateway *abstracts.Host
+	var gateway *abstract.Host
 
 	if withGW {
 		gateway, _, err = tester.Service.CreateGateway(gwRequest)
@@ -223,8 +222,8 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 }
 
 // CreateHost creates a test host
-func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abstracts.Network, public bool) (*abstracts.Host, *userdata.Content, error) {
-	tpls, err := tester.Service.SelectTemplatesBySize(abstracts.SizingRequirements{
+func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abstract.Network, public bool) (*abstract.Host, *userdata.Content, error) {
+	tpls, err := tester.Service.SelectTemplatesBySize(abstract.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,
@@ -233,11 +232,11 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abst
 	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
 	gw, _ := tester.Service.InspectHost(network.GatewayID)
-	hostRequest := abstracts.HostRequest{
+	hostRequest := abstract.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
 		TemplateID:     tpls[0].ID,
-		Networks:       []*abstracts.Network{network},
+		Networks:       []*abstract.Network{network},
 		DefaultGateway: gw,
 		PublicIP:       public,
 	}
@@ -245,8 +244,8 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abst
 }
 
 //CreateGW creates a test GW
-func (tester *ServiceTester) CreateGW(t *testing.T, network *abstracts.Network) error {
-	tpls, err := tester.Service.SelectTemplatesBySize(abstracts.SizingRequirements{
+func (tester *ServiceTester) CreateGW(t *testing.T, network *abstract.Network) error {
+	tpls, err := tester.Service.SelectTemplatesBySize(abstract.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,
@@ -254,7 +253,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, network *abstracts.Network) 
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
-	gwRequest := abstracts.GatewayRequest{
+	gwRequest := abstract.GatewayRequest{
 		ImageID:    img.ID,
 		TemplateID: tpls[0].ID,
 		Network:    network,
@@ -399,7 +398,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	// out, err := cmd.Output()
 	// assert.Nil(t, err)
 	// content := strings.Trim(string(out), "\n")
-	// assert.Equal(t, abstracts.DefaultUser, content)
+	// assert.Equal(t, abstract.DefaultUser, content)
 
 	// cmd, err = ssh.Command("ping -c1 8.8.8.8")
 	// fmt.Println(ssh.PrivateKey)
@@ -493,7 +492,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	require.NotNil(t, err)
 	nbVolumes := len(lst)
 
-	v1, err := tester.Service.CreateVolume(abstracts.VolumeRequest{
+	v1, err := tester.Service.CreateVolume(abstract.VolumeRequest{
 		Name:  "test_volume1",
 		Size:  25,
 		Speed: volumespeed.HDD,
@@ -510,7 +509,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
-	v2, err := tester.Service.CreateVolume(abstracts.VolumeRequest{
+	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
 		Name:  "test_volume2",
 		Size:  35,
 		Speed: volumespeed.HDD,
@@ -563,7 +562,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 		_ = tester.Service.DeleteHost(host.ID)
 	}()
 
-	v1, err := tester.Service.CreateVolume(abstracts.VolumeRequest{
+	v1, err := tester.Service.CreateVolume(abstract.VolumeRequest{
 		Name:  "test_volume1",
 		Size:  25,
 		Speed: volumespeed.HDD,
@@ -575,7 +574,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
-	v2, err := tester.Service.CreateVolume(abstracts.VolumeRequest{
+	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
 		Name:  "test_volume2",
 		Size:  35,
 		Speed: volumespeed.HDD,
@@ -588,7 +587,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
 	assert.Nil(t, err)
 
-	va1ID, err := tester.Service.CreateVolumeAttachment(abstracts.VolumeAttachmentRequest{
+	va1ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		Name:     "Attachment1",
 		HostID:   host.ID,
 		VolumeID: v1.ID,
@@ -599,7 +598,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 		_ = tester.Service.DeleteVolumeAttachment(host.ID, va1ID)
 	}()
 
-	va2ID, err := tester.Service.CreateVolumeAttachment(abstracts.VolumeAttachmentRequest{
+	va2ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		Name:     "Attachment2",
 		HostID:   host.ID,
 		VolumeID: v2.ID,
@@ -610,10 +609,10 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 		_ = tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
 	}()
 
-	va1, err := tester.Service.GetVolumeAttachment(host.ID, v1.ID)
+	va1, err := tester.Service.VolumeAttachment(host.ID, v1.ID)
 	assert.Nil(t, err)
 
-	va2, err := tester.Service.GetVolumeAttachment(host.ID, v2.ID)
+	va2, err := tester.Service.VolumeAttachment(host.ID, v2.ID)
 	assert.Nil(t, err)
 
 	lst, err := tester.Service.ListVolumeAttachments(host.ID)
@@ -677,9 +676,9 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 // 	assert.Empty(t, o.Content)
 // 	assert.Equal(t, 1, len(o.Metadata))
 // 	assert.Equal(t, "B", o.Metadata["A"])
-// 	o, err = tester.Service.GetObject("testC", "object1", []abstracts.Range{
-// 		abstracts.NewRange(0, 2),
-// 		abstracts.NewRange(4, 7),
+// 	o, err = tester.Service.GetObject("testC", "object1", []abstract.Range{
+// 		abstract.NewRange(0, 2),
+// 		abstract.NewRange(4, 7),
 // 	})
 // 	assert.Nil(t, err)
 // 	if err == nil {

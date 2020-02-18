@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -25,11 +26,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumeproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	volumefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/volume"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
@@ -38,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -46,9 +48,9 @@ import (
 // VolumeHandler defines API to manipulate hosts
 type VolumeHandler interface {
 	Delete(ref string) error
-	List(all bool) ([]abstracts.Volume, error)
-	Inspect(ref string) (*abstracts.Volume, map[string]*propertiesv1.HostLocalMount, error)
-	Create(name string, size int, speed volumespeed.Enum) (*abstracts.Volume, error)
+	List(all bool) ([]abstract.Volume, error)
+	Inspect(ref string) (*abstract.Volume, map[string]*propertiesv1.HostLocalMount, error)
+	Create(name string, size int, speed volumespeed.Enum) (*abstract.Volume, error)
 	Attach(volume string, host string, path string, format string, doNotFormat bool) error
 	Detach(volume string, host string) error
 }
@@ -68,7 +70,7 @@ func NewVolumeHandler(job server.Job) VolumeAPI {
 }
 
 // List returns the network list
-func (handler *volumeHandler) List(all bool) (volumes []abstracts.Volume, err error) {
+func (handler *volumeHandler) List(all bool) (volumes []abstract.Volume, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -85,7 +87,7 @@ func (handler *volumeHandler) List(all bool) (volumes []abstracts.Volume, err er
 	if err != nil {
 		return nil, err
 	}
-	err = objv.Browse(task, func(volume *abstracts.Volume) error {
+	err = objv.Browse(task, func(volume *abstract.Volume) error {
 		volumes = append(volumes, *volume)
 		return nil
 	})
@@ -117,7 +119,7 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrNotFound:
-			return abstracts.ResourceNotFoundError("volume", ref)
+			return abstract.ResourceNotFoundError("volume", ref)
 		default:
 			logrus.Debugf("failed to delete volume: %+v", err)
 			return err
@@ -181,7 +183,7 @@ func (handler *VolumeHandler) Inspect(
 	objv, err := volumefactory.Load(task, handler.service, ref)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); ok {
-			return nil, nil, abstracts.ResourceNotFoundError("volume", ref)
+			return nil, nil, abstract.ResourceNotFoundError("volume", ref)
 		}
 		return nil, nil, err
 	}
@@ -264,7 +266,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	if err != nil {
 		return nil, err
 	}
-	request := abstracts.VolumeRequest{
+	request := abstract.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -332,8 +334,8 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeRef, hostRef, pa
 			volumeAttachedV1 := clonable.(*propertiesv1.VolumeAttachments)
 
 			mountPoint = path
-			if path == abstracts.DefaultVolumeMountPoint {
-				mountPoint = abstracts.DefaultVolumeMountPoint + volumeName
+			if path == abstract.DefaultVolumeMountPoint {
+				mountPoint = abstract.DefaultVolumeMountPoint + volumeName
 			}
 
 			// For now, allows only one attachment...
@@ -341,7 +343,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeRef, hostRef, pa
 				hostID := host.ID()
 				for id := range volumeAttachedV1.Hosts {
 					if id != hostID {
-						return abstracts.ResourceNotAvailableError("volume", volumeName)
+						return abstract.ResourceNotAvailableError("volume", volumeName)
 					}
 					break
 				}
@@ -390,7 +392,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeRef, hostRef, pa
 						if err != nil {
 							return err
 						}
-						vaID, err := handler.service.CreateVolumeAttachment(abstracts.VolumeAttachmentRequest{
+						vaID, err := handler.service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 							Name:     fmt.Sprintf("%s-%s", volumeName, hostName),
 							HostID:   host.ID(),
 							VolumeID: objv.ID(),
@@ -451,7 +453,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeRef, hostRef, pa
 
 						// Create mount point
 						sshHandler := NewSSHHandler(handler.service)
-						sshConfig, err := sshHandler.GetConfig(ctx, hostID)
+						sshConfig, err := sshHandler.Config((ctx, hostID)
 						if err != nil {
 							return err
 						}
@@ -578,7 +580,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 		if _, ok := err.(*scerr.ErrNotFound); !ok {
 			return err
 		}
-		return abstracts.ResourceNotFoundError("volume", volumeRef)
+		return abstract.ResourceNotFoundError("volume", volumeRef)
 	}
 	mountPath := ""
 

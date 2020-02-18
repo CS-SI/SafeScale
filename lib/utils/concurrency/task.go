@@ -67,11 +67,11 @@ type TaskCore interface {
 	Aborted() bool
 	Abortable() bool
 	IgnoreAbortSignal(bool) error
-	ForceID(string) error
-	ID() (string, error)
-	Signature() (string, error)
-	Status() (TaskStatus, error)
-	Context() (context.Context, context.CancelFunc, error)
+	SetID(string) error
+	GetID() (string, error)
+	GetSignature() (string, error)
+	GetStatus() (TaskStatus, error)
+	GetContext() (context.Context, context.CancelFunc, error)
 	// Reset() error
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	RunInSubtask(TaskAction, TaskParameters) (TaskResult, error)
@@ -251,8 +251,8 @@ func (t *task) taskCancelReceiver() {
 	close(t.closeCh)
 }
 
-// ID returns an unique id for the task
-func (t *task) ID() (string, error) {
+// GetID returns an unique id for the task
+func (t *task) GetID() (string, error) {
 	if t == nil {
 		return "", scerr.InvalidInstanceError()
 	}
@@ -263,9 +263,9 @@ func (t *task) ID() (string, error) {
 	return t.id, nil
 }
 
-// Signature builds the "signature" of the task passed as parameter,
+// GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
-func (t *task) Signature() (string, error) {
+func (t *task) GetSignature() (string, error) {
 	if t == nil {
 		return "", scerr.InvalidInstanceError()
 	}
@@ -273,8 +273,8 @@ func (t *task) Signature() (string, error) {
 	return t.sig, nil
 }
 
-// Status returns the current task status
-func (t *task) Status() (TaskStatus, error) {
+// GetStatus returns the current task status
+func (t *task) GetStatus() (TaskStatus, error) {
 	if t == nil {
 		return 0, scerr.InvalidInstanceError()
 	}
@@ -284,17 +284,17 @@ func (t *task) Status() (TaskStatus, error) {
 	return t.status, nil
 }
 
-// Context returns the context associated to the task
-func (t *task) Context() (context.Context, context.CancelFunc, error) {
+// GetContext returns the context associated to the task
+func (t *task) GetContext() (context.Context, context.CancelFunc, error) {
 	if t == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 	return t.context, t.cancel, nil
 }
 
-// ForceID allows to specify task ID. The unicity of the ID through all the tasks
+// SetID allows to specify task ID. The unicity of the ID through all the tasks
 // becomes the responsibility of the developer...
-func (t *task) ForceID(id string) error {
+func (t *task) SetID(id string) error {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}

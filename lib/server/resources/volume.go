@@ -17,7 +17,7 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
@@ -27,8 +27,8 @@ type Volume interface {
 	Metadata
 	data.Identifyable
 
-	Browse(task concurrency.Task, callback func(*abstracts.Volume) error) error           // Browse walks through all the metadata objects in network
-	Create(task concurrency.Task, req abstracts.VolumeRequest) error                      // Create a volume
+	Browse(task concurrency.Task, callback func(*abstract.Volume) error) error            // Browse walks through all the metadata objects in network
+	Create(task concurrency.Task, req abstract.VolumeRequest) error                       // Create a volume
 	Attach(task concurrency.Task, host Host, path, format string, doNotFormat bool) error // Attach a volume to an host
 	Detach(task concurrency.Task, host Host) error                                        // Detach detach the volume identified by ref, ref can be the name or the id
 }

@@ -26,10 +26,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -85,7 +86,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 	switch hostParam := hostParam.(type) {
 	case string:
 		hostRef = hostParam
-		host, err := hostfactory.Load(handler.job.Service(), hostRef)
+		host, err = hostfactory.Load(handler.job.Task(), handler.job.Service(), hostRef)
 		if err != nil {
 			return nil, err
 		}
@@ -96,9 +97,8 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 		} else {
 			hostRef = host.ID()
 		}
-	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *abstracts.Host")
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a resources.Host*abstract.Host")
 	}
 
 	task := handler.job.Task()
@@ -106,16 +106,16 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	cfg, err := handler.job.Service().GetConfigurationOptions()
+	cfg, err := handler.job.Service().ConfigurationOptions()
 	if err != nil {
 		return nil, err
 	}
-	user := abstracts.DefaultUser
+	user := abstract.DefaultUser
 	if userIf, ok := cfg.Get("OperatorUsername"); ok {
 		user = userIf.(string)
 		if user == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			user = abstracts.DefaultUser
+			user = abstract.DefaultUser
 		}
 	}
 
@@ -129,16 +129,16 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 		User: user,
 	}
 	err = host.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		rh, ok := clonable.(*abstracts.Host)
+		rh, ok := clonable.(*abstract.HostFull)
 		if !ok {
 			return scerr.InconsistentError("")
 		}
 		sshConfig.PrivateKey = rh.PrivateKey
 
 		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			hostNetworkV1, ok := clonable.(*propsv1.HostNetwork)
+			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return scerr.InconsistentError("'*propsv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if hostNetworkV1.DefaultNetworkID != "" {
 				objn, inErr := networkfactory.Load(task, handler.service, hostNetworkV1.DefaultNetworkID)
@@ -148,9 +148,9 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 				gw, pgwErr := objn.Gateway(task, true)
 				if pgwErr == nil {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-						rh, ok := clonable.(*abstracts.Host)
+						rh, ok := clonable.(*abstract.HostFull)
 						if !ok {
-							return scerr.InconsistentError("'*abstracts.Host' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							return scerr.InconsistentError("'*abstract.Host' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 						ip, rhErr := gw.AccessIP(task)
 						if rhErr != nil {
@@ -176,9 +176,9 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 				gw, sgwErr := objn.Gateway(task, false)
 				if sgwErr == nil {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-						rh, ok := clonable.(*abstracts.Host)
+						rh, ok := clonable.(*abstract.HostFull)
 						if !ok {
-							return scerr.InconsistentError("'*abstracts.Host' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							return scerr.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 						ip, rhErr := gw.AccessIP(task)
 						if rhErr != nil {
@@ -230,7 +230,7 @@ func (handler *sshHandler) WaitServerReady(hostParam interface{}, timeout time.D
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	sshSvc := NewSSHHandler(handler.job)
-	ssh, err := sshSvc.GetConfig(hostParam)
+	ssh, err := sshSvc.Config((hostParam)
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func (handler *sshHandler) WaitServerReady(hostParam interface{}, timeout time.D
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *SSHHandler) Run(hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) { // FIXME Make sure ctx is propagated
+func (handler *sshHandler) Run(hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
@@ -400,7 +400,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := handler.GetConfig(host.ID)
+	ssh, err := handler.Config((host.ID)
 	if err != nil {
 		return -1, "", "", err
 	}

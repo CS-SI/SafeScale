@@ -30,8 +30,8 @@ import (
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
-	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstracts/filters/images"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 )
 
@@ -91,12 +91,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	vpcCIDR, _ := network["VPCCIDR"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
-	operatorUsername := abstracts.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstracts.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 
@@ -201,7 +201,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	return newP, nil
 }
 
-func addGPUCfg(tpl *abstracts.HostTemplate) {
+func addGPUCfg(tpl *abstract.HostTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -209,8 +209,8 @@ func addGPUCfg(tpl *abstracts.HostTemplate) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (p *provider) GetTemplate(id string) (*abstracts.HostTemplate, error) {
-	tpl, err := p.Stack.GetTemplate(id)
+func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
+	tpl, err := p.Stack.Template(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
 	}
@@ -219,13 +219,13 @@ func (p *provider) GetTemplate(id string) (*abstracts.HostTemplate, error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
 
-	var tpls []abstracts.HostTemplate
+	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
 		addGPUCfg(&tpl)
 		tpls = append(tpls, tpl)
@@ -234,17 +234,17 @@ func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 	return tpls, nil
 }
 
-func isWindowsImage(image abstracts.Image) bool {
+func isWindowsImage(image abstract.Image) bool {
 	return strings.Contains(strings.ToLower(image.Name), "windows")
 }
 
-func isBMSImage(image abstracts.Image) bool {
+func isBMSImage(image abstract.Image) bool {
 	return strings.HasPrefix(strings.ToUpper(image.Name), "OBS-BMS") ||
 		strings.HasPrefix(strings.ToUpper(image.Name), "OBS_BMS")
 }
 
 // ListImages lists available OS images
-func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	images, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.AuthenticationOptions()
 	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -276,7 +276,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.Config(urationOptions()
 	// caps := p.GetCapabilities()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
