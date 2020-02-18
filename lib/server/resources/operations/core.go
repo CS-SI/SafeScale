@@ -80,25 +80,25 @@ func NewCore(svc iaas.Service, kind string, path string) (*Core, error) {
 	return &c, nil
 }
 
-// Service returns the iaas.Service used to create/load the persistent object
-func (c *Core) Service() iaas.Service {
+// GetService returns the iaas.Service used to create/load the persistent object
+func (c *Core) GetService() iaas.Service {
 	return c.folder.Service()
 }
 
-// ID returns the id of the data protected
+// GetID returns the id of the data protected
 //
 // satisfies interface data.Identifyable
-func (c *Core) ID() string {
+func (c *Core) GetID() string {
 	if id, ok := c.id.Load().(string); ok {
 		return id
 	}
 	return "<undefined>"
 }
 
-// Name returns the name of the data protected
+// GetName returns the name of the data protected
 //
 // satisfies interface data.Identifyable
-func (c *Core) Name() string {
+func (c *Core) GetName() string {
 	if name, ok := c.name.Load().(string); ok {
 		return name
 	}
@@ -153,7 +153,7 @@ func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err er
 	c.Lock(task)
 	defer c.Unlock(task)
 
-	// Check c.properties is populated
+	// Make sure c.properties is populated
 	if c.properties == nil {
 		c.properties, err = serialize.NewJSONProperties("resources." + c.kind)
 		if err != nil {
@@ -182,7 +182,7 @@ func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err er
 // errors returned :
 // - scerr.ErrInvalidInstance
 // - scerr.ErrInvalidParameter
-// - scerr.ErrNotAvailable if the core instance already carries a data
+// - scerr.ErrNotAvailable if the Core instance already carries a data
 func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
 	if c == nil {
 		return scerr.InvalidInstanceError()
@@ -208,19 +208,6 @@ func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
 	}
 	return c.write(task)
 }
-
-// func (c *core) updateIdentity(task concurrency.Task) error {
-// 	guard, err := c.shielded.LockShared(task)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return guard.Shield(task, func(clonable data.Clonable) error {
-// 		ident := clonable.(data.Identifyable)
-// 		c.name = ident.GetName()
-// 		c.id = ident.GetID()
-// 		return nil
-// 	})
-// }
 
 func (c *Core) updateIdentity(task concurrency.Task) error {
 	if c.shielded != nil {

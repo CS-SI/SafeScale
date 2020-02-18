@@ -17,7 +17,6 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -26,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	sharefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/share"
@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 //go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ShareAPI
@@ -171,11 +172,7 @@ func (handler *ShareHandler) List() (shares map[string]map[string]*propertiesv1.
 			return nil, err
 		}
 
-		err = host.Inspect(task, func(_ data.Clonable) error {
-			props, inErr := host.Properties(task)
-			if inErr != nil {
-				return inErr
-			}
+		err = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 			return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
 				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 				if !ok {
@@ -193,7 +190,7 @@ func (handler *ShareHandler) List() (shares map[string]map[string]*propertiesv1.
 }
 
 // Mount a share on a local directory of an host
-func (handler *shareHandler) Mount(shareName, hostRef, path string,	withCache bool) (mount *propertiesv1.HostRemoteMount, err error) {
+func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bool) (mount *propertiesv1.HostRemoteMount, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -221,7 +218,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string,	withCache bo
 	if err != nil {
 		return nil, err
 	}
-	server, err := objs.Server(task)
+	server, err := objs.Server((task)
 	if err != nil {
 		return nil, err
 	}
@@ -352,12 +349,12 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string,	withCache bo
 			if err != nil {
 				return err
 			}
-			err = nfsClient.Install(ctx)
+			err = nfsClient.Install(task)
 			if err != nil {
 				return err
 			}
 
-			err = nfsClient.Mount(ctx, export, mountPath, withCache)
+			err = nfsClient.Mount(task, export, mountPath, withCache)
 			if err != nil {
 				return err
 			}
@@ -472,7 +469,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 	if err != nil {
 		return err
 	}
-	server, err := objs.Server(task)
+	server, err := objs.Server((task)
 	if err != nil {
 		return err
 	}

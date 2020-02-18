@@ -30,7 +30,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -249,7 +249,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 		return nil, err
 	}
 
-	// build response mapping abstracts.Host to protocol.Host
+	// build response mapping abstract.Host to protocol.Host
 	var pbhost []*protocol.Host
 	for _, host := range hosts {
 		pbhost = append(pbhost, converters.HostFromAbstractsToProtocol(host))
@@ -289,14 +289,14 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	defer job.Close()
 
-	name := in.GetName()
+	name := in.Name()
 	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	var sizing *abstracts.HostSizingRequirements
+	var sizing *abstract.HostSizingRequirements
 	if in.Sizing == nil {
-		sizing = &abstracts.HostSizingRequirements{
+		sizing = &abstract.HostSizingRequirements{
 			MinCores:    int(in.GetCpuCount()),
 			MaxCores:    int(in.GetCpuCount()),
 			MinRAMSize:  in.GetRam(),
@@ -315,17 +315,17 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, err
 	}
 
-	hostReq := abstracts.HostRequest{
+	hostReq := abstract.HostRequest{
 		ResourceName: name,
 		ImageID:      in.GetImageId(),
 		PublicIP:     in.GetPublic(),
 	}
 	err = network.Inspect(job.Task(), func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-		networkCore, ok := clonable.(*abstracts.Network)
+		networkCore, ok := clonable.(*abstract.Network)
 		if !ok {
-			return scerr.InconsistentError("'*abstracts.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		hostReq.Networks = []*abstracts.Network{networkCore}
+		hostReq.Networks = []*abstract.Network{networkCore}
 		return nil
 	})
 
@@ -369,7 +369,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	defer job.Close()
 
-	name := in.GetName()
+	name := in.Name()
 	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()

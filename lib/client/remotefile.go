@@ -77,6 +77,45 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 	return nil
 }
 
+// Upload transfers the local file to the hostname
+func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, hostname string) error {
+	if rfc.Remote == "" {
+		return scerr.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
+
+	}
+	SSHClient := New().SSH
+
+	// Copy the file
+	retcode, _, _, err := SSHClient.Copy(task, rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("failed to copy file '%s'", rfc.Local)
+	}
+
+	// Updates owner and access rights if asked for
+	cmd := ""
+	if rfc.RemoteOwner != "" {
+		cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
+	}
+	if rfc.RemoteRights != "" {
+		if cmd != "" {
+			cmd += " && "
+		}
+		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
+	}
+	retcode, _, _, err = SSHClient.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("failed to update owner and/or access rights of the remote file")
+	}
+
+	return nil
+}
+
 // RemoveRemote deletes the remote file from host
 func (rfc RemoteFileItem) RemoveRemote(task concurrency.Task, hostname string) error {
 	cmd := "rm -rf " + rfc.Remote

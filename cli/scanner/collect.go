@@ -40,7 +40,7 @@ func collect(tenantName string) error {
 		return fmt.Errorf("region value unset")
 	}
 
-	folder := fmt.Sprintf("images/%s/%s", serviceProvider.GetName(), region)
+	folder := fmt.Sprintf("images/%s/%s", serviceProvider.Name(), region)
 
 	err = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {

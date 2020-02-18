@@ -31,7 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 )
@@ -115,7 +115,7 @@ func (ud Content) OK() bool { // FIXME Complete function, mark struct fields as 
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func (ud *Content) Prepare(
-	options stacks.ConfigurationOptions, request abstracts.HostRequest, cidr string, defaultNetworkCIDR string,
+	options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
 ) error {
 
 	// Generate password for user safescale
@@ -173,7 +173,7 @@ func (ud *Content) Prepare(
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
-	ud.IsGateway = request.DefaultRouteIP == "" && request.Networks[0].Name != abstracts.SingleHostNetworkName && !useLayer3Networking
+	ud.IsGateway = request.DefaultRouteIP == "" && request.Networks[0].Name != abstract.SingleHostNetworkName && !useLayer3Networking
 	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr

@@ -24,7 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -76,7 +76,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	// Build response mapping resources.Host to protocol.Host
 	var pbTemplates []*protocol.HostTemplate
 	for _, template := range templates {
-		pbTemplates = append(pbTemplates, conv.ToProtocolHostTemplate(&template))
+		pbTemplates = append(pbTemplates, converters.HostTemplateFromAbstractsToProtocol(&template))
 	}
 	rv := &protocol.TemplateList{Templates: pbTemplates}
 	return rv, nil

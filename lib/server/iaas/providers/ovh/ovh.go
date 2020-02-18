@@ -31,8 +31,8 @@ import (
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
-	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstracts/filters/templates"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 )
 
@@ -113,12 +113,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		alternateAPIConsumerKey = val3.(string)
 	}
 
-	operatorUsername := abstracts.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstracts.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 
@@ -225,9 +225,10 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.AuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("TenantID", opts.TenantID)
+	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
@@ -242,7 +243,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.Config(urationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -253,15 +254,15 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p *provider) GetTemplate(id string) (*abstracts.HostTemplate, error) {
-	tpl, err := p.Stack.GetTemplate(id)
+func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
+	tpl, err := p.Stack.Template(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
 	}
 	return tpl, err
 }
 
-func addGPUCfg(tpl *abstracts.HostTemplate) {
+func addGPUCfg(tpl *abstract.HostTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -269,12 +270,12 @@ func addGPUCfg(tpl *abstracts.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -287,7 +288,7 @@ func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 	}
 
 	// check flavor disponibilities through OVH-API
-	authOpts, err := p.GetAuthenticationOptions()
+	authOpts, err := p.AuthenticationOptions()
 	if err != nil {
 		logrus.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
 		return allTemplates, nil
@@ -310,7 +311,7 @@ func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 		}
 	}
 
-	var listAvailableTemplates []abstracts.HostTemplate
+	var listAvailableTemplates []abstract.HostTemplate
 	for _, template := range allTemplates {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)
@@ -323,16 +324,16 @@ func (p *provider) ListTemplates(all bool) ([]abstracts.HostTemplate, error) {
 	return allTemplates, nil
 }
 
-func isWindowsTemplate(t abstracts.HostTemplate) bool {
+func isWindowsTemplate(t abstract.HostTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
 
-func isFlexTemplate(t abstracts.HostTemplate) bool {
+func isFlexTemplate(t abstract.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p *provider) CreateNetwork(req abstracts.NetworkRequest) (*abstracts.Network, error) {
+func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
 	if len(req.DNSServers) == 0 {

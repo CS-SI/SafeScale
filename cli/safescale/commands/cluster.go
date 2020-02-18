@@ -35,6 +35,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -133,7 +135,7 @@ var clusterListCommand = cli.Command{
 			c, _ := value.(api.Cluster)
 			converted, err := convertToMap(c)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name)))
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", c.Identity(concurrency.RootTask()).Name)))
 			}
 			formatted = append(formatted, formatClusterConfig(converted, false))
 		}
@@ -193,10 +195,11 @@ func outputClusterConfig() (map[string]interface{}, error) {
 	return formatted, nil
 }
 
+// FIXME: all the data must comes from lib/client
 // convertToMap converts clusterInstance to its equivalent in map[string]interface{},
 // with fields converted to string and used as keys
 func convertToMap(c api.Cluster) (map[string]interface{}, error) {
-	identity := c.GetIdentity(concurrency.RootTask())
+	identity := c.Identity(concurrency.RootTask())
 
 	result := map[string]interface{}{
 		"name":             identity.Name,
@@ -211,14 +214,14 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 
 	properties := c.GetProperties(concurrency.RootTask())
 	err := properties.Inspect(property.CompositeV1, func(clonable data.Clonable) error {
-		result["tenant"] = clonable.(*clusterpropsv1.Composite).Tenants[0]
+		result["tenant"] = clonable.(*propertiesv1.Composite).Tenants[0]
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	netCfg, err := c.GetNetworkConfig(concurrency.RootTask())
+	netCfg, err := c.NetworkConfig(concurrency.RootTask())
 	if err != nil {
 		return nil, err
 	}
@@ -235,8 +238,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		result["public_ip"] = netCfg.EndpointIP // legacy ...
 	}
 	if !properties.Lookup(clusterproperty.DefaultsV2) {
-		err = properties.Inspect(property.DefaultsV1, func(clonable data.Clonable) error {
-			defaultsV1, ok := clonable.(*clusterpropsv1.Defaults)
+		err = properties.Inspect(clusterproperty.DefaultsV1, func(clonable data.Clonable) error {
+			defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
 			if !ok {
 				return fmt.Errorf("invalid metadata")
 			}
@@ -248,8 +251,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 			return nil
 		})
 	} else {
-		err = properties.Inspect(property.DefaultsV2, func(clonable data.Clonable) error {
-			defaultsV2, ok := clonable.(*clusterpropsv2.Defaults)
+		err = properties.Inspect(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
 				return fmt.Errorf("invalid metadata")
 			}
@@ -266,8 +269,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	err = properties.Inspect(property.NodesV2, func(clonable data.Clonable) error {
-		nodesV2, ok := clonable.(*clusterpropsv2.Nodes)
+	err = properties.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 		if !ok {
 			return fmt.Errorf("invalid metadata")
 		}
@@ -280,16 +283,16 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = properties.Inspect(property.FeaturesV1, func(clonable data.Clonable) error {
-		result["features"] = clonable.(*clusterpropsv1.Features)
+	err = properties.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
+		result["features"] = clonable.(*propertiesv1.ClusterFeatures)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	err = properties.Inspect(property.StateV1, func(clonable data.Clonable) error {
-		state := clonable.(*clusterpropsv1.State).State
+	err = properties.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		state := clonable.(*propertiesv1.ClusterState).State
 		result["last_state"] = state
 		result["last_state_label"] = state.String()
 		return nil
@@ -301,7 +304,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 
 	// Add information not directly in cluster GetConfig()
 	//TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
-	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
+	if _, ok := result["features"].(*propertiesv1.ClusterFeatures).Disabled["remotedesktop"]; !ok {
 		remoteDesktops := map[string][]string{}
 		clientHost := client.New().Host
 		masters, err := c.ListMasterIDs(concurrency.RootTask())
@@ -644,7 +647,7 @@ var clusterStateCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		state, err := clusterInstance.GetState(concurrency.RootTask())
+		state, err := clusterInstance.State(concurrency.RootTask())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
@@ -1030,7 +1033,7 @@ func executeCommand(task concurrency.Task, command string, files *client.RemoteF
 	logrus.Debugf("command=[%s]", command)
 	master, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 	if err != nil {
-		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.GetIdentity(concurrency.RootTask()).Name, err.Error())
+		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.Identity(concurrency.RootTask()).Name, err.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -91,11 +91,11 @@ func JustThrowBasicError() (err error) {
 }
 
 func JustThrowError() (err error) {
-	return abstracts.ResourceDuplicateError("host", "boo")
+	return abstract.ResourceDuplicateError("host", "boo")
 }
 
 func JustThrowComplexError() (err error) {
-	err = abstracts.ResourceDuplicateError("host", "booboo")
+	err = abstract.ResourceDuplicateError("host", "booboo")
 	err = scerr.AddConsequence(err, fmt.Errorf("cleanup error"))
 	return err
 }
@@ -377,7 +377,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 }
 
 func genErr() error {
-	return abstracts.ResourceNotFoundError("host", "whatever")
+	return abstract.ResourceNotFoundError("host", "whatever")
 }
 
 func genTimeout() error {

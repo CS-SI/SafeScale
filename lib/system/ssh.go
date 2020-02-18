@@ -120,13 +120,14 @@ func IsSCPRetryable(code int) bool {
 
 // SSHConfig helper to manage ssh session
 type SSHConfig struct {
-	User          string
-	Host          string
-	PrivateKey    string
-	Port          int
-	LocalPort     int
-	GatewayConfig *SSHConfig
-	cmdTpl        string
+	User                   string
+	Host                   string
+	PrivateKey             string
+	Port                   int
+	LocalPort              int
+	GatewayConfig          *SSHConfig
+	SecondaryGatewayConfig *SSHConfig
+	cmdTpl                 string
 }
 
 // SSHTunnel a SSH tunnel

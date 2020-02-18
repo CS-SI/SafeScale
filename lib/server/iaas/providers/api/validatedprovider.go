@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/sirupsen/logrus"
 )
@@ -29,36 +29,36 @@ import (
 // ValidatedProvider ...
 type ValidatedProvider WrappedProvider
 
-func (w ValidatedProvider) CreateVIP(netID string, name string) (*abstracts.VirtualIP, error) {
+func (w ValidatedProvider) CreateVIP(netID string, name string) (*abstract.VirtualIP, error) {
 	// FIXME: Add OK method to vip, then check return value
 	return w.InnerProvider.CreateVIP(netID, name)
 }
 
-func (w ValidatedProvider) AddPublicIPToVIP(vip *abstracts.VirtualIP) error {
+func (w ValidatedProvider) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.AddPublicIPToVIP(vip)
 }
 
-func (w ValidatedProvider) BindHostToVIP(vip *abstracts.VirtualIP, hostID string) error {
+func (w ValidatedProvider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) UnbindHostFromVIP(vip *abstracts.VirtualIP, hostID string) error {
+func (w ValidatedProvider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	// FIXME:  Add OK method to vip
 	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) DeleteVIP(vip *abstracts.VirtualIP) error {
+func (w ValidatedProvider) DeleteVIP(vip *abstract.VirtualIP) error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.DeleteVIP(vip)
 }
 
-func (w ValidatedProvider) Capabilities() providers.Capabilities {
-	return w.InnerProvider.Capabilities()
+func (w ValidatedProvider) GetCapabilities() providers.Capabilities {
+	return w.InnerProvider.GetCapabilities()
 }
 
-func (w ValidatedProvider) TenantParameters() map[string]interface{} {
+func (w ValidatedProvider) GetTenantParameters() map[string]interface{} {
 	return w.InnerProvider.TenantParameters()
 }
 
@@ -68,7 +68,7 @@ func (w ValidatedProvider) Build(something map[string]interface{}) (p Provider, 
 	return w.InnerProvider.Build(something)
 }
 
-func (w ValidatedProvider) ListImages(all bool) (res []abstracts.Image, err error) {
+func (w ValidatedProvider) ListImages(all bool) (res []abstract.Image, err error) {
 	res, err = w.InnerProvider.ListImages(all)
 	if err != nil {
 		for _, image := range res {
@@ -80,7 +80,7 @@ func (w ValidatedProvider) ListImages(all bool) (res []abstracts.Image, err erro
 	return res, err
 }
 
-func (w ValidatedProvider) ListTemplates(all bool) (res []abstracts.HostTemplate, err error) {
+func (w ValidatedProvider) ListTemplates(all bool) (res []abstract.HostTemplate, err error) {
 	res, err = w.InnerProvider.ListTemplates(all)
 	if err != nil {
 		for _, hostTemplate := range res {
@@ -92,15 +92,15 @@ func (w ValidatedProvider) ListTemplates(all bool) (res []abstracts.HostTemplate
 	return res, err
 }
 
-func (w ValidatedProvider) AuthenticationOptions() (providers.Config, error) {
+func (w ValidatedProvider) GetAuthenticationOptions() (providers.Config, error) {
 	return w.InnerProvider.AuthenticationOptions()
 }
 
-func (w ValidatedProvider) ConfigurationOptions() (providers.Config, error) {
-	return w.InnerProvider.ConfigurationOptions()
+func (w ValidatedProvider) GetConfigurationOptions() (providers.Config, error) {
+	return w.InnerProvider.Config(urationOptions()
 }
 
-func (w ValidatedProvider) Name() string {
+func (w ValidatedProvider) GetName() string {
 	return w.InnerProvider.Name()
 }
 
@@ -122,8 +122,8 @@ func (w ValidatedProvider) ListRegions() ([]string, error) {
 }
 
 // GetImage ...
-func (w ValidatedProvider) GetImage(id string) (res *abstracts.Image, err error) {
-	res, err = w.InnerProvider.GetImage(id)
+func (w ValidatedProvider) GetImage(id string) (res *abstract.Image, err error) {
+	res, err = w.InnerProvider.Image(id)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -136,8 +136,8 @@ func (w ValidatedProvider) GetImage(id string) (res *abstracts.Image, err error)
 }
 
 // GetTemplate ...
-func (w ValidatedProvider) GetTemplate(id string) (res *abstracts.HostTemplate, err error) {
-	res, err = w.InnerProvider.GetTemplate(id)
+func (w ValidatedProvider) GetTemplate(id string) (res *abstract.HostTemplate, err error) {
+	res, err = w.InnerProvider.Template(id)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -149,7 +149,7 @@ func (w ValidatedProvider) GetTemplate(id string) (res *abstracts.HostTemplate, 
 }
 
 // CreateKeyPair ...
-func (w ValidatedProvider) CreateKeyPair(name string) (kp *abstracts.KeyPair, err error) {
+func (w ValidatedProvider) CreateKeyPair(name string) (kp *abstract.KeyPair, err error) {
 	kp, err = w.InnerProvider.CreateKeyPair(name)
 	if err != nil {
 		if kp == nil {
@@ -160,8 +160,8 @@ func (w ValidatedProvider) CreateKeyPair(name string) (kp *abstracts.KeyPair, er
 }
 
 // GetKeyPair ...
-func (w ValidatedProvider) GetKeyPair(id string) (kp *abstracts.KeyPair, err error) {
-	kp, err = w.InnerProvider.GetKeyPair(id)
+func (w ValidatedProvider) GetKeyPair(id string) (kp *abstract.KeyPair, err error) {
+	kp, err = w.InnerProvider.KeyPair(id)
 	if err != nil {
 		if kp == nil {
 			logrus.Warn("Invalid keypair !")
@@ -171,7 +171,7 @@ func (w ValidatedProvider) GetKeyPair(id string) (kp *abstracts.KeyPair, err err
 }
 
 // ListKeyPairs ...
-func (w ValidatedProvider) ListKeyPairs() (res []abstracts.KeyPair, err error) {
+func (w ValidatedProvider) ListKeyPairs() (res []abstract.KeyPair, err error) {
 	return w.InnerProvider.ListKeyPairs()
 }
 
@@ -181,7 +181,7 @@ func (w ValidatedProvider) DeleteKeyPair(id string) (err error) {
 }
 
 // CreateNetwork ...
-func (w ValidatedProvider) CreateNetwork(req abstracts.NetworkRequest) (res *abstracts.Network, err error) {
+func (w ValidatedProvider) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, err error) {
 	res, err = w.InnerProvider.CreateNetwork(req)
 	if err != nil {
 		if res != nil {
@@ -194,7 +194,7 @@ func (w ValidatedProvider) CreateNetwork(req abstracts.NetworkRequest) (res *abs
 }
 
 // GetNetwork ...
-func (w ValidatedProvider) GetNetwork(id string) (res *abstracts.Network, err error) {
+func (w ValidatedProvider) GetNetwork(id string) (res *abstract.Network, err error) {
 	res, err = w.InnerProvider.GetNetwork(id)
 	if err != nil {
 		if res != nil {
@@ -207,7 +207,7 @@ func (w ValidatedProvider) GetNetwork(id string) (res *abstracts.Network, err er
 }
 
 // GetNetworkByName ...
-func (w ValidatedProvider) GetNetworkByName(name string) (res *abstracts.Network, err error) {
+func (w ValidatedProvider) GetNetworkByName(name string) (res *abstract.Network, err error) {
 	res, err = w.InnerProvider.GetNetworkByName(name)
 	if err != nil {
 		if res != nil {
@@ -220,7 +220,7 @@ func (w ValidatedProvider) GetNetworkByName(name string) (res *abstracts.Network
 }
 
 // ListNetworks ...
-func (w ValidatedProvider) ListNetworks() (res []*abstracts.Network, err error) {
+func (w ValidatedProvider) ListNetworks() (res []*abstract.Network, err error) {
 	res, err = w.InnerProvider.ListNetworks()
 	if err != nil {
 		for _, item := range res {
@@ -240,7 +240,7 @@ func (w ValidatedProvider) DeleteNetwork(id string) (err error) {
 }
 
 // CreateGateway ...
-func (w ValidatedProvider) CreateGateway(req abstracts.GatewayRequest) (res *abstracts.HostFull, data *userdata.Content, err error) {
+func (w ValidatedProvider) CreateGateway(req abstract.GatewayRequest) (res *abstract.HostFull, data *userdata.Content, err error) {
 	res, data, err = w.InnerProvider.CreateGateway(req)
 	if err != nil {
 		if res != nil {
@@ -263,7 +263,7 @@ func (w ValidatedProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateHost ...
-func (w ValidatedProvider) CreateHost(request abstracts.HostRequest) (res *abstracts.HostFull, ud *userdata.Content, err error) {
+func (w ValidatedProvider) CreateHost(request abstract.HostRequest) (res *abstract.HostFull, ud *userdata.Content, err error) {
 	res, ud, err = w.InnerProvider.CreateHost(request)
 	if err != nil {
 		if res != nil {
@@ -281,7 +281,7 @@ func (w ValidatedProvider) CreateHost(request abstracts.HostRequest) (res *abstr
 }
 
 // InspectHost ...
-func (w ValidatedProvider) InspectHost(something interface{}) (res *abstracts.HostFull, err error) {
+func (w ValidatedProvider) InspectHost(something interface{}) (res *abstract.HostFull, err error) {
 	res, err = w.InnerProvider.InspectHost(something)
 	if err != nil {
 		if res != nil {
@@ -294,7 +294,7 @@ func (w ValidatedProvider) InspectHost(something interface{}) (res *abstracts.Ho
 }
 
 // WaitHostReady ...
-func (w ValidatedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstracts.HostCore, err error) {
+func (w ValidatedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.HostCore, err error) {
 	res, err = w.InnerProvider.WaitHostReady(hostParam, timeout)
 	if err != nil {
 		if res != nil {
@@ -323,7 +323,7 @@ func (w ValidatedProvider) GetHostState(something interface{}) (res hoststate.En
 }
 
 // ListHosts ...
-func (w ValidatedProvider) ListHosts(details bool) (res []*abstracts.HostFull, err error) {
+func (w ValidatedProvider) ListHosts(details bool) (res abstract.HostList, err error) {
 	res, err = w.InnerProvider.ListHosts(details)
 	if err != nil {
 		for _, item := range res {
@@ -358,7 +358,7 @@ func (w ValidatedProvider) RebootHost(id string) (err error) {
 }
 
 // ResizeHost ...
-func (w ValidatedProvider) ResizeHost(id string, request abstracts.HostSizingRequirements) (res *abstracts.HostFull, err error) {
+func (w ValidatedProvider) ResizeHost(id string, request abstract.HostSizingRequirements) (res *abstract.HostFull, err error) {
 	res, err = w.InnerProvider.ResizeHost(id, request)
 	if err != nil {
 		if res != nil {
@@ -371,7 +371,7 @@ func (w ValidatedProvider) ResizeHost(id string, request abstracts.HostSizingReq
 }
 
 // CreateVolume ...
-func (w ValidatedProvider) CreateVolume(request abstracts.VolumeRequest) (res *abstracts.Volume, err error) {
+func (w ValidatedProvider) CreateVolume(request abstract.VolumeRequest) (res *abstract.Volume, err error) {
 	res, err = w.InnerProvider.CreateVolume(request)
 	if err != nil {
 		if res != nil {
@@ -384,8 +384,8 @@ func (w ValidatedProvider) CreateVolume(request abstracts.VolumeRequest) (res *a
 }
 
 // GetVolume ...
-func (w ValidatedProvider) GetVolume(id string) (res *abstracts.Volume, err error) {
-	res, err = w.InnerProvider.GetVolume(id)
+func (w ValidatedProvider) GetVolume(id string) (res *abstract.Volume, err error) {
+	res, err = w.InnerProvider.Volume(id)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -397,7 +397,7 @@ func (w ValidatedProvider) GetVolume(id string) (res *abstracts.Volume, err erro
 }
 
 // ListVolumes ...
-func (w ValidatedProvider) ListVolumes() (res []abstracts.Volume, err error) {
+func (w ValidatedProvider) ListVolumes() (res []abstract.Volume, err error) {
 	res, err = w.InnerProvider.ListVolumes()
 	if err != nil {
 		for _, item := range res {
@@ -415,13 +415,13 @@ func (w ValidatedProvider) DeleteVolume(id string) (err error) {
 }
 
 // CreateVolumeAttachment ...
-func (w ValidatedProvider) CreateVolumeAttachment(request abstracts.VolumeAttachmentRequest) (id string, err error) {
+func (w ValidatedProvider) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (id string, err error) {
 	return w.InnerProvider.CreateVolumeAttachment(request)
 }
 
 // GetVolumeAttachment ...
-func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *abstracts.VolumeAttachment, err error) {
-	res, err = w.InnerProvider.GetVolumeAttachment(serverID, id)
+func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *abstract.VolumeAttachment, err error) {
+	res, err = w.InnerProvider.VolumeAttachment(serverID, id)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -433,7 +433,7 @@ func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *abstra
 }
 
 // ListVolumeAttachments ...
-func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []abstracts.VolumeAttachment, err error) {
+func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []abstract.VolumeAttachment, err error) {
 	res, err = w.InnerProvider.ListVolumeAttachments(serverID)
 	if err != nil {
 		for _, item := range res {

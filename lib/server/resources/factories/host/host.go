@@ -14,24 +14,53 @@
  * limitations under the License.
  */
 
-package factory
+package host
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/hosts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
+
+// List returns a list of available hosts
+func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, error) {
+	if svc == nil {
+		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+	}
+
+	// FIXME: get code from HostListener
+
+	if all {
+		return svc.ListHosts(all)
+	}
+
+	objh, err := New(svc)
+	if err != nil {
+		return nil, err
+	}
+	hosts := abstract.HostList{}
+	err = objh.Browse(task, func(hc *abstract.HostCore) error {
+		hf := converters.HostCoreToHostFull(hc)
+		hosts = append(hosts, hf)
+		return nil
+	})
+	return hosts, err
+}
 
 // New creates an instance of resources.Host
 func New(svc iaas.Service) (_ resources.Host, err error) {
 	if svc == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	objh, err := hosts.New(svc)
-	// return objh.(resources.Host), err
-	return objh, err
+	host, err := operations.NewHost(svc)
+	if err != nil {
+		return nil, err
+	}
+	return host, nil
 }
 
 // Load loads the metadata of host and returns an instance of resources.Host
@@ -48,5 +77,5 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host
 
 	//FIXME: tracer...
 
-	return hosts.Load(svc)
+	return operations.LoadHost(svc)
 }

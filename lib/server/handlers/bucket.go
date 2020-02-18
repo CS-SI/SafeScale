@@ -27,22 +27,20 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-//go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers BucketAPI
+//go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers BucketHandler
 
-// BucketAPI defines API to manipulate buckets
-type BucketAPI interface {
+// BucketHandler defines interface to manipulate buckets
+type BucketHandler interface {
 	List() ([]string, error)
 	Create(string) error
 	Delete(string) error
-	Inspect(string) (*resources.Bucket, error)
+	Inspect(string) (resources.Bucket, error)
 	Mount(string, string, string) error
 	Unmount(string, string) error
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
-
-// BucketHandler bucket service
-type BucketHandler struct {
+// bucketHandler bucket service
+type bucketHandler struct {
 	job server.Job
 }
 
@@ -78,7 +76,7 @@ func (handler *BucketHandler) Create(name string) (err error) { // FIXME Unused 
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	bucket, err := handler.job.Service().GetBucket(name)
+	bucket, err := handler.job.Service().Bucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
 			return err
@@ -113,7 +111,7 @@ func (handler *BucketHandler) Inspect(name string) (mb *resources.Bucket, err er
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	b, err := handler.job.Service().GetBucket(name)
+	b, err := handler.job.Service().Bucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
 			return nil, resources.ResourceNotFoundError("bucket", name)
@@ -121,7 +119,7 @@ func (handler *BucketHandler) Inspect(name string) (mb *resources.Bucket, err er
 		return nil, err
 	}
 	mb = &resources.Bucket{
-		Name: b.GetName(),
+		Name: b.Name(),
 	}
 	return mb, nil
 }
@@ -137,7 +135,7 @@ func (handler *BucketHandler) Mount(bucketName, hostName, path string) (err erro
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Check bucket existence
-	_, err = handler.job.Service().GetBucket(bucketName)
+	_, err = handler.job.Service().Bucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -155,7 +153,7 @@ func (handler *BucketHandler) Mount(bucketName, hostName, path string) (err erro
 		mountPoint = resources.DefaultBucketMountPoint + bucketName
 	}
 
-	authOpts, _ := handler.job.Service().GetAuthenticationOptions()
+	authOpts, _ := handler.job.Service().AuthenticationOptions()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl, _ := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
@@ -168,7 +166,7 @@ func (handler *BucketHandler) Mount(bucketName, hostName, path string) (err erro
 	regionCfg, _ := authOpts.Config("Region")
 	region, _ := regionCfg.(string)
 
-	objStorageProtocol := handler.job.Service().GetType()
+	objStorageProtocol := handler.job.Service().ObjectStorageProtocol()
 	if objStorageProtocol == "swift" {
 		objStorageProtocol = "swiftks"
 	}

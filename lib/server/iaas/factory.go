@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -49,14 +49,14 @@ func Register(name string, provider api.Provider) {
 	}
 }
 
-// GetTenantNames returns all known tenants names
-func GetTenantNames() (map[string]string, error) {
+// TenantNames returns all known tenants names
+func TenantNames() (map[string]string, error) {
 	err := loadConfig()
 	return allTenants, err
 }
 
-// GetTenants returns all known tenants
-func GetTenants() ([]interface{}, error) {
+// Tenants returns all known tenants
+func Tenants() ([]interface{}, error) {
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -156,7 +156,8 @@ func UseService(tenantName string) (newService Service, err error) {
 		// Initializes Object Storage
 		var objectStorageLocation objectstorage.Location
 		if tenantObjectStorageFound {
-			objectStorageConfig, err := initObjectStorageLocationConfig(tenant)
+			// objectStorageConfig, err := initObjectStorageLocationConfig(tenant)
+			objectStorageConfig, err := initObjectStorageLocationConfig(providerInstance.AuthenticationOptions(), tenant)
 			if err != nil {
 				return nil, err
 			}
@@ -196,7 +197,7 @@ func UseService(tenantName string) (newService Service, err error) {
 				return nil, fmt.Errorf("error accessing metadata location: %s", err.Error())
 			}
 			if found {
-				metadataBucket, err = metadataLocation.GetBucket(bucketName)
+				metadataBucket, err = metadataLocation.Bucket(bucketName)
 				if err != nil {
 					return nil, err
 				}
@@ -230,7 +231,7 @@ func UseService(tenantName string) (newService Service, err error) {
 	if !tenantInCfg {
 		return nil, fmt.Errorf("tenant '%s' not found in configuration", tenantName)
 	}
-	return nil, abstracts.ResourceNotFoundError("provider builder for", svcProvider)
+	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
 // UseSpecialService return the service referenced by the given name.
@@ -330,7 +331,7 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 				return nil, fmt.Errorf("error accessing metadata location: %s", err.Error())
 			}
 			if found {
-				metadataBucket, err = metadataLocation.GetBucket(bucketName)
+				metadataBucket, err = metadataLocation.Bucket(bucketName)
 				if err != nil {
 					return nil, err
 				}
@@ -366,7 +367,7 @@ func UseSpecialService(tenantName string, fakeProvider api.Provider, fakeLocatio
 	if !tenantInCfg {
 		return nil, fmt.Errorf("tenant '%s' not found in configuration", tenantName)
 	}
-	return nil, abstracts.ResourceNotFoundError("provider builder for", svcProvider)
+	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
 // validatRegexps validates regexp values from tenants file
@@ -412,7 +413,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
-func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+func initObjectStorageLocationConfig(authOpts stacks.AuthenticationOptions, tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -431,7 +432,9 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 			if config.Domain, ok = compute["Domain"].(string); !ok {
 				if config.Domain, ok = compute["DomainName"].(string); !ok {
 					if config.Domain, ok = identity["Domain"].(string); !ok {
-						config.Domain, _ = identity["DomainName"].(string)
+						if config.Domain, ok = identity["DomainName"].(string); !ok {
+							config.Domain = authOpts.DomainName
+						}
 					}
 				}
 			}
@@ -443,7 +446,9 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 		if config.Tenant, ok = ostorage["ProjectName"].(string); !ok {
 			if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
 				if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-					config.Tenant, _ = compute["ProjectID"].(string)
+					if config.Tenant, ok = compute["ProjectID"].(string); !ok {
+						config.Tenant = authOpts.GetString("ProjectName")
+					}
 				}
 			}
 		}
@@ -521,7 +526,7 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+func initMetadataLocationConfig(authOpts stacks.AuthenticationOptions, tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -545,7 +550,9 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 					if config.Domain, ok = compute["Domain"].(string); !ok {
 						if config.Domain, ok = compute["DomainName"].(string); !ok {
 							if config.Domain, ok = identity["Domain"].(string); !ok {
-								config.Domain, _ = identity["DomainName"].(string)
+								config.Domain, ok = identity["DomainName"].(string); !ok {
+									config.Domain = authOpts.DomainName
+								}
 							}
 						}
 					}

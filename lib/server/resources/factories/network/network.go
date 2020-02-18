@@ -15,12 +15,12 @@
  */
 
 // Package factory contains methods to load or create objects
-package factory
+package network
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/networks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -31,7 +31,7 @@ func New(svc iaas.Service) (resources.Network, error) {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	return networks.New(svc)
+	return operations.NewNetwork(svc)
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
@@ -46,10 +46,5 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Networ
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	objn, err := New(svc)
-	if err != nil {
-		return nil, err
-	}
-
-	return objn, objn.Read(task, ref)
+	return operations.LoadNetwork(task, svc, ref)
 }

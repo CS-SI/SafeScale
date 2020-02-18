@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -31,7 +31,7 @@ import (
 
 //TemplateHandler defines API to manipulate hosts
 type TemplateHandler interface {
-	List(all bool) ([]abstracts.HostTemplate, error)
+	List(all bool) ([]abstract.HostTemplate, error)
 }
 
 // templateHandler template service
@@ -46,7 +46,7 @@ func NewTemplateHandler(job server.Job) TemplateHandler {
 }
 
 // List returns the template list
-func (handler *templateHandler) List(all bool) (tlist []abstracts.HostTemplate, err error) {
+func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}

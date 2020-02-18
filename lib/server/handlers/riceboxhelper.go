@@ -65,7 +65,7 @@ func exec(job server.Job, script string, data interface{}, hostid string, svc ia
 	}
 	// retrieve ssh config to perform some commands
 	sshHandler := NewSSHHandler(job)
-	ssh, err := sshHandler.GetConfig(hostid)
+	ssh, err := sshHandler.Config((hostid)
 	if err != nil {
 		return err
 	}

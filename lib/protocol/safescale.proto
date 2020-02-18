@@ -409,6 +409,8 @@ message SshCommand{
 message SshCopyCommand{
     string source = 1;
     string destination = 2;
+    string owner = 3;
+    string mode = 4;
 }
 
 message SshResponse{

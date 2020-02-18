@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -31,9 +31,9 @@ import (
 
 // ImageAPI defines API to manipulate images
 type ImageHandler interface {
-	List(all bool) ([]abstracts.Image, error)
-	Select(osfilter string) (*abstracts.Image, error)
-	Filter(osfilter string) ([]abstracts.Image, error)
+	List(all bool) ([]abstract.Image, error)
+	Select(osfilter string) (*abstract.Image, error)
+	Filter(osfilter string) ([]abstract.Image, error)
 }
 
 // FIXME ROBUSTNESS All functions MUST propagate context
@@ -49,7 +49,7 @@ func NewImageHandler(job server.Job) ImageHandler {
 }
 
 // List returns the image list
-func (handler *imageHandler) List(all bool) (images []abstracts.Image, err error) {
+func (handler *imageHandler) List(all bool) (images []abstract.Image, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -65,11 +65,11 @@ func (handler *imageHandler) List(all bool) (images []abstracts.Image, err error
 }
 
 // Select selects the image that best fits osname
-func (handler *imageHandler) Select(osname string) (image *abstracts.Image, err error) {
+func (handler *imageHandler) Select(osname string) (image *abstract.Image, err error) {
 	return nil, scerr.NotImplementedError("ImageHandler.Select() not yet implemented")
 }
 
 // Filter filters the images that do not fit osname
-func (handler *imageHandler) Filter(osname string) (image []abstracts.Image, err error) {
+func (handler *imageHandler) Filter(osname string) (image []abstract.Image, err error) {
 	return nil, scerr.NotImplementedError("ImageHandler.Filter() not yet implemented")
 }

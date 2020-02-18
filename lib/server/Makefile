@@ -7,7 +7,7 @@ all:	lib/server/iaas lib/server/resources lib/server/handlers
 generate: clean
 	@(cd iaas && $(MAKE) $@)
 	@(cd resources && $(MAKE) $@)
-	@(cd iaas && $(MAKE) $@)
+	@(cd handlers && $(MAKE) $@)
 
 vet:
 	@$(GO) vet ./...

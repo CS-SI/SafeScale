@@ -19,7 +19,7 @@ package api
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
 
 //go:generate mockgen -destination=../mocks/mock_providerapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/providers/api Provider
@@ -32,24 +32,24 @@ type Provider interface {
 	stacks.Stack
 
 	// ListImages lists available OS images
-	ListImages(all bool) ([]abstracts.Image, error)
+	ListImages(all bool) ([]abstract.Image, error)
 
 	// ListTemplates lists available host templates
 	// Host templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates(all bool) ([]abstracts.HostTemplate, error)
+	ListTemplates(all bool) ([]abstract.HostTemplate, error)
 
-	// AuthenticationOptions returns authentication options as a Config
-	AuthenticationOptions() (providers.Config, error)
+	// GetAuthenticationOptions returns authentication options as a Config
+	GetAuthenticationOptions() (providers.Config, error)
 
-	// ConfigurationfgOpts returns configuration options as a Config
-	ConfigurationOptions() (providers.Config, error)
+	// GetConfigurationfgOpts returns configuration options as a Config
+	GetConfigurationOptions() (providers.Config, error)
 
-	// Name returns the provider name
-	Name() string
+	// GetName returns the provider name
+	GetName() string
 
-	// Capabilities returns the capabilities of the provider
-	Capabilities() providers.Capabilities
+	// GetCapabilities returns the capabilities of the provider
+	GetCapabilities() providers.Capabilities
 
-	// TenantParameters returns the tenant parameters as read
-	TenantParameters() map[string]interface{}
+	// GetTenantParameters returns the tenant parameters as read
+	GetTenantParameters() map[string]interface{}
 }

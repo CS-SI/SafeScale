@@ -17,7 +17,7 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -28,11 +28,11 @@ import (
 // !!! DEPRECATED !!! superseded by propertiesv2.ClusterDefaults
 type ClusterDefaults struct {
 	// GatewaySizing keeps the default node definition
-	GatewaySizing abstracts.HostEffectiveSizing `json:"gateway_sizing"`
+	GatewaySizing abstract.HostEffectiveSizing `json:"gateway_sizing"`
 	// MasterSizing keeps the default node definition
-	MasterSizing abstracts.HostEffectiveSizing `json:"master_sizing"`
+	MasterSizing abstract.HostEffectiveSizing `json:"master_sizing"`
 	// NodeSizing keeps the default node definition
-	NodeSizing abstracts.HostEffectiveSizing `json:"node_sizing"`
+	NodeSizing abstract.HostEffectiveSizing `json:"node_sizing"`
 	// Image keeps the default Linux image to use
 	Image string `json:"image"`
 }

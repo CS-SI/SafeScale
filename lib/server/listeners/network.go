@@ -27,9 +27,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -68,7 +70,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		}
 	}
 
-	networkName := in.GetName()
+	networkName := in.Name()
 	if networkName == "" {
 		return nil, scerr.InvalidRequestError("network name cannot be empty string")
 	}
@@ -84,12 +86,12 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
-		sizing    *abstracts.SizingRequirements
+		sizing    *abstract.HostSizingRequirements
 		gwImageID string
 		gwName    string
 	)
 	if in.Gateway == nil || in.Gateway.Sizing == nil {
-		sizing = &abstracts.SizingRequirements{
+		sizing = &abstract.HostSizingRequirements{
 			MinCores:    int(in.Gateway.Sizing.MinCpuCount),
 			MaxCores:    int(in.Gateway.Sizing.MaxCpuCount),
 			MinRAMSize:  in.Gateway.Sizing.MinRamSize,
@@ -99,12 +101,12 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 			MinFreq:     in.Gateway.Sizing.MinCpuFreq,
 		}
 	} else {
-		s := srvutils.FromProtocolHostSizing(*in.Gateway.Sizing)
+		s := converters.HostSizingRequirementsFromProtocolToAbstracts(*in.Gateway.Sizing)
 		sizing = &s
 	}
 	if in.Gateway != nil {
 		gwImageID = in.GetGateway().GetImageId()
-		gwName = in.GetGateway().GetName()
+		gwName = in.GetGateway().Name()
 	}
 
 	handler := handlers.NewNetworkHandler(job)
@@ -126,10 +128,10 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	if err != nil {
 		return nil, err
 	}
-	network := r.(*abstracts.Network)
+	network := r.(resources.Network)
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)
-	return conv.ToProtocolNetwork(network), nil
+	return converters.NetworkFromResourceToProtocol(network), nil
 }
 
 // List existing networks
@@ -173,10 +175,10 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 		return nil, err
 	}
 
-	// Build response mapping abstracts.Network to protocol.Network
+	// Build response mapping abstract.Network to protocol.Network
 	var pbnetworks []*protocol.Network
 	for _, network := range networks {
-		pbnetworks = append(pbnetworks, conv.ToProtocolNetwork(network))
+		pbnetworks = append(pbnetworks, converters.NetworkFromResourceToProtocol(network))
 	}
 	rv := &protocol.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -222,17 +224,11 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	handler := handlers.NewNetworkHandler(job)
-	network, err := handler.Inspect(ref)
+	network, err := networkfactory.Load(job.Task(), job.Service(), ref)
 	if err != nil {
 		return nil, err
 	}
-	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	if network == nil {
-		return nil, scerr.NotFoundError(fmt.Sprintf("network '%s' not found", ref))
-	}
-
-	return conv.ToProtocolNetwork(network), nil
+	return network.ToProtocol()
 }
 
 // Delete a network

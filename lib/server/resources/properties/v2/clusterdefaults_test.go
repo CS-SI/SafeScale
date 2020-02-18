@@ -20,19 +20,19 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaults_Clone(t *testing.T) {
-	ct := newDefaults()
+	ct := newClusterDefaults()
 	ct.Image = "something"
-	ct.GatewaySizing = abstracts.HostSizingRequirements{
+	ct.GatewaySizing = abstract.HostSizingRequirements{
 		MinCores: 3,
 		MinGPU:   1,
 	}
 
-	clonedCt, ok := ct.Clone().(*Defaults)
+	clonedCt, ok := ct.Clone().(*ClusterDefaults)
 	if !ok {
 		t.Fail()
 	}

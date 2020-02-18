@@ -27,8 +27,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	conv "github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -278,7 +278,7 @@ func (s *ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHCon
 	if err != nil {
 		return nil, err
 	}
-	return conv.ToSystemSSHConfig(sshConfig), nil
+	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
 }
 
 // Connect ...

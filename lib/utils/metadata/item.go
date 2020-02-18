@@ -53,19 +53,19 @@ func NewItem(svc iaas.Service, path string) (*Item, error) {
 	return theItem, nil
 }
 
-// GetService returns the service used by Item
-func (i *Item) GetService() iaas.Service {
-	return i.folder.GetService()
+// Service returns the service used by Item
+func (i *Item) Service() iaas.Service {
+	return i.folder.Service()
 }
 
-// GetBucket returns the bucket used by Item
-func (i *Item) GetBucket() objectstorage.Bucket {
-	return i.folder.GetBucket()
+// Bucket returns the bucket used by Item
+func (i *Item) Bucket() objectstorage.Bucket {
+	return i.folder.Bucket()
 }
 
-// GetPath returns the path in the Object Storage where the Item is stored
-func (i *Item) GetPath() string {
-	return i.folder.GetPath()
+// Path returns the path in the Object Storage where the Item is stored
+func (i *Item) Path() string {
+	return i.folder.Path()
 }
 
 // Written tells if the item has already been written in Object Storage

@@ -648,7 +648,7 @@ sfKeycloakDeleteGroup() {
 }
 export -f sfKeycloakDeleteGroup
 
-# sfService abstracts the command to use to manipulate services
+# sfService abstract the command to use to manipulate services
 sfService() {
     [ $# -ne 2 ] && return 1
 

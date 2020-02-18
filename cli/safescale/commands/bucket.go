@@ -21,7 +21,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -133,7 +133,7 @@ var bucketMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: abstracts.DefaultBucketMountPoint,
+			Value: abstract.DefaultBucketMountPoint,
 			Usage: "Mount point of the bucket",
 		},
 	},

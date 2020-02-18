@@ -300,13 +300,13 @@ func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) {
 	o.Metadata = newMetadata
 }
 
-// GetName returns the name of the object
-func (o *object) GetName() string {
+// Name returns the name of the object
+func (o *object) Name() string {
 	return o.Name
 }
 
-// GetLastUpdate returns the date of last update
-func (o *object) GetLastUpdate() (time.Time, error) {
+// LastUpdate returns the date of last update
+func (o *object) LastUpdate() (time.Time, error) {
 	if o == nil {
 		return time.Time{}, scerr.InvalidInstanceError()
 	}
@@ -317,13 +317,13 @@ func (o *object) GetLastUpdate() (time.Time, error) {
 	return time.Now(), fmt.Errorf("object metadata not found")
 }
 
-// GetMetadata returns the metadata of the object in Object Storage
-func (o *object) GetMetadata() ObjectMetadata {
+// Metadata returns the metadata of the object in Object Storage
+func (o *object) Metadata() ObjectMetadata {
 	return o.Metadata.Clone()
 }
 
 // GetSize returns the size of the content of the object
-func (o *object) GetSize() int64 {
+func (o *object) Size() int64 {
 	if o.item != nil {
 		size, err := o.item.Size()
 		if err == nil {
@@ -333,8 +333,8 @@ func (o *object) GetSize() int64 {
 	return -1
 }
 
-// GetETag returns the value of the ETag (+/- md5sum of the content...)
-func (o *object) GetETag() string {
+// ETag returns the value of the ETag (+/- md5sum of the content...)
+func (o *object) ETag() string {
 	if o.item != nil {
 		etag, err := o.item.ETag()
 		if err == nil {
@@ -344,8 +344,8 @@ func (o *object) GetETag() string {
 	return ""
 }
 
-// GetID ...
-func (o *object) GetID() string {
+// ID ...
+func (o *object) ID() string {
 	if o.item != nil {
 		return o.item.ID()
 	}

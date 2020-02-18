@@ -27,7 +27,7 @@ import (
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 )
 
@@ -105,7 +105,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
 
-	operatorUsername := abstracts.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 	}
@@ -160,7 +160,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.AuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -173,7 +173,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.Config(urationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -184,12 +184,12 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetName returns the providerName
-func (p *provider) GetName() string {
+func (p *provider) Name() string {
 	return "gcp"
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]abstracts.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 

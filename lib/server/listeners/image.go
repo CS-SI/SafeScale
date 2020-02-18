@@ -24,7 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -75,10 +75,10 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 		return nil, err
 	}
 
-	// Build response mapping abstracts.Image to protocol.Image
+	// Build response mapping abstract.Image to protocol.Image
 	var pbImages []*protocol.Image
 	for _, image := range images {
-		pbImages = append(pbImages, conv.ToProtocolImage(&image))
+		pbImages = append(pbImages, converters.ImageFromAbstractsToProtocol(&image))
 	}
 	rv := &protocol.ImageList{Images: pbImages}
 	return rv, nil

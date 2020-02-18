@@ -188,7 +188,7 @@ func Test_GetKeyPair(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	cli.GetKeyPair(t)
+	cli.KeyPair(t)
 }
 
 func Test_ListKeyPairs(t *testing.T) {
@@ -277,7 +277,7 @@ func Test_GetImage(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	cli.GetImage(t)
+	cli.Image(t)
 }
 
 // GetTemplate returns the Template referenced by id
@@ -289,7 +289,7 @@ func Test_GetTemplate(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	cli.GetTemplate(t)
+	cli.Template(t)
 }
 
 // ListTemplates lists available host templates

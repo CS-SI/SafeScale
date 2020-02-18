@@ -178,16 +178,16 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 
 	var (
 		bridge    PipeBridge
-		displayCh chan outputItem
+		displayCh chan<- outputItem
 	)
 	if bridge, ok = params["bridge"].(PipeBridge); !ok {
-		return nil, scerr.InvalidParameterError("p[bridge]", "must be a PipeBridge")
+		return nil, scerr.InvalidParameterError("params['bridge']", "must be a PipeBridge")
 	}
 	if bridge == nil {
-		return nil, scerr.InvalidParameterError("p[pipe]", "cannot be nil")
+		return nil, scerr.InvalidParameterError("params['bridge']", "cannot be nil")
 	}
-	if displayCh, ok = params["displayCh"].(chan outputItem); !ok {
-		return nil, scerr.InvalidParameterError("p[displayCh]", "must be a chan outputItem")
+	if displayCh, ok = params["displayCh"].(chan<- outputItem); !ok {
+		return nil, scerr.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
 	}
 
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
@@ -229,9 +229,9 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 }
 
 func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
-	displayCh, ok := p.(chan outputItem)
+	displayCh, ok := p.(<-chan outputItem)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p", "must be a chan outputItem")
+		return nil, scerr.InvalidParameterError("p", "must be a '<-chan outputItem')
 	}
 	for item := range displayCh {
 		item.Print()

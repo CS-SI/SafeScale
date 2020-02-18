@@ -22,21 +22,17 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstracts"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers HostAPI
@@ -137,7 +133,7 @@ func (handler *hostHandler) Reboot(ref string) (err error) {
 }
 
 // Resize ...
-func (handler *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost resources.Host, err error) {
+func (handler *hostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost resources.Host, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -159,7 +155,7 @@ func (handler *HostHandler) Resize(ref string, cpu int, ram float32, disk int, g
 		return nil, err
 	}
 
-	hostSizeRequest := abstracts.SizingRequirements{
+	hostSizeRequest := abstract.SizingRequirements{
 		MinDiskSize: disk,
 		MinRAMSize:  ram,
 		MinCores:    cpu,
@@ -168,7 +164,7 @@ func (handler *HostHandler) Resize(ref string, cpu int, ram float32, disk int, g
 	}
 
 	descent := false
-	err = objh.Inspect(task, func(clonable data.Clonabl, props *serialize.JSONProperties) error {
+	err = objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(hostproperty.SizingV1, func(clonable data.Clonable) error {
 			nhs, ok := clonable.(*propertiesv1.HostSizing)
 			if !ok {
@@ -186,7 +182,7 @@ func (handler *HostHandler) Resize(ref string, cpu int, ram float32, disk int, g
 		return nil, err
 	}
 	if descent {
-		log.Warn("Asking for less abstracts..., ain't gonna happen :(")
+		logrus.Warn("Asking for less abstract..., ain't gonna happen :(")
 	}
 
 	err = objh.Resize(hostSizeRequest)
@@ -194,8 +190,8 @@ func (handler *HostHandler) Resize(ref string, cpu int, ram float32, disk int, g
 }
 
 // Create creates a host
-func (handler *HostHandler) Create(
-	req abstracts.HostRequest, sizing abstracts.SizingRequirements, force bool,
+func (handler *hostHandler) Create(
+	req abstract.HostRequest, sizing abstract.HostSizingRequirements, force bool,
 ) (newHost resources.Host, err error) {
 
 	if handler == nil {
@@ -218,7 +214,7 @@ func (handler *HostHandler) Create(
 			return nil, scerr.InvalidParameterError("req.Networks", "must contain at least on network if req.PublicIP is false")
 		}
 	} else {
-		networkName = abstracts.SingleHostNetworkName
+		networkName = abstract.SingleHostNetworkName
 	}
 	tracer := concurrency.NewTracer(
 		task,
@@ -242,7 +238,7 @@ func (handler *HostHandler) Create(
 }
 
 // List returns the host list
-func (handler *hostHandler) List(all bool) (hosts []*abstracts.Host, err error) {
+func (handler *hostHandler) List(all bool) (hosts []*abstract.HostFull, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -263,8 +259,8 @@ func (handler *hostHandler) List(all bool) (hosts []*abstracts.Host, err error) 
 	if err != nil {
 		return nil, err
 	}
-	hosts = []*abstracts.Host{}
-	err = objh.Browse(task, func(host *abstracts.Host) error {
+	hosts = []*abstract.Host{}
+	err = objh.Browse(task, func(host *abstract.Host) error {
 		hosts = append(hosts, host)
 		return nil
 	})
@@ -273,7 +269,7 @@ func (handler *hostHandler) List(all bool) (hosts []*abstracts.Host, err error) 
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
-func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host resources.Host, err error) {
+func (handler *hostHandler) Inspect(task concurrency.Task, ref string) (host resources.Host, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -300,7 +296,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host resou
 }
 
 // Delete deletes host referenced by ref
-func (handler *HostHandler) Delete(ref string) (err error) {
+func (handler *hostHandler) Delete(ref string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -341,7 +337,7 @@ func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, err er
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	sshHandler := NewSSHHandler(handler.job)
-	sshConfig, err = sshHandler.GetConfig(ref)
+	sshConfig, err = sshHandler.Config((ref)
 	if err != nil {
 		return nil, err
 	}

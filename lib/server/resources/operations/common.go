@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func retrieveForensicsData(task concurrency.Task, host resources.Host) {
+func RetrieveForensicsData(task concurrency.Task, host resources.Host) {
 	if host == nil {
 		return
 	}
@@ -40,7 +40,7 @@ func retrieveForensicsData(task concurrency.Task, host resources.Host) {
 	}
 }
 
-func getPhaseWarningsAndErrors(task concurrency.Task, host resources.Host) ([]string, []string) {
+func GetPhaseWarningsAndErrors(task concurrency.Task, host resources.Host) ([]string, []string) {
 	if task == nil || host == nil {
 		return []string{}, []string{}
 	}
