@@ -409,7 +409,7 @@ func validateOVHObjectStorageRegionNaming(context, region, authURL string) error
 		rLen := len(region)
 		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
 			region = region[:rLen-1]
-			return scerr.InvalidRequestError(fmt.Sprintf("region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = %s'.", context, region))
+			return scerr.InvalidRequestError(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
 		}
 	}
 	return nil
