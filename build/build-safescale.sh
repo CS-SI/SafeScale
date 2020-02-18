@@ -30,14 +30,11 @@ make all
 echo "Install"
 make install
 
-# ----------------------
-# Copy produced binaries to export directory
-# ----------------------
-EXPDIR=/usr/local/safescale/bin
-echo "Copy produced binaries to export directory '${EXPDIR}'"
-mkdir -p ${EXPDIR}
+echo "Export"
+export CIBIN=/exported
+mkdir -p /exported
 
-cp ${GOPATH}/bin/safescale ${EXPDIR}
-cp ${GOPATH}/bin/safescaled ${EXPDIR}
-cp ${GOPATH}/bin/deploy ${EXPDIR}
-cp ${GOPATH}/bin/perform ${EXPDIR}
+CIBIN=/exported make installci
+[ $? -ne 0 ] && echo "Export failure" && return 1
+
+return 0
