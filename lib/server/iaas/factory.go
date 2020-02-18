@@ -20,11 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
+	"strconv"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
-	log "github.com/sirupsen/logrus"
-
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -33,6 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+
 )
 
 var (
@@ -89,7 +90,7 @@ func UseService(tenantName string) (newService Service, err error) {
 		tenant, _ := t.(map[string]interface{})
 		name, found = tenant["name"].(string)
 		if !found {
-			log.Error("tenant found without 'name'")
+			logrus.Error("tenant found without 'name'")
 			continue
 		}
 		if name != tenantName {
@@ -101,7 +102,7 @@ func UseService(tenantName string) (newService Service, err error) {
 		if !found {
 			provider, found = tenant["client"].(string)
 			if !found {
-				log.Error("Missing field 'provider' in tenant")
+				logrus.Error("Missing field 'provider' in tenant")
 				continue
 			}
 		}
@@ -109,33 +110,33 @@ func UseService(tenantName string) (newService Service, err error) {
 		svcProvider = provider
 		svc, found = allProviders[provider]
 		if !found {
-			log.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
+			logrus.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
 			continue
 		}
 
 		// tenantIdentity, found := tenant["identity"].(map[string]interface{})
 		// if !found {
-		// 	log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+		// 	logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
 		// }
 		// tenantCompute, found := tenant["compute"].(map[string]interface{})
 		// if !found {
-		// 	log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+		// 	logrus.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
 		// }
 		// tenantNetwork, found := tenant["network"].(map[string]interface{})
 		// if !found {
-		// 	log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+		// 	logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		// }
 		_, found = tenant["identity"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
 		}
 		_, found = tenant["compute"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
 		}
 		_, found = tenant["network"].(map[string]interface{})
 		if !found {
-			log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+			logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
 		// tenantClient := map[string]interface{}{
 		// 	"identity": tenantIdentity,
@@ -174,7 +175,7 @@ func UseService(tenantName string) (newService Service, err error) {
 				return nil, fmt.Errorf("error connecting to Object Storage Location: %s", err.Error())
 			}
 		} else {
-			log.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
+			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
 		// Initializes Metadata Object Storage (may be different than the Object Storage)
@@ -358,6 +359,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string)
+		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+			return config, err
+		}
 	}
 
 	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
@@ -398,6 +402,18 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	return config, nil
 }
 
+func validateOVHObjectStorageRegionNaming(context, region, authURL string) error {
+	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
+	// Object Storage regions don't contain anymore an index like compute regions
+	if strings.Contains(authURL, "ovh.") {
+		rLen := len(region)
+		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
+			region = region[:rLen-1]
+			return scerr.InvalidRequestError(fmt.Sprintf("region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = %s'.", context, region))
+		}
+	}
+	return nil
+}
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
 func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
@@ -511,6 +527,9 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		if config.Region, ok = ostorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
 		}
+		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+			return config, err
+		}
 	}
 
 	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
@@ -519,7 +538,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 
-	// FIXME Remove google custom code
+	// FIXME: Remove google custom code
 	if config.Type == "google" {
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
@@ -586,7 +605,7 @@ func getTenantsFromCfg() ([]interface{}, error) {
 
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
-		log.Errorf(msg)
+		logrus.Errorf(msg)
 		return nil, fmt.Errorf(msg)
 	}
 	settings := v.AllSettings()
