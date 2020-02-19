@@ -726,7 +726,7 @@ func (handler *HostHandler) Create(
 
 	// Reboot host
 	command = "sudo systemctl reboot"
-	retcode, _, _, err = sshHandler.Run(ctx, host.Name, command)
+	retcode, _, _, err = sshHandler.Run(ctx, host.Name, command, outputs.COLLECT)
 	if err != nil {
 		return nil, err
 	}
@@ -767,7 +767,7 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 		return []string{}, []string{}
 	}
 
-	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat %s/user_data.phase2.log; exit $?", utils.LogFolder))
+	recoverCode, recoverStdOut, _, recoverErr := sshHandler.Run(ctx, host.Name, fmt.Sprintf("cat %s/user_data.phase2.log; exit $?", utils.LogFolder), outputs.COLLECT)
 	var warnings []string
 	var errs []string
 

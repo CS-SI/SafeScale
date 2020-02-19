@@ -38,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -667,7 +668,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	sshHandler := NewSSHHandler(handler.service)
 
 	// logrus.Debugf("Configuring gateway '%s', phase 2", gw.Name)
-	returnCode, _, _, err := sshHandler.Run(task.GetContext(), gw.Name, command)
+	returnCode, _, _, err := sshHandler.Run(task.GetContext(), gw.Name, command, outputs.COLLECT)
 	if err != nil {
 		retrieveForensicsData(task.GetContext(), sshHandler, gw)
 
@@ -685,7 +686,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	// Reboot gateway
 	logrus.Debugf("Rebooting gateway '%s'", gw.Name)
 	command = "sudo systemctl reboot"
-	returnCode, _, _, err = sshHandler.Run(task.GetContext(), gw.Name, command)
+	returnCode, _, _, err = sshHandler.Run(task.GetContext(), gw.Name, command, outputs.COLLECT)
 	if err != nil {
 		return nil, err
 	}
