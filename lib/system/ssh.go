@@ -553,20 +553,20 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 	)
 	stdoutPipe, ok = params["stdout"].(io.ReadCloser)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p[stdout]", "is missing or is not of type io.ReadCloser")
+		return nil, scerr.InvalidParameterError("p['stdout']", "is missing or is not of type io.ReadCloser")
 	}
 	if stdoutPipe == nil {
-		return nil, scerr.InvalidParameterError("p[stdout]", "cannot be nil")
+		return nil, scerr.InvalidParameterError("p['stdout']", "cannot be nil")
 	}
 	stderrPipe, ok = params["stderr"].(io.ReadCloser)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p[stderr]", "is missing or is not of type io.ReadCloser")
+		return nil, scerr.InvalidParameterError("p['stderr']", "is missing or is not of type io.ReadCloser")
 	}
 	if stderrPipe == nil {
-		return nil, scerr.InvalidParameterError("p[stderr]", "cannot be nil")
+		return nil, scerr.InvalidParameterError("p['stderr']", "cannot be nil")
 	}
 	if collectOutputs, ok = params["collect_outputs"].(bool); !ok {
-		return nil, scerr.InvalidParameterError("p[collect_outputs]", "is missing or is not of type bool")
+		return nil, scerr.InvalidParameterError("p['collect_outputs']", "is missing or is not of type bool")
 	}
 
 	var (
@@ -645,6 +645,9 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		// Make sure all outputs have been processed
 		if !collectOutputs {
 			pbcErr = pipeBridgeCtrl.Wait()
+			if pbcErr != nil {
+				logrus.Error(pbcErr.Error())
+			}
 		}
 
 		// Extract execution information
@@ -660,10 +663,7 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 			result["stderr"] = msgError
 		}
 	}
-	// Error happening on PipeBridgeController, when command succeeded, deserves to be logged
-	if !collectOutputs && pbcErr != nil {
-		logrus.Debug(pbcErr)
-	}
+
 	return result, nil
 }
 
