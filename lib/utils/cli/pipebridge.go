@@ -8,6 +8,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Printer ...
@@ -132,7 +133,8 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) error {
 		return err
 	}
 	pbc.displayCh = make(chan outputItem, pipeCount)
-	_, err = pbc.displayTask.Start(asyncDisplay, pbc.displayCh)
+	var receiveCh <-chan outputItem = pbc.displayCh
+	_, err = pbc.displayTask.Start(taskDisplay, receiveCh)
 	if err != nil {
 		return err
 	}
@@ -142,10 +144,11 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) error {
 	if err != nil {
 		return err
 	}
+	var sendCh chan<- outputItem = pbc.displayCh
 	for _, v := range pbc.bridges {
-		_, err = taskGroup.Start(asyncRead, data.Map{
+		_, err = taskGroup.Start(taskRead, data.Map{
 			"bridge":    v,
-			"displayCh": pbc.displayCh,
+			"displayCh": sendCh,
 		})
 		if err != nil {
 			return err
@@ -165,8 +168,8 @@ func (oi outputItem) Print() {
 	oi.bridge.Print(oi.data)
 }
 
-// asyncRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func asyncRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, err error) {
+// taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
+func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, err error) {
 	if p == nil {
 		return nil, scerr.InvalidParameterError("p", "cannot be nil")
 	}
@@ -228,7 +231,7 @@ func asyncRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.
 	return nil, err
 }
 
-func asyncDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	displayCh, ok := p.(<-chan outputItem)
 	if !ok {
 		return nil, scerr.InvalidParameterError("p", "must be a chan outputItem")
@@ -250,14 +253,22 @@ func (pbc *PipeBridgeController) Wait() error {
 	if pbc.readersGroup == nil {
 		return scerr.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
-	_, err := pbc.readersGroup.Wait()
-	close(pbc.displayCh)
-	if err != nil {
-		return err
-	}
+	defer close(pbc.displayCh)
 
-	_, err = pbc.displayTask.Wait()
-	return err
+	var errors []error
+	_, err := pbc.readersGroup.Wait()
+	if err != nil {
+		errors = append(errors, err)
+		err = pbc.displayTask.Abort()
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+	_, _, err = pbc.displayTask.WaitFor(temporal.GetConnectionTimeout())
+	if err != nil {
+		errors = append(errors, err)
+	}
+	return scerr.ErrListError(errors)
 }
 
 // Stop the captures and the display.
@@ -279,13 +290,20 @@ func (pbc *PipeBridgeController) Stop() error {
 	}
 	if !ok {
 		// If not done, abort it and wait until the end
-		pbc.readersGroup.Abort()
-		err = pbc.Wait()
+		err = pbc.readersGroup.Abort()
+		if err != nil {
+			return err
+		}
+		_, _, err = pbc.readersGroup.WaitFor(temporal.GetConnectionTimeout())
 		if err != nil {
 			// In case of error, report only if error is not aborted error, as we triggered it
 			if _, ok = err.(*scerr.ErrAborted); !ok {
 				return err
 			}
+		}
+		_, _, err = pbc.displayTask.WaitFor(temporal.GetConnectionTimeout())
+		if err != nil {
+			return scerr.Wrap(err, "display task is still running")
 		}
 	}
 
