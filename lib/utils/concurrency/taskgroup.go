@@ -275,8 +275,8 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 // }
 
 // Abort aborts the task execution
-func (tg *taskGroup) Abort() {
-	tg.task.Abort()
+func (tg *taskGroup) Abort() error {
+	return tg.task.Abort()
 }
 
 // New creates a subtask from current task
