@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 )
 
 // SSHHandler exists to ease integration tests
@@ -43,7 +44,7 @@ var SSHHandler = handlers.NewSSHHandler
 // SSHListener SSH service server grpc
 type SSHListener struct{}
 
-// Run executes an ssh command an an host
+// Run executes an ssh command on a remote host
 func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshResponse, err error) {
 	if s == nil {
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
@@ -73,7 +74,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	}
 
 	handler := SSHHandler(tenant.Service)
-	retcode, stdout, stderr, err := handler.Run(ctx, host, command)
+	retcode, stdout, stderr, err := handler.Run(ctx, host, command, outputs.DISPLAY)
 	if err != nil {
 		err = status.Errorf(codes.Internal, err.Error())
 	}

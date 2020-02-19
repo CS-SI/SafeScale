@@ -168,7 +168,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCode int, stdOut string, stdErr string, err error) {
+func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs outputs.Enum) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
@@ -193,7 +193,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
+			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, outs, temporal.GetHostTimeout())
 			return err
 		},
 		temporal.GetHostTimeout(),
@@ -221,13 +221,13 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (retCo
 // }
 
 // run executes command on the host
-func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (int, string, string, error) {
+func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, outs outputs.Enum, duration time.Duration) (int, string, string, error) {
 	// Create the command
 	sshCmd, err := ssh.Command(cmd)
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.RunWithTimeout(nil, outputs.DISPLAY, duration)
+	return sshCmd.RunWithTimeout(nil, outs, duration)
 }
 
 func extracthostName(in string) (string, error) {
