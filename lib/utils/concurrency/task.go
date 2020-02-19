@@ -58,7 +58,7 @@ type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
 // Task ...
 type Task interface {
-	Abort()
+	Abort() error
 	Aborted() bool
 	ForceID(string) (Task, error)
 	GetID() (string, error)
@@ -78,6 +78,7 @@ type Task interface {
 	// StoreResult(TaskParameters)
 	TryWait() (bool, TaskResult, error)
 	Wait() (TaskResult, error)
+	WaitFor(time.Duration) (bool, TaskResult, error)
 }
 
 // task is a structure allowing to identify (indirectly) goroutines
@@ -454,7 +455,11 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 // }
 
 // Abort aborts the task execution
-func (t *task) Abort() {
+func (t *task) Abort() error {
+	if t == nil {
+		return scerr.InvalidInstanceError()
+	}
+
 	status := t.GetStatus()
 	if status == RUNNING {
 		t.lock.Lock()
@@ -469,6 +474,7 @@ func (t *task) Abort() {
 
 		t.status = ABORTED
 	}
+	return nil
 }
 
 // Aborted tells if task has been aborted
