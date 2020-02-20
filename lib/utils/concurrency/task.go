@@ -54,10 +54,15 @@ type TaskResult interface{}
 // TaskAction ...
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
-// FIXME Unit test this class
+// TaskGuard ...
+type TaskGuard interface {
+	TryWait() (bool, TaskResult, error)
+	Wait() (TaskResult, error)
+	WaitFor(time.Duration) (bool, TaskResult, error)
+}
 
-// Task ...
-type Task interface {
+// TaskCore is the interface of core methods to control task and taskgroup
+type TaskCore interface {
 	Abort() error
 	Aborted() bool
 	ForceID(string) (Task, error)
@@ -75,13 +80,15 @@ type Task interface {
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
 	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, error)
-	// StoreResult(TaskParameters)
-	TryWait() (bool, TaskResult, error)
-	Wait() (TaskResult, error)
-	WaitFor(time.Duration) (bool, TaskResult, error)
 }
 
-// task is a structure allowing to identify (indirectly) goroutines
+// Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
+type Task interface {
+	TaskCore
+	TaskGuard
+}
+
+// task is the implementation of Task
 type task struct {
 	lock   sync.Mutex
 	id     string

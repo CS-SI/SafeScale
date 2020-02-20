@@ -31,11 +31,17 @@ import (
 // The index is the ID of the sub-Task running the action.
 type TaskGroupResult map[string]TaskResult
 
+// TaskGroupGuard is the task group interface defining method to wait the taskgroup
+type TaskGroupGuard interface {
+	TryWaitGroup() (bool, TaskGroupResult, error)
+	WaitGroup() (TaskGroupResult, error)
+	WaitGroupFor(time.Duration) (bool, TaskGroupResult, error)
+}
+
 // TaskGroup is the task group interface
 type TaskGroup interface {
-	TryWait() (bool, map[string]TaskResult, error)
-	Wait() (map[string]TaskResult, error)
-	WaitFor(time.Duration) (bool, map[string]TaskResult, error)
+	TaskCore
+	TaskGroupGuard
 }
 
 // task is a structure allowing to identify (indirectly) goroutines
@@ -43,16 +49,17 @@ type taskGroup struct {
 	lock sync.Mutex
 	last uint
 	*task
+	result   TaskGroupResult
 	subtasks []Task
 }
 
 // NewTaskGroup ...
-func NewTaskGroup(parentTask Task) (Task, error) {
+func NewTaskGroup(parentTask Task) (TaskGroup, error) {
 	return newTaskGroup(context.TODO(), parentTask)
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context) (Task, error) {
+func NewTaskGroupWithContext(ctx context.Context) (TaskGroup, error) {
 	return newTaskGroup(ctx, nil)
 }
 
@@ -148,8 +155,8 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 	return tg, nil
 }
 
-// Wait waits for the task to end, and returns the error (or nil) of the execution
-func (tg *taskGroup) Wait() (TaskResult, error) {
+// WaitGroup waits for the task to end, and returns the error (or nil) of the execution
+func (tg *taskGroup) WaitGroup() (TaskGroupResult, error) {
 	tid, _ := tg.GetID() // FIXME Later
 
 	taskStatus := tg.task.GetStatus()
@@ -166,7 +173,7 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 	}
 
 	errs := make(map[string]string)
-	results := make(map[string]TaskResult)
+	results := make(TaskGroupResult)
 
 	tg.lock.Lock()
 	defer tg.lock.Unlock()
@@ -199,9 +206,9 @@ func (tg *taskGroup) Wait() (TaskResult, error) {
 	return results, tg.task.err
 }
 
-// TryWait tries to wait on a task; if done returns the error and true, if not returns nil and false
-func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
-	tid, _ := tg.GetID() // FIXME Later
+// TryWaitGroup tries to wait on a task; if done returns the error and true, if not returns nil and false
+func (tg *taskGroup) TryWaitGroup() (bool, TaskGroupResult, error) {
+	tid, _ := tg.GetID() // FIXME: Later
 
 	if tg.task.GetStatus() != RUNNING {
 		return false, nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
@@ -212,14 +219,14 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
 			return false, nil, nil
 		}
 	}
-	result, err := tg.Wait()
+	result, err := tg.WaitGroup()
 	return true, result, err
 }
 
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
 // By design, duration cannot be less than 1ms.
-func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
+func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult, error) {
 	tid, _ := tg.GetID() // FIXME Later
 
 	if tg.task.GetStatus() != RUNNING {
@@ -235,7 +242,7 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		case <-time.After(duration):
 			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil)
 		default:
-			ok, result, err := tg.TryWait()
+			ok, result, err := tg.TryWaitGroup()
 			if ok {
 				return ok, result, err
 			}

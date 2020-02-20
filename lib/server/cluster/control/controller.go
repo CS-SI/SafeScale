@@ -1200,7 +1200,7 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 		_, _ = taskGroup.Start(c.asyncStopHost, secondaryGatewayID)
 	}
 
-	_, err = taskGroup.Wait()
+	_, err = taskGroup.WaitGroup()
 	if err != nil {
 		return err
 	}
@@ -1304,7 +1304,7 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	for _, n := range nodes {
 		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
 	}
-	_, err = taskGroup.Wait()
+	_, err = taskGroup.WaitGroup()
 	if err != nil {
 		return err
 	}
