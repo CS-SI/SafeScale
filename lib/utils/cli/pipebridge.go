@@ -83,7 +83,7 @@ type PipeBridgeController struct {
 	bridges      []PipeBridge
 	displayTask  concurrency.Task
 	displayCh    chan outputItem
-	readersGroup concurrency.Task
+	readersGroup concurrency.TaskGroup
 }
 
 // NewPipeBridgeController creates a new controller of bridges of pipe
@@ -196,8 +196,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	// bufio.Scanner.Scan() may panic...
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)() // bufio.Scanner.Scan() may panic...
 
 	scanner := bufio.NewScanner(bridge.Reader())
 	scanner.Split(bufio.ScanLines)
@@ -253,21 +252,23 @@ func (pbc *PipeBridgeController) Wait() error {
 	if pbc.readersGroup == nil {
 		return scerr.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
-	defer close(pbc.displayCh)
 
 	var errors []error
-	_, err := pbc.readersGroup.Wait()
+	_, err := pbc.readersGroup.WaitGroup()
 	if err != nil {
 		errors = append(errors, err)
 		err = pbc.displayTask.Abort()
 		if err != nil {
 			errors = append(errors, err)
 		}
+	} else {
+		close(pbc.displayCh)
 	}
 	_, _, err = pbc.displayTask.WaitFor(temporal.GetConnectionTimeout())
 	if err != nil {
 		errors = append(errors, err)
 	}
+
 	return scerr.ErrListError(errors)
 }
 
@@ -284,7 +285,7 @@ func (pbc *PipeBridgeController) Stop() error {
 	}
 
 	// Try to wait the end of the task group
-	ok, _, err := pbc.readersGroup.TryWait()
+	ok, _, err := pbc.readersGroup.TryWaitGroup()
 	if err != nil {
 		return err
 	}
@@ -294,7 +295,7 @@ func (pbc *PipeBridgeController) Stop() error {
 		if err != nil {
 			return err
 		}
-		_, _, err = pbc.readersGroup.WaitFor(temporal.GetConnectionTimeout())
+		_, _, err = pbc.readersGroup.WaitGroupFor(temporal.GetConnectionTimeout())
 		if err != nil {
 			// In case of error, report only if error is not aborted error, as we triggered it
 			if _, ok = err.(*scerr.ErrAborted); !ok {
