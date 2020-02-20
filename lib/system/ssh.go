@@ -435,7 +435,7 @@ func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, s
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outs.String(), timeout), false).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outs.String(), timeout), true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 
@@ -535,6 +535,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, t
 	return -1, "", "", scerr.InconsistentError("'result' should have been of type 'data.Map'")
 }
 
+// taskExecute executes the command on remote host by SSH inside a task
 func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	if sc == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -597,6 +598,14 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		}
 	}
 
+	// Starts pipebridge if needed
+	if !collectOutputs {
+		err = pipeBridgeCtrl.Start(task)
+		if err != nil {
+			return result, err
+		}
+	}
+
 	// Launch the command and wait for its execution
 	if err := sc.Start(); err != nil {
 		return result, err
@@ -612,23 +621,22 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		if err != nil {
 			return result, err
 		}
-	} else {
-		err = pipeBridgeCtrl.Start(task)
-		if err != nil {
-			return result, err
-		}
 	}
 
 	var pbcErr error
 	err = sc.Wait()
 	_ = stdoutPipe.Close()
 	_ = stderrPipe.Close()
-
 	if err == nil {
 		result["retcode"] = 0
 		if collectOutputs {
 			result["stdout"] = string(msgOut)
 			result["stderr"] = string(msgErr)
+		} else {
+			pbcErr = pipeBridgeCtrl.Wait()
+			if pbcErr != nil {
+				logrus.Error(pbcErr.Error())
+			}
 		}
 	} else {
 		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error

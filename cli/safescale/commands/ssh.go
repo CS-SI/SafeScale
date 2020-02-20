@@ -63,7 +63,8 @@ var sshRun = cli.Command{
 			Name:  "timeout",
 			Value: "5",
 			Usage: "timeout in minutes",
-		}},
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -106,7 +107,8 @@ var sshCopy = cli.Command{
 			Name:  "timeout",
 			Value: "5",
 			Usage: "timeout in minutes",
-		}},
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
