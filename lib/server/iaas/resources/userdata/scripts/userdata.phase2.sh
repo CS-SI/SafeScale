@@ -50,9 +50,9 @@ reset_fw() {
             sfApt install -qy firewalld || return 1
 
             systemctl stop ufw
-            systemctl start firewalld || return 1
+            # systemctl start firewalld || return 1
             systemctl disable ufw
-            systemctl enable firewalld
+            # systemctl enable firewalld
             sfApt purge -qy ufw &>/dev/null || return 1
             ;;
 
@@ -62,40 +62,51 @@ reset_fw() {
                 if ! systemctl status firewalld &>/dev/null; then
                     yum install -qy firewalld || return 1
                 fi
-                systemctl enable firewalld &>/dev/null
-                systemctl start firewalld &>/dev/null
+                # systemctl enable firewalld &>/dev/null
+                # systemctl start firewalld &>/dev/null
             fi
             ;;
     esac
 
-    # Clear interfaces attached to zones
-    for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
-        for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
-            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
+    # # Clear interfaces attached to zones
+    # for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
+    #     for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
+    #         sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
+    #     done
+    # done
+    for zone in public trusted; do
+        for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
+            firewall-offline-cmd --zone=$zone --remove-interface=$nic &>/dev/null || true
         done
     done
 
     # Attach Internet interface or source IP to zone public if host is gateway
     [ ! -z $PU_IF ] && {
-        sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
+        # sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
+        firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
     }
     {{- if or .PublicIP .IsGateway }}
     [ -z $PU_IF ] && {
-        sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
+        # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
+        firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
     }
     {{- end }}
     # Attach LAN interfaces to zone trusted
     [ ! -z $PR_IFs ] && {
         for i in $PR_IFs; do
-            sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
+            # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
+            firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
         done
     }
     # Attach lo interface to zone trusted
-    sfFirewallAdd --zone=trusted --add-interface=lo || return 1
+    # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
+    firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
     # Allow service ssh on public zone
-    sfFirewallAdd --zone=public --add-service=ssh
+    # sfFirewallAdd --zone=public --add-service=ssh
+    firewall-offline-cmd --zone=public --add-service=ssh
     # Save current fw settings as permanent
-    sfFirewallReload
+    # sfFirewallReload
+    sfService enable firewalld
 }
 
 NICS=
@@ -465,17 +476,21 @@ EOF
         # Dedicated public interface available...
 
         # Allows ping
-        sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
+        # sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
+        firewall-offline-cmd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
         # Allows masquerading on public zone
-        sfFirewallAdd --zone=public --add-masquerade
+        # sfFirewallAdd --zone=public --add-masquerade
+        firewall-offline-cmd --zone=public --add-masquerade
     fi
     # Enables masquerading on trusted zone (mainly for docker networks)
-    sfFirewallAdd --zone=trusted --add-masquerade
+    # sfFirewallAdd --zone=trusted --add-masquerade
+    firewall-offline-cmd --zone=trusted --add-masquerade
 
     # Allows default services on public zone
-    sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
+    # sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
+    firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
     # Applies fw rules
-    sfFirewallReload
+    # sfFirewallReload
 
     sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 196
     sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
