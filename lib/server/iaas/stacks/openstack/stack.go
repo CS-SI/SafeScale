@@ -36,6 +36,9 @@ import (
 
 // ProviderErrorToString creates an error string from openstack api error
 func ProviderErrorToString(err error) string {
+	if err == nil {
+		return ""
+	}
 	switch e := err.(type) {
 	case gophercloud.ErrDefault401:
 		return fmt.Sprintf("code: 401, reason: %s", string(e.Body))
@@ -55,8 +58,7 @@ func ProviderErrorToString(err error) string {
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
 	default:
 		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)\n", reflect.TypeOf(err).String(), err)
-
-		return e.Error()
+		return err.Error()
 	}
 }
 
@@ -87,10 +89,10 @@ func TranslateError(err error) error {
 		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
 	case *gophercloud.ErrUnexpectedResponseCode:
 		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
+	default:
+		logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
+		return fmt.Errorf("unhandled error received from provider: %s", err.Error())
 	}
-
-	logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
-	return fmt.Errorf("unhandled error received from provider: %s", err.Error())
 }
 
 // ParseNeutronError parses neutron json error and returns fields
