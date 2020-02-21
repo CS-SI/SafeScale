@@ -560,10 +560,13 @@ func (s *Stack) deleteSubnet(id string) error {
 	err := retry.Action(
 		func() error {
 			r, _ := s.Stack.Driver.Request("DELETE", url, &opts)
+			if r == nil {
+				return fmt.Errorf("failed to acknowledge DELETE command submission")
+			}
 			if r.StatusCode == 204 || r.StatusCode == 404 {
 				return nil
 			}
-			return fmt.Errorf("%d", r.StatusCode)
+			return fmt.Errorf("DELETE command failed with status %d", r.StatusCode)
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
