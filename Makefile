@@ -76,8 +76,11 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice protoc-gen-go go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
-    	$(GO) get -u $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(DEP) $(GOVENDOR) $(COVERTOOL); \
+	@which dep rice go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
+    	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(DEP) $(GOVENDOR) $(COVERTOOL); \
+    fi
+	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
+    	printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
     fi
 	@which mockgen > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading mockgen...\n" && $(GO) get -u  $(MOCKGEN) || true); \

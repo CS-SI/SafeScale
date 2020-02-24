@@ -13,31 +13,42 @@ rm -rf SafeScale
 # Get source code
 # ----------------------
 echo "Get source code"
-BRANCH_NAME=${BRANCH_NAME:="develop"}
+BRANCH_NAME=${BRANCH_NAME:="firewalld-issue"}
 GIT_REPO_URL=${GIT_REPO_URL:="https://github.com/CS-SI/SafeScale.git"}
 echo "Cloning branch '${BRANCH_NAME}' from repo '${GIT_REPO_URL}'"
 
 git clone ${GIT_REPO_URL} -b ${BRANCH_NAME} --depth=1
 
 cd SafeScale
+sed -i "s/\(.*\)develop/\1${BRANCH_NAME}/" common.mk
 
 # ----------------------
 # Compile
 # ----------------------
-echo "Compile"
+echo "Get dev deps"
+make getdevdeps
+make getdevdeps
+[ $? -ne 0 ] && echo "Build getdevdeps failure" && return 1
+
+echo "Ensure"
+make ensure
+make ensure
+[ $? -ne 0 ] && echo "Build ensure failure" && return 1
+
+echo "All"
 make all
+[ $? -ne 0 ] && echo "Build failure" && return 1
 
 echo "Install"
 make install
+[ $? -ne 0 ] && echo "Install failure" && return 1
 
-# ----------------------
-# Copy produced binaries to export directory
-# ----------------------
-EXPDIR=/usr/local/safescale/bin
-echo "Copy produced binaries to export directory '${EXPDIR}'"
-mkdir -p ${EXPDIR}
 
-cp ${GOPATH}/bin/safescale ${EXPDIR}
-cp ${GOPATH}/bin/safescaled ${EXPDIR}
-cp ${GOPATH}/bin/deploy ${EXPDIR}
-cp ${GOPATH}/bin/perform ${EXPDIR}
+echo "Export"
+export CIBIN=/exported
+mkdir -p /exported
+
+CIBIN=/exported make installci
+[ $? -ne 0 ] && echo "Export failure" && return 1
+
+return 0

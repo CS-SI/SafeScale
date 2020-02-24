@@ -1,5 +1,4 @@
-#FROM golang:1.10
-FROM ubuntu:artful
+FROM ubuntu:bionic
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -32,10 +31,10 @@ WORKDIR /tmp
 # ----------------------
 # Install GO 1.10
 # ----------------------
-RUN wget https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz \
-&& tar -C /usr/local -xzf go1.10.3.linux-amd64.tar.gz 
+RUN wget https://dl.google.com/go/go1.13.5.linux-amd64.tar.gz \
+&& tar -C /usr/local -xzf go1.13.5.linux-amd64.tar.gz
 ENV PATH $PATH:/usr/local/go/bin:/go/bin
-RUN rm /tmp/go1.10.3.linux-amd64.tar.gz
+RUN rm /tmp/go1.13.5.linux-amd64.tar.gz
 
 # ----------------------
 # Install Protoc
@@ -49,4 +48,8 @@ ENV SHELL /bin/bash
 ENV GOPATH /go
 COPY build-safescale.sh /opt/build-safescale.sh
 
-ENTRYPOINT ["/opt/build-safescale.sh"]
+CMD sleep 5
+
+COPY marker /dev/null
+
+RUN cd /opt && ./build-safescale.sh

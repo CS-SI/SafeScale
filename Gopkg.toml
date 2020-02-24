@@ -22,7 +22,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[override]]
   name = "github.com/golang/protobuf"
-  version = "=v1.2.0"
+  version = "=v1.3.2"
 
 [[override]]
   name = "go.opencensus.io"
