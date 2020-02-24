@@ -29,10 +29,6 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   revision = "9c377598961b706d1542bd2d84d538b5094d596e"
 
 [[override]]
-  name = "google.golang.org/genproto"
-  revision = "e7d98fc518a78c9f8b5ee77be7b0b317475d89e1"
-
-[[override]]
   name = "github.com/gophercloud/gophercloud"
   revision = "7892efa714f10951c5483a28c7471d8051b12975"
 
