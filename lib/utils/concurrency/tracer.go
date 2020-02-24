@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -32,13 +33,16 @@ import (
 // Tracer ...
 type Tracer struct {
 	taskSig      string
+	fileName     string
 	funcName     string
-	inOutMessage string
+	callerParams string
 	enabled      bool
 	inDone       bool
 	outDone      bool
 	sw           temporal.Stopwatch
 }
+
+var NullTracer = &Tracer{}
 
 // IsLogActive ... FIXME:
 func IsLogActive(key string) bool {
@@ -56,93 +60,127 @@ func NewTracer(t Task, message string, enabled bool) *Tracer {
 	}
 	tracer.enabled = enabled
 
+	tracer.callerParams = message
 	if message == "" {
-		message = "()"
+		tracer.callerParams = "()"
 	}
 
-	// Build the message to trace
-	if pc, file, line, ok := runtime.Caller(1); ok {
+	if pc, file, _, ok := runtime.Caller(1); ok {
+		tracer.fileName = strings.Replace(file, getPartToRemove(), "", 1)
 		if f := runtime.FuncForPC(pc); f != nil {
-			tracer.funcName = f.Name()
-			filename := strings.Replace(file, getPartToRemove(), "", 1)
-			tracer.inOutMessage = fmt.Sprintf("%s %s%s [%s:%d]", tracer.taskSig, filepath.Base(tracer.funcName), message, filename, line)
+			tracer.funcName = filepath.Base(f.Name())
 		}
+	}
+	if tracer.funcName == "" {
+		tracer.funcName = "<unknown function>"
+	}
+	if tracer.fileName == "" {
+		tracer.funcName = "<unknown file>"
 	}
 
 	return &tracer
 }
 
-// GoingInMessage returns the content of the message when entering the function
-func (t *Tracer) GoingInMessage() string {
-	return ">>>" + t.inOutMessage
+// IsNull returns true if the instance is NullTracer
+func (t *Tracer) IsNull() bool {
+	return t == nil || t == NullTracer
 }
 
 // WithStopwatch will add a measure of duration between GoingIn and GoingOut.
 // GoingOut will add the elapsed time in the log message (if it has to be logged...).
 func (t *Tracer) WithStopwatch() *Tracer {
-	if t.sw == nil {
+	if !t.IsNull() && t.sw == nil {
 		t.sw = temporal.NewStopwatch()
 	}
 	return t
 }
 
+// GoingInMessage returns the content of the message when entering the function
+func (t *Tracer) GoingInMessage() string {
+	if t.IsNull() {
+		return ""
+	}
+	return ">>> " + t.buildMessage()
+}
+
 // GoingIn logs the input message (signifying we are going in) using TRACE level
 func (t *Tracer) GoingIn() *Tracer {
-	if t.inDone {
-		return t
+	if !t.IsNull() && !t.inDone {
+		if t.sw != nil {
+			t.sw.Start()
+		}
+		if t.enabled {
+			t.inDone = true
+			msg := t.GoingInMessage()
+			if msg != "" {
+				logrus.Tracef(msg)
+			}
+		}
 	}
-	if t.sw != nil {
-		t.sw.Start()
+	return t
+}
+
+// GoingOutMessage returns the content of the message when exiting the function
+func (t *Tracer) GoingOutMessage() string {
+	if t.IsNull() {
+		return ""
 	}
-	if t.enabled {
-		t.inDone = true
-		logrus.Tracef(t.GoingInMessage())
+	return "<<< " + t.buildMessage()
+}
+
+// GoingOut logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
+func (t *Tracer) GoingOut() *Tracer {
+	if !t.IsNull() && !t.outDone {
+		if t.sw != nil {
+			t.sw.Stop()
+		}
+		if t.enabled {
+			t.outDone = true
+			msg := t.GoingOutMessage()
+			if t.sw != nil {
+				msg += " (duration: " + t.sw.String() + ")"
+			}
+			if msg != "" {
+				logrus.Tracef(msg)
+			}
+		}
 	}
 	return t
 }
 
 // OnExitTrace returns a function that will log the output message using TRACE level.
 func (t *Tracer) OnExitTrace() func() {
-	if t.outDone {
+	if t.IsNull() || t.outDone {
 		return func() {}
 	}
 	return func() { t.GoingOut() }
 }
 
-// GoingOutMessage returns the content of the message when exiting the function
-func (t *Tracer) GoingOutMessage() string {
-	// return blockquoteGeneration(t.generation) + "<<<" + t.inOutMessage
-	return "<<<" + t.inOutMessage
-}
+// buildMessage builds the message with available information from stack trace
+func (t *Tracer) buildMessage() string {
+	if t.IsNull() {
+		return ""
+	}
 
-// GoingOut logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
-func (t *Tracer) GoingOut() *Tracer {
-	if t.outDone {
-		return t
+	message := t.taskSig
+	if _, _, line, ok := runtime.Caller(1); ok {
+		message += " " + t.funcName + t.callerParams + " [" + t.fileName + ":" + strconv.Itoa(line) + "]"
 	}
-	if t.sw != nil {
-		t.sw.Stop()
-	}
-	if t.enabled {
-		t.outDone = true
-		msg := t.GoingOutMessage()
-		if t.sw != nil {
-			msg += " (duration: " + t.sw.String() + ")"
-		}
-		logrus.Tracef(msg)
-	}
-	return t
+	return message
 }
 
 // TraceMessage returns a string containing a trace message
 func (t *Tracer) TraceMessage(format string, a ...interface{}) string {
-	return "---" + t.inOutMessage + ":" + fmt.Sprintf(format, a...)
+	return "--- " + t.buildMessage() + ": " + fmt.Sprintf(format, a...)
 }
 
 // Trace traces a message
 func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
-	if t.enabled {
-		logrus.Tracef(t.TraceMessage(format, a...))
+	if !t.IsNull() && t.enabled {
+		msg := t.TraceMessage(format, a...)
+		if msg != "" {
+			logrus.Tracef(msg)
+		}
 	}
 	return t
 }

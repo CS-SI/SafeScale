@@ -271,6 +271,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// Context cancel signal received, propagating using abort signal
 				// tracer.Trace("receiving signal from context, aborting task...")
 				t.abortCh <- true
+				close(t.abortCh)
 			case <-t.doneCh:
 				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 				// tracer.Trace("receiving done signal from go routine")
@@ -293,6 +294,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.status = TIMEOUT
 				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
 				t.abortCh <- true
+				close(t.abortCh)
 				t.lock.Unlock()
 			}
 		}
@@ -302,25 +304,31 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
 				// tracer.Trace("receiving signal from context, aborting task...")
+				t.lock.Lock()
 				t.abortCh <- true
+				close(t.abortCh)
+				t.lock.Unlock()
 			case <-t.doneCh:
 				t.lock.Lock()
 				t.status = DONE
-				t.lock.Unlock()
 				finish = true
+				t.lock.Unlock()
 			case <-t.abortCh:
 				// Abort signal received
 				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
 				t.status = ABORTED
 				t.err = scerr.AbortedError("", nil)
-				t.lock.Unlock()
 				finish = true
+				t.lock.Unlock()
 			}
 		}
 	}
 
+	t.lock.Lock()
 	t.finishCh <- struct{}{}
+	close(t.finishCh)
+	t.lock.Unlock()
 }
 
 // run executes the function 'action'
@@ -333,16 +341,16 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	t.err = err
 	t.result = result
 	t.doneCh <- true
+	close(t.doneCh)
 }
 
 // Run starts task, waits its completion then return the error code
 func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error) {
-	stask, err := t.Start(action, params)
+	_, err := t.Start(action, params)
 	if err != nil {
 		return nil, err
 	}
-
-	return stask.Wait()
+	return t.Wait()
 }
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
@@ -363,10 +371,6 @@ func (t *task) Wait() (TaskResult, error) {
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
-
-	close(t.finishCh)
-	close(t.abortCh)
-	close(t.doneCh)
 	return t.result, t.err
 }
 
