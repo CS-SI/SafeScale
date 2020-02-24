@@ -26,7 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
@@ -455,7 +457,15 @@ func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	imgs, err := svc.ListImages(false)
+	var imgs []resources.Image
+	err := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			var err error
+			imgs, err = svc.ListImages(false)
+			return err
+		},
+		temporal.GetExecutionTimeout(),
+	)
 	if err != nil {
 		return nil, err
 	}
