@@ -102,8 +102,8 @@ reset_fw() {
     # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
     firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
     # Allow service ssh on public zone
-    # sfFirewallAdd --zone=public --add-service=ssh
-    firewall-offline-cmd --zone=public --add-service=ssh
+    # sfFirewallAdd --zone=public --add-service=ssh || return 1
+    firewall-offline-cmd --zone=public --add-service=ssh || return 1
     # Save current fw settings as permanent
     # sfFirewallReload
     sfService enable firewalld
