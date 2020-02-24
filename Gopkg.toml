@@ -100,6 +100,10 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "google.golang.org/grpc"
   version = "=v1.15.0"
 
+[[override]]
+  name = "google.golang.org/api"
+  version = "=v0.15.0"
+
 [[constraint]]
   name = "github.com/dlespiau/covertool"
   revision = "b0c4c6d0583aae4e3b5d12b6ec47767670548cc4"
