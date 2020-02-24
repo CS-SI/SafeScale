@@ -79,9 +79,6 @@ getdevdeps: begin
 	@which dep rice go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
     	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(DEP) $(GOVENDOR) $(COVERTOOL); \
     fi
-	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
-    	printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
-    fi
 	@which mockgen > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading mockgen...\n" && $(GO) get -u  $(MOCKGEN) || true); \
 	fi
@@ -108,7 +105,7 @@ ensure:
 		$$(dep ensure) && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
 	done
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing protobuf... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(govendor get github.com/golang/protobuf/protoc-gen-go && $(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
+	@(govendor get github.com/golang/protobuf/protoc-gen-go@1.3.2 && $(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating gophercloud... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@while [ 1 -ne 0 ] ; do \
 		$$(dep ensure -update "github.com/gophercloud/gophercloud") && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
