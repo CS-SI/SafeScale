@@ -18,15 +18,11 @@ package remotefile
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -43,7 +39,13 @@ type RemoteFileItem struct {
 }
 
 // Upload transfers the local file to the hostname
-func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) error {
+func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) (err error) {
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if host == nil {
+		return scerr.InvalidParameterError("host", "cannot be nil")
+	}
 	if rfc.Local == "" {
 		return scerr.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
 	}
@@ -51,14 +53,8 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) err
 		return scerr.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
-	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
-	}
-	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
-	}
 
-	tracer := concurrency.NewTracer(voidtask, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -72,7 +68,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) err
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = host.Run(voidtask, fmt.Sprintf("sudo rm -f %s", remotepath), temporal.GetBigDelay(), temporal.GetExecutionTimeout())
+					_, _, _, err = host.Run(task, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -80,7 +76,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) err
 					return retry.StopRetryError("an unrecoverable network error has occurred", err)
 				}
 				if system.IsSCPRetryable(retcode) {
-					err = fmt.Errorf("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", localpath, host.Name(), remotepath, retcode, system.SCPErrorString(retcode))
+					err = fmt.Errorf("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.SafeGetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
 					return err
 				}
 				return nil
@@ -93,9 +89,9 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) err
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
 		case *retry.ErrStopRetry:
-			return scerr.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.Name())
+			return scerr.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.SafeGetName())
 		case *retry.ErrTimeout:
-			return scerr.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.Name(), remotepath)
+			return scerr.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.SafeGetName(), rfc.Remote)
 		}
 		return retryErr
 	}
@@ -111,7 +107,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) err
 		}
 		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
 	}
-	retcode, _, _, err = host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return err
 	}
@@ -132,17 +128,6 @@ func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, ho
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name())), 0777)
-		partials := strings.Split(filename, "/")
-		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name(), partials[len(partials)-1]))
-
-		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
-		if err != nil {
-			logrus.Warnf("[TRACE] Forensics error creating %s", dumpName)
-		}
-	}
-
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
@@ -156,7 +141,7 @@ func (rfc RemoteFileItem) RemoveRemote(task concurrency.Task, host resources.Hos
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to remove file '%s:%s'", host.Name(), rfc.Remote)
+		return fmt.Errorf("failed to remove file '%s:%s'", host.SafeGetName(), rfc.Remote)
 	}
 	return nil
 }

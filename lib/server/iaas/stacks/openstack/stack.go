@@ -35,11 +35,10 @@ import (
 
 // ProviderErrorToString creates an error string from openstack api error
 func ProviderErrorToString(err error) string {
+	if err == nil {
+		return ""
+	}
 	switch e := err.(type) {
-	case gophercloud.ErrDefault400:
-		return fmt.Sprintf("code: 400, reason: %s", string(e.Body))
-	case *gophercloud.ErrDefault400:
-		return fmt.Sprintf("code: 400, reason: %s", string(e.Body))
 	case gophercloud.ErrDefault401:
 		return fmt.Sprintf("code: 401, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault401:
@@ -57,19 +56,14 @@ func ProviderErrorToString(err error) string {
 	case *gophercloud.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
 	default:
-		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)", reflect.TypeOf(err).String(), err)
-
-		return e.Error()
+		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)\n", reflect.TypeOf(err).String(), err)
+		return err.Error()
 	}
 }
 
 // TranslateProviderError translates gophercloud or openstack error to SafeScale error
 func TranslateProviderError(err error) error {
 	switch e := err.(type) {
-	case gophercloud.ErrDefault400:
-		return scerr.InvalidRequestError(string(e.Body))
-	case *gophercloud.ErrDefault400:
-		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrDefault401:
 		return scerr.NotAuthenticatedError(string(e.Body))
 	case *gophercloud.ErrDefault401:
@@ -91,13 +85,13 @@ func TranslateProviderError(err error) error {
 	case *gophercloud.ErrDefault500:
 		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), nil, nil)
+		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), nil, nil)
+		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
+	default:
+		logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
+		return fmt.Errorf("unhandled error received from provider: %s", err.Error())
 	}
-
-	logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
-	return fmt.Errorf("unhandled error received from provider: %s", err.Error())
 }
 
 // ParseNeutronError parses neutron json error and returns fields

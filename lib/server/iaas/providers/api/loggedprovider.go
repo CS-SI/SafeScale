@@ -60,25 +60,25 @@ func (w LoggedProvider) ListTemplates(all bool) ([]abstract.HostTemplate, error)
 // GetAuthenticationOptions ...
 func (w LoggedProvider) GetAuthenticationOptions() (providers.Config, error) {
 	defer w.prepare(w.trace("GetAuthenticationOptions"))
-	return w.InnerProvider.AuthenticationOptions()
+	return w.InnerProvider.GetAuthenticationOptions()
 }
 
-// ConfigurationOptions ...
+// GetConfigurationOptions ...
 func (w LoggedProvider) GetConfigurationOptions() (providers.Config, error) {
 	defer w.prepare(w.trace("GetConfigurationOptions"))
-	return w.InnerProvider.Config(urationOptions()
+	return w.InnerProvider.GetConfigurationOptions()
 }
 
-// Name ...
+// GetName ...
 func (w LoggedProvider) GetName() string {
 	defer w.prepare(w.trace("GetName"))
-	return w.InnerProvider.Name()
+	return w.InnerProvider.GetName()
 }
 
-// TenantParameters ...
+// GetTenantParameters ...
 func (w LoggedProvider) GetTenantParameters() map[string]interface{} {
 	defer w.prepare(w.trace("GetTenantParameters"))
-	return w.InnerProvider.TenantParameters()
+	return w.InnerProvider.GetTenantParameters()
 }
 
 // Stack specific functions
@@ -114,13 +114,13 @@ func (w LoggedProvider) ListRegions() ([]string, error) {
 // GetImage ...
 func (w LoggedProvider) GetImage(id string) (*abstract.Image, error) {
 	defer w.prepare(w.trace("GetImage"))
-	return w.InnerProvider.Image(id)
+	return w.InnerProvider.GetImage(id)
 }
 
 // GetTemplate ...
 func (w LoggedProvider) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	defer w.prepare(w.trace("GetTemplate"))
-	return w.InnerProvider.Template(id)
+	return w.InnerProvider.GetTemplate(id)
 }
 
 // CreateKeyPair ...
@@ -132,7 +132,7 @@ func (w LoggedProvider) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 // GetKeyPair ...
 func (w LoggedProvider) GetKeyPair(id string) (*abstract.KeyPair, error) {
 	defer w.prepare(w.trace("GetKeyPair"))
-	return w.InnerProvider.KeyPair(id)
+	return w.InnerProvider.GetKeyPair(id)
 }
 
 // ListKeyPairs ...
@@ -232,7 +232,7 @@ func (w LoggedProvider) InspectHost(something interface{}) (*abstract.HostFull, 
 }
 
 // GetHostByName ...
-func (w LoggedProvider) GetHostByName(name string) (string, error) {
+func (w LoggedProvider) GetHostByName(name string) (*abstract.HostCore, error) {
 	defer w.prepare(w.trace("GetHostByName"))
 	return w.InnerProvider.GetHostByName(name)
 }
@@ -288,7 +288,7 @@ func (w LoggedProvider) CreateVolume(request abstract.VolumeRequest) (*abstract.
 // GetVolume ...
 func (w LoggedProvider) GetVolume(id string) (*abstract.Volume, error) {
 	defer w.prepare(w.trace("GetVolume"))
-	return w.InnerProvider.Volume(id)
+	return w.InnerProvider.GetVolume(id)
 }
 
 // ListVolumes ...
@@ -312,7 +312,7 @@ func (w LoggedProvider) CreateVolumeAttachment(request abstract.VolumeAttachment
 // GetVolumeAttachment ...
 func (w LoggedProvider) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	defer w.prepare(w.trace("GetVolumeAttachment"))
-	return w.InnerProvider.VolumeAttachment(serverID, id)
+	return w.InnerProvider.GetVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments ...

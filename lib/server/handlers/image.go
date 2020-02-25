@@ -17,19 +17,18 @@
 package handlers
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageAPI
+//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageHandler
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-// ImageAPI defines API to manipulate images
+// ImageHandler defines API to manipulate images
 type ImageHandler interface {
 	List(all bool) ([]abstract.Image, error)
 	Select(osfilter string) (*abstract.Image, error)
@@ -45,7 +44,7 @@ type imageHandler struct {
 
 // NewImageHandler creates an host service
 func NewImageHandler(job server.Job) ImageHandler {
-	return &ImageHandler{job: job}
+	return &imageHandler{job: job}
 }
 
 // List returns the image list
@@ -54,14 +53,14 @@ func (handler *imageHandler) List(all bool) (images []abstract.Image, err error)
 		return nil, scerr.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil"
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	return handler.job.Service().ListImages(all)
+	return handler.job.SafeGetService().ListImages(all)
 }
 
 // Select selects the image that best fits osname

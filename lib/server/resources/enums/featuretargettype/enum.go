@@ -22,8 +22,7 @@ package featuretargettype
 type Enum uint
 
 const (
-	_ Enum = iota
-
+	UNKNOWN Enum = iota
 	HOST
 	CLUSTER
 	NODE

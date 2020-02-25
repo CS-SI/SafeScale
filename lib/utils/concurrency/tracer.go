@@ -26,6 +26,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -49,13 +50,14 @@ func IsLogActive(key string) bool {
 }
 
 // NewTracer creates a new Tracer instance
-func NewTracer(t Task, message string, enabled bool) *Tracer {
+func NewTracer(t Task, enabled bool, msg ...interface{}) *Tracer {
 	tracer := Tracer{}
 	if t != nil {
-		tracer.taskSig, _ = t.Signature()
+		tracer.taskSig, _ = t.GetSignature()
 	}
 	tracer.enabled = enabled
 
+	message := strprocess.FormatStrings(msg...)
 	if message == "" {
 		message = "()"
 	}
@@ -72,8 +74,8 @@ func NewTracer(t Task, message string, enabled bool) *Tracer {
 	return &tracer
 }
 
-// GoingInMessage returns the content of the message when entering the function
-func (t *Tracer) GoingInMessage() string {
+// EnteringMessage returns the content of the message when entering the function
+func (t *Tracer) EnteringMessage() string {
 	return ">>>" + t.inOutMessage
 }
 
@@ -86,8 +88,8 @@ func (t *Tracer) WithStopwatch() *Tracer {
 	return t
 }
 
-// GoingIn logs the input message (signifying we are going in) using TRACE level
-func (t *Tracer) GoingIn() *Tracer {
+// Entering logs the input message (signifying we are going in) using TRACE level
+func (t *Tracer) Entering() *Tracer {
 	if t.inDone {
 		return t
 	}
@@ -96,7 +98,7 @@ func (t *Tracer) GoingIn() *Tracer {
 	}
 	if t.enabled {
 		t.inDone = true
-		logrus.Tracef(t.GoingInMessage())
+		logrus.Tracef(t.EnteringMessage())
 	}
 	return t
 }
@@ -106,16 +108,16 @@ func (t *Tracer) OnExitTrace() func() {
 	if t.outDone {
 		return func() {}
 	}
-	return func() { t.GoingOut() }
+	return func() { t.Exiting() }
 }
 
-// GoingOutMessage returns the content of the message when exiting the function
-func (t *Tracer) GoingOutMessage() string {
+// ExitingMessage returns the content of the message when exiting the function
+func (t *Tracer) ExitingMessage() string {
 	return "<<<" + t.inOutMessage
 }
 
-// GoingOut logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
-func (t *Tracer) GoingOut() *Tracer {
+// Exiting logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
+func (t *Tracer) Exiting() *Tracer {
 	if t.outDone {
 		return t
 	}
@@ -124,7 +126,7 @@ func (t *Tracer) GoingOut() *Tracer {
 	}
 	if t.enabled {
 		t.outDone = true
-		msg := t.GoingOutMessage()
+		msg := t.ExitingMessage()
 		if t.sw != nil {
 			msg += " (duration: " + t.sw.String() + ")"
 		}

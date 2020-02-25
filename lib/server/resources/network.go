@@ -27,14 +27,18 @@ import (
 type Network interface {
 	Metadata
 	data.Identifyable
+	data.NullValue
 
-	Browse(task concurrency.Task, callback func(*abstract.Network) error) error                                                // Browse ...
-	Create(task concurrency.Task, req abstract.NetworkRequest, gwname string, gwSizing *abstract.HostSizingRequirements) error // Create creates a network
-	AttachHost(task concurrency.Task, host Host) error                                                                         // AttachHost links host ID to the network
-	DetachHost(task concurrency.Task, hostID string) error                                                                     // DetachHost unlinks host ID from network
-	ListHosts(task concurrency.Task) ([]Host, error)                                                                           // ListHosts returns the list of Host attached to the network (excluding gateway)
-	Gateway(task concurrency.Task, primary bool) (Host, error)                                                                 // Gateway returns the gateway related to network
-	DefaultRouteIP(task concurrency.Task) (string, error)                                                                      // Returns the IP of the default route of the network
-	EndpointIP(task concurrency.Task) (string, error)                                                                          // Returns the IP address corresponding to the default route
-	HasVirtualIP(task concurrency.Task) bool                                                                                   // Tells if the network is using a VIP a default route
+	Browse(task concurrency.Task, callback func(*abstract.Network) error) error                                                // ...
+	Create(task concurrency.Task, req abstract.NetworkRequest, gwname string, gwSizing *abstract.HostSizingRequirements) error // creates a network
+	AttachHost(task concurrency.Task, host Host) error                                                                         // links host ID to the network
+	DetachHost(task concurrency.Task, hostID string) error                                                                     // unlinks host ID from network
+	ListHosts(task concurrency.Task) ([]Host, error)                                                                           // returns the list of Host attached to the network (excluding gateway)
+	GetGateway(task concurrency.Task, primary bool) (Host, error)                                                              // returns the gateway related to network
+	GetDefaultRouteIP(task concurrency.Task) (string, error)                                                                   // returns the IP of the default route of the network
+	GetEndpointIP(task concurrency.Task) (string, error)                                                                       // returns the IP address corresponding to the default route
+	SafeGetGateway(task concurrency.Task, primary bool) Host                                                                   // returns the gateway related to network
+	SafeGetDefaultRouteIP(task concurrency.Task) string                                                                        // returns the IP of the default route of the network
+	SafeGetEndpointIP(task concurrency.Task) string                                                                            // returns the IP address corresponding to the default route
+	HasVirtualIP(task concurrency.Task) bool                                                                                   // tells if the network is using a VIP a default route
 }

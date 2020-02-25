@@ -210,7 +210,7 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 
 // GetTemplate returns the Template referenced by id
 func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
-	tpl, err := p.Stack.Template(id)
+	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
 	}
@@ -261,7 +261,7 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.AuthenticationOptions()
+	opts := p.Stack.GetAuthenticationOptions()
 	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -276,7 +276,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.Config(urationOptions()
+	opts := p.Stack.GetConfigurationOptions()
 	// caps := p.GetCapabilities()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)

@@ -28,9 +28,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -156,7 +156,7 @@ var shareDelete = cli.Command{
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
 				msgs := errMessage.Load().(string)
-				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, utils.Capitalize(err.Error()))
+				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, strprocess.Capitalize(err.Error()))
 				errMessage.Store(msgs)
 				atomic.AddInt32(&errs, 1)
 			}

@@ -5,6 +5,9 @@ GO?=go
 vet:
 	@$(GO) vet ./...
 
+generate: clean
+	@$(GO) generate ./...
+
 clean:
 	@$(RM) rice-box.go || true
 

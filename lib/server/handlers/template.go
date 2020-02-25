@@ -17,15 +17,14 @@
 package handlers
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateAPI
+//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateHandler
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
@@ -54,10 +53,10 @@ func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, e
 		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	tlist, err = handler.job.Service().ListTemplates(all)
+	tlist, err = handler.job.SafeGetService().ListTemplates(all)
 	return tlist, err
 }

@@ -74,7 +74,7 @@ type ClusterFeatures struct {
 	Disabled map[string]struct{} `json:"disabled"`
 }
 
-func newFeatures() *ClusterFeatures {
+func newClusterFeatures() *ClusterFeatures {
 	return &ClusterFeatures{
 		Installed: map[string]*ClusterInstalledFeature{},
 		Disabled:  map[string]struct{}{},
@@ -84,7 +84,7 @@ func newFeatures() *ClusterFeatures {
 // Clone ...
 // satisfies interface data.Clonable
 func (f *ClusterFeatures) Clone() data.Clonable {
-	return newFeatures().Replace(f)
+	return newClusterFeatures().Replace(f)
 }
 
 // Replace ...
@@ -103,5 +103,5 @@ func (f *ClusterFeatures) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.FeaturesV1, newFeatures())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.FeaturesV1, newClusterFeatures())
 }

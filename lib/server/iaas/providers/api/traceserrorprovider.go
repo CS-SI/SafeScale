@@ -81,7 +81,7 @@ func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg providers.Config, er
 		}
 	}(fmt.Sprintf("%s:GetAuthenticationOptions", w.Label))
 
-	return w.InnerProvider.AuthenticationOptions()
+	return w.InnerProvider.GetAuthenticationOptions()
 }
 
 // GetConfigurationOptions ...
@@ -91,17 +91,17 @@ func (w ErrorTraceProvider) GetConfigurationOptions() (cfg providers.Config, err
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetConfigurationOptions", w.Label))
-	return w.InnerProvider.Config(urationOptions()
+	return w.InnerProvider.GetConfigurationOptions()
 }
 
 // GetName ...
 func (w ErrorTraceProvider) GetName() string {
-	return w.InnerProvider.Name()
+	return w.InnerProvider.GetName()
 }
 
 // GetTenantParameters ...
 func (w ErrorTraceProvider) GetTenantParameters() map[string]interface{} {
-	return w.InnerProvider.TenantParameters()
+	return w.InnerProvider.GetTenantParameters()
 }
 
 // Stack specific functions
@@ -138,7 +138,7 @@ func (w ErrorTraceProvider) GetImage(id string) (images *abstract.Image, err err
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetImage", w.Label))
-	return w.InnerProvider.Image(id)
+	return w.InnerProvider.GetImage(id)
 }
 
 // GetTemplate ...
@@ -148,7 +148,7 @@ func (w ErrorTraceProvider) GetTemplate(id string) (templates *abstract.HostTemp
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetTemplate", w.Label))
-	return w.InnerProvider.Template(id)
+	return w.InnerProvider.GetTemplate(id)
 }
 
 // CreateKeyPair ...
@@ -168,7 +168,7 @@ func (w ErrorTraceProvider) GetKeyPair(id string) (pairs *abstract.KeyPair, err 
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetKeyPair", w.Label))
-	return w.InnerProvider.KeyPair(id)
+	return w.InnerProvider.GetKeyPair(id)
 }
 
 // ListKeyPairs ...
@@ -332,7 +332,7 @@ func (w ErrorTraceProvider) InspectHost(something interface{}) (_ *abstract.Host
 }
 
 // GetHostByName ...
-func (w ErrorTraceProvider) GetHostByName(name string) (_ string, err error) {
+func (w ErrorTraceProvider) GetHostByName(name string) (_ *abstract.HostCore, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -428,7 +428,7 @@ func (w ErrorTraceProvider) GetVolume(id string) (_ *abstract.Volume, err error)
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetVolume", w.Label))
-	return w.InnerProvider.Volume(id)
+	return w.InnerProvider.GetVolume(id)
 }
 
 // ListVolumes ...
@@ -468,7 +468,7 @@ func (w ErrorTraceProvider) GetVolumeAttachment(serverID, id string) (_ *abstrac
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetVolumeAttachment", w.Label))
-	return w.InnerProvider.VolumeAttachment(serverID, id)
+	return w.InnerProvider.GetVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments ...

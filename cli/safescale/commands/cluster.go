@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/etcd/etcdserver/api"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -34,9 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -44,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -85,7 +84,7 @@ var ClusterCommand = cli.Command{
 }
 
 func extractClusterArgument(c *cli.Context) error {
-	if !c.Command.HasName("list") || strings.HasSuffix(c.App.Name, " node") || strings.HasSuffix(c.App.Name, " master") {
+	if !c.Command.HasName("list") {
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument("Missing mandatory argument CLUSTERNAME.")
@@ -94,22 +93,6 @@ func extractClusterArgument(c *cli.Context) error {
 		if clusterName == "" {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument("Invalid argument CLUSTERNAME.")
-		}
-
-		var err error
-		clusterInstance, err = clusterfactory.Load(concurrency.RootTask(), clusterName)
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			if _, ok := err.(*scerr.ErrNotFound); ok {
-				if !c.Command.HasName("create") {
-					return clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Cluster '%s' not found.", clusterName))
-				}
-			} else {
-				msg := fmt.Sprintf("failed to query for cluster '%s': %s", clusterName, err.Error())
-				return clitools.ExitOnRPC(msg)
-			}
-		} else if c.Command.HasName("create") {
-			return clitools.ExitOnErrorWithMessage(exitcode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.", clusterName))
 		}
 	}
 
@@ -124,18 +107,19 @@ var clusterListCommand = cli.Command{
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
-		list, err := clusterfactory.List()
+
+		list, err := client.New().Cluster.List(temporal.DefaultExecutionTimeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("failed to get cluster list: %v", err)))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "failed to get cluster list", false).Error())))
 		}
 
 		var formatted []interface{}
-		for _, value := range list {
-			c, _ := value.(api.Cluster)
-			converted, err := convertToMap(c)
+		for _, value := range list.Clusters {
+			// c, _ := value.(api.Cluster)
+			converted, err := convertToMap(value)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", c.Identity(concurrency.RootTask()).Name)))
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
 			}
 			formatted = append(formatted, formatClusterConfig(converted, false))
 		}
@@ -176,7 +160,11 @@ var clusterInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clusterConfig, err := outputClusterConfig()
+		cluster, err := client.New().Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
+		}
+		clusterConfig, err := outputClusterConfig(cluster)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -185,8 +173,8 @@ var clusterInspectCommand = cli.Command{
 }
 
 // outputClusterConfig displays cluster configuration after filtering and completing some fields
-func outputClusterConfig() (map[string]interface{}, error) {
-	toFormat, err := convertToMap(clusterInstance)
+func outputClusterConfig(cluster *protocol.ClusterResponse) (map[string]interface{}, error) {
+	toFormat, err := convertToMap(cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -198,132 +186,105 @@ func outputClusterConfig() (map[string]interface{}, error) {
 // FIXME: all the data must comes from lib/client
 // convertToMap converts clusterInstance to its equivalent in map[string]interface{},
 // with fields converted to string and used as keys
-func convertToMap(c api.Cluster) (map[string]interface{}, error) {
-	identity := c.Identity(concurrency.RootTask())
+func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, error) {
+	// identity := c.Identity(concurrency.RootTask()
 
 	result := map[string]interface{}{
-		"name":             identity.Name,
-		"flavor":           identity.Flavor,
-		"flavor_label":     identity.Flavor.String(),
-		"complexity":       identity.Complexity,
-		"complexity_label": identity.Complexity.String(),
+		"name":             c.GetIdentity().GetName(),
+		"flavor":           c.GetIdentity().GetFlavor(),
+		"flavor_label":     c.GetIdentity().GetFlavor().String(),
+		"complexity":       c.GetIdentity().GetComplexity(),
+		"complexity_label": c.GetIdentity().GetComplexity().String(),
 		"admin_login":      "cladm",
-		"admin_password":   identity.AdminPassword,
-		"keypair":          identity.Keypair,
+		"admin_password":   c.GetIdentity().GetAdminPassword(),
+		"keypair":          c.GetIdentity().GetSshConfig().GetPrivateKey(),
 	}
 
-	properties := c.GetProperties(concurrency.RootTask())
-	err := properties.Inspect(property.CompositeV1, func(clonable data.Clonable) error {
-		result["tenant"] = clonable.(*propertiesv1.Composite).Tenants[0]
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	netCfg, err := c.NetworkConfig(concurrency.RootTask())
-	if err != nil {
-		return nil, err
-	}
-	result["network_id"] = netCfg.NetworkID
-	result["cidr"] = netCfg.CIDR
-	result["default_route_ip"] = netCfg.DefaultRouteIP
-	result["gateway_ip"] = netCfg.DefaultRouteIP // legacy ...
-	result["primary_gateway_ip"] = netCfg.GatewayIP
-	result["endpoint_ip"] = netCfg.EndpointIP
-	result["primary_public_ip"] = netCfg.EndpointIP
-	if netCfg.SecondaryGatewayIP != "" {
-		result["secondary_gateway_ip"] = netCfg.SecondaryGatewayIP
-		result["secondary_public_ip"] = netCfg.SecondaryPublicIP
-		result["public_ip"] = netCfg.EndpointIP // legacy ...
-	}
-	if !properties.Lookup(clusterproperty.DefaultsV2) {
-		err = properties.Inspect(clusterproperty.DefaultsV1, func(clonable data.Clonable) error {
-			defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
-			if !ok {
-				return fmt.Errorf("invalid metadata")
-			}
-			result["defaults"] = map[string]interface{}{
-				"image":  defaultsV1.Image,
-				"master": defaultsV1.MasterSizing,
-				"node":   defaultsV1.NodeSizing,
-			}
-			return nil
-		})
-	} else {
-		err = properties.Inspect(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
-			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
-			if !ok {
-				return fmt.Errorf("invalid metadata")
-			}
-			result["defaults"] = map[string]interface{}{
-				"image":   defaultsV2.Image,
-				"gateway": defaultsV2.GatewaySizing,
-				"master":  defaultsV2.MasterSizing,
-				"node":    defaultsV2.NodeSizing,
-			}
-			return nil
-		})
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	err = properties.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
-		nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
-		if !ok {
-			return fmt.Errorf("invalid metadata")
+	properties := c.GetProperties()
+	var (
+		content  map[string]interface{}
+		sgwpubip string
+	)
+	for _, v := range properties {
+		err := json.Unmarshal([]byte(v), &content)
+		if err != nil {
+			return nil, err
 		}
-		result["nodes"] = map[string]interface{}{
-			"masters": nodesV2.Masters,
-			"nodes":   nodesV2.PrivateNodes,
+		for propnum, propcont := range content {
+			switch propnum {
+			case clusterproperty.CompositeV1:
+				if tenants, ok := propcont.([]interface{}); ok {
+					result["tenant"] = tenants[0]
+				}
+			case clusterproperty.ControlPlaneV1:
+				if cp, ok := propcont.(map[string]interface{}); ok {
+					result["controplanevip"] = cp["VIP"]
+				}
+			case clusterproperty.NetworkV2:
+				if net, ok := propcont.(map[string]interface{}); ok {
+					result["network_id"] = net["NetworkID"]
+					result["cidr"] = net["CIDR"]
+					result["default_route_ip"] = net["DefaultRouteIP"]
+					result["primary_gateway_ip"] = net["GatewayIP"]
+					result["endpoint_ip"] = net["EndpointIP"]
+					result["primary_public_ip"] = net["EndpointIP"]
+					if sgwpubip, ok = net["SecondaryPublicIP"].(string); ok && sgwpubip != "" {
+						result["secondary_gateway_ip"] = net["SecondaryGatewayIP"]
+						result["secondary_public_ip"] = sgwpubip
+					}
+				}
+			case clusterproperty.DefaultsV1:
+				if _, ok := result["defaults"]; !ok {
+					if defaults, ok := propcont.(map[string]interface{}); ok {
+						result["defaults"] = map[string]interface{}{
+							"image":  defaults["Image"].(string),
+							"master": defaults["MasterSizing"],
+							"node":   defaults["NodeSizing"],
+						}
+					}
+				}
+			case clusterproperty.DefaultsV2:
+				if defaults, ok := propcont.(map[string]interface{}); ok {
+					result["defaults"] = map[string]interface{}{
+						"image":   defaults["Image"],
+						"gateway": defaults["GatewaySizing"],
+						"master":  defaults["MasterSizing"],
+						"node":    defaults["NodeSizing"],
+					}
+				}
+			case clusterproperty.NodesV2:
+				if nodes, ok := propcont.(map[string]map[string]interface{}); ok {
+					result["nodes"] = map[string]interface{}{
+						"masters": nodes["Masters"],
+						"nodes":   nodes["PrivateNodes"],
+					}
+				}
+			case clusterproperty.FeaturesV1:
+				result["features"] = propcont.(map[string]map[string]interface{})
+			case clusterproperty.StateV1:
+				if state, ok := propcont.(clusterstate.Enum); ok {
+					result["last_state"] = state
+					result["last_state_label"] = state.String()
+				}
+			}
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = properties.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
-		result["features"] = clonable.(*propertiesv1.ClusterFeatures)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	err = properties.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) error {
-		state := clonable.(*propertiesv1.ClusterState).State
-		result["last_state"] = state
-		result["last_state_label"] = state.String()
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 	result["admin_login"] = "cladm"
 
 	// Add information not directly in cluster GetConfig()
 	//TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
-	if _, ok := result["features"].(*propertiesv1.ClusterFeatures).Disabled["remotedesktop"]; !ok {
+	disabled := result["features"].(map[string]interface{})["disabled"].(map[string]string)
+	if _, ok := disabled["remotedesktop"]; !ok {
 		remoteDesktops := map[string][]string{}
-		clientHost := client.New().Host
-		masters, err := c.ListMasterIDs(concurrency.RootTask())
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range masters {
-			host, err := clientHost.Inspect(id, temporal.GetExecutionTimeout())
-			if err != nil {
-				return nil, err
-			}
-			urlFmt := "https://%s/_platform/remotedesktop/%s/"
-			urls := []string{fmt.Sprintf(urlFmt, netCfg.EndpointIP, host.Name)}
-			if netCfg.SecondaryPublicIP != "" {
+		urlFmt := "https://%s/_platform/remotedesktop/%s/"
+		for _, v := range result["nodes"].(map[string]interface{})["masters"].(map[string]interface{}) {
+			urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.(string))}
+			if sgwpubip != "" {
 				// VPL: no public VIP IP yet, so don't repeat primary gateway public IP
 				// urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
-				urls = append(urls, fmt.Sprintf(urlFmt, netCfg.SecondaryPublicIP, host.Name))
+				urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.(string)))
 			}
-			remoteDesktops[host.Name] = urls
+			remoteDesktops[v.(string)] = urls
 		}
 		result["remote_desktop"] = remoteDesktops
 	} else {
@@ -444,101 +405,103 @@ var clusterCreateCommand = cli.Command{
 		cidr := c.String("cidr")
 
 		disable := c.StringSlice("disable")
-		disableFeatures := map[string]struct{}{}
-		for _, v := range disable {
-			disableFeatures[v] = struct{}{}
-		}
 
 		los := c.String("os")
 
 		var (
-			gatewaysDef *protocol.HostDefinition
-			mastersDef  *protocol.HostDefinition
-			nodesDef    *protocol.HostDefinition
+			globalDef   string
+			gatewaysDef string
+			mastersDef  string
+			nodesDef    string
 		)
 		if c.IsSet("sizing") {
-			nodesDef, _, err = constructPBHostDefinitionFromCLI(c, "sizing")
+			globalDef, err = constructPBHostDefinitionFromCLI(c, "sizing")
 			if err != nil {
 				return err
 			}
-			gatewaysDef = nodesDef
-			mastersDef = nodesDef
 		}
 		if c.IsSet("gw-sizing") {
-			gatewaysDef, _, err = constructPBHostDefinitionFromCLI(c, "gw-sizing")
+			gatewaysDef, err = constructPBHostDefinitionFromCLI(c, "gw-sizing")
 			if err != nil {
 				return err
 			}
 		}
-		var mastersCount uint
 		if c.IsSet("master-sizing") {
-			mastersDef, mastersCount, err = constructPBHostDefinitionFromCLI(c, "master-sizing")
+			mastersDef, err = constructPBHostDefinitionFromCLI(c, "master-sizing")
 			if err != nil {
 				return err
 			}
 		}
-		var nodesCount uint
 		if c.IsSet("node-sizing") {
-			nodesDef, nodesCount, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+			nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
 			if err != nil {
 				return err
 			}
 		}
 
-		if gatewaysDef == nil && mastersDef == nil && nodesDef == nil {
-			cpu := int32(c.Uint("cpu"))
-			ram := float32(c.Float64("ram"))
-			disk := int32(c.Uint("disk"))
-			gpu := int32(c.Uint("gpu"))
+		// VPL: logic has to be moved belongside what is commented in constructPBHostDefinitionFromCLI
+		// if gatewaysDef == nil && mastersDef == nil && nodesDef == nil {
+		// 	cpu := int32(c.Uint("cpu"))
+		// 	ram := float32(c.Float64("ram"))
+		// 	disk := int32(c.Uint("disk"))
+		// 	gpu := int32(c.Uint("gpu"))
 
-			if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
-				nodesDef = &protocol.HostDefinition{
-					ImageId: los,
-					Sizing: &protocol.HostSizing{
-						MinCpuCount: cpu,
-						MaxCpuCount: cpu * 2,
-						MinRamSize:  ram,
-						MaxRamSize:  ram * 2.0,
-						MinDiskSize: disk,
-						GpuCount:    gpu,
-					},
-				}
-				gatewaysDef = nodesDef
-				gatewaysDef.Sizing.GpuCount = -1 // Neither GPU for gateways by default ...
-				mastersDef = gatewaysDef         // ... nor for masters
-			}
+		// 	if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
+		// 		nodesDef = &protocol.HostDefinition{
+		// 			ImageId: los,
+		// 			Sizing: &protocol.HostSizing{
+		// 				MinCpuCount: cpu,
+		// 				MaxCpuCount: cpu * 2,
+		// 				MinRamSize:  ram,
+		// 				MaxRamSize:  ram * 2.0,
+		// 				MinDiskSize: disk,
+		// 				GpuCount:    gpu,
+		// 			},
+		// 		}
+		// 		gatewaysDef = nodesDef
+		// 		gatewaysDef.Sizing.GpuCount = -1 // Neither GPU for gateways by default ...
+		// 		mastersDef = gatewaysDef         // ... nor for masters
+		// 	}
+		// }
+
+		req := &protocol.ClusterCreateRequest{
+			Name:          clusterName,
+			Complexity:    protocol.ClusterComplexity(comp),
+			Flavor:        protocol.ClusterFlavor(fla),
+			KeepOnFailure: keep,
+			Cidr:          cidr,
+			Disabled:      disable,
+			Os:            los,
+			GlobalSizing:  globalDef,
+			GatewaySizing: gatewaysDef,
+			MasterSizing:  mastersDef,
+			NodeSizing:    nodesDef,
 		}
-
-		clusterInstance, err := cluster.Create(concurrency.RootTask(), resources.ClusterRequest{
-			Name:                    clusterName,
-			Complexity:              comp,
-			CIDR:                    cidr,
-			Flavor:                  fla,
-			KeepOnFailure:           keep,
-			GatewaysDef:             gatewaysDef,
-			MastersDef:              mastersDef,
-			MastersCount:            mastersCount,
-			NodesCount:              nodesCount,
-			NodesDef:                nodesDef,
-			DisabledDefaultFeatures: disableFeatures,
-		})
+		res, err := client.New().Cluster.Create(req, temporal.GetLongOperationTimeout())
+		// clusterInstance, err := cluster.Create(concurrency.RootTask(), resources.ClusterRequest{
+		// 	Name:                    clusterName,
+		// 	Complexity:              comp,
+		// 	CIDR:                    cidr,
+		// 	Flavor:                  fla,
+		// 	KeepOnFailure:           keep,
+		// 	GatewaysDef:             gatewaysDef,
+		// 	MastersDef:              mastersDef,
+		// 	MastersCount:            mastersCount,
+		// 	NodesCount:              nodesCount,
+		// 	NodesDef:                nodesDef,
+		// 	DisabledDefaultFeatures: disableFeatures,
+		// })
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			if clusterInstance != nil {
-				cluDel := clusterInstance.Delete(concurrency.RootTask())
-				if cluDel != nil {
-					logrus.Warnf("Error deleting cluster instance: %s", cluDel)
-				}
-			}
 			msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
-		if clusterInstance == nil {
+		if res == nil {
 			msg := fmt.Sprintf("failed to create cluster: unknown reason")
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 
-		toFormat, err := convertToMap(clusterInstance)
+		toFormat, err := convertToMap(res)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -583,7 +546,7 @@ var clusterDeleteCommand = cli.Command{
 			logrus.Println("'-f,--force' does nothing yet")
 		}
 
-		err = clusterInstance.Delete(concurrency.RootTask())
+		err = client.New().Cluster.Delete(clusterName, temporal.GetLongOperationTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -605,7 +568,8 @@ var clusterStopCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		err = clusterInstance.Stop(concurrency.RootTask())
+
+		err = client.New().Cluster.Stop(clusterName, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -626,10 +590,11 @@ var clusterStartCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		err = clusterInstance.Start(concurrency.RootTask())
+		clusterRef := c.Args().First()
+		err = client.New().Cluster.Start(clusterRef, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "start of cluster", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -647,7 +612,8 @@ var clusterStateCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		state, err := clusterInstance.State(concurrency.RootTask())
+
+		state, err := client.New().Cluster.GetState(clusterName, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
@@ -656,7 +622,7 @@ var clusterStateCommand = cli.Command{
 		return clitools.SuccessResponse(map[string]interface{}{
 			"Name":       clusterName,
 			"State":      state,
-			"StateLabel": state.String(),
+			"StateLabel": state.(clusterstate.Enum).String(),
 		})
 	},
 }
@@ -719,10 +685,10 @@ var clusterExpandCommand = cli.Command{
 		los := c.String("os")
 
 		var (
-			nodesDef   *protocol.HostDefinition
+			nodesDef   string
 			nodesCount uint
 		)
-		nodesDef, nodesCount, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+		nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
 		if err != nil {
 			return err
 		}
@@ -730,30 +696,14 @@ var clusterExpandCommand = cli.Command{
 			count = nodesCount
 		}
 
-		if nodesDef == nil {
-			cpu := int32(c.Uint("cpu"))
-			ram := float32(c.Float64("ram"))
-			disk := int32(c.Uint("disk"))
-			gpu := int32(c.Uint("gpu"))
-			if gpu == 0 {
-				gpu = -1
-			}
-			if cpu > 0 || ram > 0.0 || disk > 0 || gpu >= 1 || los != "" {
-				nodesDef = &protocol.HostDefinition{
-					ImageId: los,
-					Sizing: &protocol.HostSizing{
-						MinCpuCount: cpu,
-						MaxCpuCount: cpu * 2,
-						MinRamSize:  ram,
-						MaxRamSize:  ram * 2.0,
-						MinDiskSize: disk,
-						GpuCount:    gpu,
-					},
-				}
-			}
+		req := protocol.ClusterResizeRequest{
+			Name:       clusterName,
+			Action:     protocol.CRA_EXPAND,
+			Count:      int32(count),
+			NodeSizing: nodesDef,
+			ImageId:    los,
 		}
-
-		hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, nodesDef)
+		hosts, err := client.New().Cluster.Expand(req, temporal.GetLongOperationTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -794,15 +744,17 @@ var clusterShrinkCommand = cli.Command{
 		if count > 1 {
 			countS = "s"
 		}
-		present, err := clusterInstance.CountNodes(concurrency.RootTask())
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(err)
-		}
-		if count > present {
-			msg := fmt.Sprintf("cannot delete %d node%s, the cluster contains only %d of them", count, countS, present)
-			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
-		}
+
+		// VPL: to move inside safescaled
+		// present, err := clusterInstance.CountNodes(concurrency.RootTask()
+		// if err != nil {
+		// 	err = scerr.FromGRPCStatus(err)
+		// 	return clitools.FailureResponse(err)
+		// }
+		// if count > present {
+		// 	msg := fmt.Sprintf("cannot delete %d node%s, the cluster contains only %d of them", count, countS, present)
+		// 	return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
+		// }
 
 		if !yes {
 			msg := fmt.Sprintf("Are you sure you want to delete %d node%s from Cluster %s", count, countS, clusterName)
@@ -811,22 +763,15 @@ var clusterShrinkCommand = cli.Command{
 			}
 		}
 
-		// fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...", count, countS, clusterName)
-		var msgs []string
-		availableMaster, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
+		req := protocol.ClusterResizeRequest{
+			Name:   clusterName,
+			Action: protocol.CRA_SHRINK,
+			Count:  int32(count),
+		}
+		_, err = client.New().Cluster.Shrink(req, temporal.GetLongOperationTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(err)
-		}
-		for i := uint(0); i < count; i++ {
-			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster.ID)
-			if err != nil {
-				err = scerr.FromGRPCStatus(err)
-				msgs = append(msgs, fmt.Sprintf("failed to delete node #%d: %s", i+1, err.Error()))
-			}
-		}
-		if len(msgs) > 0 {
-			return clitools.FailureResponse(clitools.ExitOnRPC(strings.Join(msgs, "\n")))
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -841,6 +786,11 @@ var clusterKubectlCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		task, err := concurrency.RootTask()
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -915,7 +865,8 @@ var clusterKubectlCommand = cli.Command{
 		if len(filteredArgs) > 0 {
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
-		return executeCommand(concurrency.RootTask(), cmdStr, valuesOnRemote, outputs.DISPLAY)
+
+		return executeCommand(task, cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -928,6 +879,11 @@ var clusterHelmCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		task, err := concurrency.RootTask()
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1008,7 +964,8 @@ var clusterHelmCommand = cli.Command{
 			}
 		}
 		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
-		return executeCommand(concurrency.RootTask(), cmdStr, valuesOnRemote, outputs.DISPLAY)
+
+		return executeCommand(task, cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }
 
@@ -1031,9 +988,9 @@ var clusterRunCommand = cli.Command{
 
 func executeCommand(task concurrency.Task, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
-	master, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
+	master, err := clusterInstance.FindAvailableMaster(task)
 	if err != nil {
-		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.Identity(concurrency.RootTask()).Name, err.Error())
+		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.Identity(concurrency.RootTask().Name, err.Error()))
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 

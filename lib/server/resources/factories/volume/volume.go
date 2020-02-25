@@ -29,7 +29,7 @@ func New(svc iaas.Service) (resources.Volume, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
-	return operations.New(svc)
+	return operations.NewVolume(svc)
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
@@ -47,10 +47,5 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Volu
 	//FIXME: tracer...
 	// defer scerr.OnPanic(&err)()
 
-	objv, err := operations.New(svc)
-	if err != nil {
-		return nil, err
-	}
-
-	return objv, objv.Read(task, ref)
+	return operations.LoadVolume(task, svc, ref)
 }

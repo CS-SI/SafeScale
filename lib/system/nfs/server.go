@@ -19,10 +19,10 @@ package nfs
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Server structure
@@ -50,7 +50,7 @@ func (s *Server) GetHost() string {
 // Install installs and configure NFS service on the remote host
 func (s *Server) Install(task concurrency.Task) error {
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install nfs server")
+	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 }
 
 // AddShare configures a local path to be exported by NFS
@@ -103,7 +103,7 @@ func (s *Server) RemoveShare(task concurrency.Task, path string) error {
 		"Path": path,
 	}
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
+	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
 }
 
 // MountBlockDevice mounts a block device in the remote system
@@ -115,7 +115,7 @@ func (s *Server) MountBlockDevice(task concurrency.Task, deviceName, mountPoint,
 		"DoNotFormat": doNotFormat,
 	}
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_mount.sh", data)
-	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
+	err = scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to mount block device")
 	return stdout, err
 }
 
@@ -125,5 +125,5 @@ func (s *Server) UnmountBlockDevice(task concurrency.Task, volumeUUID string) er
 		"UUID": volumeUUID,
 	}
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_unmount.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
+	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }

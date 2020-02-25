@@ -148,7 +148,7 @@ func (provider *provider) GetHostByName(string) (*abstract.HostCore, error) {
 func (provider *provider) GetHostState(interface{}) (hoststate.Enum, error) {
 	return hoststate.ERROR, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListHosts(bool) ([]*abstract.HostFull, error) {
+func (provider *provider) ListHosts(bool) (abstract.HostList, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteHost(id string) error {

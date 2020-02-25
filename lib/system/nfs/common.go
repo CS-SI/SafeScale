@@ -33,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -213,37 +212,4 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	*/
 
 	return retcode, stdout, stderr, err
-}
-
-func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	var collected []string
-	if stdout != "" {
-		errLines := strings.Split(stdout, "\n")
-		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred") {
-				collected = append(collected, errline)
-			}
-		}
-	}
-	if stderr != "" {
-		errLines := strings.Split(stderr, "\n")
-		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred") {
-				collected = append(collected, errline)
-			}
-		}
-	}
-
-	if len(collected) > 0 {
-		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("%s: return code [%d], std error [%s]", msg, retcode, collected))
-		}
-		return fmt.Errorf("%s: return code [%d], std error [%s]", msg, retcode, strings.Join(collected, ";"))
-	}
-
-	if retcode != 0 {
-		return fmt.Errorf("%s: nonzero return code [%d]", msg, retcode)
-	}
-
-	return nil
 }

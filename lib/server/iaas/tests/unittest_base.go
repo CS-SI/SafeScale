@@ -64,9 +64,8 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	_ = stack
 }
 
-// ListImages test
-func (tester *ServiceTester) ListImages(t *testing.T) {
-
+// Images test
+func (tester *ServiceTester) Images(t *testing.T) {
 	images, err := tester.Service.ListImages(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, images)
@@ -85,11 +84,10 @@ func (tester *ServiceTester) ListImages(t *testing.T) {
 	for _, img := range imgs {
 		fmt.Println(">>", img.Name)
 	}
-
 }
 
-//ListHostTemplates test
-func (tester *ServiceTester) ListHostTemplates(t *testing.T) {
+// HostTemplates test
+func (tester *ServiceTester) HostTemplates(t *testing.T) {
 	tpls, err := tester.Service.ListTemplates(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
@@ -132,7 +130,7 @@ func (tester *ServiceTester) GetKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("unit_test_kp")
 	require.Nil(t, err)
 
-	kp2, err := tester.Service.KeyPair("unit_test_kp")
+	kp2, err := tester.Service.GetKeyPair("unit_test_kp")
 	require.Nil(t, err)
 
 	assert.Equal(t, kp.ID, kp2.ID)
@@ -485,8 +483,8 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 
 }
 
-//Volume test
-func (tester *ServiceTester) Volume(t *testing.T) {
+//Volumes test
+func (tester *ServiceTester) Volumes(t *testing.T) {
 	// Get initial number of volumes
 	lst, err := tester.Service.ListVolumes()
 	require.NotNil(t, err)
@@ -506,7 +504,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	assert.Equal(t, 25, v1.Size)
 	assert.Equal(t, volumespeed.HDD, v1.Speed)
 
-	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay()
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
@@ -519,7 +517,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.AVAILABLE, temporal.GetBigDelay()
 	assert.Nil(t, err)
 
 	lst, err = tester.Service.ListVolumes()
@@ -541,12 +539,12 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	}
 }
 
-//VolumeAttachment test
-func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
+// VolumeAttachments test
+func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 	// TODO: handle kp delete
 	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "1.1.6.0/24")
 
-	// FIXME Handle test errors
+	// FIXME: Handle test errors
 	defer func() {
 		_ = tester.Service.DeleteGateway(gw.ID)
 		defer func() {
@@ -571,7 +569,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	defer func() {
 		_ = tester.Service.DeleteVolume(v1.ID)
 	}()
-	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.AVAILABLE, temporal.GetBigDelay()
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
@@ -584,7 +582,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.AVAILABLE, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.AVAILABLE, temporal.GetBigDelay()
 	assert.Nil(t, err)
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
@@ -638,7 +636,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	}
 }
 
-//Containers test
+// Containers test
 func (tester *ServiceTester) Containers(t *testing.T) {
 	_, err := tester.Service.CreateBucket("testC")
 	assert.Nil(t, err)
@@ -657,7 +655,7 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 	assert.NotContains(t, cl, "testC", "testC2")
 }
 
-//VPL: disabled, need overhaul
+//TODO: disabled, need overhaul
 // // Objects test
 // func (tester *ServiceTester) Objects(t *testing.T) {
 // 	_, err := tester.Service.CreateBucket("testC")
@@ -700,14 +698,4 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 // 	assert.Nil(t, err)
 // }
 
-// GetImage ...
-func (tester *ServiceTester) GetImage(t *testing.T) {
-	// TODO Implement this test
-}
-
-// GetTemplate ...
-func (tester *ServiceTester) GetTemplate(t *testing.T) {
-	// TODO Implement this test
-}
-
-// TODO Implement missing methods here (Look at TODO Implement Test)
+// TODO: Implement missing methods here (Look at TODO Implement Test)

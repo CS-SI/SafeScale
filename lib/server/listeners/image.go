@@ -65,7 +65,7 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -78,7 +78,7 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	// Build response mapping abstract.Image to protocol.Image
 	var pbImages []*protocol.Image
 	for _, image := range images {
-		pbImages = append(pbImages, converters.ImageFromAbstractsToProtocol(&image))
+		pbImages = append(pbImages, converters.ImageFromAbstractToProtocol(&image))
 	}
 	rv := &protocol.ImageList{Images: pbImages}
 	return rv, nil

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -61,10 +62,10 @@ func (tm *taskedLock) RLock(task Task) error {
 		return scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tracer := NewTracer(task, "", Trace.Locks)
-	defer tracer.GoingIn().OnExitTrace()()
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "")
+	defer tracer.Entering().OnExitTrace()()
 
-	tid, err := task.ID()
+	tid, err := task.GetID()
 	if err != nil {
 		return err
 	}
@@ -92,14 +93,14 @@ func (tm *taskedLock) RLock(task Task) error {
 // RUnlock unregisters the lock for read for the context and unlock for read
 // only if no lock for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) error {
-	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.ID()
+	tid, err := task.GetID()
 	if err != nil {
 		return err
 	}
@@ -128,14 +129,14 @@ func (tm *taskedLock) RUnlock(task Task) error {
 
 // Lock acquires a write lock.
 func (tm *taskedLock) Lock(task Task) error {
-	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.ID()
+	tid, err := task.GetID()
 	if err != nil {
 		return err
 	}
@@ -152,7 +153,7 @@ func (tm *taskedLock) Lock(task Task) error {
 	// If already lock for read, returns an error
 	if _, ok := tm.readLocks[tid]; ok {
 		tracer.Trace("Cannot Lock, already RLocked")
-		taskID, _ := task.ID()
+		taskID, _ := task.GetID()
 		return fmt.Errorf("cannot Lock task '%s': already RLocked", taskID)
 	}
 	// registers lock for read for the task and actively lock the RWMutex
@@ -164,14 +165,14 @@ func (tm *taskedLock) Lock(task Task) error {
 
 // Unlock releases a write lock
 func (tm *taskedLock) Unlock(task Task) error {
-	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.ID()
+	tid, err := task.GetID()
 	if err != nil {
 		return err
 	}
@@ -206,7 +207,7 @@ func (tm *taskedLock) IsRLocked(task Task) (bool, error) {
 		return false, scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.ID()
+	tid, err := task.GetID()
 	if err != nil {
 		return false, err
 	}
@@ -225,7 +226,7 @@ func (tm *taskedLock) IsLocked(task Task) (bool, error) {
 		return false, scerr.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	tid, err := task.ID()
+	tid, err := task.GetID()
 	if err != nil {
 		return false, err
 	}

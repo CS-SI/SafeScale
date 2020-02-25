@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -46,7 +45,7 @@ var GetCurrentTenant = getCurrentTenant
 // getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		tenants, err := iaas.TenantNames()
+		tenants, err := iaas.GetTenantNames()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
@@ -95,11 +94,11 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 	}
 	defer task.Close()
 
-	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	tenants, err := iaas.TenantNames()
+	tenants, err := iaas.GetTenantNames()
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +143,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 	defer task.Close()
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -188,21 +187,21 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	}
 	defer task.Close()
 
-	name := in.Name()
+	name := in.GetName()
 
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if currentTenant != nil && currentTenant.name == in.Name() {
+	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
 	}
 
-	service, err := iaas.UseService(in.Name())
+	service, err := iaas.UseService(in.GetName())
 	if err != nil {
 		return empty, err
 	}
-	currentTenant = &Tenant{name: in.Name(), Service: service}
+	currentTenant = &Tenant{name: in.GetName(), Service: service}
 	return empty, nil
 }
 
@@ -248,7 +247,7 @@ func getCurrentStorageTenants() *StorageTenants {
 // StorageList lists registered storage tenants
 func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error()
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
@@ -261,7 +260,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Emp
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -295,7 +294,7 @@ func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Emp
 // StorageGet returns the name of the current storage tenants used for data related commands
 func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantNameList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error()
 	}
 	if ctx == nil {
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
@@ -308,7 +307,7 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empt
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -321,7 +320,7 @@ func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empt
 	getCurrentStorageTenants()
 	if currentStorageTenants == nil {
 		msg := "cannot get storage tenants: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
+		tracer.Trace(strprocess.Capitalize(msg))
 		return nil, status.Errorf(codes.FailedPrecondition, msg)
 	}
 
@@ -348,23 +347,23 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *protocol.TenantName
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames())); err == nil {
+	if err := srvutils.JobRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames()); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 
-	storageServices, err := iaas.UseStorages(in.GetNames())
+	storageServices, err := iaas.UseStorages(in.GetNames()
 	if err != nil {
 		return empty, scerr.Wrap(err, "cannot set storage tenants").ToGRPCStatus()
 	}
 
 	currentStorageTenants = &StorageTenants{names: in.GetNames(), StorageServices: storageServices}
-	tracer.Trace("Current storage tenants are now '%v'", in.GetNames())
+	tracer.Trace("Current storage tenants are now '%v'", in.GetNames()
 	return empty, nil
 }
 */

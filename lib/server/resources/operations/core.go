@@ -40,9 +40,13 @@ const (
 	byNameFolderName = "byName"
 )
 
+var NullCore = func() *Core {
+	return &Core{kind: "nil"}
+}()
+
 // Core contains the core functions of a persistent object
 type Core struct {
-	concurrency.TaskedLock
+	concurrency.TaskedLock `json:"-"`
 
 	kind       string
 	shielded   *concurrency.Shielded
@@ -55,22 +59,22 @@ type Core struct {
 // NewCore creates an instance of core
 func NewCore(svc iaas.Service, kind string, path string) (*Core, error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return NullCore, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if kind == "" {
-		return nil, scerr.InvalidParameterError("kind", "cannot be empty string")
+		return NullCore, scerr.InvalidParameterError("kind", "cannot be empty string")
 	}
 	if path == "" {
-		return nil, scerr.InvalidParameterError("path", "cannot be empty string")
+		return NullCore, scerr.InvalidParameterError("path", "cannot be empty string")
 	}
 
 	folder, err := newFolder(svc, path)
 	if err != nil {
-		return nil, err
+		return NullCore, err
 	}
 	props, err := serialize.NewJSONProperties("resources." + kind)
 	if err != nil {
-		return nil, err
+		return NullCore, err
 	}
 	c := Core{
 		kind:       kind,
@@ -80,35 +84,52 @@ func NewCore(svc iaas.Service, kind string, path string) (*Core, error) {
 	return &c, nil
 }
 
-// GetService returns the iaas.Service used to create/load the persistent object
-func (c *Core) GetService() iaas.Service {
-	return c.folder.Service()
+// IsNull returns true if the core is equal to NullCore
+func (c *Core) IsNull() bool {
+	return c == nil || c.kind == "nil"
 }
 
-// GetID returns the id of the data protected
+// SafeGetService returns the iaas.Service used to create/load the persistent object
+func (c *Core) SafeGetService() iaas.Service {
+	if !c.IsNull() && c.folder != nil {
+		return c.folder.SafeGetService()
+	}
+	return nil
+}
+
+// SafeGetID returns the id of the data protected
 //
 // satisfies interface data.Identifyable
-func (c *Core) GetID() string {
+func (c *Core) SafeGetID() string {
+	if c.IsNull() {
+		return "<NullCore>"
+	}
 	if id, ok := c.id.Load().(string); ok {
 		return id
 	}
-	return "<undefined>"
+	return ""
 }
 
-// GetName returns the name of the data protected
+// SafeGetName returns the name of the data protected
 //
 // satisfies interface data.Identifyable
-func (c *Core) GetName() string {
+func (c *Core) SafeGetName() string {
+	if c.IsNull() {
+		return "<NullCore>"
+	}
 	if name, ok := c.name.Load().(string); ok {
 		return name
 	}
-	return "<undefined>"
+	return ""
 }
 
 // Inspect protects the data for shared read
 func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if c.IsNull() {
+		return scerr.NotAvailableError("cannot use Inspect() on NullCore")
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -143,6 +164,9 @@ func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if c.IsNull() {
+		return scerr.NotAvailableError("cannot use Alter() on NullCore")
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -187,6 +211,9 @@ func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
+	if c.IsNull() {
+		return scerr.NotAvailableError("cannot use Carry() on NullCore")
+	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -216,8 +243,8 @@ func (c *Core) updateIdentity(task concurrency.Task) error {
 			if !ok {
 				return scerr.InconsistentError("'data.Identifyable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			c.name.Store(ident.Name())
-			c.id.Store(ident.ID())
+			c.name.Store(ident.SafeGetName())
+			c.id.Store(ident.SafeGetID())
 			return nil
 		})
 	}
@@ -234,6 +261,9 @@ func (c *Core) updateIdentity(task concurrency.Task) error {
 func (c *Core) Read(task concurrency.Task, ref string) error {
 	if c == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if c.IsNull() {
+		return scerr.NotAvailableError("cannot use Read() on NullCore")
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -293,7 +323,7 @@ func (c *Core) readByID(task concurrency.Task, id string) error {
 	return c.shielded.Alter(task, func(clonable data.Clonable) error {
 		data, ok := clonable.(data.Serializable)
 		if !ok {
-			return scerr.InconsistentError(fmt.Sprintf("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String()))
+			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		return c.folder.Read(byIDFolderName, id, func(buf []byte) error {
 			return data.Deserialize(buf)
@@ -306,7 +336,7 @@ func (c *Core) readByName(task concurrency.Task, name string) error {
 	return c.shielded.Alter(task, func(clonable data.Clonable) error {
 		data, ok := clonable.(data.Serializable)
 		if !ok {
-			return scerr.InconsistentError(fmt.Sprintf("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String()))
+			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		return c.folder.Read(byNameFolderName, name, func(buf []byte) error {
 			return data.Deserialize(buf)
@@ -319,7 +349,7 @@ func (c *Core) write(task concurrency.Task) error {
 	return c.shielded.Inspect(task, func(clonable data.Clonable) error {
 		ser, ok := clonable.(data.Serializable)
 		if !ok {
-			return scerr.InconsistentError(fmt.Sprintf("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String()))
+			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		buf, err := ser.Serialize()
 		if err != nil {
@@ -327,19 +357,29 @@ func (c *Core) write(task concurrency.Task) error {
 		}
 		ident, ok := clonable.(data.Identifyable)
 		if !ok {
-			return scerr.InconsistentError(fmt.Sprintf("'data.Identifyable' expected, '%s' provided", reflect.TypeOf(clonable).String()))
+			return scerr.InconsistentError("'data.Identifyable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		err = c.folder.Write(byNameFolderName, ident.Name(), buf)
+		err = c.folder.Write(byNameFolderName, ident.SafeGetName(), buf)
 		if err != nil {
 			return err
 		}
-		return c.folder.Write(byIDFolderName, ident.ID(), buf)
+		return c.folder.Write(byIDFolderName, ident.SafeGetID(), buf)
 	})
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (c *Core) Reload(task concurrency.Task) error {
-	err := c.readByID(task, c.ID())
+	if c == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if c.IsNull() {
+		return scerr.NotAvailableError("cannot use Inspect() on NullCore")
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	err := c.readByID(task, c.SafeGetID())
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); ok {
 			return scerr.NotFoundError(fmt.Sprintf("the metadata of %s '%s' vanished", c.kind, c.name))
@@ -353,6 +393,9 @@ func (c *Core) Reload(task concurrency.Task) error {
 func (c *Core) BrowseFolder(task concurrency.Task, callback func(buf []byte) error) error {
 	if c == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if c.IsNull() {
+		return scerr.NotAvailableError("cannot use BrowseFolder() on NullCore")
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -371,6 +414,9 @@ func (c *Core) Delete(task concurrency.Task) error {
 	if c == nil {
 		return scerr.InvalidInstanceError()
 	}
+	if c.IsNull() {
+		return scerr.NotAvailableError("cannot use Delete() on NullCore")
+	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -379,8 +425,8 @@ func (c *Core) Delete(task concurrency.Task) error {
 	defer c.Unlock(task)
 
 	var idFound, nameFound bool
-	id := c.ID()
-	name := c.Name()
+	id := c.SafeGetID()
+	name := c.SafeGetName()
 
 	// Checks entries exist in Object Storage
 	err := c.folder.Search(byIDFolderName, id)

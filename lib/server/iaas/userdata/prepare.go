@@ -69,6 +69,8 @@ type Content struct {
 	CIDR string
 	// DefaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
 	DefaultRouteIP string
+	// EndpointIP is the IP of the gateway or the VIP if gateway HA is enabled
+	EndpointIP string
 	// PrimaryGatewayPrivateIP is the private IP of the primary gateway
 	PrimaryGatewayPrivateIP string
 	// PrimaryGatewayPublicIP is the public IP of the primary gateway
@@ -94,8 +96,8 @@ type Content struct {
 }
 
 var (
-	userdataPhase1Template atomic.Value //*template.Template
-	userdataPhase2Template atomic.Value //*template.Template
+	userdataPhase1Template atomic.Value
+	userdataPhase2Template atomic.Value
 )
 
 // NewContent ...
@@ -106,7 +108,7 @@ func NewContent() *Content {
 }
 
 // OK ...
-func (ud Content) OK() bool { // FIXME Complete function, mark struct fields as optional, then validate
+func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as optional, then validate
 	result := true
 	result = result && ud.BashLibrary != ""
 	result = result && ud.HostName != ""

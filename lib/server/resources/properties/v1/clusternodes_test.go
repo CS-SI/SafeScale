@@ -1,23 +1,24 @@
 package propertiesv1
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNodes_Clone(t *testing.T) {
-	node := &Node{
+	node := &ClusterNode{
 		ID:        "",
 		Name:      "Something",
 		PublicIP:  "",
 		PrivateIP: "",
 	}
 
-	ct := newNodes()
+	ct := newClusterNodes()
 	ct.PrivateNodes = append(ct.PrivateNodes, node)
 
-	clonedCt, ok := ct.Clone().(*Nodes)
+	clonedCt, ok := ct.Clone().(*ClusterNodes)
 	if !ok {
 		t.Fail()
 	}

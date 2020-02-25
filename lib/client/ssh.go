@@ -370,12 +370,12 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 			_, err = strconv.Atoi(portStr)
 			if err != nil {
 				logrus.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
-				return fmt.Errorf("unable to close tunnel :%s", err.Error())
+				return scerr.Wrap(err, "unable to close tunnel")
 			}
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
 				logrus.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return fmt.Errorf("unable to close tunnel :%s", err.Error())
+				return scerr.Wrap(err, "unable to close tunnel")
 			}
 		}
 	}

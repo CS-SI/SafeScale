@@ -190,11 +190,10 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 		return nil, scerr.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
 	}
 
-	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(t, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	// bufio.Scanner.Scan() may panic...
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)() // bufio.Scanner.Scan() may panic...
 
 	scanner := bufio.NewScanner(bridge.Reader())
 	scanner.Split(bufio.ScanLines)
@@ -231,7 +230,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	displayCh, ok := p.(<-chan outputItem)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p", "must be a '<-chan outputItem')
+		return nil, scerr.InvalidParameterError("p", "must be a '<-chan outputItem'")
 	}
 	for item := range displayCh {
 		item.Print()

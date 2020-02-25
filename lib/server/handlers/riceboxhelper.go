@@ -32,7 +32,7 @@ import (
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &err)()
 
 	box, err := rice.FindBox("../handlers/scripts")
 	if err != nil {
@@ -65,11 +65,11 @@ func exec(job server.Job, script string, data interface{}, hostid string, svc ia
 	}
 	// retrieve ssh config to perform some commands
 	sshHandler := NewSSHHandler(job)
-	ssh, err := sshHandler.Config((hostid)
+	ssh, err := sshHandler.GetConfig((hostid))
 	if err != nil {
 		return err
 	}
 
-	_, err = ssh.SudoCommand(job.Task(), scriptCmd)
+	_, err = ssh.SudoCommand(job.SafeGetTask(), scriptCmd)
 	return err
 }

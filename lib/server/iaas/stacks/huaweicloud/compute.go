@@ -48,6 +48,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -260,7 +261,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, true, "(%s)", request.ResourceName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -320,7 +321,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
+			logrus.Debugf(strprocess.Capitalize(msg))
 		}
 	}
 	if request.Password == "" {
@@ -337,12 +338,11 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		logrus.Debugf(utils.Capitalize(msg))
+		logrus.Debugf(strprocess.Capitalize(msg))
 		return nil, userData, fmt.Errorf(msg)
 	}
 
-	// Determine system disk size based on vcpus count
-	template, err := s.Template(request.TemplateID)
+	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
 		return nil, userData, fmt.Errorf("failed to get image: %s", openstack.ProviderErrorToString(err))
 	}
@@ -402,45 +402,15 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// --- Initializes abstract.HostFull ---
 
 	host = abstract.NewHostFull()
+	host.Core.Name = request.ResourceName
 	host.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Core.Password = request.Password
-
-	// // FIXME: move this Alter to resources.Host.Create() implementation
-	// err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
-	// 	innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-	// 		// FIXME: validate cast
-	// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-	// 	hostNetworkV1.IsGateway = isGateway
-	// 	hostNetworkV1.DefaultNetworkID = defaultNetworkID
-	// 	hostNetworkV1.DefaultGatewayID = defaultGatewayID
-	// 	hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
-	// 	return nil
-	// })
-	// if innerErr != nil {
-	// 	return innerErr
-	// }
-
 	host.Network.IsGateway = isGateway
 	host.Network.DefaultNetworkID = defaultNetworkID
 	host.Network.DefaultGatewayID = defaultGatewayID
 	host.Network.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
-
-	// // Adds Host property SizingV1
-	// // template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
-	// return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
-	// 	hostSizingV1 := clonable.(*propertiesv1.HostSizing)
-	// 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-	// 	hostSizingV1.Template = request.TemplateID
-	// 	hostSizingV1.AllocatedSize = operations.ModelHostTemplateToPropertyHostSize(template)
-	// 	return nil
-	// })
 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
-
-	// })
-	// if err != nil {
-	// 	return nil, nil, nil, nil, userData, err
-	// }
 
 	// --- query provider for host creation ---
 
@@ -468,7 +438,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 					request.ResourceName, openstack.ProviderErrorToString(err), codeStr)
 			}
 
-			creationZone, zoneErr := s.AvailabilityZoneOfServer(server.ID)
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
 			if zoneErr != nil {
 				logrus.Tracef("Host successfully created but can't confirm AZ: %s", zoneErr)
 			} else {
@@ -505,6 +475,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	}
 
 	newHost := host
+
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
@@ -545,24 +516,6 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			}
 		}()
 
-		// // FIXME: move this Alter to resources.Host.Create() implementation
-		// // Updates Host property NetworkV1 in host instance
-		// err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
-		// 	return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-		// 		// FIXME: validate cast
-		// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-		// 		if ipversion.IPv4.Is(fip.PublicIPAddress) {
-		// 			hostNetworkV1.PublicIPv4 = fip.PublicIPAddress
-		// 		} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
-		// 			hostNetworkV1.PublicIPv6 = fip.PublicIPAddress
-		// 		}
-		// 		userData.PublicIP = fip.PublicIPAddress
-		// 		return nil
-		// 	})
-		// })
-		// if err != nil {
-		// 	return nil, nil, nil, nil, userData, err
-		// }
 		if ipversion.IPv4.Is(fip.PublicIPAddress) {
 			host.Network.PublicIPv4 = fip.PublicIPAddress
 		} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
@@ -965,7 +918,7 @@ func (s *Stack) DeleteHost(id string) error {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
 					return scerr.Wrap(abstract.ResourceTimeoutError("host", id, temporal.GetContextTimeout()),
-						fmt.Sprintf("host '%s' not deleted after %v", id, temporal.GetContextTimeout()))
+						"host '%s' not deleted after %v", id, temporal.GetContextTimeout())
 				}
 				return innerRetryErr
 			}
@@ -1136,7 +1089,7 @@ func (s *Stack) toHostSizing(flavor map[string]interface{}) *abstract.HostEffect
 		if !ok {
 			return nil
 		}
-		tpl, err := s.Template(fid)
+		tpl, err := s.GetTemplate(fid)
 		if err != nil {
 			return nil
 		}
@@ -1196,7 +1149,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*ab
 		hostRef = host.ID
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, true, "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

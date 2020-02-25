@@ -7,13 +7,11 @@ DIRECTORIES := $(sort $(dir $(wildcard */)))
 all: generate
 
 generate:
-	@(cd feature ; make $(@))
-	@(cd cluster ; make $(@))
+	@(cd clusterflavors ; make $(@))
 
 vet:
 	@$(GO) vet ./...
 
 clean: 
-	@(cd feature ; make $(@))
-	@(cd cluster ; make $(@))
+	@(cd clusterflavors ; make $(@))
 	@$(RM) rice-box.go

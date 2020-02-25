@@ -32,6 +32,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 var removePart atomic.Value
@@ -266,7 +267,7 @@ func (e *errCore) ToGRPCStatus() error {
 
 // Wrap creates a new error with a message 'message' and a causer error 'causer'
 func Wrap(cause error, msg ...interface{}) Error {
-	newErr := &errCore{message: formatMessage(msg...)(), causer: cause, consequences: []error{}}
+	newErr := &errCore{message: strprocess.FormatStrings(msg...), causer: cause, consequences: []error{}}
 	if casted, ok := cause.(*errCore); ok {
 		newErr.grpcCode = casted.GRPCCode()
 	} else {
@@ -276,12 +277,12 @@ func Wrap(cause error, msg ...interface{}) Error {
 }
 
 // NewError creates a new error with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
-func NewError(msg string, cause error, consequences []error) Error {
+func NewError(cause error, consequences []error, msg ...interface{}) Error {
 	if consequences == nil {
 		consequences = []error{}
 	}
 	return &errCore{
-		message:      msg,
+		message:      strprocess.FormatStrings(msg...),
 		causer:       cause,
 		consequences: consequences,
 		fields:       make(fields),
@@ -342,13 +343,6 @@ func Cause(err error) (resp error) {
 	return resp
 }
 
-func formatMessage(msg ...interface{}) func() string {
-	if len(msg) > 1 {
-		return func() string { return fmt.Sprintf(msg[0].(string), msg[1:]...) }
-	}
-	return func() string { return fmt.Sprint(msg[0].(string)) }
-}
-
 // ErrTimeout defines a Timeout error
 type ErrTimeout struct {
 	*errCore
@@ -399,7 +393,7 @@ func NotFoundError(msg ...interface{}) *ErrNotFound {
 
 	return &ErrNotFound{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -437,7 +431,7 @@ type ErrNotAvailable struct {
 func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
 	return &ErrNotAvailable{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -475,7 +469,7 @@ type ErrDuplicate struct {
 func DuplicateError(msg ...interface{}) *ErrDuplicate {
 	return &ErrDuplicate{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -513,7 +507,7 @@ type ErrInvalidRequest struct {
 func InvalidRequestError(msg ...interface{}) *ErrInvalidRequest {
 	return &ErrInvalidRequest{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -551,7 +545,7 @@ type ErrSyntax struct {
 func SyntaxError(msg ...interface{}) *ErrSyntax {
 	return &ErrSyntax{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -589,7 +583,7 @@ type ErrNotAuthenticated struct {
 func NotAuthenticatedError(msg ...interface{}) *ErrNotAuthenticated {
 	return &ErrNotAuthenticated{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -627,7 +621,7 @@ type ErrForbidden struct {
 func ForbiddenError(msg ...interface{}) *ErrForbidden {
 	return &ErrForbidden{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -753,7 +747,7 @@ type ErrOverload struct {
 func OverloadError(msg ...interface{}) *ErrOverload {
 	return &ErrOverload{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -791,7 +785,7 @@ type ErrNotImplemented struct {
 func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
 	return &ErrNotImplemented{
 		errCore: &errCore{
-			message:      decorateWithCallTrace("not implemented yet:", formatMessage(msg...)(), ""),
+			message:      decorateWithCallTrace("not implemented yet:", strprocess.FormatStrings(msg...), ""),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -884,7 +878,7 @@ type ErrRuntimePanic struct {
 func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
 	return &ErrRuntimePanic{
 		errCore: &errCore{
-			message:      formatMessage(msg...)(),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),
@@ -1071,7 +1065,7 @@ type ErrInconsistent struct {
 func InconsistentError(msg ...interface{}) *ErrInconsistent {
 	return &ErrInconsistent{
 		errCore: &errCore{
-			message:      decorateWithCallTrace(formatMessage(msg...)(), "", ""),
+			message:      decorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),

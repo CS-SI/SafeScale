@@ -41,7 +41,7 @@ func GetConnection(host string, port int) *grpc.ClientConn {
 // GetReference return a reference from the name or id given in the protocol.Reference
 func GetReference(in *protocol.Reference) string {
 	var ref string
-	name := in.Name()
+	name := in.GetName()
 	if strings.TrimSpace(name) != "" {
 		ref = name
 	}

@@ -23,7 +23,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	featureops "github.com/CS-SI/SafeScale/lib/server/resources/operations/feature"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -50,7 +50,7 @@ func List() ([]interface{}, error) {
 			}
 		}
 	}
-	for _, feat := range featureops.GetAllEmbeddedMap() {
+	for _, feat := range operations.GetAllEmbeddedFeatures() {
 		yamlKey := "feature.suitableFor.host"
 
 		if !captured.Contains(feat.Name()) {
@@ -63,7 +63,7 @@ func List() ([]interface{}, error) {
 				cfgFiles.Add(feat.GetFilename())
 			}
 
-			captured.Add(feat.Name())
+			captured.Add(feat.GetName())
 		}
 	}
 
@@ -76,21 +76,18 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
-	}
 	if name == "" {
-		return nil, utils.InvalidParameterError("name", "can't be empty string!")
+		return nil, scerr.InvalidParameterError("name", "can't be empty string!")
 	}
 
-	feat, err := featureops.New(task, name)
+	feat, err := operations.NewFeature(task, name)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); !ok {
 			return nil, err
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		feat, err = featureops.NewEmbedded(name)
+		feat, err = operations.NewEmbeddedFeature(name)
 		if err != nil {
 			return nil, err
 		}
@@ -108,5 +105,5 @@ func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) 
 		return nil, scerr.InvalidParameterError("name", "canno't be empty string!")
 	}
 
-	return featureops.NewEmbedded(task, name)
+	return operations.NewEmbeddedFeature(task, name)
 }

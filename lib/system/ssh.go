@@ -430,7 +430,7 @@ func (sc *SSHCommand) Display() string {
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
 func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, string, error) {
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outs.String()), false).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(t, false, "(%s)", outs.String()).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 
 	return sc.RunWithTimeout(t, outs, 0)
@@ -438,7 +438,7 @@ func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, s
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outs.String(), timeout), false).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(task, false, "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 	// Set up the outputs (std and err)
@@ -493,10 +493,10 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, t
 	// 		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 	// 	}
 	// 	if !issues {
-	// 		logrus.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display())
+	// 		logrus.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display()
 	// 	}
 	// case <-time.After(timeout):
-	// 	errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
+	// 	errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display()
 	// 	logrus.Warnf(errMsg)
 	// 	return 0, "", "", fmt.Errorf(errMsg)
 	// }
@@ -777,7 +777,7 @@ func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, 
 	if task == nil {
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
-	ctx, _, err := task.Context()
+	ctx, _, err := task.GetContext()
 	if err != nil {
 		return nil, err
 	}
@@ -816,7 +816,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 		return "", scerr.InvalidInstanceContentError("ssh.Host", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(task, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), true).GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(task, true, "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().OnExitTrace()()
 	defer scerr.OnExitTraceError(
 		fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout)),
 		&err,
@@ -1000,11 +1000,11 @@ func (ssh *SSHConfig) Enter(username, shell string) error {
 // func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SSHCommand, error) {
 // 	tunnels, sshConfig, err := ssh.CreateTunneling()
 // 	if err != nil {
-// 		return nil, fmt.Errorf("unable to create command : %s", err.Error())
+// 		return nil, fmt.Errorf("unable to create command : %s", err.Error()
 // 	}
 // 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
 // 	if err != nil {
-// 		return nil, fmt.Errorf("unable to create command : %s", err.Error())
+// 		return nil, fmt.Errorf("unable to create command : %s", err.Error()
 // 	}
 
 // 	cmd := exec.CommandContext(ctx, "bash", "-c", sshCmdString)

@@ -34,8 +34,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -72,7 +74,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()()
 
 	// Checks if CIDR is valid...
 	_, _, err = net.ParseCIDR(req.CIDR)
@@ -137,7 +139,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
@@ -174,7 +176,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
 
 	// If not found, we look for any network from provider
 	// 1st try with id
@@ -218,7 +220,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "").WithStopwatch().Entering().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*abstract.Network
@@ -269,7 +271,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
@@ -285,7 +287,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	sns, err := s.listSubnets(id)
 	if err != nil {
 		msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-		logrus.Debugf(utils.Capitalize(msg))
+		logrus.Debugf(strprocess.Capitalize(msg))
 		return fmt.Errorf(msg)
 	}
 	for _, sn := range sns {
@@ -296,7 +298,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 				return err
 			default:
 				msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-				logrus.Debugf(utils.Capitalize(msg))
+				logrus.Debugf(strprocess.Capitalize(msg))
 				return fmt.Errorf(msg)
 			}
 		}
@@ -308,7 +310,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 			return err
 		default:
 			msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-			logrus.Debugf(utils.Capitalize(msg))
+			logrus.Debugf(strprocess.Capitalize(msg))
 			return fmt.Errorf(msg)
 		}
 	}
@@ -322,7 +324,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostF
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()()
 	defer scerr.OnPanic(&err)()
 
 	userData = userdata.NewContent()
@@ -338,7 +340,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostF
 
 	password, err := utils.GeneratePassword(16)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+		return nil, userData, scerr.Wrap(err, "failed to generate password")
 	}
 	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
@@ -395,7 +397,7 @@ func (s *Stack) DeleteGateway(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
 
 	return s.DeleteHost(id)
 }
@@ -481,8 +483,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		case gophercloud.ErrDefault400:
 			neutronError := ParseNeutronError(r.Err.Error())
 			if neutronError != nil {
-				msg := fmt.Sprintf("error creating subnet: bad request: %s", neutronError["message"])
-				return nil, fmt.Errorf(msg)
+				return nil, scerr.NewError(nil, nil, "error creating subnet: bad request: %s", neutronError["message"])
 			}
 		}
 		return nil, scerr.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
@@ -582,7 +583,7 @@ func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
 	paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
-			return false, fmt.Errorf("error listing subnets: %s", ProviderErrorToString(err))
+			return false, scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "error listing subnets")
 		}
 
 		for _, subnet := range list {
@@ -607,7 +608,11 @@ func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
 }
 
 // deleteSubnet deletes the sub network identified by id
-func (s *Stack) deleteSubnet(id string) error {
+func (s *Stack) deleteSubnet(id string) (err error) {
+	tracer := concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "").Entering()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
@@ -617,19 +622,14 @@ func (s *Stack) deleteSubnet(id string) error {
 		}
 	}
 	if router != nil {
-		if err := s.removeSubnetFromRouter(router.ID, id); err != nil {
-			msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-			logrus.Debug(utils.Capitalize(msg))
-			return fmt.Errorf(msg)
+		if err = s.removeSubnetFromRouter(router.ID, id); err != nil {
+			return scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "failed to delete subnet '%s'", id)
 		}
-		if err := s.deleteRouter(router.ID); err != nil {
-			msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-			logrus.Debug(utils.Capitalize(msg))
-			return fmt.Errorf(msg)
+		if err = s.deleteRouter(router.ID); err != nil {
+			return scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "failed to delete subnet '%s'", id)
 		}
 	}
 
-	var err error
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			r := subnets.Delete(s.NetworkClient, id)
@@ -640,16 +640,14 @@ func (s *Stack) deleteSubnet(id string) error {
 				switch neutronError["type"] {
 				case "SubnetInUse":
 					msg := fmt.Sprintf("hosts or services are still attached")
-					logrus.Warnf(utils.Capitalize(msg))
+					logrus.Warnf(strprocess.Capitalize(msg))
 					return abstract.ResourceNotAvailableError("subnet", id)
 				default:
 					logrus.Debugf("NeutronError: type = %s", neutronError["type"])
 				}
 			}
 			if err != nil {
-				msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "failed to delete subnet '%s'", id)
 			}
 
 			return nil
@@ -666,7 +664,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				return abstract.ResourceTimeoutError("network", id, temporal.GetContextTimeout())
 			}
 		}
-		return fmt.Errorf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), retryErr)
+		return scerr.Wrap(retryErr, "failed to delete subnet after %v", temporal.GetContextTimeout())
 	}
 	return nil
 }
@@ -816,27 +814,27 @@ func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (string, string, error) {
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	if s == nil {
-		return "", "", scerr.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 	if vip == nil {
-		return "", "", scerr.InvalidParameterError("vip", "cannot be nil")
+		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
 	if hostID == "" {
-		return "", "", scerr.InvalidParameterError("host", "cannot be empty string")
+		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
 	if err != nil {
-		return "", "", err
+		return err
 	}
 	hostPorts, err := s.listPorts(ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
 	if err != nil {
-		return "", "", err
+		return err
 	}
 	addressPair := ports.AddressPair{
 		MACAddress: vipPort.MACAddress,
@@ -846,10 +844,10 @@ func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (string, s
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
 		_, err = ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
 		if err != nil {
-			return "", "", err
+			return err
 		}
 	}
-	return vip.PrivateIP, "", nil
+	return nil
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host

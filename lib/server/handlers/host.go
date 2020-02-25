@@ -17,7 +17,6 @@
 package handlers
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/sirupsen/logrus"
@@ -27,28 +26,29 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-//go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers HostAPI
+//go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers HostHandler
 
 // TODO: At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
-// HostAPI defines API to manipulate hosts
+// HostHandler defines API to manipulate hosts
 type HostHandler interface {
-	Create(name string, net string, os string, public bool, sizingParam interface{}, force bool) (*resources.Host, error)
-	List(all bool) ([]*resources.Host, error)
-	ForceInspect(ref string) (*resources.Host, error)
-	Inspect(ref string) (*resources.Host, error)
+	Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements, force bool) (resources.Host, error)
+	List(all bool) (abstract.HostList, error)
+	Inspect(ref string) (resources.Host, error)
 	Delete(ref string) error
 	SSH(ref string) (*system.SSHConfig, error)
 	Reboot(ref string) error
-	Resize(name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*resources.Host, error)
+	Resize(name string, sizing abstract.HostSizingRequirements) (resources.Host, error)
 	Start(ref string) error
 	Stop(ref string) error
 }
@@ -72,12 +72,12 @@ func (handler *hostHandler) Start(ref string) (err error) { // FIXME Unused ctx
 		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.Task()
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	objh, err := hostfactory.Load(task, handler.service, ref)
+	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		return err
 	}
@@ -96,12 +96,12 @@ func (handler *hostHandler) Stop(ref string) (err error) {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	objh, err := hostfactory.Load(task, handler.service, ref)
+	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		return err
 	}
@@ -120,12 +120,12 @@ func (handler *hostHandler) Reboot(ref string) (err error) {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	objh, err := hostfactory.Load(task, handler.service, ref)
+	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (handler *hostHandler) Reboot(ref string) (err error) {
 }
 
 // Resize ...
-func (handler *hostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost resources.Host, err error) {
+func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (newHost resources.Host, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -144,48 +144,40 @@ func (handler *hostHandler) Resize(ref string, cpu int, ram float32, disk int, g
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	objh, err := hostfactory.Load(task, handler.service, ref)
+	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		return nil, err
 	}
 
-	hostSizeRequest := abstract.SizingRequirements{
-		MinDiskSize: disk,
-		MinRAMSize:  ram,
-		MinCores:    cpu,
-		MinFreq:     freq,
-		MinGPU:      gpuNumber,
-	}
-
-	descent := false
+	reduce := false
 	err = objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(hostproperty.SizingV1, func(clonable data.Clonable) error {
 			nhs, ok := clonable.(*propertiesv1.HostSizing)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			descent = descent || (hostSizeRequest.MinCores < nhs.RequestedSize.Cores)
-			descent = descent || (hostSizeRequest.MinRAMSize < nhs.RequestedSize.RAMSize)
-			descent = descent || (hostSizeRequest.MinGPU < nhs.RequestedSize.GPUNumber)
-			descent = descent || (hostSizeRequest.MinFreq < nhs.RequestedSize.CPUFreq)
-			descent = descent || (hostSizeRequest.MinDiskSize < nhs.RequestedSize.DiskSize)
+			reduce = reduce || (sizing.MinCores < nhs.RequestedSize.MinCores)
+			reduce = reduce || (sizing.MinRAMSize < nhs.RequestedSize.MinRAMSize)
+			reduce = reduce || (sizing.MinGPU < nhs.RequestedSize.MinGPU)
+			reduce = reduce || (sizing.MinCPUFreq < nhs.RequestedSize.MinFreq)
+			reduce = reduce || (sizing.MinDiskSize < nhs.RequestedSize.MinDiskSize)
 			return nil
 		})
 	})
 	if err != nil {
 		return nil, err
 	}
-	if descent {
-		logrus.Warn("Asking for less abstract..., ain't gonna happen :(")
+	if reduce {
+		logrus.Warn("Asking for less resource..., ain't gonna happen :(")
 	}
 
-	err = objh.Resize(hostSizeRequest)
+	err = objh.Resize(sizing)
 	return objh, err
 }
 
@@ -204,7 +196,7 @@ func (handler *hostHandler) Create(
 		return nil, scerr.InvalidParameterError("req.Name", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
+	task := handler.job.SafeGetTask()
 
 	var networkName string
 	if !req.PublicIP {
@@ -218,15 +210,14 @@ func (handler *hostHandler) Create(
 	}
 	tracer := concurrency.NewTracer(
 		task,
-		fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)",
-			req.ResourceName, networkName, req.ImageID, req.PublicIP, force),
-		true,
-	).WithStopwatch().GoingIn()
+		debug.IfTrace("handlers.host"),
+		"('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, networkName, req.ImageID, req.PublicIP, force,
+	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	objh, err := hostfactory.New(handler.service)
+	objh, err := hostfactory.New(handler.job.SafeGetService())
 	if err != nil {
 		return nil, err
 	}
@@ -238,30 +229,30 @@ func (handler *hostHandler) Create(
 }
 
 // List returns the host list
-func (handler *hostHandler) List(all bool) (hosts []*abstract.HostFull, err error) {
+func (handler *hostHandler) List(all bool) (hosts abstract.HostList, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError()
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.Task()
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if all {
-		return handler.job.Service().ListHosts()
+		return handler.job.SafeGetService().ListHosts(true)
 	}
 
-	objh, err := hostfactory.New(handler.service)
+	objh, err := hostfactory.New(handler.job.SafeGetService())
 	if err != nil {
 		return nil, err
 	}
-	hosts = []*abstract.Host{}
-	err = objh.Browse(task, func(host *abstract.Host) error {
-		hosts = append(hosts, host)
+	hosts = abstract.HostList{}
+	err = objh.Browse(task, func(host *abstract.HostCore) error {
+		hosts = append(hosts, converters.HostCoreToHostFull(*host))
 		return nil
 	})
 	return hosts, err
@@ -269,7 +260,7 @@ func (handler *hostHandler) List(all bool) (hosts []*abstract.HostFull, err erro
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
-func (handler *hostHandler) Inspect(task concurrency.Task, ref string) (host resources.Host, err error) {
+func (handler *hostHandler) Inspect(ref string) (host resources.Host, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -280,12 +271,12 @@ func (handler *hostHandler) Inspect(task concurrency.Task, ref string) (host res
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	objh, err := hostfactory.Load(task, handler.service, ref)
+	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return nil, nil
@@ -307,13 +298,13 @@ func (handler *hostHandler) Delete(ref string) (err error) {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
-	objh, err := hostfactory.Load(task, handler.service, ref)
+	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		return err
 	}
@@ -332,12 +323,12 @@ func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, err er
 		return nil, scerr.InvalidParameterError("ref", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	sshHandler := NewSSHHandler(handler.job)
-	sshConfig, err = sshHandler.Config((ref)
+	sshConfig, err = sshHandler.GetConfig(ref)
 	if err != nil {
 		return nil, err
 	}

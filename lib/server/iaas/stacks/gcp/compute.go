@@ -35,10 +35,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -219,9 +221,9 @@ func (s *Stack) DeleteKeyPair(id string) error {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, template *abstract.HostTemplate, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 
 	defer scerr.OnPanic(&err)()
@@ -232,7 +234,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	hostMustHavePublicIP := request.PublicIP
 
 	if len(networks) == 0 {
-		return nil, nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
+		return nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
 	}
 
 	// If no key pair is supplied create one
@@ -240,30 +242,30 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		id, err := uuid.NewV4()
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
-			return nil, nil, userData, fmt.Errorf(msg)
+			logrus.Debugf(strprocess.Capitalize(msg))
+			return nil, userData, fmt.Errorf(msg)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
 		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
-			return nil, nil, userData, fmt.Errorf(msg)
+			logrus.Debugf(strprocess.Capitalize(msg))
+			return nil, userData, fmt.Errorf(msg)
 		}
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
 
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
-	// defaultNetworkID := defaultNetwork.ID
-	// defaultGateway := request.DefaultGateway
+	defaultNetworkID := defaultNetwork.ID
+	defaultGatewayID := request.DefaultGateway.ID
 	isGateway := request.DefaultRouteIP == "" && defaultNetwork.Name != abstract.SingleHostNetworkName
 	//VPL: moved to ojects.Host.Create()
 	// defaultGatewayID := ""
@@ -282,7 +284,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	// if defaultGateway == nil && !hostMustHavePublicIP {
 	if request.DefaultRouteIP == "" && !hostMustHavePublicIP {
-		return nil, nil, userData, fmt.Errorf("the host '%s' must have a gateway or be public", resourceName)
+		return nil, userData, fmt.Errorf("the host '%s' must have a gateway or be public", resourceName)
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -291,14 +293,14 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	err = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		logrus.Debugf(utils.Capitalize(msg))
-		return nil, nil, userData, fmt.Errorf(msg)
+		logrus.Debugf(strprocess.Capitalize(msg))
+		return nil, userData, fmt.Errorf(msg)
 	}
 
 	// Determine system disk size based on vcpus count
-	template, err = s.Template(request.TemplateID)
+	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, nil, userData, fmt.Errorf("failed to get image: %s", err)
+		return nil, userData, fmt.Errorf("failed to get image: %s", err)
 	}
 	if request.DiskSize > template.DiskSize {
 		template.DiskSize = request.DiskSize
@@ -314,9 +316,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		}
 	}
 
-	rim, err := s.Image(request.ImageID)
+	rim, err := s.GetImage(request.ImageID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
@@ -325,7 +327,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	if s.GcpConfig.Zone == "" {
 		azList, err := s.ListAvailabilityZones()
 		if err != nil {
-			return nil, nil, userData, err
+			return nil, userData, err
 		}
 		var az string
 		for az = range azList {
@@ -338,7 +340,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// Sets provider parameters to create host
 	userDataPhase1, err := userData.Generate("phase1")
 	if err != nil {
-		return nil, nil, userData, err
+		return nil, userData, err
 	}
 
 	// --- Initializes abstract.HostCore ---
@@ -437,15 +439,20 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, nil, userData, retryErr
+		return nil, userData, retryErr
 	}
 	if desistError != nil {
-		return nil, nil, userData, abstract.ResourceForbiddenError(request.ResourceName, fmt.Sprintf("error creating host: %s", desistError.Error()))
+		return nil, userData, abstract.ResourceForbiddenError(request.ResourceName, fmt.Sprintf("error creating host: %s", desistError.Error()))
 	}
 	logrus.Debugf("host resource created.")
 
 	newHost := abstract.NewHostFull()
 	newHost.Core = hostCore
+	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	newHost.Network.IsGateway = isGateway
+	newHost.Network.DefaultNetworkID = defaultNetworkID
+	newHost.Network.DefaultGatewayID = defaultGatewayID
+	newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
@@ -470,35 +477,45 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		logrus.Warnf("Missing data in host: %s", spew.Sdump(newHost))
 	}
 
-	return newHost, template, userData, nil
+	return newHost, userData, nil
 }
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.HostFull, err error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.HostCore, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	var hostCore *abstract.HostCore
+	var (
+		hostCore *abstract.HostCore
+		hostRef  string
+	)
 	switch hostParam := hostParam.(type) {
 	case string:
 		hostCore = abstract.NewHostCore()
 		hostCore.ID = hostParam
+		hostRef = hostCore.ID
+		if hostRef == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be empty string")
+		}
 	case *abstract.HostCore:
 		hostCore = hostParam
 		if hostCore == nil {
 			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
 		}
-	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a non-empty string or a *abstract.HostCore")
-	}
-	hostRef := hostCore.Name
-	if hostRef == "" {
 		hostRef = hostCore.ID
+		if hostRef == "" {
+			hostRef = hostCore.Name
+		}
+		if hostRef == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "'*abstract.HostCore' does not contain values for neither Name nor ID")
+		}
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a non-empty string or a '*abstract.HostCore'")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostCore.ID), true).GoingIn()
+	tracer := concurrency.NewTracer(nil, true, "(%s)", hostCore.ID).Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -525,7 +542,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 		}
 		return nil, retryErr
 	}
-	return hostComplete, nil
+	return hostComplete.Core, nil
 }
 
 func publicAccess(isPublic bool) []*compute.AccessConfig {
@@ -845,15 +862,18 @@ func (s *Stack) DeleteHost(id string) (err error) {
 
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 
-	waitErr := retry.WhileUnsuccessfulDelay5Seconds(func() error {
-		_, recErr := service.Instances.Get(projectID, zone, instanceName).Do()
-		if gerr, ok := recErr.(*googleapi.Error); ok {
-			if gerr.Code == 404 {
-				return nil
+	waitErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			_, recErr := service.Instances.Get(projectID, zone, instanceName).Do()
+			if gerr, ok := recErr.(*googleapi.Error); ok {
+				if gerr.Code == 404 {
+					return nil
+				}
 			}
-		}
-		return fmt.Errorf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr)
-	}, temporal.GetContextTimeout())
+			return fmt.Errorf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr)
+		},
+		temporal.GetContextTimeout(),
+	)
 
 	if waitErr != nil {
 		logrus.Error(scerr.Cause(waitErr))
@@ -863,7 +883,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request abstract.HostSizingRequirements) (abstract.HostList, error) {
+func (s *Stack) ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, error) {
 	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 

@@ -24,33 +24,41 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // Host links Object Storage folder and Network
 type Host interface {
 	Metadata
 	Targetable
+	data.NullValue
 
-	Browse(task concurrency.Task, callback func(*abstract.HostCore) error) error                                           // Browse ...
-	Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) error             // Create creates a new host and its metadata
-	WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err error)                                  // WaitSSHReady ...
-	SSHConfig(task concurrency.Task) (*system.SSHConfig, error)                                                            // SSHConfig loads SSH configuration for host from metadata
-	Run(task concurrency.Task, cmd string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) // Run tries to execute command 'cmd' on the host
-	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, error)                 // Pull downloads a file from host
-	Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, error)    // Push uploads a file to ho
-	Share(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, error)                                         // Share returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
-	Start(task concurrency.Task) error                                                                                     // Start starts the host
-	Stop(task concurrency.Task) error                                                                                      // Stop stops the host
-	Reboot(task concurrency.Task) error                                                                                    // Reboot reboots the host
-	Resize(hostSize abstract.HostSizingRequirements) error                                                                 // resize the host (probably not yet implemented on some proviers if not all)
-	PublicIP(task concurrency.Task) (ip string, err error)                                                                 // PublicIP returns the public IP address of the host
-	PrivateIP(task concurrency.Task) (ip string, err error)                                                                // PrivateIP returns the IP address of the host on the default local network
-	PrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, err error)                                     // PrivateIPOnNetwork returns the IP address of the host on the local network requested
-	AccessIP(task concurrency.Task) (string, error)                                                                        // GetAccessIP returns the IP to reach the host
-	IsClusterMember(task concurrency.Task) (bool, error)                                                                   // IsClusterMember returns true if the host is member of a cluster
-	PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) error                     // creates a file 'filename' on remote 'host' with the content 'content'
-	DefaultNetwork(task concurrency.Task) (Network, error)                                                                 // returns the resources.Network object corresponding to the default network of the host
-	State(task concurrency.Task) (hoststate.Enum, error)                                                                   // returns the current state of the host
-	ToProtocol(task concurrency.Task) (protocol.Host, error)                                                               // Converts a host to equivalent gRPC message
+	Browse(task concurrency.Task, callback func(*abstract.HostCore) error) error                                                              // Browse ...
+	Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) error                                // creates a new host and its metadata
+	WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err error)                                                     // WaitSSHReady ...
+	SSHConfig(task concurrency.Task) (*system.SSHConfig, error)                                                                               // loads SSH configuration for host from metadata
+	Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) // tries to execute command 'cmd' on the host
+	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, error)                                    // downloads a file from host
+	Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, error)                       // uploads a file to host
+	Start(task concurrency.Task) error                                                                                                        // starts the host
+	Stop(task concurrency.Task) error                                                                                                         // stops the host
+	Reboot(task concurrency.Task) error                                                                                                       // reboots the host
+	Resize(hostSize abstract.HostSizingRequirements) error                                                                                    // resize the host (probably not yet implemented on some proviers if not all)
+	GetPublicIP(task concurrency.Task) (ip string, err error)                                                                                 // returns the public IP address of the host, with error handling
+	GetPrivateIP(task concurrency.Task) (ip string, err error)                                                                                // returns the IP address of the host on the default local network, with error handling
+	GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, err error)                                                     // returns the IP address of the host on the local network requested, with error handling
+	GetAccessIP(task concurrency.Task) (string, error)                                                                                        // returns the IP to reach the host, with error handling
+	GetDefaultNetwork(task concurrency.Task) (Network, error)                                                                                 // returns the resources.Network object corresponding to the default network of the host, with error handling
+	GetState(task concurrency.Task) (hoststate.Enum, error)                                                                                   // returns the current state of the host, with error handling
+	GetShare(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, error)                                                         // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
+	SafeGetPublicIP(task concurrency.Task) string                                                                                             // returns the public IP address of the host, without error handling (returning "" if cannot be defined)
+	SafeGetPrivateIP(task concurrency.Task) string                                                                                            // returns the IP address of the host on the default local network, without error handling (returning "" if cannot be defined)
+	SafeGetPrivateIPOnNetwork(task concurrency.Task, networkID string) string                                                                 // returns the IP address of the host on the local network requested, , without error handling (returning "" if cannot be defined)
+	SafeGetAccessIP(task concurrency.Task) string                                                                                             // returns the IP to reach the host, , without error handling (returning "" if cannot be defined)
+	SafeGetState(task concurrency.Task) hoststate.Enum                                                                                        // returns the latest retrieved state of the host, without error handling
+	IsClusterMember(task concurrency.Task) (bool, error)                                                                                      // returns true if the host is member of a cluster
+	PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) error                                        // creates a file 'filename' on remote 'host' with the content 'content'
+	ToProtocol(task concurrency.Task) (protocol.Host, error)                                                                                  // converts a host to equivalent gRPC message
 }

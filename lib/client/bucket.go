@@ -125,8 +125,8 @@ func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dur
 
 	_, err = service.Mount(ctx, &protocol.BucketMountingPoint{
 		Bucket: bucketName,
-		Host: &protocol.Reference{Name: hostName},
-		Path: mountPoint,
+		Host:   &protocol.Reference{Name: hostName},
+		Path:   mountPoint,
 	})
 	return err
 }

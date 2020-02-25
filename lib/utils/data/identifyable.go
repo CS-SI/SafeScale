@@ -20,6 +20,6 @@ package data
 
 // Identifyable proposes methods to identify a struct
 type Identifyable interface {
-	Name() string // Returns the name
-	ID() string   // Returns the ID
+	SafeGetName() string // Returns the name
+	SafeGetID() string   // Returns the ID
 }

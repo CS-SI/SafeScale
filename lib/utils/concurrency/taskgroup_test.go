@@ -34,7 +34,7 @@ func TestChildrenWaitingGame(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.ID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -59,7 +59,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.ID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -97,7 +97,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.ID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -126,7 +126,7 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.ID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -163,7 +163,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.ID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -225,7 +225,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.ID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 

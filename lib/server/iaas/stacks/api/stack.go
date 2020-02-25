@@ -72,7 +72,7 @@ type Stack interface {
 	// AddPublicIPToVIP adds a public IP to VIP
 	AddPublicIPToVIP(*abstract.VirtualIP) error
 	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-	BindHostToVIP(*abstract.VirtualIP, string) (privateIP string, publicIP string, err error)
+	BindHostToVIP(*abstract.VirtualIP, string) error
 	// UnbindHostFromVIP removes the bind between the VIP and a host
 	UnbindHostFromVIP(*abstract.VirtualIP, string) error
 	// DeleteVIP deletes the port corresponding to the VIP
@@ -83,7 +83,7 @@ type Stack interface {
 	// GetHost returns the host identified by id or updates content of a *abstract.HostFull
 	InspectHost(interface{}) (*abstract.HostFull, error)
 	// GetHostByName returns the ID of the host identified by name
-	GetHostByName(string) (string, error)
+	GetHostByName(string) (*abstract.HostCore, error)
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(interface{}) (hoststate.Enum, error)
 	// ListHosts lists all hosts

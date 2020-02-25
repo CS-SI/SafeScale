@@ -225,7 +225,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.AuthenticationOptions()
+	opts := p.Stack.GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("TenantID", opts.TenantID)
 	cfg.Set("DomainName", opts.DomainName)
@@ -243,7 +243,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.Config(urationOptions()
+	opts := p.Stack.GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -255,7 +255,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
-	tpl, err := p.Stack.Template(id)
+	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
 	}
@@ -288,7 +288,7 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	}
 
 	// check flavor disponibilities through OVH-API
-	authOpts, err := p.AuthenticationOptions()
+	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
 		logrus.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
 		return allTemplates, nil

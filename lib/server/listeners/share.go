@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/asaskevich/govalidator"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -28,7 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	convert "github.com/CS-SI/SafeScale/lib/server/utils"
+	sharefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/share"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -69,7 +69,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		}
 	}
 
-	shareName := in.Name()
+	shareName := in.GetName()
 	hostRef := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
 	shareType := in.GetType()
@@ -80,16 +80,16 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	share, err := sharefactory.New(job.Service())
+	share, err := sharefactory.New(job.SafeGetService())
 	if err != nil {
 		return nil, err
 	}
 	err = share.Create(
-		job.Task(),
+		job.SafeGetTask(),
 		shareName,
 		hostRef, sharePath,
 		in.GetSecurityModes(),
@@ -133,7 +133,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		}
 	}
 
-	shareName := in.Name()
+	shareName := in.GetName()
 
 	job, err := PrepareJob(ctx, "", "share delete")
 	if err != nil {
@@ -141,15 +141,15 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", shareName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	share, err := sharefactory.Load(job.Task(), job.Service(), shareName)
+	share, err := sharefactory.Load(job.SafeGetTask(), job.SafeGetService(), shareName)
 	if err != nil {
 		return empty, err
 	}
-	err = share.Delete(job.Task())
+	err = share.Delete(job.SafeGetTask())
 	if err != nil {
 		return empty, err
 	}
@@ -184,7 +184,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -197,7 +197,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	var pbshares []*protocol.ShareDefinition
 	for k, item := range shares {
 		for _, share := range item {
-			pbshares = append(pbshares, converters.ToProtocolShare(k, share))
+			pbshares = append(pbshares, converters.ShareAbstractToProtocol(k, share))
 		}
 	}
 	list := &protocol.ShareList{ShareList: pbshares}
@@ -239,7 +239,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -248,7 +248,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	if err != nil {
 		return nil, err
 	}
-	return converters.ShareMountFromAbstractsToProtocol(in.GetShare().Name(), in.GetHost().Name(), mount), nil
+	return converters.ShareMountFromAbstractToProtocol(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
 }
 
 // Unmount unmounts share from the given host
@@ -287,7 +287,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -332,7 +332,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	defer task.Close()
 
 	shareRef := srvutils.GetReference(in)
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", shareRef), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, true, "('%s')", shareRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -343,14 +343,14 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	defer job.Close()
 
 	handler := handlers.NewShareHandler(job)
-	host, share, mounts, err := handler.Inspect(shareRef)
+	share, err := handler.Inspect(shareRef)
 	if err != nil {
 		return nil, err
 	}
 	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	if host == nil {
+	if share == nil {
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
-	return convert.ToProtocolShareMountList(host.Name, share, mounts), nil
+	return converters.ShareMountsFromResourceToProtocol(share), nil
 }

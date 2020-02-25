@@ -17,13 +17,14 @@
 package handlers
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -34,7 +35,7 @@ type BucketHandler interface {
 	List() ([]string, error)
 	Create(string) error
 	Delete(string) error
-	Inspect(string) (resources.Bucket, error)
+	Inspect(string) (*abstract.Bucket, error)
 	Mount(string, string, string) error
 	Unmount(string, string) error
 }
@@ -45,26 +46,26 @@ type bucketHandler struct {
 }
 
 // NewBucketHandler creates a Bucket service
-func NewBucketHandler(job server.Job) BucketAPI {
-	return &BucketHandler{job: job}
+func NewBucketHandler(job server.Job) BucketHandler {
+	return &bucketHandler{job: job}
 }
 
 // List retrieves all available buckets
-func (handler *BucketHandler) List() (rv []string, err error) {
+func (handler *bucketHandler) List() (rv []string, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	rv, err = handler.job.Service().ListBuckets(objectstorage.RootPath)
+	rv, err = handler.job.SafeGetService().ListBuckets(objectstorage.RootPath)
 	return rv, err
 }
 
 // Create a bucket
-func (handler *BucketHandler) Create(name string) (err error) { // FIXME Unused ctx
+func (handler *bucketHandler) Create(name string) (err error) { // FIXME Unused ctx
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -72,20 +73,21 @@ func (handler *BucketHandler) Create(name string) (err error) { // FIXME Unused 
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), "('"+name+"')", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	bucket, err := handler.job.Service().Bucket(name)
+	svc := handler.job.SafeGetService()
+	bucket, err := svc.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
 			return err
 		}
 	}
 	if bucket != nil {
-		return resources.ResourceDuplicateError("bucket", name)
+		return abstract.ResourceDuplicateError("bucket", name)
 	}
-	_, err = handler.job.Service().CreateBucket(name)
+	_, err = svc.CreateBucket(name)
 	if err != nil {
 		return err
 	}
@@ -93,12 +95,19 @@ func (handler *BucketHandler) Create(name string) (err error) { // FIXME Unused 
 }
 
 // Delete a bucket
-func (handler *BucketHandler) Delete(name string) (err error) { // FIXME Unused ctx
-	tracer := concurrency.NewTracer(handler.job.Task(), "('"+name+"')", true).WithStopwatch().GoingIn()
+func (handler *bucketHandler) Delete(name string) (err error) {
+	if handler == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if name == "" {
+		return scerr.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	err = handler.job.Service().DeleteBucket(name)
+	err = handler.job.SafeGetService().DeleteBucket(name)
 	if err != nil {
 		return err
 	}
@@ -106,54 +115,68 @@ func (handler *BucketHandler) Delete(name string) (err error) { // FIXME Unused 
 }
 
 // Inspect a bucket
-func (handler *BucketHandler) Inspect(name string) (mb *resources.Bucket, err error) {
-	tracer := concurrency.NewTracer(handler.job.Task(), "('"+name+"')", true).WithStopwatch().GoingIn()
+func (handler *bucketHandler) Inspect(name string) (mb *abstract.Bucket, err error) {
+	if handler == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if name == "" {
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	b, err := handler.job.Service().Bucket(name)
+	b, err := handler.job.SafeGetService().GetBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
-			return nil, resources.ResourceNotFoundError("bucket", name)
+			return nil, abstract.ResourceNotFoundError("bucket", name)
 		}
 		return nil, err
 	}
-	mb = &resources.Bucket{
-		Name: b.Name(),
+	mb = &abstract.Bucket{
+		Name: b.SafeGetName(),
 	}
 	return mb, nil
 }
 
 // Mount a bucket on an host on the given mount point
-func (handler *BucketHandler) Mount(bucketName, hostName, path string) (err error) {
+func (handler *bucketHandler) Mount(bucketName, hostName, path string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
+	if bucketName == "" {
+		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
+	}
+	if hostName == "" {
+		return scerr.InvalidParameterError("hostName", "cannot be empty string")
+	}
 
-	tracer := concurrency.NewTracer(handler.job.Task(), fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Check bucket existence
-	_, err = handler.job.Service().Bucket(bucketName)
+	_, err = handler.job.SafeGetService().GetBucket(bucketName)
 	if err != nil {
 		return err
 	}
 
 	// Get Host ID
-	hostHandler := NewHostHandler(handler.job)
-	host, err := hostHandler.Inspect(hostName)
+	svc := handler.job.SafeGetService()
+	host, err := hostfactory.Load(task, svc, hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return scerr.NotFoundError("no host found with name or id '%s'", hostName)
 	}
 
 	// Create mount point
 	mountPoint := path
-	if path == resources.DefaultBucketMountPoint {
-		mountPoint = resources.DefaultBucketMountPoint + bucketName
+	if path == "" || path == abstract.DefaultBucketMountPoint {
+		mountPoint = abstract.DefaultBucketMountPoint + bucketName
 	}
 
-	authOpts, _ := handler.job.Service().AuthenticationOptions()
+	authOpts, _ := svc.GetAuthenticationOptions()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl, _ := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
@@ -166,7 +189,7 @@ func (handler *BucketHandler) Mount(bucketName, hostName, path string) (err erro
 	regionCfg, _ := authOpts.Config("Region")
 	region, _ := regionCfg.(string)
 
-	objStorageProtocol := handler.job.Service().ObjectStorageProtocol()
+	objStorageProtocol := handler.job.SafeGetService().SafeGetObjectStorageProtocol()
 	if objStorageProtocol == "swift" {
 		objStorageProtocol = "swiftks"
 	}
@@ -191,13 +214,24 @@ func (handler *BucketHandler) Mount(bucketName, hostName, path string) (err erro
 		Protocol:   objStorageProtocol,
 	}
 
-	rerr := exec(handler.job, "mount_object_storage.sh", data, host.ID, handler.job.Service())
+	rerr := exec(handler.job, "mount_object_storage.sh", data, host.SafeGetID(), svc)
 	return rerr
 }
 
 // Unmount a bucket
-func (handler *BucketHandler) Unmount(bucketName, hostName string) (err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+func (handler *bucketHandler) Unmount(bucketName, hostName string) (err error) {
+	if handler == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if bucketName == "" {
+		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
+	}
+	if hostName == "" {
+		return scerr.InvalidParameterError("hostName", "cannot be empty string")
+	}
+
+	task := handler.job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -211,8 +245,8 @@ func (handler *BucketHandler) Unmount(bucketName, hostName string) (err error) {
 	}
 
 	// Get Host ID
-	hostHandler := NewHostHandler(handler.job)
-	host, err := hostHandler.Inspect(hostName)
+	svc := handler.job.SafeGetService()
+	host, err := hostfactory.Load(task, svc, hostName)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); ok {
 			return err
@@ -226,6 +260,6 @@ func (handler *BucketHandler) Unmount(bucketName, hostName string) (err error) {
 		Bucket: bucketName,
 	}
 
-	rerr := exec(handler.job, "umount_object_storage.sh", data, host.ID, handler.job.Service())
+	rerr := exec(handler.job, "umount_object_storage.sh", data, host.SafeGetID(), svc)
 	return rerr
 }

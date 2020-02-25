@@ -28,12 +28,10 @@ type Share interface {
 	data.Identifyable
 
 	Browse(task concurrency.Task, callback func(hostName string, shareID string) error) error
-	// Create creates a share on host
-	Create(task concurrency.Task, shareName string, host Host, path string, securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error
-	// Server returns the *Host acting as share server
-	Server(task concurrency.Task) (Host, error)
-	// Mount mounts a share on a local directory of an host
-	Mount(task concurrency.Task, hostName, path string, withCache bool) (*propertiesv1.HostRemoteMount, error)
-	// Unmount unmounts a share from local directory of an host
-	Unmount(task concurrency.Task, targetName string) error
+	Create(task concurrency.Task, shareName string, host Host, path string, securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error // creates a share on host
+	GetServer(task concurrency.Task) (Host, error)                                                                                                                                    // returns the *Host acting as share server, with error handling
+	SafeGetServer(task concurrency.Task) Host                                                                                                                                         // returns the *Host acting as share server, with error handling (may return nil)
+	Mount(task concurrency.Task, hostName, path string, withCache bool) (*propertiesv1.HostRemoteMount, error)                                                                        // mounts a share on a local directory of an host
+	Unmount(task concurrency.Task, targetName string) error                                                                                                                           // unmounts a share from local directory of an host
+
 }

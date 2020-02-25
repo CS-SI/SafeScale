@@ -232,7 +232,7 @@ func HostFullFromAbstractsToProtocol(in *abstract.HostFull) *protocol.Host {
 
 // HostCoreToHostFull ...
 func HostCoreToHostFull(in abstract.HostCore) *abstract.HostFull {
-	return &abstract.HostFull{Core: in}
+	return &abstract.HostFull{Core: &in}
 }
 
 // HostDescriptionFromAbstractToProperty

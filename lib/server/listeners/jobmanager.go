@@ -96,7 +96,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 	defer task.Close()
 
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", uuid), true).GoingIn()
+	tracer := concurrency.NewTracer(task, true, "('%s')", uuid).Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -113,7 +113,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	// tenant := GetCurrentTenant()
 	// if tenant == nil {
 	// 	msg := "cannot stop process: no tenant set"
-	// 	tracer.Trace(utils.Capitalize(msg))
+	// 	tracer.Trace(strprocess.Capitalize(msg))
 	// 	return empty, status.Errorf(codes.FailedPrecondition, msg)
 	// }
 
@@ -152,7 +152,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 	}
 	defer task.Close()
 
-	tracer := concurrency.NewTracer(task, "", true).GoingIn()
+	tracer := concurrency.NewTracer(task, true, "").Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -167,7 +167,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 	// tenant := GetCurrentTenant()
 	// if tenant == nil {
 	// 	msg := "cannot list process: no tenant set"
-	// 	tracer.Trace(utils.Capitalize(msg))
+	// 	tracer.Trace(strprocess.Capitalize(msg))
 	// 	return nil, status.Errorf(codes.FailedPrecondition, msg)
 	// }
 

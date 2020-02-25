@@ -85,7 +85,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 
 // CreateVolume creates a block volume
 func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
-	volume, err := s.Volume(request.Name)
+	volume, err := s.GetVolume(request.Name)
 	if volume != nil && err == nil {
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
 	}
@@ -173,7 +173,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
-	return s.Stack.VolumeAttachment(serverID, id)
+	return s.Stack.GetVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments lists available volume attachment

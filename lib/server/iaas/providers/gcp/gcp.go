@@ -160,7 +160,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.AuthenticationOptions()
+	opts := p.Stack.GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -173,7 +173,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.Config(urationOptions()
+	opts := p.Stack.GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -184,7 +184,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetName returns the providerName
-func (p *provider) Name() string {
+func (p *provider) GetName() string {
 	return "gcp"
 }
 

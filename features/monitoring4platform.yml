@@ -319,8 +319,8 @@ feature:
                                     }
                                     http.HandleFunc("/", handleWebhook)
                                     http.HandleFunc("/_health", handleHealth)
-                            -       http.Handle("/metrics", prometheus.Handler())
-                            +       http.Handle("/metrics", promhttp.Handler())
+                            -       http.Handle("/metrics", prometheus.Handler()
+                            +       http.Handle("/metrics", promhttp.Handler()
                                     log.Println("Listening on", *listenAddr, "and running", command)
                                     log.Fatal(http.ListenAndServe(*listenAddr, nil))
                              }
