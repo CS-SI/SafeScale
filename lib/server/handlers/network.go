@@ -588,22 +588,24 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	defer func() {
 		if err != nil {
 			logrus.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
-			derr := handler.service.DeleteHost(gw.ID)
-			if derr != nil {
-				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
-				switch derr.(type) {
-				case *scerr.ErrNotFound:
-					logrus.Errorf(msgRoot+", resource not found: %v", request.Name, derr)
-				case *scerr.ErrTimeout:
-					logrus.Errorf(msgRoot+", timeout: %v", request.Name, derr)
-				default:
-					logrus.Errorf(msgRoot+": %v", request.Name, derr)
+			if gw != nil {
+				derr := handler.service.DeleteHost(gw.ID)
+				if derr != nil {
+					msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
+					switch derr.(type) {
+					case *scerr.ErrNotFound:
+						logrus.Errorf(msgRoot+", resource not found: %v", request.Name, derr)
+					case *scerr.ErrTimeout:
+						logrus.Errorf(msgRoot+", timeout: %v", request.Name, derr)
+					default:
+						logrus.Errorf(msgRoot+": %v", request.Name, derr)
+					}
+					err = scerr.AddConsequence(err, derr)
+				} else {
+					logrus.Infof("Cleaning up on failure, gateway '%s' deleted", request.Name)
 				}
 				err = scerr.AddConsequence(err, derr)
-			} else {
-				logrus.Infof("Cleaning up on failure, gateway '%s' deleted", request.Name)
 			}
-			err = scerr.AddConsequence(err, derr)
 		}
 	}()
 
