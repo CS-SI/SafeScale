@@ -245,7 +245,7 @@ type volumeDisplayable struct {
 func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInfo) *volumeInfoDisplayable {
 	return &volumeInfoDisplayable{
 		volumeInfo.GetId(),
-		volumeInfo.Name(),
+		volumeInfo.GetName(),
 		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 		srvutils.GetReference(volumeInfo.GetHost()),
@@ -258,7 +258,7 @@ func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInfo) *volumeInfoDisplay
 func toDisplayableVolume(volumeInfo *protocol.Volume) *volumeDisplayable {
 	return &volumeDisplayable{
 		volumeInfo.GetId(),
-		volumeInfo.Name(),
+		volumeInfo.GetName(),
 		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 	}
