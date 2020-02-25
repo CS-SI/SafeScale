@@ -32,7 +32,9 @@ make getdevdeps --silent
 
 hash -r
 
-echo "--> Ensure"
+echo "--> Ensure silent"
+make ensure --silent
+
 make ensure
 
 hash -r
