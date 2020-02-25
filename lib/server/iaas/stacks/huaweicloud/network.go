@@ -187,7 +187,7 @@ func (s *Stack) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, true, "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 
 	subnet, err := s.findSubnetByName(req.Name)
@@ -580,10 +580,13 @@ func (s *Stack) deleteSubnet(id string) error {
 	err := retry.Action(
 		func() error {
 			r, _ := s.Stack.Driver.Request("DELETE", url, &opts)
+			if r == nil {
+				return fmt.Errorf("failed to acknowledge DELETE command submission")
+			}
 			if r.StatusCode == 204 || r.StatusCode == 404 {
 				return nil
 			}
-			return fmt.Errorf("%d", r.StatusCode)
+			return fmt.Errorf("DELETE command failed with status %d", r.StatusCode)
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
@@ -657,7 +660,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, 
 		gwname = "gw-" + req.Network.Name
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gwname), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 
 	hostReq := abstract.HostRequest{

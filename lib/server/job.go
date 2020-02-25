@@ -33,11 +33,12 @@ import (
 
 // Job is the interface of a daemon job
 type Job interface {
-	ID() string
+	SafeGetID() string
+	SafeGetName() string
+	SafeGetTask() concurrency.Task
+	SafeGetService() iaas.Service
+	SafeGetDuration() time.Duration
 	String() string
-	Task() concurrency.Task
-	Service() iaas.Service
-	Duration() time.Duration
 	Abort() error
 	Aborted() bool
 	Close()
@@ -107,7 +108,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		task:        task,
 		cancel:      cancel,
 		service:     svc,
-		tenant:      svc.Name(),
+		tenant:      svc.GetName(),
 		startTime:   time.Now(),
 	}
 	err = register(&nj)
@@ -117,23 +118,28 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	return &nj, nil
 }
 
-// ID returns the id of the job (ie the uuid of gRPC message)
-func (j *job) ID() string {
+// SafeGetID returns the id of the job (ie the uuid of gRPC message)
+func (j *job) SafeGetID() string {
 	return j.uuid
 }
 
-// Task returns the task instance
-func (j *job) Task() concurrency.Task {
+// SafeGetName returns the name (== id) of the job
+func (j *job) SafeGetName() string {
+	return j.uuid
+}
+
+// SafeGetTask returns the task instance
+func (j *job) SafeGetTask() concurrency.Task {
 	return j.task
 }
 
-// Service returns the service instance
-func (j *job) Service() iaas.Service {
+// SafeGetService returns the service instance
+func (j *job) SafeGetService() iaas.Service {
 	return j.service
 }
 
-// Duration returns the duration of the job
-func (j *job) Duration() time.Duration {
+// SafeGetDuration returns the duration of the job
+func (j *job) SafeGetDuration() time.Duration {
 	return time.Since(j.startTime)
 }
 
@@ -145,7 +151,7 @@ func (j *job) Abort() error {
 	if j.cancel == nil {
 		return scerr.InvalidInstanceContentError("j.cancel", "cannot be nil")
 	}
-	logrus.Debugf("{job:%s} cancelling from job.Abort()...", j.ID())
+	logrus.Debugf("{job:%s} cancelling from job.Abort()...", j.SafeGetID())
 	j.cancel()
 	j.cancel = nil
 	return nil
@@ -163,7 +169,7 @@ func (j *job) Close() {
 	}
 	_ = deregister(j)
 	if j.cancel != nil {
-		logrus.Debugf("{job:%s} cancelling from job.Close()...", j.ID())
+		logrus.Debugf("{job:%s} cancelling from job.Close()...", j.SafeGetID())
 		j.cancel()
 	}
 }
@@ -183,7 +189,7 @@ func register(job Job) error {
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
-	jobMap[job.ID()] = job
+	jobMap[job.SafeGetID()] = job
 	return nil
 }
 
@@ -192,7 +198,7 @@ func deregister(job Job) error {
 	if job == nil {
 		return scerr.InvalidParameterError("job", "cannot be nil")
 	}
-	return deregisterUUID(job.ID())
+	return deregisterUUID(job.SafeGetID())
 }
 
 func deregisterUUID(uuid string) error {
@@ -228,7 +234,7 @@ func AbortJobByID(id string) error {
 func ListJobs() map[string]string {
 	listMap := map[string]string{}
 	for uuid, job := range jobMap {
-		listMap[uuid] = job.String()
+		listMap[uuid] = job.SafeGetName()
 	}
 	return listMap
 }

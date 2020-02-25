@@ -28,7 +28,7 @@ type Callback func(data.Clonable, *serialize.JSONProperties) error
 
 // Metadata contains the core functions of a persistent object
 type Metadata interface {
-	Service() iaas.Service                                                     // Service returns the iaas.Service used to create/load the persistency object
+	SafeGetService() iaas.Service                                              // Service returns the iaas.Service used to create/load the persistency object
 	Inspect(task concurrency.Task, callback Callback) error                    // Inspect protects the data for shared read
 	Alter(task concurrency.Task, callback Callback) error                      // Alter protects the data for exclusive write
 	Carry(task concurrency.Task, clonable data.Clonable) error                 // Carry links metadata with real data

@@ -44,7 +44,7 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 	}
 	hosts := abstract.HostList{}
 	err = objh.Browse(task, func(hc *abstract.HostCore) error {
-		hf := converters.HostCoreToHostFull(hc)
+		hf := converters.HostCoreToHostFull(*hc)
 		hosts = append(hosts, hf)
 		return nil
 	})
@@ -77,5 +77,5 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host
 
 	//FIXME: tracer...
 
-	return operations.LoadHost(svc)
+	return operations.LoadHost(task, svc, ref)
 }

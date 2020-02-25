@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ExportOptions ...
@@ -143,5 +144,5 @@ func (s *Share) Add(task concurrency.Task) error {
 	}
 
 	retcode, stdout, stderr, err := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
+	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }

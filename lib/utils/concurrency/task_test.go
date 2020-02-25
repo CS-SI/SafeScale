@@ -34,7 +34,7 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.ID()
+	theID, err := got.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -43,7 +43,7 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, theTask)
 
 	if theTask != nil {
-		if stat, ok := theTask.Status(); ok == nil {
+		if stat, ok := theTask.GetStatus(); ok == nil {
 			if stat != DONE {
 				t.Errorf("Task should be DONE")
 			}
@@ -64,7 +64,7 @@ func TestWaitingGame(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.ID()
+	theID, err := got.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -157,7 +157,7 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	err = nil
 	for {
 		time.Sleep(time.Duration(80) * time.Millisecond)
-		ctx, cancel, err := single.Context()
+		ctx, cancel, err := single.GetContext()
 		require.Nil(t, err)
 
 		if singleReplacement, err := NewTaskWithContext(ctx, cancel); err == nil {
@@ -322,14 +322,14 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		}
 
 		if witherror {
-			st, err := single.Status()
+			st, err := single.GetStatus()
 			require.Nil(t, err)
 			if st != ABORTED {
 				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
 			}
 			require.True(t, st == ABORTED)
 		} else {
-			st, err := single.Status()
+			st, err := single.GetStatus()
 			require.Nil(t, err)
 			if st == ABORTED {
 				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
@@ -447,7 +447,7 @@ func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	theID, err := overlord.ID()
+	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 

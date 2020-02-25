@@ -47,7 +47,7 @@ func newFolder(svc iaas.Service, path string) (*folder, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	cryptKey := svc.MetadataKey()
+	cryptKey := svc.SafeGetMetadataKey()
 	crypt := cryptKey != nil && len(cryptKey) > 0
 	f := &folder{
 		path:    strings.Trim(path, "/"),
@@ -60,18 +60,18 @@ func newFolder(svc iaas.Service, path string) (*folder, error) {
 	return f, nil
 }
 
-// GetService returns the service used by the folder
-func (f *folder) GetService() iaas.Service {
+// SafeGetService returns the service used by the folder
+func (f *folder) SafeGetService() iaas.Service {
 	return f.service
 }
 
-// GetBucket returns the bucket used by the folder to store Object Storage
-func (f *folder) GetBucket() objectstorage.Bucket {
-	return f.service.MetadataBucket()
+// SafeGetBucket returns the bucket used by the folder to store Object Storage
+func (f *folder) SafeGetBucket() objectstorage.Bucket {
+	return f.service.SafeGetMetadataBucket()
 }
 
-// GetPath returns the base path of the folder
-func (f *folder) GetPath() string {
+// SafeGetPath returns the base path of the folder
+func (f *folder) SafeGetPath() string {
 	return f.path
 }
 
@@ -92,7 +92,7 @@ func (f *folder) absolutePath(path ...string) string {
 // Search tells if the object named 'name' is inside the ObjectStorage folder
 func (f *folder) Search(path string, name string) error {
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, err := f.service.MetadataBucket().List(absPath, objectstorage.NoPrefix)
+	list, err := f.service.SafeGetMetadataBucket().List(absPath, objectstorage.NoPrefix)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (f *folder) Search(path string, name string) error {
 
 // Delete removes metadata passed as parameter
 func (f *folder) Delete(path string, name string) error {
-	err := f.service.MetadataBucket().DeleteObject(f.absolutePath(path, name))
+	err := f.service.SafeGetMetadataBucket().DeleteObject(f.absolutePath(path, name))
 	if err != nil {
 		return scerr.Wrap(err, "failed to remove metadata in Object Storage")
 	}
@@ -122,7 +122,7 @@ func (f *folder) Delete(path string, name string) error {
 // returns false, err if an error occured
 // returns true, nil if the object has been found
 // The callback function has to know how to decode it and where to store the result
-func (f *folder) Read(path string, name string, callback folderDecoderCallback) error {
+func (f *folder) Read(path string, name string, callback func([]byte) error) error {
 	err := f.Search(path, name)
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); ok {
@@ -132,7 +132,7 @@ func (f *folder) Read(path string, name string, callback folderDecoderCallback) 
 	}
 
 	var buffer bytes.Buffer
-	_, err = f.service.MetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
+	_, err = f.service.SafeGetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
 		return scerr.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
 	}
@@ -174,13 +174,13 @@ func (f *folder) Write(path string, name string, content []byte) error {
 	}
 
 	source := bytes.NewBuffer(data)
-	_, err = f.service.MetadataBucket().WriteObject(f.absolutePath(path, name), source, int64(source.Len()), nil)
+	_, err = f.service.SafeGetMetadataBucket().WriteObject(f.absolutePath(path, name), source, int64(source.Len()), nil)
 	return err
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *folder) Browse(path string, callback folderDecoderCallback) error {
-	list, err := f.service.MetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
+	list, err := f.service.SafeGetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
 	if err != nil {
 		logrus.Errorf("Error browsing metadata: listing objects: %+v", err)
 		return err
@@ -188,7 +188,7 @@ func (f *folder) Browse(path string, callback folderDecoderCallback) error {
 
 	for _, i := range list {
 		var buffer bytes.Buffer
-		_, err = f.service.MetadataBucket().ReadObject(i, &buffer, 0, 0)
+		_, err = f.service.SafeGetMetadataBucket().ReadObject(i, &buffer, 0, 0)
 		if err != nil {
 			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", err)
 			return err

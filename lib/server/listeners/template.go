@@ -63,7 +63,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	defer job.Close()
 
 	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -76,7 +76,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	// Build response mapping resources.Host to protocol.Host
 	var pbTemplates []*protocol.HostTemplate
 	for _, template := range templates {
-		pbTemplates = append(pbTemplates, converters.HostTemplateFromAbstractsToProtocol(&template))
+		pbTemplates = append(pbTemplates, converters.HostTemplateFromAbstractToProtocol(&template))
 	}
 	rv := &protocol.TemplateList{Templates: pbTemplates}
 	return rv, nil

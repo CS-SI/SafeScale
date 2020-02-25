@@ -429,12 +429,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *abstract.HostTemplate, _ *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, scerr.InvalidInstanceError()
 	}
 	if req.Network == nil {
-		return nil, nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
 
 	defer scerr.OnPanic(&err)()
@@ -453,13 +453,13 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull
 		PublicIP:     true,
 	}
 
-	host, template, userData, err := s.CreateHost(hostReq)
+	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
 		case *scerr.ErrInvalidRequest:
-			return nil, nil, userData, err
+			return nil, userData, err
 		default:
-			return nil, nil, userData, fmt.Errorf("error creating gateway : %s", err)
+			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
 		}
 	}
 
@@ -474,7 +474,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull
 	// 	return nil, userData, err
 	// }
 
-	return host, template, userData, err
+	return host, userData, err
 }
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
@@ -494,8 +494,8 @@ func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (string, string, error) {
-	return "", "", scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host

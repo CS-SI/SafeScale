@@ -33,6 +33,7 @@ import (
 	_ "github.com/graymeta/stow/swift"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -88,7 +89,7 @@ func (o *object) Reload() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	item, err := o.bucket.container.Item(o.Name)
 	if err != nil {
@@ -117,7 +118,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return scerr.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", from, to), concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%d, %d)", from, to).Entering().OnExitTrace()()
 
 	var seekTo int64
 	var length int64
@@ -128,9 +129,12 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return err
 	}
 
-	size := o.GetSize()
+	size, err := o.GetSize()
+	if err != nil {
+		return scerr.Wrap(err, "failed to get bucket size")
+	}
 	if size < 0 {
-		return fmt.Errorf("unknown size of object")
+		return scerr.NewError(nil, nil, "unknown size of object")
 	}
 
 	length = size
@@ -190,9 +194,9 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 		return scerr.InvalidParameterError("o.bucket", "cannot be nil")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%d)", sourceSize).Entering().OnExitTrace()()
 
-	item, err := o.bucket.container.Put(o.Name, source, sourceSize, o.GetMetadata())
+	item, err := o.bucket.container.Put(o.Name, source, sourceSize, o.SafeGetMetadata())
 	if err != nil {
 		return err
 	}
@@ -205,10 +209,13 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 	if o == nil {
 		return scerr.InvalidInstanceError()
 	}
+	if source == nil { // If source is nil, do nothing and don't trigger an error
+		return nil
+	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", sourceSize, chunkSize), concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().OnExitTrace()()
 
-	metadataCopy := o.GetMetadata().Clone()
+	metadataCopy := o.SafeGetMetadata().Clone()
 
 	var chunkIndex int
 	remaining := sourceSize
@@ -243,14 +250,14 @@ func writeChunk(
 	if err == io.EOF {
 		msg := fmt.Sprintf("failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 		logrus.Errorf(msg)
-		return fmt.Errorf(msg)
+		return scerr.NewError(fmt.Errorf(msg), nil, "")
 	}
 	r := bytes.NewReader(buf)
 	objectNamePart := objectName + strconv.Itoa(chunkIndex)
 	metadata["Split"] = objectName
 	_, err = container.Put(objectNamePart, r, int64(nBytesRead), metadata)
 	if err != nil {
-		return err
+		return scerr.Wrap(err, "failed to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 	}
 	logrus.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
 	return err
@@ -262,7 +269,7 @@ func (o *object) Delete() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	err := o.bucket.container.RemoveItem(o.Name)
 	if err != nil {
@@ -273,17 +280,26 @@ func (o *object) Delete() error {
 }
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
-func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
+	if o == nil {
+		return scerr.InvalidInstanceError()
+	}
+
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	for k, v := range newMetadata {
 		o.Metadata[k] = v
 	}
+	return nil
 }
 
 // AddMetadata adds missing entries in object metadata
-func (o *object) AddMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
+	if o == nil {
+		return scerr.InvalidInstanceError()
+	}
+
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	for k, v := range newMetadata {
 		_, found := o.Metadata[k]
@@ -291,63 +307,129 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) {
 			o.Metadata[k] = v
 		}
 	}
+	return nil
 }
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
-func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(nil, "", concurrency.IsLogActive("Trace.Controller")).GoingIn().OnExitTrace()()
+func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
+	if o == nil {
+		return scerr.InvalidInstanceError()
+	}
+	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	o.Metadata = newMetadata
+	return nil
 }
 
-// Name returns the name of the object
-func (o *object) Name() string {
-	return o.Name
-}
-
-// LastUpdate returns the date of last update
-func (o *object) LastUpdate() (time.Time, error) {
+// GetLastUpdate returns the date of last update
+func (o *object) GetLastUpdate() (time.Time, error) {
 	if o == nil {
 		return time.Time{}, scerr.InvalidInstanceError()
 	}
-
-	if o.item != nil {
-		return o.item.LastMod()
+	if o.item == nil {
+		return time.Time{}, scerr.InvalidInstanceContentError("o.item", "cannot be nil")
 	}
-	return time.Now(), fmt.Errorf("object metadata not found")
+	t, err := o.item.LastMod()
+	if err != nil {
+		return time.Time{}, scerr.NewError(err, nil, "")
+	}
+	return t, nil
 }
 
-// Metadata returns the metadata of the object in Object Storage
-func (o *object) Metadata() ObjectMetadata {
-	return o.Metadata.Clone()
+// SafeGetLastUpdate returns the date of last update
+// Intended to be used when o, o.item are notoriously not nil (because previously checked)
+func (o *object) SafeGetLastUpdate() time.Time {
+	t, _ := o.GetLastUpdate()
+	return t
+}
+
+// GetMetadata returns the metadata of the object in Object Storage
+func (o *object) GetMetadata() (ObjectMetadata, error) {
+	if o == nil {
+		return ObjectMetadata{}, scerr.InvalidInstanceError()
+	}
+	return o.Metadata.Clone(), nil
+}
+
+// SafeGetMetadata returns the metadata of the object in Object Storage
+// Intended to be used when o, o.item are notoriously not nil (because previously checked)
+func (o *object) SafeGetMetadata() ObjectMetadata {
+	md, _ := o.GetMetadata()
+	return md
 }
 
 // GetSize returns the size of the content of the object
-func (o *object) Size() int64 {
-	if o.item != nil {
-		size, err := o.item.Size()
-		if err == nil {
-			return size
-		}
+func (o *object) GetSize() (int64, error) {
+	if o == nil {
+		return -1, scerr.InvalidInstanceError()
 	}
-	return -1
+	if o.item == nil {
+		return -1, scerr.InvalidInstanceContentError("o.item", "cannot be nil")
+	}
+	size, err := o.item.Size()
+	if err != nil {
+		return -1, err
+	}
+	return size, nil
 }
 
-// ETag returns the value of the ETag (+/- md5sum of the content...)
-func (o *object) ETag() string {
-	if o.item != nil {
-		etag, err := o.item.ETag()
-		if err == nil {
-			return etag
-		}
-	}
-	return ""
+// SafeGetSize returns the size of the content of the object
+func (o *object) SafeGetSize() int64 {
+	size, _ := o.GetSize()
+	return size
 }
 
-// ID ...
-func (o *object) ID() string {
-	if o.item != nil {
-		return o.item.ID()
+// GetETag returns the value of the ETag (+/- md5sum of the content...)
+func (o *object) GetETag() (string, error) {
+	if o == nil {
+		return "", scerr.InvalidInstanceError()
 	}
-	return ""
+	if o.item == nil {
+		return "", scerr.InvalidInstanceContentError("o.item", "cannot be nil")
+	}
+	etag, err := o.item.ETag()
+	if err != nil {
+		return "", err
+	}
+	return etag, nil
+}
+
+// SafeGetETag returns the value of the ETag (+/- md5sum of the content...)
+// Intended to be used when o, o.item are notoriously not nil (because previously checked)
+func (o *object) SafeGetETag() string {
+	etag, _ := o.GetETag()
+	return etag
+}
+
+// GetID ...
+func (o *object) GetID() (string, error) {
+	if o == nil {
+		return "", scerr.InvalidInstanceError()
+	}
+	if o.item == nil {
+		return "", scerr.InvalidInstanceContentError("o.item", "cannot be nil")
+	}
+	return o.item.ID(), nil
+}
+
+// SafeGetID ...
+// Intended to be used when o, o.item are notoriously not nil (because previously checked)
+func (o *object) SafeGetID() string {
+	id, _ := o.GetID()
+	return id
+}
+
+// GetName returns the name of the object
+func (o *object) GetName() (string, error) {
+	if o == nil {
+		return "", scerr.InvalidInstanceError()
+	}
+	return o.Name, nil
+}
+
+// SafeGetName returns the name of the object
+// Intended to be used when o, o.item are notoriously not nil (because previously checked)
+func (o *object) SafeGetName() string {
+	n, _ := o.GetName()
+	return n
 }

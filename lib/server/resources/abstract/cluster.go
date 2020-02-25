@@ -22,8 +22,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
-//go:generate mockgen -destination=mocks/mock_cluster.go -package=mocks github.com/CS-SI/SafeScale/lib/server/resources/abstract ClusterRequest
-
 // ClusterRequest defines what kind of Cluster is wanted
 type ClusterRequest struct {
 	// Name is the name of the cluster wanted

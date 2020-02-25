@@ -37,7 +37,7 @@ var currentTenant atomic.Value
 func GetCurrentTenant() *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {
-		tenants, err := iaas.Tenants()
+		tenants, err := iaas.GetTenants()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}

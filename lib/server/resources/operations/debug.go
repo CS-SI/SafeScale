@@ -25,5 +25,9 @@ var (
 		Share   bool
 		Tenant  bool
 		Volume  bool
+		Feature struct {
+			Action bool
+			Step   bool
+		}
 	}{}
 )

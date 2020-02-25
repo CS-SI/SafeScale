@@ -34,8 +34,8 @@ import (
 
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
-	Bucket *bucket
-	// Data       *data
+	Bucket     *bucket
+	Cluster    *cluster
 	Host       *host
 	Image      *image
 	JobManager *jobManager

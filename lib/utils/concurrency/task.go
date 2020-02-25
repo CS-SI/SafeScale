@@ -59,9 +59,10 @@ type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 type TaskGuard interface {
 	TryWait() (bool, TaskResult, error)
 	Wait() (TaskResult, error)
+	WaitFor(time.Duration) (bool, TaskResult, error)
 }
 
-// TaskCore is the interface of methods to control task and taskgroup
+// TaskCore is the interface of core methods to control task and taskgroup
 type TaskCore interface {
 	Abort() error
 	Aborted() bool
@@ -128,7 +129,7 @@ var globalTask atomic.Value
 func RootTask() (Task, error) {
 	anon := globalTask.Load()
 	if anon == nil {
-		newT, _ := newTask(nil, nil, nil)
+		newT, _ := newTask(nil, nil, nil) // nolint
 		newT.id = "0"
 		globalTask.Store(newT)
 		anon = globalTask.Load()
@@ -138,12 +139,12 @@ func RootTask() (Task, error) {
 
 // NewTask creates a new instance of struct task
 func NewTask() (Task, error) {
-	return newTask(nil, nil, nil)
+	return newTask(nil, nil, nil) // nolint
 }
 
 // NewUnbreakableTask is a new task that cannot be aborted by default (but this can be changed with IgnoreAbortSignal(false))
 func NewUnbreakableTask() (Task, error) {
-	nt, err := newTask(nil, nil, nil)
+	nt, err := newTask(nil, nil, nil) // nolint
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +157,7 @@ func NewUnbreakableTask() (Task, error) {
 // Such a task can be aborted if the parent one can be
 func NewTaskWithParent(parentTask Task) (Task, error) {
 	// Don't use context.TODO() we don't want to force context if there is no one
-	return newTask(nil, nil, parentTask)
+	return newTask(nil, nil, parentTask) // nolint
 }
 
 // NewTaskWithContext creates a task with a context and cancel function
@@ -235,7 +236,7 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 
 // taskCancelReceiver captures cancel signal if it arrives and abort the task
 func (t *task) taskCancelReceiver() {
-	sig, _ := t.Signature()
+	sig, _ := t.GetSignature()
 	finish := false
 	for !finish {
 		select {
@@ -324,12 +325,12 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 // If timeout happens, error returned will be ErrTimeout
 // This function is useful when you know at the time you use it there will be a timeout to apply.
 func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, error) {
-	tid, err := t.ID()
+	tid, err := t.GetID()
 	if err != nil {
 		return nil, err
 	}
 
-	status, err := t.Status()
+	status, err := t.GetStatus()
 	if err != nil {
 		return t, err
 	}
@@ -370,7 +371,7 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, e
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
 	go t.run(action, params)
 
-	sig, _ := t.Signature() // If we arrive here, no need to check again for an error impossible to happen
+	sig, _ := t.GetSignature() // If we arrive here, no need to check again for an error impossible to happen
 	// tracer := NewTracer(true, t, "")
 	finish := false
 
@@ -509,12 +510,12 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.ID()
+	tid, err := t.GetID()
 	if err != nil {
 		return nil, err
 	}
 
-	status, err := t.Status()
+	status, err := t.GetStatus()
 	if err != nil {
 		return nil, err
 	}
@@ -549,12 +550,12 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.ID()
+	tid, err := t.GetID()
 	if err != nil {
 		return false, nil, err
 	}
 
-	status, err := t.Status()
+	status, err := t.GetStatus()
 	if err != nil {
 		return false, nil, err
 	}
@@ -585,12 +586,12 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.ID()
+	tid, err := t.GetID()
 	if err != nil {
 		return false, nil, err
 	}
 
-	status, err := t.Status()
+	status, err := t.GetStatus()
 	if err != nil {
 		return false, nil, err
 	}
@@ -626,12 +627,12 @@ func (t *task) Reset() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.ID()
+	tid, err := t.GetID()
 	if err != nil {
 		return err
 	}
 
-	status, err := t.Status()
+	status, err := t.GetStatus()
 	if err != nil {
 		return err
 	}
@@ -657,11 +658,11 @@ func (t *task) Abort() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	status, err := t.Status()
+	status, err := t.GetStatus()
 	if err != nil {
 		return err
 	}
-	id, err := t.ID()
+	id, err := t.GetID()
 	if err != nil {
 		return err
 	}
@@ -694,7 +695,7 @@ func (t *task) Abort() (err error) {
 
 // Aborted tells if task has been aborted
 func (t *task) Aborted() bool {
-	status, err := t.Status()
+	status, err := t.GetStatus()
 	if err != nil {
 		return false
 	}
@@ -705,7 +706,7 @@ func (t *task) Aborted() bool {
 func (t *task) Abortable() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.abortDisengaged == false
+	return !t.abortDisengaged
 }
 
 // IgnoreAbortSignal can be use to disable the effet of Abort()

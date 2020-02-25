@@ -30,10 +30,12 @@ import (
 	"github.com/dlespiau/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"google.golang.org/appengine/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/debug"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/listeners"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
@@ -55,8 +57,15 @@ func work() {
 		exit.Exit(1)
 	}()
 
+	// NOTE: is it the good behavior ? Shouldn't we fail ?
+	// If trace settings cannot be registered, report it but do not fail
+	err := debug.RegisterTraceSettings(appTrace)
+	if err != nil {
+		log.Errorf(err.Error())
+	}
+
 	logrus.Infoln("Checking configuration")
-	_, err := iaas.GetTenantNames()
+	_, err = iaas.GetTenantNames()
 	if err != nil {
 		logrus.Fatalf(err.Error())
 	}

@@ -26,10 +26,10 @@ import (
 )
 
 func TestState_Clone(t *testing.T) {
-	ct := newState()
+	ct := newClusterState()
 	ct.State = clusterstate.Created
 
-	clonedCt, ok := ct.Clone().(*State)
+	clonedCt, ok := ct.Clone().(*ClusterState)
 	if !ok {
 		t.Fail()
 	}

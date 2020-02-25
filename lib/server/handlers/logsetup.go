@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"io"
 	"os"
 

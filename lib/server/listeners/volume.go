@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -82,7 +81,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	defer job.Close()
 
 	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -135,7 +134,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefiniti
 	name := in.GetName()
 	speed := in.GetSpeed()
 	size := in.GetSize()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -146,7 +145,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefiniti
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return converters.VolumeFromAbstractsToProtocol(vol), nil
+	return converters.VolumeFromAbstractToProtocol(vol), nil
 }
 
 // Attach a volume to an host and create a mount point
@@ -175,7 +174,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		}
 	}
 
-	volumeRef := srvutils.GetReference(in.Volume())
+	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, scerr.InvalidRequestError("neither name nor id given as reference for volume")
 	}
@@ -201,8 +200,8 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr), true)
-	defer tracer.WithStopwatch().GoingIn().OnExitTrace()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := VolumeHandler(job)
@@ -240,7 +239,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 		}
 	}
 
-	volumeRef := srvutils.GetReference(in.Volume())
+	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, scerr.InvalidRequestError("neither name nor id given as reference for volume")
 	}
@@ -255,7 +254,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -306,7 +305,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -356,7 +355,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -370,5 +369,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, scerr.NotFoundError(fmt.Sprintf("volume '%s' not found", ref))
 	}
 
-	return conv.VolumeInfoFromAbstractsToProtocol(volume, mounts), nil
+	return converters.VolumeInfoFromAbstractToProtocol(volume, mounts), nil
 }

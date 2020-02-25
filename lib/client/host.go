@@ -63,8 +63,8 @@ func (h *host) Inspect(name string, timeout time.Duration) (*protocol.Host, erro
 
 }
 
-// Get host status
-func (h *host) Status(name string, timeout time.Duration) (*protocol.HostStatus, error) {
+// GetStatus gets host status
+func (h *host) GetStatus(name string, timeout time.Duration) (*protocol.HostStatus, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := protocol.NewHostServiceClient(h.session.connection)

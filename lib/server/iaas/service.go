@@ -54,8 +54,8 @@ type Service interface {
 	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, error)
 	FilterImages(string) ([]abstract.Image, error)
-	MetadataKey() *crypt.Key
-	MetadataBucket() objectstorage.Bucket
+	SafeGetMetadataKey() *crypt.Key
+	SafeGetMetadataBucket() objectstorage.Bucket
 	ListHostsByName(bool) (map[string]*abstract.HostFull, error)
 	SearchImage(string) (*abstract.Image, error)
 	SelectTemplatesBySize(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, error)
@@ -124,19 +124,21 @@ func (a ByRankDRF) Less(i, j int) bool { return RankDRF(a[i]) < RankDRF(a[j]) }
 // 	return access.Host.AccessIP()
 // }
 
-func (svc *service) Name() string {
-	return svc.GetName()
+func (svc *service) SafeGetName() string {
+	return svc.Provider.GetName()
 }
 
-func (svc *service) ID() string {
-	return svc.GetName()
+func (svc *service) SafeGetID() string {
+	return svc.Provider.GetName()
 }
 
-func (svc *service) MetadataBucket() objectstorage.Bucket {
+// SafeGetMetadataBucket returns the bucket instance describing metadata bucket
+func (svc *service) SafeGetMetadataBucket() objectstorage.Bucket {
 	return svc.metadataBucket
 }
 
-func (svc *service) MetadataKey() *crypt.Key {
+// SafeGetMetadataKey returns the key used to crypt data in metadata bucket
+func (svc *service) SafeGetMetadataKey() *crypt.Key {
 	return svc.metadataKey
 }
 
@@ -307,7 +309,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := concurrency.NewTracer(nil, true, "").Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -344,7 +346,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 			if !ok {
 				return nil, fmt.Errorf("region value unset")
 			}
-			folder := fmt.Sprintf("images/%s/%s", svc.Name(), region)
+			folder := fmt.Sprintf("images/%s/%s", svc.SafeGetName(), region)
 
 			imageList, err := db.ReadAll(folder)
 			if err != nil {

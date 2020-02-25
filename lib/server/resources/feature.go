@@ -30,11 +30,11 @@ type Targetable interface {
 	data.Identifyable
 
 	// GetTargetType returns the type of the target
-	GetTargetType() featuretargettype.Enum
+	SafeGetTargetType() featuretargettype.Enum
 	// GetInstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-	GetInstallMethods(concurrency.Task) map[uint8]installmethod.Enum
+	SafeGetInstallMethods(concurrency.Task) map[uint8]installmethod.Enum
 	// GetInstalledFatures returns a list of installed features
-	GetInstalledFeatures(concurrency.Task) []string
+	SafeGetInstalledFeatures(concurrency.Task) []string
 	// ComplementFeatureParameters adds parameters corresponding to the target in preparation of feature installation
 	ComplementFeatureParameters(t concurrency.Task, v data.Map) error
 }
@@ -44,13 +44,19 @@ type Feature interface {
 	data.Clonable
 
 	// GetName returns the name of the feature
-	GetName() string
+	GetName() (string, error)
 	// GetFilename returns the filename of the feature
-	GetFilename() string
+	GetFilename() (string, error)
 	// GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetDisplayFilename() string
+	GetDisplayFilename() (string, error)
+	// SafeGetName returns the name of the feature
+	SafeGetName() string
+	// SafeGetFilename returns the filename of the feature
+	SafeGetFilename() string
+	// GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
+	SafeGetDisplayFilename() string
 	// GetSpecs returns the feature specs
-	GetSpecs() *viper.Viper
+	SafeGetSpecs() *viper.Viper
 	// Requirements returns the other features needed as requirements
 	GetRequirements() ([]string, error)
 	// Applyable tells if the feature is installable on the target

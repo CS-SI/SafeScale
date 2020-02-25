@@ -70,7 +70,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		}
 	}
 
-	networkName := in.Name()
+	networkName := in.GetName()
 	if networkName == "" {
 		return nil, scerr.InvalidRequestError("network name cannot be empty string")
 	}
@@ -81,7 +81,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -98,19 +98,19 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 			MaxRAMSize:  in.Gateway.Sizing.MaxRamSize,
 			MinDiskSize: int(in.Gateway.Sizing.MinDiskSize),
 			MinGPU:      int(in.Gateway.Sizing.GpuCount),
-			MinFreq:     in.Gateway.Sizing.MinCpuFreq,
+			MinCPUFreq:  in.Gateway.Sizing.MinCpuFreq,
 		}
 	} else {
-		s := converters.HostSizingRequirementsFromProtocolToAbstracts(*in.Gateway.Sizing)
+		s := converters.HostSizingRequirementsFromProtocolToAbstract(*in.Gateway.Sizing)
 		sizing = &s
 	}
 	if in.Gateway != nil {
 		gwImageID = in.GetGateway().GetImageId()
-		gwName = in.GetGateway().Name()
+		gwName = in.GetGateway().GetName()
 	}
 
 	handler := handlers.NewNetworkHandler(job)
-	r, err := job.Task().Run(
+	r, err := job.SafeGetTask().Run(
 		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
 			tracer.Trace("calling handler.Create()...")
 			return handler.Create(
@@ -165,7 +165,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -220,11 +220,11 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	network, err := networkfactory.Load(job.Task(), job.Service(), ref)
+	network, err := networkfactory.Load(job.SafeGetTask(), job.SafeGetService(), ref)
 	if err != nil {
 		return nil, err
 	}
@@ -268,12 +268,12 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := handlers.NewNetworkHandler(job)
-	_, err = job.Task().Run(
+	_, err = job.SafeGetTask().Run(
 		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
 			return nil, handler.Delete(ref)
 		},

@@ -3,6 +3,7 @@ package bucket
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	objectstorageops "github.com/CS-SI/SafeScale/lib/server/resources/operations/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -13,7 +14,7 @@ func List(svc iaas.Service) ([]string, error) {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	// tracer := concurrency.NewTracer(task, "", false).GoingIn()
+	// tracer := concurrency.NewTracer(task, "", false).Entering()
 	// defer tracer.OnExitTrace()()
 	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

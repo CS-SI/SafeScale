@@ -254,7 +254,7 @@ func ParseParameter(request string) (map[string]*Token, error) {
 		}
 
 		// handles the cases >= or <=
-		if val, err := mytoken.Operator(); err == nil && (val == ">" || val == "<") {
+		if val, err := mytoken.GetOperator(); err == nil && (val == ">" || val == "<") {
 			if tok = s.Scan(); tok != scanner.EOF {
 				if s.TokenText() == "=" {
 					mytoken.members[mytoken.pos-1] += "="

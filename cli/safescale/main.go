@@ -19,10 +19,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"path"
 	"runtime"
+	"runtime/pprof"
 	"sort"
 	"strings"
 	"syscall"
@@ -33,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	// Autoload embedded provider drivers
@@ -68,6 +71,13 @@ func main() {
 		}
 	}()
 
+	// NOTE: is it the good behavior ? Shouldn't we fail ?
+	// If trace settings cannot be registered, report it but do not fail
+	err := debug.RegisterTraceSettings(appTrace)
+	if err != nil {
+		log.Errorf(err.Error())
+	}
+
 	app := cli.NewApp()
 	app.Writer = os.Stderr
 	app.Name = "safescale"
@@ -96,6 +106,10 @@ func main() {
 			Name:  "debug, d",
 			Usage: "Show debug information",
 		},
+		cli.StringFlag{
+			Name:  "profile, p",
+			Usage: "Profiles binary (CPU+RAM)",
+		},
 		// cli.IntFlag{
 		// 	Name:  "port, p",
 		// 	Usage: "Bind to specified port `PORT`",
@@ -123,6 +137,7 @@ func main() {
 			}
 			utils.Debug = true
 		}
+
 		return nil
 	}
 
@@ -158,8 +173,47 @@ func main() {
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 
+	// TODO: enables performance profiling
+	var (
+		profilingParts []string
+		profileMemory  bool
+	)
+	if value, ok := cli.GlobalString("profile"); ok {
+		if value == "" {
+			value = "cpu,mem"
+		}
+		profilingParts := strings.Split(value, ",")
+		for _, v := range profilingParts {
+			switch v {
+			case "cpu":
+				f, err := os.Create(filename)
+				if err != nil {
+					log.Fatal(err)
+				}
+				pprof.StartCPUProfile(f)
+				defer pprof.StopCPUProfile()
+			case "mem", "memory", "ram":
+				profileMemory = true
+			default:
+				logrus.Infof("Unsupported profiling option '%s'", v)
+			}
+		}
+	}
+
 	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println("Error Running App : " + err.Error())
+	}
+
+	if profileMemory {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		defer f.Close()
+		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			logrus.Errorf("could not write memory profile: ", err)
+		}
 	}
 }

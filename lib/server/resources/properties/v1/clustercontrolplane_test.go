@@ -4,8 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 )
 
 func TestControlPlane_Clone(t *testing.T) {
@@ -21,7 +22,7 @@ func TestControlPlane_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
-	clonedCt.VirtualIP.Hosts[0] = "Test"
+	clonedCt.VirtualIP.Hosts[0].Name = "Test"
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {

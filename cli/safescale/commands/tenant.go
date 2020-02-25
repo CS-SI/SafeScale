@@ -18,11 +18,11 @@ package commands
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -52,7 +52,7 @@ var tenantList = cli.Command{
 		tenants, err := client.New().Tenant.List(temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
 		}
 		return clitools.SuccessResponse(tenants.GetTenants())
 	},
@@ -66,7 +66,7 @@ var tenantGet = cli.Command{
 		tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
 		}
 		return clitools.SuccessResponse(tenant)
 	},
@@ -85,7 +85,7 @@ var tenantSet = cli.Command{
 		err := client.New().Tenant.Set(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -96,13 +96,13 @@ var tenantSet = cli.Command{
 // 	Aliases: []string{"storage-ls"},
 // 	Usage:   "List available storage tenants",
 // 	Action: func(c *cli.Context) error {
-// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-// 		tenants, err := client.New().Tenant.StorageList(temporal.GetExecutionTimeout())
+// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args()
+// 		tenants, err := client.New().Tenant.StorageList(temporal.GetExecutionTimeout()
 // 		if err != nil {
 // 			err = scerr.FromGRPCStatus(err)
-// 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
+// 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error()))
 // 		}
-// 		return clitools.SuccessResponse(tenants.GetTenants())
+// 		return clitools.SuccessResponse(tenants.GetTenants()
 // 	},
 // }
 
@@ -110,13 +110,13 @@ var tenantSet = cli.Command{
 // 	Name:  "storage-get",
 // 	Usage: "Get current storage tenants",
 // 	Action: func(c *cli.Context) error {
-// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-// 		tenants, err := client.New().Tenant.StorageGet(temporal.GetExecutionTimeout())
+// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args()
+// 		tenants, err := client.New().Tenant.StorageGet(temporal.GetExecutionTimeout()
 // 		if err != nil {
 // 			err = scerr.FromGRPCStatus(err)
-// 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
+// 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "get storage tenants", false).Error()))
 // 		}
-// 		return clitools.SuccessResponse(tenants.GetNames())
+// 		return clitools.SuccessResponse(tenants.GetNames()
 // 	},
 // }
 
@@ -129,13 +129,13 @@ var tenantSet = cli.Command{
 // 			_ = cli.ShowSubcommandHelp(c)
 // 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
 // 		}
-// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+// 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args()
 // 		tenantNames := []string{c.Args().First()}
 // 		tenantNames = append(tenantNames, c.Args().Tail()...)
-// 		err := client.New().Tenant.StorageSet(tenantNames, temporal.GetExecutionTimeout())
+// 		err := client.New().Tenant.StorageSet(tenantNames, temporal.GetExecutionTimeout()
 // 		if err != nil {
 // 			err = scerr.FromGRPCStatus(err)
-// 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
+// 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "set storage tenants", false).Error()))
 // 		}
 // 		return clitools.SuccessResponse(nil)
 // 	},

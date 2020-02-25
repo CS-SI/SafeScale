@@ -69,7 +69,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -115,7 +115,7 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 	defer job.Close()
 
 	bucketName := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -161,7 +161,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 	defer job.Close()
 
 	bucketName := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -206,7 +206,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	defer job.Close()
 
 	bucketName := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -256,7 +256,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 
 	bucketName := in.Bucket()
 	hostName := in.GetHost().Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -302,7 +302,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 
 	bucketName := in.Bucket()
 	hostName := in.GetHost().Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

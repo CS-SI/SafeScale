@@ -27,8 +27,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // safescale ssh connect host2
@@ -64,9 +66,9 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 		}
 	}
 
-	hostRef := in.GetHost().Name()
+	hostRef := in.GetHost().GetName()
 	if hostRef == "" {
-		hostRef = in.GetHost().ID()
+		hostRef = in.GetHost().GetId()
 	}
 	if hostRef == "" {
 		return nil, scerr.InvalidParameterError("in.Host", "host reference is missing")
@@ -80,17 +82,17 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', <command>)", hostRef), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	host, err := hostfactory.Load(job.Task(), job.Service(), hostRef)
+	host, err := hostfactory.Load(job.SafeGetTask(), job.SafeGetService(), hostRef)
 	if err != nil {
 		return nil, err
 	}
 
-	retcode, stdout, stderr, err := host.Run(job.Task(), command)
+	retcode, stdout, stderr, err := host.Run(job.SafeGetTask(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +137,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 
 	source := in.Source
 	dest := in.Destination
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", source, dest), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -169,23 +171,23 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		if !pull {
 			return nil, scerr.InvalidRequestError("failed to find a remote host in the request")
 		}
-		localPath = destination
+		localPath = dest
 	}
 
-	host, err := hostfactory.Load(job.Task(), job.Service(), hostRef)
+	host, err := hostfactory.Load(job.SafeGetTask(), job.SafeGetService(), hostRef)
 	if err != nil {
 		return nil, err
 	}
 	if pull {
-		retcode, stdout, stderr, err = host.Pull(hostPath, localPath)
+		retcode, stdout, stderr, err = host.Pull(job.SafeGetTask(), hostPath, localPath, temporal.GetLongOperationTimeout())
 	} else {
-		retcode, stdout, stderr, err = host.Push(localPath, hostPath, in.Owner, in.Mode)
+		retcode, stdout, stderr, err = host.Push(job.SafeGetTask(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
 	}
 	if err != nil {
 		return nil, err
 	}
 	if retcode != 0 {
-		return nil, scerr.NewError(fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr), nil, nil)
+		return nil, scerr.NewError(nil, nil, fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
 	}
 
 	return &protocol.SshResponse{

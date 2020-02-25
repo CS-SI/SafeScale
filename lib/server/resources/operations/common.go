@@ -23,6 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -32,7 +33,7 @@ func RetrieveForensicsData(task concurrency.Task, host resources.Host) {
 		return
 	}
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		hostName := host.Name()
+		hostName := host.SafeGetName()
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", hostName)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", hostName, "phase2"))
 		_, _, _, _ = host.Pull(task, "/opt/safescale/var/tmp/user_data.phase2.sh", dumpName+"sh", temporal.GetExecutionTimeout())
@@ -45,7 +46,7 @@ func GetPhaseWarningsAndErrors(task concurrency.Task, host resources.Host) ([]st
 		return []string{}, []string{}
 	}
 
-	recoverCode, recoverStdOut, _, recoverErr := host.Run(task, fmt.Sprintf("cat /opt/safescale/var/log/user_data.phase2.log; exit $?"), temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	recoverCode, recoverStdOut, _, recoverErr := host.Run(task, `cat /opt/safescale/var/log/user_data.phase2.log; exit $?`, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	warnings := []string{}
 	errs := []string{}
 

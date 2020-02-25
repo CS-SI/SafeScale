@@ -99,7 +99,7 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -149,7 +149,7 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -196,7 +196,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -239,7 +239,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	defer job.Close()
 
 	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("(%v)", all), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
@@ -290,7 +290,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	defer job.Close()
 
 	name := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -370,7 +370,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	defer job.Close()
 
 	name := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -426,7 +426,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -478,7 +478,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -527,7 +527,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -576,7 +576,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

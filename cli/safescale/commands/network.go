@@ -25,10 +25,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -62,7 +62,7 @@ var networkList = cli.Command{
 		networks, err := client.New().Network.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
 		}
 		return clitools.SuccessResponse(networks.GetNetworks())
 	},
@@ -87,7 +87,7 @@ var networkDelete = cli.Command{
 		err := client.New().Network.Delete(networkList, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -108,7 +108,7 @@ var networkInspect = cli.Command{
 		network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
 		}
 
 		// Convert struct to map using struct to json then json to map
@@ -134,7 +134,7 @@ var networkInspect = cli.Command{
 				what = "primary"
 			}
 			casted := scerr.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %s gateway", what))
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(casted.Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 		}
 		mapped["gateway_name"] = pgw.Name
 		if network.GetSecondaryGatewayId() != "" {
@@ -142,7 +142,7 @@ var networkInspect = cli.Command{
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
 				casted := scerr.Wrap(err, "failed to inspect secondary gateway")
-				return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(casted.Error())))
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 			}
 			mapped["secondary_gateway_name"] = sgw.Name
 		}
@@ -240,7 +240,7 @@ var networkCreate = cli.Command{
 		network, err := client.New().Network.Create(netdef, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 		}
 		return clitools.SuccessResponse(network)
 	},
@@ -274,10 +274,10 @@ var networkVIPCreateCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = scerr.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network VIP", false).Error())))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of network VIP not yet implemented"))
@@ -297,10 +297,10 @@ var networkVIPInspectCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = scerr.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network VIP", false).Error())))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "inspection of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of network VIP not yet implemented"))
@@ -320,10 +320,10 @@ var networkVIPDeleteCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = scerr.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network VIP", false).Error())))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "deletion of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of network VIP not yet implemented"))
@@ -342,10 +342,10 @@ var networkVIPBindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = scerr.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network VIP", false).Error())))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to network VIP not yet implemented"))
@@ -364,10 +364,10 @@ var networkVIPUnbindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = scerr.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unbind host from network VIP", false).Error())))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "unbind host from network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from network VIP not yet implemented"))
