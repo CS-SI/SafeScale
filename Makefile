@@ -14,13 +14,13 @@ include ./common.mk
 EXECS=cli/safescale/safescale cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover cli/perform/perform cli/perform/perform-cover cli/scanner/scanner
 
 # List of files
-PKG_FILES := $(shell find . \( -path ./vendor -o -path ./Godeps \) -prune -o -type f -name '*.go' -print | grep -v version.go | grep -v gomock_reflect_ | grep -v cluster/mocks )
+PKG_FILES := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks )
 # List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v lib/system/firewall/ | grep -v /vendor/)
+PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/)
 # List of packages alt
-PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v lib/security/ | grep -v lib/system/firewall/ | grep -v gomock_reflect_ | grep -v cluster/mocks | grep -v stacks/mocks | grep -v cloudwatt |xargs -I {} dirname {} | uniq )
+PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks | xargs -I {} dirname {} | uniq )
 # List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v lib/system/firewall/ | grep -v sandbox)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v sandbox)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -106,8 +106,8 @@ getdevdeps: begin ground
 	fi
 
 ensure: common
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	
 sdk: getdevdeps
 	@(cd lib && $(MAKE) $(@))
 
@@ -256,3 +256,4 @@ help: with_git
 	@echo '  status       - Shows build status.'
 	@echo ''
 	@echo
+
