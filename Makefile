@@ -40,7 +40,7 @@ COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
 GOLANGCI := github.com/golangci/golangci-lint/cmd/golangci-lint
 
-DEVDEPSLIST := $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(COVERTOOL)  $(GOVENDOR)
+DEVDEPSLIST := $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(COVERTOOL) $(GOVENDOR)
 NEWDEVDEPSLIST := $(STRINGER) $(GOLANGCI) $(MOCKGEN) $(LINTER) $(CONVEY) $(ERRCHECK)
 
 BUILD_TAGS = ""
@@ -153,9 +153,9 @@ depclean: begin
 generate: sdk
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@rm -f ./generation_results.log || true
+	@$(GO) generate -run stringer ./...  2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
-	@$(GO) generate -run stringer ./...  2>&1 | tee -a generation_results.log
 	@$(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
 
