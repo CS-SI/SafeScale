@@ -17,58 +17,52 @@
 package feature
 
 import (
-	"io/ioutil"
-	"strings"
-
-	mapset "github.com/deckarep/golang-set"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-// List lists all features suitable for hosts
-func List() ([]interface{}, error) {
-	cfgFiles := mapset.NewSet()
+// // List lists all features suitable for hosts
+// func List() ([]interface{}, error) {
+// 	cfgFiles := mapset.NewSet()
 
-	captured := mapset.NewSet()
+// 	captured := mapset.NewSet()
 
-	var paths []string
-	paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
-	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
-	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
+// 	var paths []string
+// 	paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
+// 	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
+// 	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
 
-	for _, path := range paths {
-		files, err := ioutil.ReadDir(path)
-		if err == nil {
-			for _, f := range files {
-				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
-					cfgFiles.Add(strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
-				}
-			}
-		}
-	}
-	for _, feat := range operations.GetAllEmbeddedFeatures() {
-		yamlKey := "feature.suitableFor.host"
+// 	for _, path := range paths {
+// 		files, err := ioutil.ReadDir(path)
+// 		if err == nil {
+// 			for _, f := range files {
+// 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
+// 					cfgFiles.Add(strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+// 				}
+// 			}
+// 		}
+// 	}
+// 	for _, feat := range operations.GetAllEmbeddedFeatures() {
+// 		yamlKey := "feature.suitableFor.host"
 
-		if !captured.Contains(feat.Name()) {
-			ok := false
-			if feat.GetSpecs().IsSet(yamlKey) {
-				value := strings.ToLower(feat.GetSpecs().GetString(yamlKey))
-				ok = value == "ok" || value == "yes" || value == "true" || value == "1"
-			}
-			if ok {
-				cfgFiles.Add(feat.GetFilename())
-			}
+// 		if !captured.Contains(feat.Name()) {
+// 			ok := false
+// 			if feat.GetSpecs().IsSet(yamlKey) {
+// 				value := strings.ToLower(feat.GetSpecs().GetString(yamlKey))
+// 				ok = value == "ok" || value == "yes" || value == "true" || value == "1"
+// 			}
+// 			if ok {
+// 				cfgFiles.Add(feat.GetFilename())
+// 			}
 
-			captured.Add(feat.GetName())
-		}
-	}
+// 			captured.Add(feat.GetName())
+// 		}
+// 	}
 
-	return cfgFiles.ToSlice(), nil
-}
+// 	return cfgFiles.ToSlice(), nil
+// }
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
@@ -82,12 +76,12 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 
 	feat, err := operations.NewFeature(task, name)
 	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		feat, err = operations.NewEmbeddedFeature(name)
+		feat, err = operations.NewEmbeddedFeature(task, name)
 		if err != nil {
 			return nil, err
 		}
