@@ -27,11 +27,9 @@ sed -i "s/\(.*\)develop/\1${BRANCH_NAME}/" common.mk
 # ----------------------
 echo "Get dev deps"
 make getdevdeps
-make getdevdeps
 [ $? -ne 0 ] && echo "Build getdevdeps failure" && return 1
 
 echo "Ensure"
-make ensure
 make ensure
 [ $? -ne 0 ] && echo "Build ensure failure" && return 1
 
@@ -42,7 +40,6 @@ make all
 echo "Install"
 make install
 [ $? -ne 0 ] && echo "Install failure" && return 1
-
 
 echo "Export"
 export CIBIN=/exported
