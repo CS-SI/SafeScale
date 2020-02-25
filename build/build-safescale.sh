@@ -28,8 +28,7 @@ sed -i "s/\(.*\)develop/\1${BRANCH_NAME}/" common.mk
 echo "--> Get dev deps"
 make getdevdeps
 
-echo "--> Silent Ensure"
-make ensure 2>&1 >/dev/null
+make getdevdeps --silent
 
 hash -r
 
