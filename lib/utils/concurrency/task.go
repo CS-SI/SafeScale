@@ -165,13 +165,10 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 		cancel:     cancel,
 		status:     READY,
 		generation: generation,
-		abortCh:    make(chan bool, 1),
-		doneCh:     make(chan bool, 1),
-		finishCh:   make(chan struct{}, 1),
+		// abortCh:    make(chan bool, 1),
+		// doneCh:     make(chan bool, 1),
+		// finishCh:   make(chan struct{}, 1),
 	}
-	close(t.abortCh)
-	close(t.doneCh)
-	close(t.finishCh)
 
 	tid, _ := t.GetID() // FIXME Later
 	t.sig = fmt.Sprintf("{task %s}", tid)
