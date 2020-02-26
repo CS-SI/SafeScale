@@ -308,22 +308,26 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// Context cancel signal received, propagating using abort signal
 				// tracer.Trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
-				t.abortCh <- true
-				close(t.abortCh)
+				if t.status == RUNNING {
+					t.abortCh <- true
+					close(t.abortCh)
+				}
 				t.lock.Unlock()
 			case <-t.doneCh:
 				t.lock.Lock()
 				t.status = DONE
-				finish = true
 				t.lock.Unlock()
+				finish = true
 			case <-t.abortCh:
 				// Abort signal received
 				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
-				t.status = ABORTED
-				t.err = scerr.AbortedError("", nil)
-				finish = true
+				if t.status != TIMEOUT {
+					t.status = ABORTED
+					t.err = scerr.AbortedError("", nil)
+				}
 				t.lock.Unlock()
+				finish = true
 			}
 		}
 	}
