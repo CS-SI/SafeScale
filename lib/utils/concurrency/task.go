@@ -267,8 +267,12 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
 				// tracer.Trace("receiving signal from context, aborting task...")
-				t.abortCh <- true
-				close(t.abortCh)
+				t.lock.Lock()
+				if t.status == RUNNING {
+					t.abortCh <- true
+					close(t.abortCh)
+				}
+				t.lock.Unlock()
 			case <-t.doneCh:
 				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 				// tracer.Trace("receiving done signal from go routine")
@@ -288,10 +292,12 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				finish = true
 			case <-time.After(timeout):
 				t.lock.Lock()
+				if t.status == RUNNING {
+					t.abortCh <- true
+					close(t.abortCh)
+				}
 				t.status = TIMEOUT
 				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
-				t.abortCh <- true
-				close(t.abortCh)
 				t.lock.Unlock()
 			}
 		}
