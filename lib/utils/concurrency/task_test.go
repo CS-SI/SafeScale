@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
@@ -20,10 +22,8 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	require.Nil(t, err)
 
 	single, err = single.StartWithTimeout(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		forever := true
-		for forever {
+		for {
 			if t.Aborted() {
-				forever = false
 				break
 			}
 			fmt.Println("Forever young...")
