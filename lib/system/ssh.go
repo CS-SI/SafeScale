@@ -742,7 +742,7 @@ func (ssh *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, is
 		return 0, "", "", fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
 
-	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}'{{.LocalPath}}' {{.User}}@{{.Host}}:'{{.RemotePath}}'{{else}}{{.User}}@{{.Host}}:'{{.RemotePath}}' '{{.LocalPath}}'{{end}}")
+	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
 	if err != nil {
 		return 0, "", "", fmt.Errorf("error parsing command template: %s", err.Error())
 	}
