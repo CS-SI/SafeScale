@@ -26,8 +26,8 @@ import (
 )
 
 var (
-	clientRPCUUID uuid.UUID
-	uuidSet bool
+	clientRPCUUID       uuid.UUID
+	uuidSet             bool
 	mutexContextManager sync.Mutex
 )
 

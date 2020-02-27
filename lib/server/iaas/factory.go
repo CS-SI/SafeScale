@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -33,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
 )
 
 var (
@@ -159,7 +158,7 @@ func UseService(tenantName string) (newService Service, err error) {
 		// Initializes Object Storage
 		var (
 			objectStorageLocation objectstorage.Location
-			authOpts providers.Config
+			authOpts              providers.Config
 		)
 		if tenantObjectStorageFound {
 			authOpts, err = providerInstance.GetAuthenticationOptions()
@@ -284,7 +283,6 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 	}
 	return nil
 }
-
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
 func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
@@ -414,6 +412,7 @@ func validateOVHObjectStorageRegionNaming(context, region, authURL string) error
 	}
 	return nil
 }
+
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
 func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
