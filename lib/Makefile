@@ -24,7 +24,11 @@ all:	sdk lib/system lib/utils lib/server lib/client
 vet:
 	@$(GO) vet ./...
 
-generate: sdk
+gensrc:
+	@(cd server/iaas/resources/userdata && $(MAKE) $(@))
+	@(cd system && $(MAKE) $(@))
+
+generate: gensrc sdk
 	@(cd server/iaas/resources/enums && $(MAKE) $@)
 	@(cd server && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)

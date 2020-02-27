@@ -153,7 +153,8 @@ depclean: begin
 generate: sdk
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@rm -f ./generation_results.log || true
-	@$(GO) generate -run stringer ./...  2>&1 | tee -a generation_results.log
+	@cd cli && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
+	@cd lib && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@$(GO) generate -run stringer ./...  2>&1 | tee -a generation_results.log
