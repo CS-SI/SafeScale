@@ -30,7 +30,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/gax-go v1.0.3 // indirect
 	github.com/gophercloud/gophercloud v0.0.0-20190509032623-7892efa714f1
-	github.com/gopherjs/gopherjs v0.0.0-20191106031601-ce3c9ade29de // indirect
+	github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00 // indirect
 	github.com/gorilla/websocket v1.4.0
 	github.com/gostaticanalysis/analysisutil v0.0.3 // indirect
 	github.com/graymeta/stow v0.2.3
@@ -77,7 +77,8 @@ require (
 	golang.org/x/lint v0.0.0-20200130185559-910be7a94367 // indirect
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
-	golang.org/x/sys v0.0.0-20200124204421-9fbb57f87de9
+	golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae
+	golang.org/x/tools v0.0.0-20200226224502-204d844ad48d // indirect
 	gomodules.xyz/stow v0.2.4 // indirect
 	google.golang.org/api v0.15.0
 	google.golang.org/grpc v1.26.0
