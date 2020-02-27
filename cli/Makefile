@@ -26,7 +26,13 @@ cli/perform:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building binary perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd perform && $(MAKE))
 
-generate: clean
+generate: clean gensrc
+	@(cd safescale && $(MAKE) $(@))
+	@(cd safescaled && $(MAKE) $(@))
+	@(cd scanner && $(MAKE) $(@))
+	@(cd perform && $(MAKE) $(@))
+
+gensrc:
 	@(cd safescale && $(MAKE) $(@))
 	@(cd safescaled && $(MAKE) $(@))
 	@(cd scanner && $(MAKE) $(@))
