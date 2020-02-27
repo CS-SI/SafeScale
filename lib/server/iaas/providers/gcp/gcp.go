@@ -19,8 +19,6 @@ package gcp
 import (
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -60,9 +58,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	networkName := "safescale"
 
 	networkCfg, ok := params["network"].(map[string]interface{})
-	if !ok {
-		logrus.Warnf("section network not found in tenants.toml !!")
-	} else {
+	if ok { // Do not log missing network section, it may happen without issue
 		newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
 		if newNetworkName != "" {
 			networkName = newNetworkName
