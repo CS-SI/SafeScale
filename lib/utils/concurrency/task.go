@@ -52,7 +52,20 @@ type TaskParameters interface{}
 // TaskResult ...
 type TaskResult interface{}
 
-// TaskAction ...
+// TaskAction defines the type of the function that can be started by a Task.
+// NOTE: you have to check if task is aborted inside this function using method Aborted(),
+//       to be able to stop the corresponding process when task is aborted (no matter what
+//       the abort reason is), and permit to end properly. Otherwise this may lead to goroutine leak.
+// Example:
+// task.Start(func(t concurrency.Task, p TaskParameters) (concurrency.TaskResult, error) {
+//    for {
+//        if t.Aborted() {
+//            break // or return
+//        }
+//        ...
+//    }
+//    return nil
+//})
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
 // TaskGuard ...
@@ -206,16 +219,16 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 	}
 
 	t := &task{
-		context:  taskContext,
-		cancel:   taskCancel,
-		status:   READY,
-		abortCh:  make(chan bool, 1),
-		doneCh:   make(chan bool, 1),
-		finishCh: make(chan struct{}, 1),
+		context: taskContext,
+		cancel:  taskCancel,
+		status:  READY,
+		// abortCh:  make(chan bool, 1),
+		// doneCh:   make(chan bool, 1),
+		// finishCh: make(chan struct{}, 1),
 	}
-	close(t.abortCh)
-	close(t.doneCh)
-	close(t.finishCh)
+	// close(t.abortCh)
+	// close(t.doneCh)
+	// close(t.finishCh)
 
 	u, err := uuid.NewV4()
 	if err != nil {
@@ -396,20 +409,22 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// tracer.Trace("receiving abort signal")
 				logrus.Debugf("%s received abort signal", sig)
 				t.mu.Lock()
-				if !t.abortDisengaged {
+				if !t.abortDisengaged && t.status != TIMEOUT {
 					t.status = ABORTED
 					t.err = scerr.AbortedError("aborted", nil)
 				} else {
 					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
 				}
-
 				t.mu.Unlock()
 				// VPL: don't force stop on abort to let the task the chance to clean up and end properly
 				// finish = true
 			case <-time.After(timeout):
 				t.mu.Lock()
-				t.status = TIMEOUT
-				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+				if t.status == RUNNING {
+					t.abortCh <- true
+					close(t.abortCh)
+					t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+				}
 				t.mu.Unlock()
 				finish = true
 			}
@@ -434,10 +449,14 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				logrus.Debugf("%s received abort signal", sig)
 				// tracer.Trace("receiving abort signal")
 				t.mu.Lock()
-				t.status = ABORTED
-				t.err = scerr.AbortedError("aborted", nil)
+				if !t.abortDisengaged && t.status != TIMEOUT {
+					t.status = ABORTED
+					t.err = scerr.AbortedError("aborted", nil)
+				} else {
+					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
+				}
 				t.mu.Unlock()
-				// VPL: don't force stop on abort to let the task the chance to clean up and end properly
+				// VPL: don't force stop on abort to let the goroutine the chance to clean up and end properly
 				// finish = true
 			}
 		}

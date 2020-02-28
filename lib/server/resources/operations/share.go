@@ -23,9 +23,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/martian/log"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
@@ -51,17 +53,17 @@ type ShareIdentity struct {
 	ShareName string `json:"share_name"` // contains the name of the share
 }
 
-// ID returns the ID of the share
+// SafeGetID returns the ID of the share
 //
 // satisfies interface data.Identifyable
-func (si *ShareIdentity) ID() string {
+func (si *ShareIdentity) SafeGetID() string {
 	return si.ShareID
 }
 
-// Name returns the name of the share
+// SafeGetName returns the name of the share
 //
 // satisfies interface data.Identifyable
-func (si *ShareIdentity) Name() string {
+func (si *ShareIdentity) SafeGetName() string {
 	return si.ShareName
 }
 
@@ -95,15 +97,19 @@ type share struct {
 	*Core
 }
 
+func nullShare() *share {
+	return &share{Core: nullCore()}
+}
+
 // NewShare creates an instance of Share
 func NewShare(svc iaas.Service) (*share, error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullShare(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	core, err := NewCore(svc, "share", sharesFolderName)
 	if err != nil {
-		return nil, err
+		return nullShare(), err
 	}
 	return &share{Core: core}, nil
 }
@@ -115,18 +121,18 @@ func NewShare(svc iaas.Service) (*share, error) {
 //        If retry times out, return scerr.ErrTimeout
 func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (*share, error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nullShare(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullShare(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nullShare(), scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	share, err := NewShare(svc)
 	if err != nil {
-		return nil, err
+		return share, err
 	}
 
 	err = retry.WhileUnsuccessfulDelay1Second(
@@ -141,14 +147,18 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (*share, err
 			logrus.Debugf("timeout reading metadata of share '%s'", ref)
 			err = scerr.NotFoundError("failed to load metadata of share '%s': timeout", ref)
 		}
-		return nil, err
+		return nullShare(), err
 	}
 	return share, nil
 }
 
+func (objs *share) IsNull() bool {
+	return objs == nil || objs.Core.IsNull()
+}
+
 // Browse walks through shares folder and executes a callback for each entry
 func (objs *share) Browse(task concurrency.Task, callback func(string, string) error) error {
-	if objs == nil {
+	if objs.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -233,10 +243,11 @@ func (objs *share) Create(
 	task concurrency.Task,
 	shareName string,
 	server resources.Host, path string,
-	securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
+	options string,
+	/*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (err error) {
 
-	if objs == nil {
+	if objs.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -287,7 +298,7 @@ func (objs *share) Create(
 	}
 
 	// Installs NFS Server software if needed
-	sshConfig, err := server.SSHConfig(task)
+	sshConfig, err := server.GetSSHConfig(task)
 	if err != nil {
 		return err
 	}
@@ -316,7 +327,7 @@ func (objs *share) Create(
 	if err != nil {
 		return err
 	}
-	err = nfsServer.AddShare(task, sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
+	err = nfsServer.AddShare(task, sharePath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 	if err != nil {
 		return err
 	}
@@ -395,7 +406,7 @@ func (objs *share) Create(
 
 // GetServer returns the *Host acting as share server, with error handling
 func (objs *share) GetServer(task concurrency.Task) (resources.Host, error) {
-	if objs == nil {
+	if objs.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -427,19 +438,15 @@ func (objs *share) GetServer(task concurrency.Task) (resources.Host, error) {
 }
 
 // SafeGetServer returns the *Host acting as share server, with no error handling
-// if server cannot be found, returns NullHost
 func (objs *share) SafeGetServer(task concurrency.Task) (host resources.Host) {
-	host = NullHost
-	if !objs.IsNull() {
-		host, _ = objs.GetServer(task)
-	}
+	host, _ = objs.GetServer(task)
 	return host
 }
 
 // Mount mounts a share on a local directory of an host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
 func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache bool) (*propertiesv1.HostRemoteMount, error) {
-	if objs == nil {
+	if objs.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -568,7 +575,7 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 		return nil, err
 	}
 
-	targetSSHConfig, err := objtarget.SSHConfig(task)
+	targetSSHConfig, err := objtarget.GetSSHConfig(task)
 	if err != nil {
 		return nil, err
 	}
@@ -692,7 +699,7 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 
 // Unmount unmounts a share from local directory of an host
 func (objs *share) Unmount(task concurrency.Task, targetName string) error {
-	if objs == nil {
+	if objs.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -771,7 +778,7 @@ func (objs *share) Unmount(task concurrency.Task, targetName string) error {
 			}
 
 			// Unmount share from client
-			sshConfig, inErr := objtarget.SSHConfig(task)
+			sshConfig, inErr := objtarget.GetSSHConfig(task)
 			if inErr != nil {
 				return inErr
 			}
@@ -808,7 +815,7 @@ func (objs *share) Unmount(task concurrency.Task, targetName string) error {
 
 // Delete deletes a share from server
 func (objs *share) Delete(task concurrency.Task) error {
-	if objs == nil {
+	if objs.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -856,7 +863,7 @@ func (objs *share) Delete(task concurrency.Task) error {
 				return scerr.InvalidRequestError("still used by: %s", strings.Join(list, ","))
 			}
 
-			sshConfig, err := objserver.SSHConfig(task)
+			sshConfig, err := objserver.GetSSHConfig(task)
 			if err != nil {
 				return err
 			}
@@ -888,4 +895,65 @@ func sanitize(in string) (string, error) {
 		return "", scerr.InvalidParameterError("in", "must be a string containing an absolute path")
 	}
 	return sanitized, nil
+}
+
+func (objs *share) ToProtocol(task concurrency.Task) (*protocol.ShareMountList, error) {
+	if objs.IsNull() {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	shareID := objs.SafeGetID()
+	shareName := objs.SafeGetName()
+	server := objs.SafeGetServer(task)
+	share, err := server.GetShare(task, shareID)
+	if err != nil {
+		return nil, err
+	}
+
+	psml := &protocol.ShareMountList{
+		Share: &protocol.ShareDefinition{
+			Id:              shareID,
+			Name:            shareName,
+			Host:            &protocol.Reference{Name: server.SafeGetName()},
+			Path:            share.Path,
+			Type:            share.Type,
+			OptionsAsString: share.ShareOptions,
+			// SecurityModes: share.ShareAcls,
+		},
+	}
+	for k := range share.ClientsByName {
+		h, err := LoadHost(task, objs.SafeGetService(), k)
+		if err != nil {
+			log.Errorf(err.Error())
+			continue
+		}
+		mounts, err := h.GetMounts(task)
+		if err != nil {
+			log.Errorf(err.Error())
+			continue
+		}
+		path, ok := mounts.RemoteMountsByShareID[shareID]
+		if !ok {
+			logrus.Error(scerr.InconsistentError("failed to find the path on host '%s' where share '%s' is mounted", h.SafeGetName(), shareName).Error())
+			continue
+		}
+		mount, ok := mounts.RemoteMountsByPath[path]
+		if !ok {
+			logrus.Error(scerr.InconsistentError("failed to find a mount associated to share path '%s' for host '%s'", path, h.SafeGetName()).Error())
+			continue
+		}
+		psmd := &protocol.ShareMountDefinition{
+			Host:    &protocol.Reference{Name: k},
+			Share:   &protocol.Reference{Name: shareName, Id: shareID},
+			Path:    mount.Path,
+			Type:    mount.FileSystem,
+			Options: mount.Options,
+		}
+		psml.MountList = append(psml.MountList, psmd)
+	}
+
+	return psml, nil
 }

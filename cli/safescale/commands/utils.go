@@ -22,7 +22,7 @@ import (
 	"strconv"
 
 	"github.com/denisbrodbeck/machineid"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
@@ -33,8 +33,8 @@ func GenerateClientIdentity() string {
 	return id
 }
 
-// constructPBHostDefinitionFromCLI ...
-func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (string, error) {
+// constructHostDefinitionStringFromCLI ...
+func constructHostDefinitionStringFromCLI(c *cli.Context, key string) (string, error) {
 	var sizing string
 	if c.IsSet(key) {
 		if c.IsSet("cpu") || c.IsSet("cpufreq") || c.IsSet("gpu") || c.IsSet("ram") || c.IsSet("disk") {

@@ -19,18 +19,16 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path"
 	"runtime"
-	"runtime/pprof"
 	"sort"
 	"strings"
 	"syscall"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -71,20 +69,13 @@ func main() {
 		}
 	}()
 
-	// NOTE: is it the good behavior ? Shouldn't we fail ?
-	// If trace settings cannot be registered, report it but do not fail
-	err := debug.RegisterTraceSettings(appTrace)
-	if err != nil {
-		log.Errorf(err.Error())
-	}
-
 	app := cli.NewApp()
 	app.Writer = os.Stderr
 	app.Name = "safescale"
 	app.Usage = "safescale COMMAND"
 	app.Version = Version + ", build " + Revision + " (" + BuildDate + ")"
-	app.Authors = []cli.Author{
-		cli.Author{
+	app.Authors = []*cli.Author{
+		&cli.Author{
 			Name:  "CS-SI",
 			Email: "safescale@c-s.fr",
 		},
@@ -92,32 +83,51 @@ func main() {
 
 	app.EnableBashCompletion = true
 
-	cli.VersionFlag = cli.BoolFlag{
+	cli.VersionFlag = &cli.BoolFlag{
 		Name:  "version, V",
 		Usage: "Print program version",
 	}
 
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "verbose, v",
 			Usage: "Increase verbosity",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "debug, d",
 			Usage: "Show debug information",
 		},
-		cli.StringFlag{
-			Name:  "profile, p",
-			Usage: "Profiles binary (CPU+RAM)",
+		&cli.StringFlag{
+			Name:  "profile",
+			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
+			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
 		},
-		// cli.IntFlag{
-		// 	Name:  "port, p",
-		// 	Usage: "Bind to specified port `PORT`",
-		// 	Value: 50051,
+		// &cli.IntFlag{
+		// 	Name:  "server, S",
+		// 	Usage: "Connect to daemon on 'server:port' (not honored yet...)",
+		// 	Value: "localhost:50051",
 		// },
 	}
 
+	var profileCloseFunc func()
+
 	app.Before = func(c *cli.Context) error {
+		// Define trace settings of the application (what to trace if trace is wanted)
+		// NOTE: is it the good behavior ? Shouldn't we fail ?
+		// If trace settings cannot be registered, report it but do not fail
+		err := debug.RegisterTraceSettings(appTrace)
+		if err != nil {
+			logrus.Errorf(err.Error())
+		}
+
+		// Sets profiling
+		if c.IsSet("profile") {
+			what := c.String("profile")
+			profileCloseFunc = debug.Profile(what)
+		} else {
+			profileCloseFunc = func() {}
+		}
+
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
 			utils.Verbose = true
@@ -125,19 +135,24 @@ func main() {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
 
-		if c.GlobalBool("verbose") {
+		// Defines trace level wanted by user
+		if utils.Verbose = c.Bool("verbose"); utils.Verbose {
 			logrus.SetLevel(logrus.InfoLevel)
 			utils.Verbose = true
 		}
-		if c.GlobalBool("debug") {
-			if c.GlobalBool("verbose") {
+		if utils.Debug = c.Bool("debug"); utils.Debug {
+			if utils.Verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			} else {
 				logrus.SetLevel(logrus.DebugLevel)
 			}
-			utils.Debug = true
 		}
 
+		return nil
+	}
+
+	app.After = func(c *cli.Context) error {
+		profileCloseFunc()
 		return nil
 	}
 
@@ -174,46 +189,9 @@ func main() {
 	sort.Sort(cli.CommandsByName(app.Commands))
 
 	// TODO: enables performance profiling
-	var (
-		profilingParts []string
-		profileMemory  bool
-	)
-	if value, ok := cli.GlobalString("profile"); ok {
-		if value == "" {
-			value = "cpu,mem"
-		}
-		profilingParts := strings.Split(value, ",")
-		for _, v := range profilingParts {
-			switch v {
-			case "cpu":
-				f, err := os.Create(filename)
-				if err != nil {
-					log.Fatal(err)
-				}
-				pprof.StartCPUProfile(f)
-				defer pprof.StopCPUProfile()
-			case "mem", "memory", "ram":
-				profileMemory = true
-			default:
-				logrus.Infof("Unsupported profiling option '%s'", v)
-			}
-		}
-	}
 
 	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println("Error Running App : " + err.Error())
-	}
-
-	if profileMemory {
-		f, err := os.Create(*memprofile)
-		if err != nil {
-			log.Fatal("could not create memory profile: ", err)
-		}
-		defer f.Close()
-		runtime.GC() // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			logrus.Errorf("could not write memory profile: ", err)
-		}
 	}
 }

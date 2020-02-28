@@ -19,8 +19,11 @@ package converters
 import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/lib/system"
 )
 
 // Contains the function used to convert from abstract structures
@@ -36,41 +39,34 @@ func HostTemplateToHostEffectiveSizing(ht *abstract.HostTemplate) *abstract.Host
 	return hes
 }
 
-// VolumeFromAbstractToProtocol converts an api.Volume to a *Volume
-func VolumeFromAbstractToProtocol(in *abstract.Volume) *protocol.Volume {
-	return &protocol.Volume{
-		Id:    in.ID,
-		Name:  in.Name,
-		Size:  int32(in.Size),
-		Speed: protocol.VolumeSpeed(in.Speed),
-	}
-}
-
 // VolumeAttachmentFromAbstractToProtocol ...
 func VolumeAttachmentFromAbstractToProtocol(in *abstract.VolumeAttachment) *protocol.VolumeAttachment {
 	return &protocol.VolumeAttachment{
-		Volume:    &protocol.Reference{Id: in.VolumeID},
 		Host:      &protocol.Reference{Id: in.ServerID},
 		MountPath: in.MountPoint,
+		Format:    in.Format,
 		Device:    in.Device,
 	}
 }
 
-// VolumeInfoFromAbstractToProtocol converts an api.Volume to a *VolumeInfo
-func VolumeInfoFromAbstractToProtocol(volume *abstract.Volume, mounts map[string]*propertiesv1.HostLocalMount) *protocol.VolumeInfo {
-	pbvi := &protocol.VolumeInfo{
-		Id:    volume.ID,
-		Name:  volume.Name,
-		Size:  int32(volume.Size),
-		Speed: protocol.VolumeSpeed(volume.Speed),
+// VolumeFromAbstractToProtocol converts an api.Volume to a *VolumeInfo
+func VolumeFromAbstractToProtocol(volume *abstract.Volume, mounts map[string]*propertiesv1.HostLocalMount) *protocol.VolumeInspectResponse {
+	pbvi := &protocol.VolumeInspectResponse{
+		Id:          volume.ID,
+		Name:        volume.Name,
+		Size:        int32(volume.Size),
+		Speed:       protocol.VolumeSpeed(volume.Speed),
+		Attachments: []*protocol.VolumeAttachment{},
 	}
 	if len(mounts) > 0 {
 		for k, mount := range mounts {
-			pbvi.Host = &protocol.Reference{Name: k}
-			pbvi.MountPath = mount.Path
-			pbvi.Device = mount.Device
-			pbvi.Format = mount.FileSystem
-
+			a := protocol.VolumeAttachment{
+				Host:      &protocol.Reference{Name: k},
+				MountPath: mount.Path,
+				Device:    mount.Device,
+				Format:    mount.FileSystem,
+			}
+			pbvi.Attachments = append(pbvi.Attachments, &a)
 			break
 		}
 	}
@@ -94,7 +90,7 @@ func HostEffectiveSizingFromAbstractToProtocol(in *abstract.HostEffectiveSizing)
 }
 
 // GatewayDefinitionFromAbstractToProtocol ...
-func GatewayDefinitionFromAbstractsToProtocol(in *abstract.HostEffectiveSizing) *protocol.GatewayDefinition {
+func GatewayDefinitionFromAbstractToProtocol(in *abstract.HostEffectiveSizing) *protocol.GatewayDefinition {
 	return &protocol.GatewayDefinition{
 		Cpu:      int32(in.Cores),
 		Ram:      in.RAMSize,
@@ -105,16 +101,8 @@ func GatewayDefinitionFromAbstractsToProtocol(in *abstract.HostEffectiveSizing) 
 	}
 }
 
-// HostStatusFromAbstractToProtocol ...
-func HostStatusFromAbstractsToProtocol(in *abstract.HostCore) *protocol.HostStatus {
-	return &protocol.HostStatus{
-		Name:   in.Name,
-		Status: protocol.HostState(in.LastState).String(),
-	}
-}
-
 // HostTemplateFromAbstractToProtocol ...
-func HostTemplateFromAbstractToProtocol(in *abstract.HostTemplate) *protocol.HostTemplate {
+func HostTemplateFromAbstractToProtocol(in abstract.HostTemplate) *protocol.HostTemplate {
 	return &protocol.HostTemplate{
 		Id:       in.ID,
 		Name:     in.Name,
@@ -136,9 +124,9 @@ func ImageFromAbstractToProtocol(in *abstract.Image) *protocol.Image {
 
 // NetworkFromAbstractToProtocol ...
 func NetworkFromAbstractToProtocol(in *abstract.Network) *protocol.Network {
-	var pbVIP protocol.VirtualIp
+	var pbVIP *protocol.VirtualIp
 	if in.VIP != nil {
-		pbVIP = VirtualIPFromAbstractToProtocol(*in.VIP)
+		pbVIP = VirtualIPFromAbstractToProtocol(*(in.VIP))
 	}
 	return &protocol.Network{
 		Id:                 in.ID,
@@ -146,7 +134,7 @@ func NetworkFromAbstractToProtocol(in *abstract.Network) *protocol.Network {
 		Cidr:               in.CIDR,
 		GatewayId:          in.GatewayID,
 		SecondaryGatewayId: in.SecondaryGatewayID,
-		VirtualIp:          &pbVIP,
+		VirtualIp:          pbVIP,
 		Failover:           in.SecondaryGatewayID != "",
 		State:              protocol.NetworkState(in.NetworkState),
 	}
@@ -180,7 +168,7 @@ func HostSizingRequirementsFromAbstractToPropertyV2(src abstract.HostSizingRequi
 }
 
 // VirtualIPFromAbstractToProtocol converts a *abstract.VirtualIP to a protocol.VirtualIp
-func VirtualIPFromAbstractToProtocol(in abstract.VirtualIP) protocol.VirtualIp {
+func VirtualIPFromAbstractToProtocol(in abstract.VirtualIP) *protocol.VirtualIp {
 	out := protocol.VirtualIp{
 		Id:        in.ID,
 		NetworkId: in.NetworkID,
@@ -189,9 +177,9 @@ func VirtualIPFromAbstractToProtocol(in abstract.VirtualIP) protocol.VirtualIp {
 	}
 	out.Hosts = make([]*protocol.Host, len(in.Hosts))
 	for _, i := range in.Hosts {
-		out.Hosts = append(out.Hosts, HostCoreFromAbstractsToProtocol(i))
+		out.Hosts = append(out.Hosts, HostCoreFromAbstractToProtocol(i))
 	}
-	return out
+	return &out
 }
 
 // HostEffectiveSizingFromAbstractToPropertyV2 ...
@@ -206,24 +194,24 @@ func HostEffectiveSizingFromAbstractToPropertyV2(ahes *abstract.HostEffectiveSiz
 }
 
 // HostCoreFromAbstractToProtocol ...
-func HostCoreFromAbstractsToProtocol(in *abstract.HostCore) *protocol.Host {
+func HostCoreFromAbstractToProtocol(in *abstract.HostCore) *protocol.Host {
 	ph := &protocol.Host{
 		Id:         in.ID,
 		Name:       in.Name,
-		State:      HostStateFromAbstractsToProtocol(in.LastState),
+		State:      HostStateFromAbstractToProtocol(in.LastState),
 		PrivateKey: in.PrivateKey,
 	}
 	return ph
 }
 
-// HostFullFromAbstractsToProtocol ...
-func HostFullFromAbstractsToProtocol(in *abstract.HostFull) *protocol.Host {
+// HostFullFromAbstractToProtocol ...
+func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	ph := &protocol.Host{
 		Id:         in.Core.ID,
 		Name:       in.Core.Name,
 		PublicIp:   in.Network.PublicIPv4,
 		PrivateIp:  in.Network.IPv4Addresses[in.Network.DefaultNetworkID],
-		State:      HostStateFromAbstractsToProtocol(in.Core.LastState),
+		State:      HostStateFromAbstractToProtocol(in.Core.LastState),
 		PrivateKey: in.Core.PrivateKey,
 		GatewayId:  in.Network.DefaultGatewayID,
 	}
@@ -259,5 +247,61 @@ func HostNetworkFromAbstractToPropertyV1(src abstract.HostNetwork) *propertiesv1
 		PublicIPv6:              src.PublicIPv6,
 		IPv4Addresses:           src.IPv4Addresses,
 		IPv6Addresses:           src.IPv6Addresses,
+	}
+}
+
+func HostStateFromAbstractToProtocol(in hoststate.Enum) protocol.HostState {
+	return protocol.HostState(in)
+}
+
+func BucketListFromAbstractToProtocol(in []string) *protocol.BucketList {
+	out := protocol.BucketList{Buckets: []*protocol.Bucket{}}
+	for _, v := range in {
+		b := protocol.Bucket{
+			Name: v,
+		}
+		out.Buckets = append(out.Buckets, &b)
+	}
+	return &out
+}
+
+func BucketMountPointFromAbstractToProtocol(in abstract.Bucket) *protocol.BucketMountingPoint {
+	return &protocol.BucketMountingPoint{
+		Bucket: in.Name,
+		Host:   &protocol.Reference{Name: in.Host},
+		Path:   in.MountPoint,
+	}
+}
+
+func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
+	return &protocol.SshConfig{
+		User:             in.User,
+		Host:             in.Host,
+		PrivateKey:       in.PrivateKey,
+		Port:             int32(in.Port),
+		Gateway:          SSHConfigFromAbstractToProtocol(*in.GatewayConfig),
+		SecondaryGateway: SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig),
+	}
+}
+
+// HostStatusFromAbstractToProtocol ...
+func HostStatusFromAbstractToProtocol(name string, status hoststate.Enum) *protocol.HostStatus {
+	return &protocol.HostStatus{
+		Name:   name,
+		Status: protocol.HostState(status).String(),
+	}
+}
+
+// VolumeSpeedFromAbstractToProtocol ...
+func VolumeSpeedFromAbstractToProtocol(in volumespeed.Enum) protocol.VolumeSpeed {
+	switch in {
+	case volumespeed.COLD:
+		return protocol.VolumeSpeed_VS_COLD
+	case volumespeed.SSD:
+		return protocol.VolumeSpeed_VS_SSD
+	case volumespeed.HDD:
+		fallthrough
+	default:
+		return protocol.VolumeSpeed_VS_HDD
 	}
 }

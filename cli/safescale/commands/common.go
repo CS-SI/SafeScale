@@ -19,7 +19,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"

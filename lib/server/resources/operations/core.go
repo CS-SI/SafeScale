@@ -40,10 +40,6 @@ const (
 	byNameFolderName = "byName"
 )
 
-var NullCore = func() *Core {
-	return &Core{kind: "nil"}
-}()
-
 // Core contains the core functions of a persistent object
 type Core struct {
 	concurrency.TaskedLock `json:"-"`
@@ -56,25 +52,29 @@ type Core struct {
 	id         atomic.Value
 }
 
+func nullCore() *Core {
+	return &Core{kind: "nil"}
+}
+
 // NewCore creates an instance of core
 func NewCore(svc iaas.Service, kind string, path string) (*Core, error) {
 	if svc == nil {
-		return NullCore, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullCore(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if kind == "" {
-		return NullCore, scerr.InvalidParameterError("kind", "cannot be empty string")
+		return nullCore(), scerr.InvalidParameterError("kind", "cannot be empty string")
 	}
 	if path == "" {
-		return NullCore, scerr.InvalidParameterError("path", "cannot be empty string")
+		return nullCore(), scerr.InvalidParameterError("path", "cannot be empty string")
 	}
 
 	folder, err := newFolder(svc, path)
 	if err != nil {
-		return NullCore, err
+		return nullCore(), err
 	}
 	props, err := serialize.NewJSONProperties("resources." + kind)
 	if err != nil {
-		return NullCore, err
+		return nullCore(), err
 	}
 	c := Core{
 		kind:       kind,
@@ -84,9 +84,9 @@ func NewCore(svc iaas.Service, kind string, path string) (*Core, error) {
 	return &c, nil
 }
 
-// IsNull returns true if the core is equal to NullCore
+// IsNull returns true if the core instance represents the null value for Core
 func (c *Core) IsNull() bool {
-	return c == nil || c.kind == "nil"
+	return c == nil || c.kind == "" || c.kind == "nil"
 }
 
 // SafeGetService returns the iaas.Service used to create/load the persistent object
@@ -94,7 +94,7 @@ func (c *Core) SafeGetService() iaas.Service {
 	if !c.IsNull() && c.folder != nil {
 		return c.folder.SafeGetService()
 	}
-	return nil
+	return iaas.NullService()
 }
 
 // SafeGetID returns the id of the data protected
@@ -125,11 +125,8 @@ func (c *Core) SafeGetName() string {
 
 // Inspect protects the data for shared read
 func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err error) {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if c.IsNull() {
-		return scerr.NotAvailableError("cannot use Inspect() on NullCore")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -162,11 +159,8 @@ func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 
 // Alter protects the data for exclusive write
 func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err error) {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if c.IsNull() {
-		return scerr.NotAvailableError("cannot use Alter() on NullCore")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -208,11 +202,8 @@ func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err er
 // - scerr.ErrInvalidParameter
 // - scerr.ErrNotAvailable if the Core instance already carries a data
 func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if c.IsNull() {
-		return scerr.NotAvailableError("cannot use Carry() on NullCore")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -259,11 +250,8 @@ func (c *Core) updateIdentity(task concurrency.Task) error {
 // In case of any other error, abort the retry to propagate the error
 // If retry times out, returns errNotFound
 func (c *Core) Read(task concurrency.Task, ref string) error {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if c.IsNull() {
-		return scerr.NotAvailableError("cannot use Read() on NullCore")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -369,11 +357,8 @@ func (c *Core) write(task concurrency.Task) error {
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (c *Core) Reload(task concurrency.Task) error {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if c.IsNull() {
-		return scerr.NotAvailableError("cannot use Inspect() on NullCore")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -391,11 +376,8 @@ func (c *Core) Reload(task concurrency.Task) error {
 
 // BrowseFolder walks through host folder and executes a callback for each entries
 func (c *Core) BrowseFolder(task concurrency.Task, callback func(buf []byte) error) error {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if c.IsNull() {
-		return scerr.NotAvailableError("cannot use BrowseFolder() on NullCore")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -411,11 +393,8 @@ func (c *Core) BrowseFolder(task concurrency.Task, callback func(buf []byte) err
 
 // Delete deletes the matadata
 func (c *Core) Delete(task concurrency.Task) error {
-	if c == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if c.IsNull() {
-		return scerr.NotAvailableError("cannot use Delete() on NullCore")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")

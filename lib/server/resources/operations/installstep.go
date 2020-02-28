@@ -26,7 +26,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
@@ -459,7 +458,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Executes the script on the remote host
-	retcode, outrun, _, err := client.New().SSH.Run(task, host.SafeGetName(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, err := host.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if err != nil {
 		return stepResult{err: err, output: outrun}, nil
 	}

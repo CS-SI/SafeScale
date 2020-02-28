@@ -48,6 +48,16 @@ func newBucket(location stow.Location, bucketName string) (*bucket, error) {
 	}, nil
 }
 
+// NullBucket returns a bucket instance corresponding to null value
+func NullBucket() *bucket {
+	return &bucket{}
+}
+
+// IsNull tells if the bucket corresponds to its null value
+func (b *bucket) IsNull() bool {
+	return b == nil || b.location == nil
+}
+
 // CreateObject ...
 func (b *bucket) CreateObject(objectName string) (Object, error) {
 	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%s)", objectName).Entering().OnExitTrace()()

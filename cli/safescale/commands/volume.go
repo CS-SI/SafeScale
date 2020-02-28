@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -35,10 +35,10 @@ import (
 var volumeCmdName = "volume"
 
 //VolumeCmd volume command
-var VolumeCmd = cli.Command{
+var VolumeCmd = &cli.Command{
 	Name:  "volume",
 	Usage: "volume COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		volumeList,
 		volumeInspect,
 		volumeDelete,
@@ -48,12 +48,12 @@ var VolumeCmd = cli.Command{
 	},
 }
 
-var volumeList = cli.Command{
+var volumeList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available volumes",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
@@ -68,7 +68,7 @@ var volumeList = cli.Command{
 	},
 }
 
-var volumeInspect = cli.Command{
+var volumeInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
@@ -85,11 +85,11 @@ var volumeInspect = cli.Command{
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "inspection of volume", false).Error())))
 		}
-		return clitools.SuccessResponse(toDisplaybleVolumeInfo(volumeInfo))
+		return clitools.SuccessResponse(toDisplayableVolumeInfo(volumeInfo))
 	},
 }
 
-var volumeDelete = cli.Command{
+var volumeDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete volume",
@@ -114,18 +114,18 @@ var volumeDelete = cli.Command{
 	},
 }
 
-var volumeCreate = cli.Command{
+var volumeCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a volume",
 	ArgsUsage: "<Volume_name>",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "size",
 			Value: 10,
 			Usage: "Size of the volume (in Go)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "speed",
 			Value: "HDD",
 			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
@@ -158,26 +158,26 @@ var volumeCreate = cli.Command{
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of volume", true).Error())))
 		}
-		return clitools.SuccessResponse(toDisplaybleVolume(volume))
+		return clitools.SuccessResponse(toDisplayableVolume(volume))
 	},
 }
 
-var volumeAttach = cli.Command{
+var volumeAttach = &cli.Command{
 	Name:      "attach",
 	Usage:     "Attach a volume to an host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
 			Value: abstract.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "format",
 			Value: "ext4",
 			Usage: "Filesystem format",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "do-not-format",
 			Usage: "Prevent the volume to be formated (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so cannot be attach with this option)",
 		},
@@ -204,7 +204,7 @@ var volumeAttach = cli.Command{
 	},
 }
 
-var volumeDetach = cli.Command{
+var volumeDetach = &cli.Command{
 	Name:      "detach",
 	Usage:     "Detach a volume from an host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",

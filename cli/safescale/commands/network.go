@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -35,11 +35,11 @@ import (
 var networkCmdName = "network"
 
 // NetworkCmd command
-var NetworkCmd = cli.Command{
+var NetworkCmd = &cli.Command{
 	Name:    "network",
 	Aliases: []string{"net"},
 	Usage:   "network COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		networkCreate,
 		networkDelete,
 		networkInspect,
@@ -48,12 +48,12 @@ var NetworkCmd = cli.Command{
 	},
 }
 
-var networkList = cli.Command{
+var networkList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List existing Networks (created by SafeScale)",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all Networks on tenant (not only those created by SafeScale)",
 		}},
@@ -68,7 +68,7 @@ var networkList = cli.Command{
 	},
 }
 
-var networkDelete = cli.Command{
+var networkDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "delete Network",
@@ -93,7 +93,7 @@ var networkDelete = cli.Command{
 	},
 }
 
-var networkInspect = cli.Command{
+var networkInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "inspect NETWORK",
@@ -123,7 +123,7 @@ var networkInspect = cli.Command{
 		sgwID := network.GetSecondaryGatewayId()
 
 		// Added operation status
-		opState := network.State()
+		opState := network.State
 		mapped["state"] = opState.String()
 
 		pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())
@@ -155,32 +155,32 @@ var networkInspect = cli.Command{
 	},
 }
 
-var networkCreate = cli.Command{
+var networkCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a network",
 	ArgsUsage: "<network_name>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cidr",
 			Value: "192.168.0.0/24",
 			Usage: "cidr of the network",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "os",
 			Value: "Ubuntu 18.04",
 			Usage: "Image name for the gateway",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "gwname",
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "failover",
 			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name: "S, sizing",
 			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
@@ -203,15 +203,15 @@ var networkCreate = cli.Command{
 				--sizing "cpu <= 8, ram ~ 16"
 `,
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "cpu",
 			Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
 		},
-		cli.Float64Flag{
+		&cli.Float64Flag{
 			Name:  "ram",
 			Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "disk",
 			Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
 		},
@@ -223,7 +223,7 @@ var networkCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		def, _, err := constructPBHostDefinitionFromCLI(c, "sizing")
+		sizing, err := constructHostDefinitionStringFromCLI(c, "sizing")
 		if err != nil {
 			return err
 		}
@@ -232,9 +232,9 @@ var networkCreate = cli.Command{
 			Name:     c.Args().Get(0),
 			FailOver: c.Bool("failover"),
 			Gateway: &protocol.GatewayDefinition{
-				ImageId: c.String("os"),
-				Name:    c.String("gwname"),
-				Sizing:  def.Sizing,
+				ImageId:        c.String("os"),
+				Name:           c.String("gwname"),
+				SizingAsString: sizing,
 			},
 		}
 		network, err := client.New().Network.Create(netdef, temporal.GetExecutionTimeout())
@@ -247,13 +247,13 @@ var networkCreate = cli.Command{
 }
 
 // networkVIPCommand handles 'network vip' commands
-var networkVIPCommand = cli.Command{
+var networkVIPCommand = &cli.Command{
 	Name:      "vip",
 	Aliases:   []string{"virtualip"},
 	Usage:     "manage network virtual IP",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		networkVIPCreateCommand,
 		networkVIPInspectCommand,
 		networkVIPDeleteCommand,
@@ -262,7 +262,7 @@ var networkVIPCommand = cli.Command{
 	},
 }
 
-var networkVIPCreateCommand = cli.Command{
+var networkVIPCreateCommand = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create NETWORK VIPNAME",
@@ -285,7 +285,7 @@ var networkVIPCreateCommand = cli.Command{
 	},
 }
 
-var networkVIPInspectCommand = cli.Command{
+var networkVIPInspectCommand = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "inspect NETWORK VIPNAME",
@@ -308,7 +308,7 @@ var networkVIPInspectCommand = cli.Command{
 	},
 }
 
-var networkVIPDeleteCommand = cli.Command{
+var networkVIPDeleteCommand = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "destroy"},
 	Usage:     "delete NETWORK VIPNAME",
@@ -330,7 +330,7 @@ var networkVIPDeleteCommand = cli.Command{
 	},
 }
 
-var networkVIPBindCommand = cli.Command{
+var networkVIPBindCommand = &cli.Command{
 	Name:      "bind",
 	Aliases:   []string{"attach"},
 	Usage:     "create NETWORK VIPNAME HOST",
@@ -352,7 +352,7 @@ var networkVIPBindCommand = cli.Command{
 	},
 }
 
-var networkVIPUnbindCommand = cli.Command{
+var networkVIPUnbindCommand = &cli.Command{
 	Name:      "unbind",
 	Aliases:   []string{"detach"},
 	Usage:     "unbind NETWORK VIPNAME HOST",

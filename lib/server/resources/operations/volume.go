@@ -25,11 +25,14 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumeproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -52,15 +55,21 @@ type volume struct {
 	*Core
 }
 
+// nullVolume returns an instance of share corresponding to its null value.
+// The idea is to avoid nil pointer using nullVolume()
+func nullVolume() *volume {
+	return &volume{Core: nullCore()}
+}
+
 // NewVolume creates an instance of Volume
 func NewVolume(svc iaas.Service) (_ *volume, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "can't be nil")
+		return nullVolume(), scerr.InvalidParameterError("svc", "can't be nil")
 	}
 
 	core, err := NewCore(svc, "volume", volumesFolderName)
 	if err != nil {
-		return nil, err
+		return nullVolume(), err
 	}
 	return &volume{Core: core}, nil
 }
@@ -68,18 +77,18 @@ func NewVolume(svc iaas.Service) (_ *volume, err error) {
 // LoadVolume loads the metadata of a network
 func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (*volume, error) {
 	if task != nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nullVolume(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullVolume(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nullVolume(), scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	volume, err := NewVolume(svc)
 	if err != nil {
-		return nil, err
+		return volume, err
 	}
 	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
@@ -93,14 +102,108 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (*volume, e
 			logrus.Debugf("timeout reading metadata of volume '%s'", ref)
 			err = scerr.NotFoundError("failed to load metadata of volume '%s': timeout", ref)
 		}
-		return nil, err
+		return nullVolume(), err
 	}
 	return volume, nil
 }
 
+// IsNull tells if the instance is a null value
+func (objv *volume) IsNull() bool {
+	return objv == nil || objv.Core.IsNull()
+}
+
+// GetSpeed ...
+func (objv *volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, error) {
+	if objv.IsNull() {
+		return 0, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return 0, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	var speed volumespeed.Enum
+	err := objv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		av, ok := clonable.(*abstract.Volume)
+		if !ok {
+			return scerr.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		speed = av.Speed
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return speed, nil
+}
+
+// SafeGetSpeed ...
+// Intended to be used when objv is notoriously not nil
+func (objv *volume) SafeGetSpeed(task concurrency.Task) volumespeed.Enum {
+	speed, _ := objv.GetSpeed(task)
+	return speed
+}
+
+// GetSize ...
+func (objv *volume) GetSize(task concurrency.Task) (int, error) {
+	if objv.IsNull() {
+		return 0, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return 0, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	var size int
+	err := objv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		av, ok := clonable.(*abstract.Volume)
+		if !ok {
+			return scerr.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		size = av.Size
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return size, nil
+}
+
+// SafeGetSize ...
+// Intended to be used when objv is notoriously not nil
+func (objv *volume) SafeGetSize(task concurrency.Task) int {
+	size, _ := objv.GetSize(task)
+	return size
+}
+
+// GetAttachments ...
+func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, error) {
+	if objv.IsNull() {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	var vaV1 *properties.VolumeAttachments
+	err := objv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
+			var ok error
+			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return vaV1, nil
+}
+
 // Browse walks through volume folder and executes a callback for each entries
 func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume) error) error {
-	// This function can be called from nil pointer by design, so no validation on objv being nil
+	if objv.IsNull() {
+		return scerr.InvalidInstanceError()
+	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -120,7 +223,7 @@ func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume
 
 // Delete deletes volume and its metadata
 func (objv *volume) Delete(task concurrency.Task) (err error) {
-	if objv == nil {
+	if objv.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -181,7 +284,7 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 
 // Create a volume
 func (objv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (err error) {
-	if objv == nil {
+	if objv.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -224,7 +327,7 @@ func (objv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (e
 
 // Attach a volume to an host
 func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, format string, doNotFormat bool) (err error) {
-	if objv == nil {
+	if objv.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -390,7 +493,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 			deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
 
 			// Create mount point
-			sshConfig, err := host.SSHConfig(task)
+			sshConfig, err := host.GetSSHConfig(task)
 			if err != nil {
 				return err
 			}
@@ -550,7 +653,7 @@ func (objv *volume) listAttachedDevices(task concurrency.Task, host resources.Ho
 
 // Detach detach the volume identified by ref, ref can be the name or the id
 func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err error) {
-	if objv == nil {
+	if objv.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -645,7 +748,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 					}
 
 					// Unmount the Block Device ...
-					sshConfig, err := host.SSHConfig(task)
+					sshConfig, err := host.GetSSHConfig(task)
 					if err != nil {
 						return err
 					}
@@ -705,4 +808,21 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 	// 	return fmt.Errorf("volume detachment canceld by user")
 	// default:
 	// }
+}
+
+func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.Volume, error) {
+	if objv.IsNull() {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	out := &protocol.Volume{
+		Id:    objv.SafeGetID(),
+		Name:  objv.SafeGetName(),
+		Speed: converters.VolumeSpeedFromAbstractToProtocol(objv.SafeGetSpeed(task)),
+		Size:  int32(objv.SafeGetSize(task)),
+	}
+	return out, nil
 }

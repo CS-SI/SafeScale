@@ -37,6 +37,7 @@ require (
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
 	github.com/golangci/golangci-lint v1.23.6 // indirect
 	github.com/golangci/revgrep v0.0.0-20180812185044-276a5c0a1039 // indirect
+	github.com/google/martian v2.1.0+incompatible
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/gax-go v1.0.3 // indirect
 	github.com/gophercloud/gophercloud v0.0.0-20190509032623-7892efa714f1
@@ -90,6 +91,7 @@ require (
 	github.com/tommy-muehle/go-mnd v1.2.0 // indirect
 	github.com/tpng/gopkgs v0.0.0-20180428091733-81e90e22e204 // indirect
 	github.com/urfave/cli v1.22.2
+	github.com/urfave/cli/v2 v2.1.1
 	github.com/valyala/fasttemplate v1.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	github.com/zmb3/goaddimport v0.0.0-20170810013102-4ab94a07ab86 // indirect

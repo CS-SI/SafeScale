@@ -17,7 +17,7 @@
 package cli
 
 import (
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 )

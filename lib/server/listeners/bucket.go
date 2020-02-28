@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -69,7 +70,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), "", true).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.bucket"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -79,7 +80,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 		return nil, err
 	}
 
-	return converters.BucketListFromAbstractsToProtocol(buckets), nil
+	return converters.BucketListFromAbstractToProtocol(buckets), nil
 }
 
 // Create a new bucket
@@ -114,8 +115,8 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 	}
 	defer job.Close()
 
-	bucketName := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().Entering()
+	bucketName := in.GetName()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -160,8 +161,8 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 	}
 	defer job.Close()
 
-	bucketName := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().Entering()
+	bucketName := in.GetName()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -205,8 +206,8 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	}
 	defer job.Close()
 
-	bucketName := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().Entering()
+	bucketName := in.GetName()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -219,7 +220,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	if resp == nil {
 		return nil, scerr.NotFoundError(fmt.Sprintf("bucket '%s' not found", bucketName))
 	}
-	return converters.BucketMountPointFromAbstractsToProtocol(resp), nil
+	return converters.BucketMountPointFromAbstractToProtocol(*resp), nil
 }
 
 // Mount a bucket on the filesystem of the host
@@ -254,9 +255,9 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 	}
 	defer job.Close()
 
-	bucketName := in.Bucket()
-	hostName := in.GetHost().Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().Entering()
+	bucketName := in.GetBucket()
+	hostName := in.GetHost().Name
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -300,9 +301,9 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 	}
 	defer job.Close()
 
-	bucketName := in.Bucket()
-	hostName := in.GetHost().Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().Entering()
+	bucketName := in.GetBucket()
+	hostName := in.GetHost().Name
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

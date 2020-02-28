@@ -18,7 +18,7 @@ package commands
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -30,20 +30,20 @@ import (
 var templateCmdName = "template"
 
 // TemplateCmd command
-var TemplateCmd = cli.Command{
+var TemplateCmd = &cli.Command{
 	Name:  "template",
 	Usage: "template COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		templateList,
 	},
 }
 
-var templateList = cli.Command{
+var templateList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available templates",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all available templates in tenant (without any filter)",
 		}},

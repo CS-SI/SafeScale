@@ -23,7 +23,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -37,11 +37,11 @@ import (
 var shareCmdName = "share"
 
 // ShareCmd ssh command
-var ShareCmd = cli.Command{
+var ShareCmd = &cli.Command{
 	Name:    "share",
 	Aliases: []string{"nas"},
 	Usage:   "share COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		shareCreate,
 		shareDelete,
 		shareMount,
@@ -51,46 +51,46 @@ var ShareCmd = cli.Command{
 	},
 }
 
-var shareCreate = cli.Command{
+var shareCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a nfs server on an host and exports a directory",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
 			Value: abstract.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "readonly",
 			Usage: "Disallow write requests on this NFS volume",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rootsquash",
 			Usage: "Map requests from uid/gid 0 to the anonymous uid/gid",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "secure",
 			Usage: "Requires that requests originate on an Internet port less than IPPORT_RESERVED (1024).",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "async",
 			Usage: "This option allows the NFS server to violate the NFS protocol and reply to requests before any changes made by that request have been committed to stable storage",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "nohide",
 			Usage: "Enable exports of volumes mounted in the share export path",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "crossmount",
 			Usage: "Similar to nohide but it makes it possible for clients to move from the filesystem marked with crossmnt to exported filesystems mounted on it",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "subtreecheck",
 			Usage: "Enable subtree checking",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "securityModes",
 			Usage: "{sys(the default--no cryptographic security), krb5(authentication only), krb5i(integrity protection), and krb5p(privacy protection)}",
 		},
@@ -107,7 +107,7 @@ var shareCreate = cli.Command{
 			Name: shareName,
 			Host: &protocol.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
-			Options: &protocol.ExportOptions{
+			Options: &protocol.NFSExportOptions{
 				ReadOnly:     c.Bool("readonly"),
 				RootSquash:   c.Bool("rootsquash"),
 				Secure:       c.Bool("secure"),
@@ -127,7 +127,7 @@ var shareCreate = cli.Command{
 	},
 }
 
-var shareDelete = cli.Command{
+var shareDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete a share",
@@ -175,7 +175,7 @@ var shareDelete = cli.Command{
 	},
 }
 
-var shareList = cli.Command{
+var shareList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List all created shared",
@@ -190,17 +190,17 @@ var shareList = cli.Command{
 	},
 }
 
-var shareMount = cli.Command{
+var shareMount = &cli.Command{
 	Name:      "mount",
 	Usage:     "Mount an exported nfs directory on an host",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
 			Value: abstract.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "ac",
 			Usage: "Disable cache coherence to improve performances",
 		},
@@ -231,7 +231,7 @@ var shareMount = cli.Command{
 	},
 }
 
-var shareUnmount = cli.Command{
+var shareUnmount = &cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a share from an host",
@@ -258,7 +258,7 @@ var shareUnmount = cli.Command{
 	},
 }
 
-var shareInspect = cli.Command{
+var shareInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "List the share information and clients connected to it",

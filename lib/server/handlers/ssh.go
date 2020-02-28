@@ -266,7 +266,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := host.SSHConfig(task)
+	ssh, err := host.GetSSHConfig(task)
 	if err != nil {
 		return -1, "", "", err
 	}

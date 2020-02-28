@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	sharefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/share"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -80,31 +81,43 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	share, err := sharefactory.New(job.SafeGetService())
+	// LEGACY: NFSExportOptions of protocol has been deprecated and replaced by OptionsAsString
+	if in.OptionsAsString == "" && in.Options != nil {
+		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(*in.Options)
+	}
+	svc := job.SafeGetService()
+	host, err := hostfactory.Load(task, svc, hostRef)
+	share, err := sharefactory.New(svc)
 	if err != nil {
 		return nil, err
 	}
 	err = share.Create(
-		job.SafeGetTask(),
+		task,
 		shareName,
-		hostRef, sharePath,
-		in.GetSecurityModes(),
-		in.GetOptions().GetReadOnly(),
-		in.GetOptions().GetRootSquash(),
-		in.GetOptions().GetSecure(),
-		in.GetOptions().GetAsync(),
-		in.GetOptions().GetNoHide(),
-		in.GetOptions().GetCrossMount(),
-		in.GetOptions().GetSubtreeCheck(),
+		host, sharePath,
+		in.OptionsAsString,
+		// in.GetSecurityModes(),
+		// in.GetOptions().GetReadOnly(),
+		// in.GetOptions().GetRootSquash(),
+		// in.GetOptions().GetSecure(),
+		// in.GetOptions().GetAsync(),
+		// in.GetOptions().GetNoHide(),
+		// in.GetOptions().GetCrossMount(),
+		// in.GetOptions().GetSubtreeCheck(),
 	)
 	if err != nil {
 		return nil, err
 	}
-	return share.ToProtocol()
+	psml, err := share.ToProtocol(task)
+	if err != nil {
+		return nil, err
+	}
+	return psml.Share, nil
 }
 
 // Delete call share service deletion
@@ -197,7 +210,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	var pbshares []*protocol.ShareDefinition
 	for k, item := range shares {
 		for _, share := range item {
-			pbshares = append(pbshares, converters.ShareAbstractToProtocol(k, share))
+			pbshares = append(pbshares, converters.ShareFromPropertyToProtocol(k, share))
 		}
 	}
 	list := &protocol.ShareList{ShareList: pbshares}
@@ -248,7 +261,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	if err != nil {
 		return nil, err
 	}
-	return converters.ShareMountFromAbstractToProtocol(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
+	return converters.ShareMountFromPropertyToProtocol(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
 }
 
 // Unmount unmounts share from the given host
@@ -332,7 +345,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	defer task.Close()
 
 	shareRef := srvutils.GetReference(in)
-	tracer := concurrency.NewTracer(nil, true, "('%s')", shareRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, true, "('%s')", shareRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -352,5 +365,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
-	return converters.ShareMountsFromResourceToProtocol(share), nil
+	return share.ToProtocol(task)
 }

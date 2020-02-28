@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -54,45 +53,45 @@ func (s *Server) Install(task concurrency.Task) error {
 }
 
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(task concurrency.Task, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
-	share, err := NewShare(s, path)
+func (s *Server) AddShare(task concurrency.Task, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) error {
+	share, err := NewShare(s, path, options)
 	if err != nil {
 		return fmt.Errorf("failed to create the share : %s", err.Error())
 	}
 
-	acl := ExportACL{
-		Host:          "*",
-		SecurityModes: []securityflavor.Enum{},
-		Options: ExportOptions{
-			ReadOnly:       readOnly,
-			NoRootSquash:   !rootSquash,
-			Secure:         secure,
-			Async:          async,
-			NoHide:         noHide,
-			CrossMount:     crossMount,
-			NoSubtreeCheck: !subtreeCheck,
-			SetFSID:        false,
-			AnonUID:        0,
-			AnonGID:        0,
-		},
-	}
+	// acl := ExportACL{
+	// 	Host:          "*",
+	// 	SecurityModes: []securityflavor.Enum{},
+	// 	Options: ExportOptions{
+	// 		ReadOnly:       readOnly,
+	// 		NoRootSquash:   !rootSquash,
+	// 		Secure:         secure,
+	// 		Async:          async,
+	// 		NoHide:         noHide,
+	// 		CrossMount:     crossMount,
+	// 		NoSubtreeCheck: !subtreeCheck,
+	// 		SetFSID:        false,
+	// 		AnonUID:        0,
+	// 		AnonGID:        0,
+	// 	},
+	// }
 
-	for _, securityMode := range secutityModes {
-		switch securityMode {
-		case "sys":
-			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Sys)
-		case "krb5":
-			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5)
-		case "krb5i":
-			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5i)
-		case "krb5p":
-			acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5p)
-		default:
-			return fmt.Errorf("cannot add the share, %s is not a valid security mode", securityMode)
-		}
-	}
+	// for _, securityMode := range securityModes {
+	// 	switch securityMode {
+	// 	case "sys":
+	// 		acl.SecurityModes = append(acl.SecurityModes, securityflavor.Sys)
+	// 	case "krb5":
+	// 		acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5)
+	// 	case "krb5i":
+	// 		acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5i)
+	// 	case "krb5p":
+	// 		acl.SecurityModes = append(acl.SecurityModes, securityflavor.Krb5p)
+	// 	default:
+	// 		return fmt.Errorf("cannot add the share, %s is not a valid security mode", securityMode)
+	// 	}
+	// }
 
-	share.AddACL(acl)
+	// share.AddACL(acl)
 
 	return share.Add(task)
 }

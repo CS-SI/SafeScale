@@ -51,7 +51,7 @@ import (
 type VolumeHandler interface {
 	Delete(ref string) error
 	List(all bool) ([]abstract.Volume, error)
-	Inspect(ref string) (resources.Volume, map[string]*propertiesv1.HostLocalMount, error)
+	Inspect(ref string) (resources.Volume, error)
 	Create(name string, size int, speed volumespeed.Enum) (resources.Volume, error)
 	Attach(volume string, host string, path string, format string, doNotFormat bool) error
 	Detach(volume string, host string) error
@@ -158,9 +158,7 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
-func (handler *volumeHandler) Inspect(
-	ref string,
-) (volume resources.Volume, mounts map[string]*propertiesv1.HostLocalMount, err error) {
+func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err error) {
 
 	if handler == nil {
 		return nil, nil, scerr.InvalidInstanceError()
@@ -185,58 +183,59 @@ func (handler *volumeHandler) Inspect(
 		}
 		return nil, nil, err
 	}
-	volumeID := objv.SafeGetID()
+	return objv, nil
+	// volumeID := objv.SafeGetID()
 
-	mounts = map[string]*propertiesv1.HostLocalMount{}
-	err = objv.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
-			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
-			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			if len(volumeAttachedV1.Hosts) > 0 {
-				for id := range volumeAttachedV1.Hosts {
-					host, inErr := hostfactory.Load(task, handler.job.SafeGetService(), id)
-					if inErr != nil {
-						logrus.Debug(inErr.Error())
-						continue
-					}
-					inErr = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-						return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
-							hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
-							if !ok {
-								return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-							}
-							if volumeAttachment, found := hostVolumesV1.VolumesByID[volumeID]; found {
-								return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) error {
-									hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
-									if !ok {
-										return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-									}
-									if mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[volumeAttachment.Device]]; ok {
-										mounts[host.SafeGetName()] = mount
-									} else {
-										mounts[host.SafeGetName()] = propertiesv1.NewHostLocalMount()
-									}
-									return nil
-								})
-							}
-							return nil
-						})
-					})
-					if inErr != nil {
-						logrus.Debug(inErr.Error())
-						continue
-					}
-				}
-			}
-			return nil
-		})
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	return objv, mounts, nil
+	// mounts = map[string]*propertiesv1.HostLocalMount{}
+	// err = objv.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+	// 	return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
+	// 		volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
+	// 		if !ok {
+	// 			return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	// 		if len(volumeAttachedV1.Hosts) > 0 {
+	// 			for id := range volumeAttachedV1.Hosts {
+	// 				host, inErr := hostfactory.Load(task, handler.job.SafeGetService(), id)
+	// 				if inErr != nil {
+	// 					logrus.Debug(inErr.Error())
+	// 					continue
+	// 				}
+	// 				inErr = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+	// 					return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+	// 						hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
+	// 						if !ok {
+	// 							return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 						}
+	// 						if volumeAttachment, found := hostVolumesV1.VolumesByID[volumeID]; found {
+	// 							return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) error {
+	// 								hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+	// 								if !ok {
+	// 									return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 								}
+	// 								if mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[volumeAttachment.Device]]; ok {
+	// 									mounts[host.SafeGetName()] = mount
+	// 								} else {
+	// 									mounts[host.SafeGetName()] = propertiesv1.NewHostLocalMount()
+	// 								}
+	// 								return nil
+	// 							})
+	// 						}
+	// 						return nil
+	// 					})
+	// 				})
+	// 				if inErr != nil {
+	// 					logrus.Debug(inErr.Error())
+	// 					continue
+	// 				}
+	// 			}
+	// 		}
+	// 		return nil
+	// 	})
+	// })
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
+	// return objv, mounts, nil
 }
 
 // Create a volume
@@ -648,7 +647,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 					}
 
 					// Unmount the Block Device ...
-					sshConfig, err := host.SSHConfig(task)
+					sshConfig, err := host.GetSSHConfig(task)
 					if err != nil {
 						return err
 					}

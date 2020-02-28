@@ -2,7 +2,7 @@ VERSION=20.1.0-alpha
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
-MAKE_LEVEL=-1
+MAKE_LEVEL=1
 MAKE_TRACE=""
 else
 MAKE_LEVEL+=1

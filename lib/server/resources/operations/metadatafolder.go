@@ -47,15 +47,21 @@ func newFolder(svc iaas.Service, path string) (*folder, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	cryptKey := svc.SafeGetMetadataKey()
-	crypt := cryptKey != nil && len(cryptKey) > 0
 	f := &folder{
 		path:    strings.Trim(path, "/"),
 		service: svc,
-		crypt:   crypt,
 	}
-	if crypt {
-		f.cryptKey = cryptKey
+
+	cryptKey, err := svc.GetMetadataKey()
+	if err != nil {
+		if _, ok := err.(*scerr.ErrNotFound); !ok {
+			return nil, err
+		}
+	} else {
+		f.crypt = cryptKey != nil && len(cryptKey) > 0
+		if f.crypt {
+			f.cryptKey = cryptKey
+		}
 	}
 	return f, nil
 }

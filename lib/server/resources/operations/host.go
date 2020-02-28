@@ -57,10 +57,6 @@ const (
 	hostsFolderName = "hosts"
 )
 
-var NullHost = func() *host {
-	return &host{Core: NullCore}
-}()
-
 // host ...
 // follows interface resources.Host
 type host struct {
@@ -84,21 +80,26 @@ func NewHost(svc iaas.Service) (*host, error) {
 	return &host{Core: core}, nil
 }
 
+// nullHost returns a *host corresponding to NullValue
+func nullHost() *host {
+	return &host{Core: nullCore()}
+}
+
 // Load ...
 func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (*host, error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nullHost(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullHost(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nullHost(), scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	rh, err := NewHost(svc)
 	if err != nil {
-		return nil, err
+		return nullHost(), err
 	}
 
 	err = retry.WhileUnsuccessfulDelay1Second(
@@ -113,25 +114,22 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (*host, error
 			logrus.Debugf("timeout reading metadata of host '%s'", ref)
 			err = scerr.NotFoundError("timeout trying to read metadata")
 		}
-		return nil, scerr.Wrap(err, "failed to read metadata of host '%s'", ref)
+		return nullHost(), scerr.Wrap(err, "failed to read metadata of host '%s'", ref)
 	}
 	if err != nil {
-		return nil, err
+		return nullHost(), err
 	}
 	return rh, nil
 }
 
 func (rh *host) IsNull() bool {
-	return rh == nil || rh.Core == nil || rh.Core.IsNull()
+	return rh == nil || rh.Core.IsNull()
 }
 
 // Browse walks through host folder and executes a callback for each entries
 func (rh *host) Browse(task concurrency.Task, callback func(*abstract.HostCore) error) (err error) {
-	if rh == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if rh.IsNull() {
-		return scerr.NotAvailableError("cannot use Browse() on NullHost")
+		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -152,7 +150,7 @@ func (rh *host) Browse(task concurrency.Task, callback func(*abstract.HostCore) 
 
 // GetState returns the current state of the provider host
 func (rh *host) GetState(task concurrency.Task) (hoststate.Enum, error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return hoststate.UNKNOWN, scerr.InvalidInstanceError()
 	}
 	if rh.IsNull() {
@@ -195,7 +193,7 @@ func (rh *host) SafeGetState(task concurrency.Task) (state hoststate.Enum) {
 // Create creates a new host and its metadata
 // If the metadata is already carrying a host, returns scerr.ErrNotAvailable
 func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) error {
-	if rh == nil {
+	if rh.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if rh.IsNull() {
@@ -497,7 +495,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase string) (string, e
 			sshDefaultTimeout = num
 		}
 	}
-	sshCfg, err := rh.SSHConfig(task)
+	sshCfg, err := rh.GetSSHConfig(task)
 	if err != nil {
 		return "", err
 	}
@@ -539,14 +537,14 @@ func (rh *host) updateNetwork(task concurrency.Task, networkID string) error {
 
 // WaitSSHReady waits until SSH responds successfully
 func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return "", scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return "", scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	sshCfg, err := rh.SSHConfig(task)
+	sshCfg, err := rh.GetSSHConfig(task)
 	if err != nil {
 		return "", err
 	}
@@ -597,7 +595,7 @@ func getOrCreateDefaultNetwork(task concurrency.Task, svc iaas.Service) (resourc
 
 // Delete deletes a host with its metadata and updates network links
 func (rh *host) Delete(task concurrency.Task) error {
-	if rh == nil {
+	if rh.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -871,12 +869,12 @@ func (rh *host) Delete(task concurrency.Task) error {
 	return nil
 }
 
-// SSHConfig loads SSH configuration for host from metadata
+// GetSSHConfig loads SSH configuration for host from metadata
 //
 // FIXME: system.SSHConfig should be able to carry data about secondary Gateway
 //        Currently, if primary gateway is down, ssh to a host in the network will fail
-func (rh *host) SSHConfig(task concurrency.Task) (_ *system.SSHConfig, err error) {
-	if rh == nil {
+func (rh *host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, err error) {
+	if rh.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -970,7 +968,7 @@ func (rh *host) SSHConfig(task concurrency.Task) (_ *system.SSHConfig, err error
 
 // Run tries to execute command 'cmd' on the host
 func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return 0, "", "", scerr.InvalidInstanceError()
 	}
 	if task != nil {
@@ -987,7 +985,7 @@ func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connec
 	)
 
 	// retrieve ssh config to perform some commands
-	ssh, err := rh.SSHConfig(task)
+	ssh, err := rh.GetSSHConfig(task)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -1040,7 +1038,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 
 // Pull downloads a file from host
 func (rh *host) Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return 0, "", "", scerr.InvalidInstanceError()
 	}
 	if source == "" {
@@ -1051,7 +1049,7 @@ func (rh *host) Pull(task concurrency.Task, target, source string, timeout time.
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := rh.SSHConfig(task)
+	ssh, err := rh.GetSSHConfig(task)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -1065,7 +1063,7 @@ func (rh *host) Pull(task concurrency.Task, target, source string, timeout time.
 
 // Push uploads a file to host
 func (rh *host) Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return 0, "", "", scerr.InvalidInstanceError()
 	}
 	if source == "" {
@@ -1076,7 +1074,7 @@ func (rh *host) Push(task concurrency.Task, source, target, owner, mode string, 
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := rh.SSHConfig(task)
+	ssh, err := rh.GetSSHConfig(task)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -1105,7 +1103,7 @@ func (rh *host) Push(task concurrency.Task, source, target, owner, mode string, 
 
 // GetShare returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1146,12 +1144,88 @@ func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.
 	if err != nil {
 		return nil, err
 	}
+
 	return hostShare, nil
 }
 
+// GetVolumes returns information about volumes attached to the host
+func (objh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, error) {
+	if objh.IsNUll() {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	var hvV1 *propertiesv1.HostVolumes
+	err := objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+			va, ok := clonable.(*propertiesv1.HostVolumes)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.Volumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return hvV1, nil
+}
+
+// // GetAttachedVolume returns information about where and how the volume referenced is attached to the host
+// func (objh *host) GetAttachedVolume(task concurrency.Task, volumeRef string) (*propertiesv1.HostLocalMount, error) {
+// 	if objh.IsNUll() {
+// 		return nil, scerr.InvalidInstanceError()
+// 	}
+// 	if task == nil {
+// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+// 	}
+// 	if volumeRef == "" {
+// 		return nil, scerr.InvalidParameterError("volumeRef", "cannot be empty string")
+// 	}
+
+// 	var mount *propertiesv1.HostMount
+// 	err := objh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+// 		var hostVolume *propertiesv1.HostVolume
+// 		innerErr := props.Inspect(hostproperty.HostVolumesV1, func(clonable data.Clonable) error {
+// 			vaV1, ok := clonable.(*propertiesv1.HostVolumes)
+// 			if !ok {
+// 				return scerr.InconsistentError("'*propertiesv1.HostVolumess' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// 			}
+// 			hostVolume, ok = vaV1.VolumesByID[volumeRef]
+// 			if !ok {
+// 				var ref string
+// 				ref, ok = vaV1.VolumesByName[volumeRef]
+// 				hostVolume, ok = vaV1.VolumesByID[ref]
+// 			}
+// 			if !ok {
+// 				return scerr.NotFoundError("failed to find a volume referenced by '%s' attached to host '%s'", volumeRef, objh.SafeGetName())
+// 			}
+// 			return nil
+// 		})
+// 		if innerErr != nil {
+// 			return innerErr
+// 		}
+
+// 		return props.Inspect(hostproperty.HostLocalMountV1, func(clonable data.Clonable) error {
+// 			hlmV1, ok := clonable.(*propertiesv1.HostLocalMount)
+// 			if !ok {
+// 				return scerr.InconsistentError("'*propertiesv1.HostMount' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// 			}
+// 			mount, ok := hlmV1.ByDevice[hostVolume.Device]
+// 			return nil
+// 		})
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return mount, nil
+// }
+
 // Start starts the host
 func (rh *host) Start(task concurrency.Task) (err error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task != nil {
@@ -1182,7 +1256,7 @@ func (rh *host) Start(task concurrency.Task) (err error) {
 
 // Stop stops the host
 func (rh *host) Stop(task concurrency.Task) (err error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task != nil {
@@ -1223,12 +1297,15 @@ func (rh *host) Reboot(task concurrency.Task) error {
 // Resize ...
 // not yet implemented
 func (rh *host) Resize(hostSize abstract.HostSizingRequirements) error {
+	if rh.IsNull() {
+		return scerr.InvalidInstanceError()
+	}
 	return scerr.NotImplementedError("Host.Resize() not yet implemented")
 }
 
 // AddFeature handles 'safescale host add-feature <host name or id> <feature name>'
 func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, err error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1277,7 +1354,7 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 
 // CheckFeature ...
 func (rh *host) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1310,7 +1387,7 @@ func (rh *host) CheckFeature(task concurrency.Task, name string, vars data.Map, 
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
 func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, error) {
-	if rh == nil {
+	if rh.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1366,7 +1443,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 // To be used when rh is notoriously not nil.
 // satisfies install.Targetable interface.
 func (rh *host) SafeGetTargetType() featuretargettype.Enum {
-	if rh == nil {
+	if rh.IsNull() {
 		return featuretargettype.UNKNOWN
 	}
 	return featuretargettype.HOST
@@ -1375,7 +1452,7 @@ func (rh *host) SafeGetTargetType() featuretargettype.Enum {
 // GetPublicIP returns the public IP address of the host
 func (rh *host) GetPublicIP(task concurrency.Task) (ip string, err error) {
 	ip = ""
-	if rh == nil {
+	if rh.IsNull() {
 		return "", scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1402,28 +1479,25 @@ func (rh *host) GetPublicIP(task concurrency.Task) (ip string, err error) {
 // SafeGetPublicIP returns the public IP address of the host
 // To be used when rh is notoriously not nil
 func (rh *host) SafeGetPublicIP(task concurrency.Task) string {
-	if rh == nil {
-		return ""
-	}
 	ip, _ := rh.GetPublicIP(task)
 	return ip
 }
 
 // GetPrivateIP returns the private IP of the host on its default Network
 func (rh *host) GetPrivateIP(task concurrency.Task) (ip string, err error) {
-	if rh == nil {
-		return "", scerr.InvalidInstanceError()
+	ip = ""
+	if rh.IsNull() {
+		return ip, scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return "", scerr.InvalidParameterError("task", "cannot be nil")
+		return ip, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	ip = ""
 	if rh == nil {
-		return "", scerr.InvalidInstanceError()
+		return ip, scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return "", scerr.InvalidParameterError("task", "cannot be nil")
+		return ip, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	defer scerr.OnPanic(&err)()
 
@@ -1455,7 +1529,7 @@ func (rh *host) SafeGetPrivateIP(task concurrency.Task) string {
 // GetPrivateIPOnNetwork returns the private IP of the host on its default Network
 func (rh *host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, err error) {
 	ip = ""
-	if rh == nil {
+	if rh.IsNull() {
 		return ip, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1492,11 +1566,11 @@ func (rh *host) SafeGetPrivateIPOnNetwork(task concurrency.Task, networkID strin
 // GetAccessIP returns the IP to reach the host
 func (rh *host) GetAccessIP(task concurrency.Task) (ip string, err error) {
 	ip = ""
-	if rh == nil {
-		return "", scerr.InvalidInstanceError()
+	if rh.IsNull() {
+		return ip, scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return "", scerr.InvalidParameterError("task", "cannot be nil")
+		return ip, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	ip, err = rh.GetPublicIP(task)
@@ -1509,9 +1583,6 @@ func (rh *host) GetAccessIP(task concurrency.Task) (ip string, err error) {
 // SafeGetAccessIP returns the IP to reach the host
 // To be used when rh is notoriously not nil
 func (rh *host) SafeGetAccessIP(task concurrency.Task) string {
-	if rh == nil {
-		return ""
-	}
 	ip, _ := rh.GetAccessIP(task)
 	return ip
 }
@@ -1520,13 +1591,13 @@ func (rh *host) SafeGetAccessIP(task concurrency.Task) string {
 //
 // satisfies interface install.Targetable
 func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
-	if rh == nil {
+	if rh.IsNull() {
 		logrus.Error(scerr.InvalidInstanceError().Error())
-		return nil
+		return map[uint8]installmethod.Enum{}
 	}
 	if task == nil {
 		logrus.Error(scerr.InvalidParameterError("task", "cannot be nil").Error())
-		return nil
+		return map[uint8]installmethod.Enum{}
 	}
 
 	rh.Lock(task)
@@ -1575,6 +1646,66 @@ func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installme
 	return rh.installMethods
 }
 
+// GetShares returns the information about the shares hosted by the host
+func (rh *host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares, err error) {
+	shares = nil
+	if rh.IsNull() {
+		return shares, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return shares, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			shares = hostSharesV1
+			return nil
+		})
+	})
+	return shares, err
+}
+
+// SafeGetShares returns the information about the shares of the host
+// Intented to be used when objn is notoriously not nil (because previously checked)
+func (rh *host) SafeGetShares(task concurrency.Task) *propertiesv1.HostShares {
+	shares, _ := rh.GetShares(task)
+	return shares
+}
+
+// GetMounts returns the information abouts the mounts of the host
+func (rh *host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts, err error) {
+	mounts = nil
+	if rh.IsNull() {
+		return mounts, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return mounts, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			mounts = hostMountsV1
+			return nil
+		})
+	})
+	return mounts, err
+}
+
+// SafeGetMounts returns the information about the mounts of the host
+// Intended to be used when objh is notoriously not nil (because previously checked)
+func (rh *host) SafeGetMounts(task concurrency.Task) *propertiesv1.HostMounts {
+	mounts, _ := rh.GetMounts(task)
+	return mounts
+}
+
 // SafeGetInstalledFeatures returns a list of installed features
 //
 // satisfies interface install.Targetable
@@ -1587,7 +1718,7 @@ func (rh *host) SafeGetInstalledFeatures(task concurrency.Task) []string {
 //
 // satisfies interface install.Targetable
 func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) error {
-	if rh == nil {
+	if rh.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1656,11 +1787,11 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) e
 // IsClusterMember returns true if the host is member of a cluster
 func (rh *host) IsClusterMember(task concurrency.Task) (yes bool, err error) {
 	yes = false
-	if rh == nil {
-		return false, scerr.InvalidInstanceError()
+	if rh.IsNull() {
+		return yes, scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return false, scerr.InvalidParameterError("task", "cannot be nil")
+		return yes, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
@@ -1801,13 +1932,12 @@ func (rh *host) GetDefaultNetwork(task concurrency.Task) (objn resources.Network
 }
 
 // ToProtocol convert an resources.Host to protocol.Host
-func (rh *host) ToProtocol(task concurrency.Task) (pbHost protocol.Host, err error) {
-	pbHost = protocol.Host{}
+func (rh *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, err error) {
 	if rh == nil {
-		return pbHost, scerr.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return pbHost, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	defer scerr.OnPanic(&err)()
@@ -1845,10 +1975,10 @@ func (rh *host) ToProtocol(task concurrency.Task) (pbHost protocol.Host, err err
 		})
 	})
 	if err != nil {
-		return pbHost, err
+		return ph, err
 	}
 
-	pbHost = protocol.Host{
+	ph = &protocol.Host{
 		Cpu:                 int32(hostSizingV1.AllocatedSize.Cores),
 		Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
 		GatewayId:           hostNetworkV1.DefaultGatewayID,
@@ -1862,5 +1992,5 @@ func (rh *host) ToProtocol(task concurrency.Task) (pbHost protocol.Host, err err
 		State:               protocol.HostState(ahc.LastState),
 		AttachedVolumeNames: volumes,
 	}
-	return pbHost, nil
+	return ph, nil
 }

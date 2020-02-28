@@ -24,7 +24,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -355,7 +354,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	}
 
 	if err != nil {
-		return nil, client.DecorateError(err, fmt.Sprintf("[%s] host resource creation failed: %s", hostLabel, err.Error()), false)
+		return nil, scerr.Wrap(err, "[%s] host resource creation failed")
 	}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, host.SafeGetName())
 	logrus.Debugf("[%s] host resource creation successful", hostLabel)
@@ -713,7 +712,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, err
 	}
 	if err != nil {
-		return nil, client.DecorateError(err, fmt.Sprintf("[%s] creation failed: %s", hostLabel, err.Error()), true)
+		return nil, scerr.Wrap(err, "[%s] creation failed", hostLabel)
 	}
 	hostLabel = fmt.Sprintf("node #%d (%s)", index, host.SafeGetName())
 	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
@@ -755,32 +754,28 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.T
 	logrus.Debugf("[cluster %s] configuring nodes...", clusterName)
 
 	var (
-		pbHost *protocol.Host
+		host   resources.Host
 		i      uint
 		hostID string
 		errs   []string
 	)
 
 	var subtasks []concurrency.Task
-	clientHost := client.New().Host
 	for _, hostID = range list {
 		i++
-		pbHost, err = clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
+		host, err = LoadHost(task, svc, hostID)
 		if err != nil {
-			break
+			errs = append(errs, fmt.Sprintf("failed to get metadata of host '%s': %s", hostID, err.Error()))
+			continue
 		}
 		subtask, err := task.StartInSubtask(c.taskConfigureNode, data.Map{
 			"index": i,
-			"host":  pbHost,
+			"host":  host,
 		})
 		if err != nil {
 			return nil, err
 		}
 		subtasks = append(subtasks, subtask)
-	}
-	// Deals with the metadata read failure
-	if err != nil {
-		errs = append(errs, fmt.Sprintf("failed to get metadata of host '%s': %s", hostID, err.Error()))
 	}
 
 	for _, s := range subtasks {

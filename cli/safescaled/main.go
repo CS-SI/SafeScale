@@ -29,7 +29,7 @@ import (
 
 	"github.com/dlespiau/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"google.golang.org/appengine/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

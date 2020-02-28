@@ -54,7 +54,7 @@ type Service interface {
 	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, error)
 	FilterImages(string) ([]abstract.Image, error)
-	SafeGetMetadataKey() *crypt.Key
+	GetMetadataKey() (*crypt.Key, error)
 	SafeGetMetadataBucket() objectstorage.Bucket
 	ListHostsByName(bool) (map[string]*abstract.HostFull, error)
 	SearchImage(string) (*abstract.Image, error)
@@ -124,27 +124,52 @@ func (a ByRankDRF) Less(i, j int) bool { return RankDRF(a[i]) < RankDRF(a[j]) }
 // 	return access.Host.AccessIP()
 // }
 
+// NullService creates a service instance corresponding to null value
+func NullService() *service {
+	return &service{}
+}
+
+// IsNull tells if the instance is null value
+func (svc *service) IsNull() bool {
+	return svc == nil || svc.Provider == nil
+}
+
 func (svc *service) SafeGetName() string {
-	return svc.Provider.GetName()
+	if !svc.IsNull() {
+		return svc.Provider.GetName()
+	}
+	return ""
 }
 
 func (svc *service) SafeGetID() string {
-	return svc.Provider.GetName()
+	if !svc.IsNull() {
+		return svc.Provider.GetName()
+	}
+	return ""
 }
 
 // SafeGetMetadataBucket returns the bucket instance describing metadata bucket
 func (svc *service) SafeGetMetadataBucket() objectstorage.Bucket {
-	return svc.metadataBucket
+	if !svc.IsNull() {
+		return svc.metadataBucket
+	}
+	return objectstorage.NullBucket()
 }
 
-// SafeGetMetadataKey returns the key used to crypt data in metadata bucket
-func (svc *service) SafeGetMetadataKey() *crypt.Key {
-	return svc.metadataKey
+// GetMetadataKey returns the key used to crypt data in metadata bucket
+func (svc *service) GetMetadataKey() (*crypt.Key, error) {
+	if svc.IsNull() {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if svc.metadataKey == nil {
+		return nil, scerr.NotFoundError("no crypt key defined for metadata content")
+	}
+	return svc.metadataKey, nil
 }
 
 // ChangeProvider allows to change provider interface of service object (mainly for test purposes)
 func (svc *service) ChangeProvider(provider providers.Provider) error {
-	if svc == nil {
+	if svc.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if provider == nil {
@@ -158,7 +183,7 @@ func (svc *service) ChangeProvider(provider providers.Provider) error {
 // If host in error state, returns utils.ErrNotAvailable
 // If timeout is reached, returns utils.ErrTimeout
 func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) error {
-	if svc == nil {
+	if svc.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if hostID == "" {
@@ -192,7 +217,7 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 // WaitVolumeState waits an host achieve state
 // If timeout is reached, returns utils.ErrTimeout
 func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if volumeID == "" {
@@ -245,7 +270,7 @@ func pollVolume(svc *service, volumeID string, state volumestate.Enum, cout chan
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (svc *service) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 
@@ -261,7 +286,7 @@ func (svc *service) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 
 // SelectTemplateByName returns the template by its name
 func (svc *service) SelectTemplateByName(name string) (*abstract.HostTemplate, error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 
@@ -305,7 +330,7 @@ func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
 func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements, force bool) (selectedTpls []*abstract.HostTemplate, err error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 
@@ -482,7 +507,7 @@ func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
 func (svc *service) FilterImages(filter string) ([]abstract.Image, error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 
@@ -548,7 +573,7 @@ func filterImagesByRegex(re *regexp.Regexp) imagefilters.Predicate {
 
 // ListImages reduces the list of needed
 func (svc *service) ListImages(all bool) ([]abstract.Image, error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 
@@ -561,7 +586,7 @@ func (svc *service) ListImages(all bool) ([]abstract.Image, error) {
 
 // SearchImage search an image corresponding to OS Name
 func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 
@@ -595,14 +620,8 @@ func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
 }
 
 // CreateHostWithKeyPair creates an host
-func (svc *service) CreateHostWithKeyPair(request abstract.HostRequest) (
-	*abstract.HostFull,
-	*userdata.Content,
-	*abstract.KeyPair,
-	error,
-) {
-
-	if svc == nil {
+func (svc *service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, error) {
+	if svc.IsNull() {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
@@ -644,7 +663,7 @@ func (svc *service) CreateHostWithKeyPair(request abstract.HostRequest) (
 
 // ListHostsByName list hosts by name
 func (svc *service) ListHostsByName(details bool) (map[string]*abstract.HostFull, error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 
@@ -761,8 +780,8 @@ func SimilarityScore(ref string, s string) float64 {
 
 // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
 func InitializeBucket(svc *service, location objectstorage.Location) error {
-	if svc == nil {
-		return scerr.InvalidParameterError("svc", "cannot be nil")
+	if svc.IsNull() {
+		return scerr.InvalidParameterError("svc", "cannot be null value")
 	}
 	if location == nil {
 		return scerr.InvalidParameterError("location", "cannot be nil")

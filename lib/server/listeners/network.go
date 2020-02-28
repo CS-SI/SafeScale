@@ -81,7 +81,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", networkName).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -110,9 +111,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	}
 
 	handler := handlers.NewNetworkHandler(job)
-	r, err := job.SafeGetTask().Run(
+	r, err := task.Run(
 		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
-			tracer.Trace("calling handler.Create()...")
 			return handler.Create(
 				networkName,
 				in.GetCidr(),
@@ -131,7 +131,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	network := r.(resources.Network)
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)
-	return converters.NetworkFromResourceToProtocol(network), nil
+	return network.ToProtocol(task)
 }
 
 // List existing networks
@@ -178,7 +178,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	// Build response mapping abstract.Network to protocol.Network
 	var pbnetworks []*protocol.Network
 	for _, network := range networks {
-		pbnetworks = append(pbnetworks, converters.NetworkFromResourceToProtocol(network))
+		pbnetworks = append(pbnetworks, converters.NetworkFromAbstractToProtocol(network))
 	}
 	rv := &protocol.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -220,15 +220,16 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	network, err := networkfactory.Load(job.SafeGetTask(), job.SafeGetService(), ref)
+	network, err := networkfactory.Load(task, job.SafeGetService(), ref)
 	if err != nil {
 		return nil, err
 	}
-	return network.ToProtocol()
+	return network.ToProtocol(task)
 }
 
 // Delete a network
@@ -253,7 +254,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 

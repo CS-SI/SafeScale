@@ -18,7 +18,7 @@ package commands
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -30,20 +30,20 @@ import (
 var imageCmdName = "image"
 
 // ImageCmd command
-var ImageCmd = cli.Command{
+var ImageCmd = &cli.Command{
 	Name:  "image",
 	Usage: "image COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		imageList,
 	},
 }
 
-var imageList = cli.Command{
+var imageList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available images",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all available images in tenant (without any filter)",
 		}},

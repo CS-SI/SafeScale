@@ -73,19 +73,23 @@ type cluster struct {
 	concurrency.TaskedLock `json:"-"`
 }
 
+func nullCluster() *cluster {
+	return &cluster{Core: nullCore()}
+}
+
 // NewCluster ...
 func NewCluster(task concurrency.Task, svc iaas.Service) (_ *cluster, err error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nullCluster(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullCluster(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	defer scerr.OnPanic(&err)()
 
 	core, err := NewCore(svc, "cluster", clustersFolderName)
 	if err != nil {
-		return nil, err
+		return nullCluster(), err
 	}
 
 	return &cluster{Core: core}, nil
@@ -94,29 +98,29 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ *cluster, err error)
 // LoadCluster ...
 func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ *cluster, err error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nullCluster(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullCluster(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nullCluster(), scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 	defer scerr.OnPanic(&err)()
 
 	instance, err := NewCluster(task, svc)
 	if err != nil {
-		return nil, err
+		return instance, err
 	}
 	err = instance.Read(task, name)
 	if err != nil {
-		return nil, err
+		return nullCluster(), err
 	}
 
 	// From here, we can deal with legacy
 	err = instance.upgradePropertyNodesIfNeeded(task)
 	if err != nil {
-		return nil, err
+		return nullCluster(), err
 	}
 
 	return instance, nil
@@ -172,6 +176,11 @@ func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) error {
 	})
 }
 
+// IsNull tells if the instance represents a null value of cluster
+func (c *cluster) IsNull() bool {
+	return c == nil || c.Core.IsNull()
+}
+
 // // VPL: ambiguous candidate on GetName(), didn't find where yet...
 // // GetName returns the name if the cluster
 // func (c *cluster) GetName() string {
@@ -185,7 +194,7 @@ func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) error {
 
 // Create creates the necessary infrastructure of the Cluster
 func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (err error) {
-	if c == nil {
+	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -868,17 +877,27 @@ func complementSizingRequirements(req *abstract.HostSizingRequirements, def abst
 // Serialize converts cluster data to JSON
 // satisfies interface data.Serializable
 func (c *cluster) Serialize() ([]byte, error) {
+	if c.IsNull() {
+		return []byte{}, scerr.InvalidInstanceError()
+	}
 	return serialize.ToJSON(c)
 }
 
 // Deserialize reads json code and reinstantiates cluster
 // satisfies interface data.Serializable
 func (c *cluster) Deserialize(buf []byte) error {
+	if c.IsNull() {
+		return scerr.InvalidInstanceError()
+	}
 	return serialize.FromJSON(buf, c)
 }
 
 // Boostrap (re)connects controller with the appropriate Makers
 func (c *cluster) Bootstrap(task concurrency.Task) error {
+	if c.IsNull() {
+		return scerr.InvalidInstanceError()
+	}
+
 	c.Lock(task)
 	defer c.Unlock(task)
 
@@ -895,7 +914,7 @@ func (c *cluster) Bootstrap(task concurrency.Task) error {
 
 // Browse walks through cluster folder and executes a callback for each entry
 func (c *cluster) Browse(task concurrency.Task, callback func([]byte) error) error {
-	if c == nil {
+	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -910,7 +929,7 @@ func (c *cluster) Browse(task concurrency.Task, callback func([]byte) error) err
 
 // GetIdentity returns the identity of the cluster
 func (c *cluster) GetIdentity(task concurrency.Task) (identity abstract.ClusterIdentity, err error) {
-	if c == nil {
+	if c.IsNull() {
 		return abstract.ClusterIdentity{}, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -925,11 +944,8 @@ func (c *cluster) GetIdentity(task concurrency.Task) (identity abstract.ClusterI
 
 // SafeGetIdentity returns the identity of the cluster
 // Intended to be used when c, task are notiously not nil (because previously checked)
-func (c *cluster) SafeGetIdentity(task concurrency.Task) (identity abstract.ClusterIdentity) {
-	identity = abstract.ClusterIdentity{}
-	if c != nil && task != nil {
-		identity, _ = c.GetIdentity(task)
-	}
+func (c *cluster) SafeGetIdentity(task concurrency.Task) abstract.ClusterIdentity {
+	identity, _ := c.GetIdentity(task)
 	return identity
 }
 
@@ -937,7 +953,7 @@ func (c *cluster) SafeGetIdentity(task concurrency.Task) (identity abstract.Clus
 //
 // satisfies interface cluster.Controller
 func (c *cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, err error) {
-	if c == nil {
+	if c.IsNull() {
 		return 0, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -958,17 +974,14 @@ func (c *cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, e
 // Intended to be used when c, task are notoriously not nil (because previously checked)
 // satisfies interface cluster.Controller
 func (c *cluster) SafeGetFlavor(task concurrency.Task) (flavor clusterflavor.Enum) {
-	flavor = 0
-	if c != nil && task != nil {
-		flavor, _ = c.GetFlavor(task)
-	}
+	flavor, _ = c.GetFlavor(task)
 	return flavor
 }
 
 // GetComplexity returns the complexity of the cluster
 // satisfies interface cluster.Controller
 func (c *cluster) GetComplexity(task concurrency.Task) (complexity clustercomplexity.Enum, err error) {
-	if c == nil {
+	if c.IsNull() {
 		return 0, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -989,17 +1002,14 @@ func (c *cluster) GetComplexity(task concurrency.Task) (complexity clustercomple
 // Intended to be used when c, task are notoriously not nim (because previously checked)
 // satisfies interface cluster.Controller
 func (c *cluster) SafeGetComplexity(task concurrency.Task) (complexity clustercomplexity.Enum) {
-	complexity = 0
-	if c != nil && task != nil {
-		complexity, _ = c.GetComplexity(task)
-	}
+	complexity, _ = c.GetComplexity(task)
 	return complexity
 }
 
 // GetAdminPassword returns the password of the cluster admin account
 // satisfies interface cluster.Controller
 func (c *cluster) GetAdminPassword(task concurrency.Task) (adminPassword string, err error) {
-	if c == nil {
+	if c.IsNull() {
 		return "", scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1019,26 +1029,20 @@ func (c *cluster) GetAdminPassword(task concurrency.Task) (adminPassword string,
 // Intended to be used when c, task are notoriously not nil
 // satisfies interface resources.Cluster
 func (c *cluster) SafeGetAdminPassword(task concurrency.Task) (adminPassword string) {
-	adminPassword = ""
-	if c != nil && task != nil {
-		adminPassword, _ = c.GetAdminPassword(task)
-	}
+	adminPassword, _ = c.GetAdminPassword(task)
 	return adminPassword
 }
 
 // GetKeyPair returns the key pair used in the cluster
 // satisfies interface cluster.Controller
 func (c *cluster) GetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair, err error) {
-	if c == nil {
+	keyPair = abstract.KeyPair{}
+	if c.IsNull() {
 		return keyPair, scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return keyPair, scerr.InvalidParameterError("task", "cannot be nil")
 	}
-
-	tracer := concurrency.NewTracer(nil, false, "").Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.RLock(task)
 	defer c.RUnlock(task)
@@ -1049,22 +1053,20 @@ func (c *cluster) GetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair, e
 // GetKeyPair returns the key pair used in the cluster
 // Intended to be used when c, task are notoriously not nil (because previously checked)
 // satisfies interface cluster.Controller
-func (c *cluster) SafeGetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair) {
-	keyPair = abstract.KeyPair{}
-	if c != nil && task != nil {
-		keyPair, _ = c.GetKeyPair(task)
-	}
+func (c *cluster) SafeGetKeyPair(task concurrency.Task) abstract.KeyPair {
+	keyPair, _ := c.GetKeyPair(task)
 	return keyPair
 }
 
 // GetNetworkConfig returns network configuration of the cluster
 // satisfies interface cluster.Controller
 func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.ClusterNetwork, err error) {
-	if c == nil {
-		return nil, scerr.InvalidInstanceError()
+	config = &propertiesv2.ClusterNetwork{}
+	if c.IsNull() {
+		return config, scerr.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return config, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(task, false, "").Entering()
@@ -1107,31 +1109,23 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 			return nil
 		})
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return config, nil
+	return config, err
 }
 
 // SafeGetNetworkConfig returns network configuration of the cluster
 // Intended to be used when c, task are notoriously not nil (because previously checked)
 // satisfies interface resources.Cluster
 func (c *cluster) SafeGetNetworkConfig(task concurrency.Task) (config *propertiesv2.ClusterNetwork) {
-	config = &propertiesv2.ClusterNetwork{}
-	if c != nil && task != nil {
-		config, _ = c.GetNetworkConfig(task)
-	}
+	config, _ = c.GetNetworkConfig(task)
 	return config
 }
 
 // Start starts the cluster
 // satisfies interface cluster.cluster.Controller
 func (c *cluster) Start(task concurrency.Task) (err error) {
-	if c == nil {
+	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
-	defer scerr.OnPanic(&err)()
 
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -1140,6 +1134,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 	tracer := concurrency.NewTracer(nil, false, "").Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	// If the cluster is in state Stopping or Stopped, do nothing
 	var prevState clusterstate.Enum
@@ -2894,6 +2889,8 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 		}
 	}
 
+	clusterFlavor := c.SafeGetFlavor(task)
+
 	// Unjoins from cluster are done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
@@ -2913,15 +2910,18 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 			}
 		}
 
-		err = c.leaveNodeFromSwarm(task, host, selectedMaster)
-		if err != nil {
-			return err
+		if clusterFlavor != clusterflavor.K8S {
+			err = c.leaveNodeFromSwarm(task, host, selectedMaster)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
+// leaveNodeFromSwarm unregisters properly a node from docker Swarm
 func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster resources.Host) error {
 	if selectedMaster == nil {
 		var err error

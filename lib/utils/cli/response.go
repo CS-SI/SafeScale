@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	urfcli "github.com/urfave/cli"
+	urfcli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/cmdstatus"
 )
