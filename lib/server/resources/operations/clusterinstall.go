@@ -205,6 +205,11 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	return nil
 }
 
+// ListInstalledFeatures returns a slice of installed features
+func (c *cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, error) {
+	return nil, scerr.NotImplementedError("ListInstalledFeatures() is not implemented yet")
+}
+
 // AddFeature installs a feature on the cluster
 func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, error) {
 	if c == nil {

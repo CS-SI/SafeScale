@@ -32,6 +32,7 @@ type IndexedListOfClusterNodes map[uint]Host
 type Cluster interface {
 	Metadata
 	Targetable
+	data.NullValue
 
 	Create(task concurrency.Task, req abstract.ClusterRequest) error // Create creates a new cluster and save its metadata
 	GetIdentity(task concurrency.Task) (abstract.ClusterIdentity, error)
@@ -68,4 +69,5 @@ type Cluster interface {
 	CheckFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, error)     // checks feature on cluster
 	AddFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, error)       // adds feature on cluster
 	RemoveFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, error)    // removes feature from cluster
+	ListInstalledFeatures(task concurrency.Task) ([]Feature, error)                                                // returns the list of installed features
 }

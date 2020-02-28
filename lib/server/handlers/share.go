@@ -43,7 +43,7 @@ import (
 
 // ShareHandler defines API to manipulate Shares
 type ShareHandler interface {
-	Create(string, string, string, []string, bool, bool, bool, bool, bool, bool, bool) (resources.Share, error)
+	Create(string, string, string, string /*[]string, bool, bool, bool, bool, bool, bool, bool*/) (resources.Share, error)
 	Inspect(string) (resources.Share, error)
 	Delete(string) error
 	List() (map[string]map[string]*propertiesv1.HostShare, error)
@@ -71,8 +71,8 @@ func sanitize(in string) (string, error) {
 
 // Create a share on host
 func (handler *shareHandler) Create(
-	shareName, hostName, path string, securityModes []string,
-	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
+	shareName, hostName, path string, options string, /*securityModes []string,
+	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (share resources.Share, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -104,7 +104,7 @@ func (handler *shareHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	return objs, objs.Create(task, shareName, objh, path, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
+	return objs, objs.Create(task, shareName, objh, path, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 }
 
 // Delete a share from host
@@ -327,7 +327,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, err
 	}
 
-	sshConfig, err := target.SSHConfig(task)
+	sshConfig, err := target.GetSSHConfig(task)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 
 	defer func() {
 		if err != nil {
-			sshConfig, derr := target.SSHConfig(task)
+			sshConfig, derr := target.GetSSHConfig(task)
 			if derr != nil {
 				logrus.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
@@ -524,7 +524,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 			}
 
 			// Unmount share from client
-			sshConfig, inErr := target.SSHConfig(task)
+			sshConfig, inErr := target.GetSSHConfig(task)
 			if inErr != nil {
 				return inErr
 			}

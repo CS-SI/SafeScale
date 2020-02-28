@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -50,7 +49,7 @@ var VolumeHandler = handlers.NewVolumeHandler
 type VolumeListener struct{}
 
 // List the available volumes
-func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeList, err error) {
+func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list volumes").ToGRPCStatus()
@@ -92,16 +91,16 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	}
 
 	// Map resources.Volume to protocol.Volume
-	var pbvolumes []*protocol.Volume
+	var pbvolumes []*protocol.VolumeInspectResponse
 	for _, volume := range volumes {
 		pbvolumes = append(pbvolumes, converters.VolumeFromAbstractToProtocol(&volume))
 	}
-	rv := &protocol.VolumeList{Volumes: pbvolumes}
+	rv := &protocol.VolumeListResponse{Volumes: pbvolumes}
 	return rv, nil
 }
 
 // Create a new volume
-func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefinition) (_ *protocol.Volume, err error) {
+func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRequest) (_ *protocol.VolumeInspectResponse, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot create volume").ToGRPCStatus()
@@ -134,7 +133,8 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefiniti
 	name := in.GetName()
 	speed := in.GetSpeed()
 	size := in.GetSize()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -145,11 +145,11 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeDefiniti
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return converters.VolumeFromAbstractToProtocol(vol), nil
+	return vol.ToProtocol(task)
 }
 
 // Attach a volume to an host and create a mount point
-func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachment) (_ *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot attach volume").ToGRPCStatus()
@@ -214,7 +214,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 }
 
 // Detach a volume from an host. It umount associated mountpoint
-func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachment) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot detach volume").ToGRPCStatus()
@@ -320,7 +320,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 }
 
 // Inspect a volume
-func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInfo, err error) {
+func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInspectResponse, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot inspect volume").ToGRPCStatus()
@@ -355,19 +355,16 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := VolumeHandler(job)
-	volume, mounts, err := handler.Inspect(ref)
+	volume, err := handler.Inspect(ref)
 	if err != nil {
 		return nil, err
 	}
-	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	if volume == nil {
-		return nil, scerr.NotFoundError(fmt.Sprintf("volume '%s' not found", ref))
-	}
 
-	return converters.VolumeInfoFromAbstractToProtocol(volume, mounts), nil
+	return converters.VolumeInfoFromResourceToProtocol(task, volume)
 }

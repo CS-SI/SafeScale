@@ -135,6 +135,7 @@ message NetworkDefinition{
     bool fail_over = 5;
 }
 
+// Deprecated: replaced by string representation of host sizing
 message GatewayDefinition{
     int32 cpu = 1;  // Deprecated: replaced by sizing field
     float ram = 2;  // Deprecated: replaced by sizing field
@@ -143,7 +144,8 @@ message GatewayDefinition{
     string name = 6;
     int32 gpu_count = 7;    // Deprecated: replaced by sizing field
     string gpu_type = 8;    // Deprecated: replaced by sizing field
-    HostSizing sizing = 9;
+    HostSizing sizing = 9;  // Deprecated: replaced by sizing_as_string field
+    string sizing_as_string = 10;
 }
 
 message Network{
@@ -198,7 +200,8 @@ message HostDefinition{
     int32 gpu_count = 11;   // Deprecated: replaced by sizing field
     float cpu_freq = 12;    // Deprecated: replaced by sizing field
     bool force = 13;
-    HostSizing sizing = 14;
+    HostSizing sizing = 14; // Deprecated: replace by sizing_as_string field
+    string sizing_as_string = 15;
 }
 
 enum NetworkState {
@@ -255,6 +258,7 @@ message SshConfig{
     string private_key = 3;
     int32 port = 4;
     SshConfig gateway = 5;
+    SshConfig secondary_gateway = 6;
 }
 
 message HostListRequest{
@@ -303,50 +307,43 @@ service TemplateService{
 // safescale volume inspect v1
 // safescale volume update v1 --speed="HDD" --size=1000
 
-enum VolumeSpeed{
+enum VolumeSpeed {
     VS_COLD = 0;
     VS_HDD = 1;
     VS_SSD = 2;
 }
 
-message VolumeDefinition{
+message VolumeCreateRequest {
     string name = 2;
     VolumeSpeed speed = 3;
     int32 size = 4;
 }
 
-message Volume{
+message VolumeCreateResponse {
     string id = 1;
     string name = 2;
     VolumeSpeed speed = 3;
     int32 size = 4;
 }
-//message VolumeInfo{
-//    Volume volume = 1;
-//    VolumeAttachment attachment = 2;
-//
-//}
 
-message VolumeInfo{
+message VolumeDetachmentRequest {
+    Reference volume = 1;
+    Reference host = 2;
+}
+
+message VolumeInspectResponse {
     string id = 1;
     string name = 2;
     VolumeSpeed speed = 3;
     int32 size = 4;
-    Reference host = 5;
-    string mount_path = 6;
-    string format = 7;
-    string device = 8;
+    Reference host = 5; // Deprecated: replaced by attachment field
+    string mount_path = 6; // Deprecated: replaced by attachment field
+    string format = 7; // Deprecated: replaced by attachment field
+    string device = 8; // Deprecated: replaced by attachment field
+    repeated VolumeAttachment attachments = 10;
 }
 
-message VolumeListRequest{
-    bool all = 1;
-}
-
-message VolumeList{
-    repeated Volume volumes = 1;
-}
-
-message VolumeAttachment{
+message VolumeAttachmentRequest {
     Reference volume = 2;
     Reference host = 3;
     string mount_path = 4;
@@ -355,18 +352,30 @@ message VolumeAttachment{
     bool do_not_format = 7;
 }
 
-message VolumeDetachment{
-    Reference volume = 1;
-    Reference host = 2;
+message VolumeAttachment {
+    Reference host = 1;
+    string mount_path = 2;
+    string format = 3;
+    string device = 4;
+    bool do_not_format = 5;
 }
 
+message VolumeListRequest{
+    bool all = 1;
+}
+
+message VolumeListResponse {
+    repeated VolumeInspectResponse volumes = 1;
+}
+
+
 service VolumeService{
-    rpc Create(VolumeDefinition) returns (Volume) {}
-    rpc Attach(VolumeAttachment) returns (google.protobuf.Empty) {}
-    rpc Detach(VolumeDetachment) returns (google.protobuf.Empty){}
+    rpc Create(VolumeCreateRequest) returns (VolumeCreateResponse) {}
+    rpc Attach(VolumeAttachmentRequest) returns (google.protobuf.Empty) {}
+    rpc Detach(VolumeDetachmentRequest) returns (google.protobuf.Empty){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
-    rpc List(VolumeListRequest) returns (VolumeList) {}
-    rpc Inspect(Reference) returns (VolumeInfo){}
+    rpc List(VolumeListRequest) returns (VolumeListResponse) {}
+    rpc Inspect(Reference) returns (VolumeInspectResponse){}
 }
 
 // safescale bucket|container create c1
@@ -431,7 +440,7 @@ service SshService{
 // safescale nas|share list
 // safescale nas|share inspect share1
 
-message ExportOptions{
+message NFSExportOptions{
     bool read_only = 1;
     bool root_squash = 2;
     bool secure = 3;
@@ -447,8 +456,9 @@ message ShareDefinition{
     Reference host = 3;
     string path = 4;
     string type = 5;
-    ExportOptions options = 6;
+    NFSExportOptions options = 6;  // Deprecated: replaced by field options_as_string to be Network FileSystem agnostic
     repeated string security_modes = 7;
+    string options_as_string = 8;
 }
 
 message ShareList{
@@ -632,18 +642,28 @@ message FeatureListResponse {
 enum FeatureAction {
     FA_CHECK = 0;
     FA_ADD = 1;
-    FA_DELETE = 2;
+    FA_REMOVE = 2;
+}
+
+message FeatureSettings {
+    bool skip_proxy = 1;
+    bool serialize = 2;
+    bool ignore_feature_requirements = 3;
+    bool ignore_sizing_requirements = 4;
+    bool add_unconditionally = 5;
 }
 
 message FeatureActionRequest {
     FeatureAction action = 1;
     FeatureTargetType target_type = 2;
     Reference target_ref = 3;
+    map<string, string> variables = 4;
+    FeatureSettings settings = 5;
 }
 
 service FeatureService {
     rpc List(FeatureListRequest) returns (FeatureListResponse){}
     rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
     rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
-    rpc Delete(FeatureActionRequest) returns (google.protobuf.Empty){}
+    rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}
 }

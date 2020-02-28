@@ -426,12 +426,12 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			_, nerr := ssh.WaitServerReady(job.Task(), "ready", time.Duration(6+concurrency-1)*time.Minute)
+			_, nerr := ssh.WaitServerReady(job.SafeGetTask(), "ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
 				logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
 			}
-			c, err := ssh.Command(job.Task(), cmd)
+			c, err := ssh.Command(job.SafeGetTask(), cmd)
 			if err != nil {
 				logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err

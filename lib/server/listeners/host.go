@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	"github.com/asaskevich/govalidator"
@@ -36,6 +35,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -99,7 +99,7 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -149,7 +149,7 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -196,7 +196,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -239,7 +239,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	defer job.Close()
 
 	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("(%v)", all), true).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
@@ -252,7 +252,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	// build response mapping abstract.Host to protocol.Host
 	var pbhost []*protocol.Host
 	for _, host := range hosts {
-		pbhost = append(pbhost, converters.HostFromAbstractsToProtocol(host))
+		pbhost = append(pbhost, converters.HostFullFromAbstractToProtocol(host))
 	}
 	rv := &protocol.HostList{Hosts: pbhost}
 	return rv, nil
@@ -289,8 +289,9 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	defer job.Close()
 
-	name := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().Entering()
+	name := in.GetName()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -306,11 +307,11 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 			MinCPUFreq:  in.GetCpuFreq(),
 		}
 	} else {
-		s := converters.HostSizingRequirementsFromProtocolToAbstracts(*in.Sizing)
+		s := converters.HostSizingRequirementsFromProtocolToAbstract(*in.Sizing)
 		sizing = &s
 	}
 
-	network, err := networkfactory.Load(job.Task(), job.Service(), in.GetNetwork())
+	network, err := networkfactory.Load(task, job.SafeGetService(), in.GetNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +321,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		ImageID:      in.GetImageId(),
 		PublicIP:     in.GetPublic(),
 	}
-	err = network.Inspect(job.Task(), func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 		networkCore, ok := clonable.(*abstract.Network)
 		if !ok {
 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -335,7 +336,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, err
 	}
 	logrus.Infof("Host '%s' created", name)
-	return converters.HostFromAbstractsToProtocol(host), nil
+	return host.ToProtocol(task)
 }
 
 // Resize an host
@@ -369,25 +370,28 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	defer job.Close()
 
-	name := in.Name()
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", name), true).WithStopwatch().Entering()
+	name := in.GetName()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := handlers.NewHostHandler(job)
 	host, err := handler.Resize(
 		name,
-		int(in.GetCpuCount()),
-		in.GetRam(),
-		int(in.GetDisk()),
-		int(in.GetGpuCount()),
-		float32(in.GetCpuFreq()),
+		abstract.HostSizingRequirements{
+			MinCores:    int(in.GetCpuCount()),
+			MinRAMSize:  in.GetRam(),
+			MinDiskSize: int(in.GetDisk()),
+			MinGPU:      int(in.GetGpuCount()),
+			MinCPUFreq:  in.GetCpuFreq(),
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
 	tracer.Trace("Host '%s' successfully resized", name)
-	return converters.HostFromAbstractsTProtocol(host), nil
+	return host.ToProtocol(task)
 }
 
 // Status returns the status of a host (running or stopped mainly)
@@ -426,20 +430,17 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := handlers.NewHostHandler(job)
-	host, err := handler.ForceInspect(ref)
+	host, err := handler.Inspect(ref)
 	if err != nil {
 		return nil, err
 	}
-	state, err := host.State(job.Task)
-	if err != nil {
-		return nil, err
-	}
-	return converters.HostStatusFromAbstractsToProtocol(state), nil
+	return converters.HostStatusFromAbstractToProtocol(host.SafeGetName(), host.SafeGetState(task)), nil
 }
 
 // Inspect an host
@@ -478,16 +479,17 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	handler := handlers.NewHostHandler(job)
-	host, err := handler.ForceInspect(ref)
+	host, err := handler.Inspect(ref)
 	if err != nil {
 		return nil, err
 	}
-	return srvutils.ToProtocolHost(host), nil
+	return host.ToProtocol(task)
 }
 
 // Delete an host
@@ -527,7 +529,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -576,7 +578,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.Task(), fmt.Sprintf("('%s')", ref), true).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -587,5 +589,5 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 
 	tracer.Trace("SSH config of host '%s' successfully loaded", ref)
-	return srvutils.ToProtocolSSHConfig(sshConfig), nil
+	return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
 }

@@ -23,18 +23,19 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 )
 
-// ShareFromPropertyToProtocol convert a share from model to protocolbuffer format
+// ShareFromPropertyToProtocol convert a share from host to protocol message
 func ShareFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare) *protocol.ShareDefinition {
 	return &protocol.ShareDefinition{
-		Id:   share.ID,
-		Name: share.Name,
-		Host: &protocol.Reference{Name: hostName},
-		Path: share.Path,
-		Type: "nfs",
+		Id:              share.ID,
+		Name:            share.Name,
+		Host:            &protocol.Reference{Name: hostName},
+		Path:            share.Path,
+		Type:            "nfs",
+		OptionsAsString: share.ShareOptions,
 	}
 }
 
-// ToProtocolShareMount convert share mount on host to protocolbuffer format
+// ToProtocolShareMount convert share mount on host to protocol message
 func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *propertiesv1.HostRemoteMount) *protocol.ShareMountDefinition {
 	return &protocol.ShareMountDefinition{
 		Share: &protocol.Reference{Name: shareName},
@@ -44,7 +45,7 @@ func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *
 	}
 }
 
-// ToProtocolShareMountList converts share mounts to protocol buffer
+// ToProtocolShareMountList converts share mounts from host to protocol message
 func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare, mounts map[string]*propertiesv1.HostRemoteMount) *protocol.ShareMountList {
 	var pbMounts []*protocol.ShareMountDefinition
 	for k, v := range mounts {

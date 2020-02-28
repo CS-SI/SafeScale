@@ -25,7 +25,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -41,10 +41,10 @@ import (
 var sshCmdName = "ssh"
 
 // SSHCmd ssh command
-var SSHCmd = cli.Command{
+var SSHCmd = &cli.Command{
 	Name:  "ssh",
 	Usage: "ssh COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		sshRun,
 		sshCopy,
 		sshConnect,
@@ -53,16 +53,16 @@ var SSHCmd = cli.Command{
 	},
 }
 
-var sshRun = cli.Command{
+var sshRun = &cli.Command{
 	Name:      "run",
 	Usage:     "Run a command on the host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "c",
 			Usage: "Command to execute",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "timeout",
 			Value: "5",
 			Usage: "timeout in minutes",
@@ -105,12 +105,12 @@ func normalizeFileName(fileName string) string {
 	return absPath
 }
 
-var sshCopy = cli.Command{
+var sshCopy = &cli.Command{
 	Name:      "copy",
 	Usage:     "Copy a local file/directory to an host or copy from host to local",
 	ArgsUsage: "from to  Ex: /my/local/file.txt host1:/remote/path/",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "timeout",
 			Value: "5",
 			Usage: "timeout in minutes",
@@ -145,17 +145,17 @@ var sshCopy = cli.Command{
 	},
 }
 
-var sshConnect = cli.Command{
+var sshConnect = &cli.Command{
 	Name:      "connect",
 	Usage:     "Connect to the host with interactive shell",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "u,username",
 			Value: "",
 			Usage: "Username to connect to",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "s,shell",
 			Value: "bash",
 			Usage: "Shell to use (default: bash)",
@@ -185,22 +185,22 @@ var sshConnect = cli.Command{
 	},
 }
 
-var sshTunnel = cli.Command{
+var sshTunnel = &cli.Command{
 	Name:      "tunnel",
 	Usage:     "Create a ssh tunnel between admin host and a host in the cloud",
 	ArgsUsage: "<Host_name|Host_ID --local local_port  --remote remote_port>",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "local",
 			Value: 8080,
 			Usage: "local tunnel's port, if not set all",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "remote",
 			Value: 8080,
 			Usage: "remote tunnel's port, if not set all",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "timeout",
 			Value: "1",
 			Usage: "timeout in minutes",
@@ -235,22 +235,22 @@ var sshTunnel = cli.Command{
 	},
 }
 
-var sshClose = cli.Command{
+var sshClose = &cli.Command{
 	Name:      "close",
 	Usage:     "Close one or several ssh tunnel",
 	ArgsUsage: "<Host_name|Host_ID> --local local_port --remote remote_port",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "local",
 			Value: ".*",
 			Usage: "local tunnel's port, if not set all",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "remote",
 			Value: ".*",
 			Usage: "remote tunnel's port, if not set all",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "timeout",
 			Value: "1",
 			Usage: "timeout in minutes",

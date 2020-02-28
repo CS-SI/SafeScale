@@ -18,6 +18,7 @@
 package resources
 
 import (
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -41,4 +42,5 @@ type Network interface {
 	SafeGetDefaultRouteIP(task concurrency.Task) string                                                                        // returns the IP of the default route of the network
 	SafeGetEndpointIP(task concurrency.Task) string                                                                            // returns the IP address corresponding to the default route
 	HasVirtualIP(task concurrency.Task) bool                                                                                   // tells if the network is using a VIP a default route
+	ToProtocol(task concurrency.Task) (*protocol.Network, error)
 }

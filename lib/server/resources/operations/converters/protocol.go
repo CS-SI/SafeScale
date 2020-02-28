@@ -19,7 +19,11 @@ package converters
 // Contains functions that are used to convert from Protocol
 
 import (
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/system"
 )
 
@@ -50,4 +54,59 @@ func FromProtocolHostDefinitionToProtocolGatewayDefinition(in protocol.HostDefin
 	}
 	*def.Sizing = *in.Sizing
 	return def
+}
+
+func FeatureSettingsFromProtocolToResource(in protocol.FeatureSettings) resources.FeatureSettings {
+	return resources.FeatureSettings{
+		SkipProxy:               in.SkipProxy,
+		Serialize:               in.Serialize,
+		SkipFeatureRequirements: in.IgnoreFeatureRequirements,
+		SkipSizingRequirements:  in.IgnoreSizingRequirements,
+		AddUnconditionally:      in.AddUnconditionally,
+	}
+}
+
+func HostSizingRequirementsFromProtocolToAbstract(in protocol.HostSizing) abstract.HostSizingRequirements {
+	return abstract.HostSizingRequirements{
+		MinCores:    int(in.MinCpuCount),
+		MaxCores:    int(in.MaxCpuCount),
+		MinRAMSize:  in.MinRamSize,
+		MaxRAMSize:  in.MaxRamSize,
+		MinDiskSize: int(in.MinDiskSize),
+		MinGPU:      int(in.GpuCount),
+		MinCPUFreq:  in.MinCpuFreq,
+	}
+}
+
+func NFSExportOptionsFromProtocolToString(in protocol.NFSExportOptions) string {
+	var out string
+	if in.ReadOnly {
+		out += "ro,"
+	} else {
+		out += "rw,"
+	}
+	if !in.RootSquash {
+		out += "no_root_squash,"
+	}
+	if in.Secure {
+		out += "secure,"
+	} else {
+		out += "insecure,"
+	}
+	if in.Async {
+		out = "async,"
+	} else {
+		out = "sync,"
+	}
+	if in.NoHide {
+		out += "nohide,"
+	}
+	if in.CrossMount {
+		out += "crossmnt,"
+	}
+	if !in.SubtreeCheck {
+		out += "no_subtree_check,"
+	}
+	out = strings.TrimRight(out, ",")
+	return out
 }

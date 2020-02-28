@@ -18,7 +18,7 @@ package commands
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -31,10 +31,10 @@ import (
 var bucketCmdName = "bucket"
 
 // BucketCmd bucket command
-var BucketCmd = cli.Command{
+var BucketCmd = &cli.Command{
 	Name:  "bucket",
 	Usage: "bucket COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		bucketList,
 		bucketCreate,
 		bucketDelete,
@@ -44,7 +44,7 @@ var BucketCmd = cli.Command{
 	},
 }
 
-var bucketList = cli.Command{
+var bucketList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List buckets",
@@ -59,7 +59,7 @@ var bucketList = cli.Command{
 	},
 }
 
-var bucketCreate = cli.Command{
+var bucketCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Creates a bucket",
@@ -80,7 +80,7 @@ var bucketCreate = cli.Command{
 	},
 }
 
-var bucketDelete = cli.Command{
+var bucketDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Delete a bucket",
@@ -105,7 +105,7 @@ var bucketDelete = cli.Command{
 	},
 }
 
-var bucketInspect = cli.Command{
+var bucketInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "detail"},
 	Usage:     "Inspect a bucket",
@@ -126,12 +126,12 @@ var bucketInspect = cli.Command{
 	},
 }
 
-var bucketMount = cli.Command{
+var bucketMount = &cli.Command{
 	Name:      "mount",
 	Usage:     "Mount a bucket on the filesystem of an host",
 	ArgsUsage: "<Bucket_name> <Host_name>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
 			Value: abstract.DefaultBucketMountPoint,
 			Usage: "Mount point of the bucket",
@@ -153,7 +153,7 @@ var bucketMount = cli.Command{
 	},
 }
 
-var bucketUnmount = cli.Command{
+var bucketUnmount = &cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a bucket from the filesystem of an host",

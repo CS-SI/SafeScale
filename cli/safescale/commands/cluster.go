@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -40,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -55,12 +54,12 @@ var (
 var clusterCommandName = "cluster"
 
 // ClusterCommand command
-var ClusterCommand = cli.Command{
+var ClusterCommand = &cli.Command{
 	Name:      "cluster",
 	Aliases:   []string{"datacenter", "dc", "platform"},
 	Usage:     "create and manage cluster",
 	ArgsUsage: "COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		clusterNodeCommand,
 		clusterMasterCommand,
 		clusterListCommand,
@@ -79,7 +78,7 @@ var ClusterCommand = cli.Command{
 		clusterListFeaturesCommand,
 		clusterCheckFeatureCommand,
 		clusterAddFeatureCommand,
-		clusterDeleteFeatureCommand,
+		clusterRemoveFeatureCommand,
 	},
 }
 
@@ -100,7 +99,7 @@ func extractClusterArgument(c *cli.Context) error {
 }
 
 // clusterListCommand handles 'deploy cluster list'
-var clusterListCommand = cli.Command{
+var clusterListCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available clusters",
@@ -147,7 +146,7 @@ func formatClusterConfig(value interface{}, detailed bool) map[string]interface{
 }
 
 // clusterInspectCmd handles 'deploy cluster <clustername> inspect'
-var clusterInspectCommand = cli.Command{
+var clusterInspectCommand = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "get"},
 	Usage:     "inspect CLUSTERNAME",
@@ -295,41 +294,41 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, error) {
 }
 
 // clusterCreateCmd handles 'deploy cluster <clustername> create'
-var clusterCreateCommand = cli.Command{
+var clusterCreateCommand = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a cluster",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "complexity, C",
 			Value: "Small",
 			Usage: "Defines the sizing of the cluster: Small, Normal, Large",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "flavor, F",
 			Value: "K8S",
 			Usage: "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "keep-on-failure, k",
 			Usage: "If used, the resources are not deleted on failure (default: not set)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cidr, N",
 			Value: "192.168.0.0/16",
 			Usage: "Defines the CIDR of the network to use with cluster",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "disable",
 			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "os",
 			Usage: "Defines the operating system to use",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name: "sizing",
 			Usage: `Describe sizing for any type of host in format "<component><operator><value>[,...]" where:
 	<component> can be cpu, cpufreq, gpu, ram, disk
@@ -353,27 +352,27 @@ var clusterCreateCommand = cli.Command{
 	Can be used with --gw-sizing and friends to set a global host sizing and refine for a particular type of host.
 `,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "gw-sizing",
 			Usage: `Describe gateway sizing in format "<component><operator><value>[,...] (cf. --sizing for details)`,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "master-sizing",
 			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "cpu",
 			Usage: "DEPRECATED! uses --sizing and friends! Defines the number of cpu of masters and nodes in the cluster",
 		},
-		cli.Float64Flag{
+		&cli.Float64Flag{
 			Name:  "ram",
 			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "disk",
 			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of system disk of masters and nodes (in GB)",
 		},
@@ -415,25 +414,25 @@ var clusterCreateCommand = cli.Command{
 			nodesDef    string
 		)
 		if c.IsSet("sizing") {
-			globalDef, err = constructPBHostDefinitionFromCLI(c, "sizing")
+			globalDef, err = constructHostDefinitionStringFromCLI(c, "sizing")
 			if err != nil {
 				return err
 			}
 		}
 		if c.IsSet("gw-sizing") {
-			gatewaysDef, err = constructPBHostDefinitionFromCLI(c, "gw-sizing")
+			gatewaysDef, err = constructHostDefinitionStringFromCLI(c, "gw-sizing")
 			if err != nil {
 				return err
 			}
 		}
 		if c.IsSet("master-sizing") {
-			mastersDef, err = constructPBHostDefinitionFromCLI(c, "master-sizing")
+			mastersDef, err = constructHostDefinitionStringFromCLI(c, "master-sizing")
 			if err != nil {
 				return err
 			}
 		}
 		if c.IsSet("node-sizing") {
-			nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+			nodesDef, err = constructHostDefinitionStringFromCLI(c, "node-sizing")
 			if err != nil {
 				return err
 			}
@@ -464,7 +463,7 @@ var clusterCreateCommand = cli.Command{
 		// 	}
 		// }
 
-		req := &protocol.ClusterCreateRequest{
+		req := protocol.ClusterCreateRequest{
 			Name:          clusterName,
 			Complexity:    protocol.ClusterComplexity(comp),
 			Flavor:        protocol.ClusterFlavor(fla),
@@ -515,17 +514,17 @@ var clusterCreateCommand = cli.Command{
 }
 
 // clusterDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterDeleteCommand = cli.Command{
+var clusterDeleteCommand = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"destroy", "remove", "rm"},
 	Usage:     "delete CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name: "assume-yes, yes, y",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name: "force, f",
 		},
 	},
@@ -556,7 +555,7 @@ var clusterDeleteCommand = cli.Command{
 }
 
 // clusterStopCmd handles 'deploy cluster <clustername> stop'
-var clusterStopCommand = cli.Command{
+var clusterStopCommand = &cli.Command{
 	Name:      "stop",
 	Aliases:   []string{"freeze", "halt"},
 	Usage:     "stop CLUSTERNAME",
@@ -578,7 +577,7 @@ var clusterStopCommand = cli.Command{
 	},
 }
 
-var clusterStartCommand = cli.Command{
+var clusterStartCommand = &cli.Command{
 	Name:      "start",
 	Aliases:   []string{"unfreeze"},
 	Usage:     "start CLUSTERNAME",
@@ -601,7 +600,7 @@ var clusterStartCommand = cli.Command{
 }
 
 // clusterStateCmd handles 'deploy cluster <clustername> state'
-var clusterStateCommand = cli.Command{
+var clusterStateCommand = &cli.Command{
 	Name:      "state",
 	Usage:     "state CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
@@ -621,49 +620,49 @@ var clusterStateCommand = cli.Command{
 		}
 		return clitools.SuccessResponse(map[string]interface{}{
 			"Name":       clusterName,
-			"State":      state,
-			"StateLabel": state.(clusterstate.Enum).String(),
+			"State":      state.State,
+			"StateLabel": clusterstate.Enum(state.State).String(),
 		})
 	},
 }
 
 // clusterExpandCmd handles 'deploy cluster <clustername> expand'
-var clusterExpandCommand = cli.Command{
+var clusterExpandCommand = &cli.Command{
 	Name:      "expand",
 	Usage:     "expand CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "count, n",
 			Usage: "Define the number of nodes wanted (default: 1)",
 			Value: 1,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "os",
 			Usage: "Define the Operating System wanted",
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "cpu",
 			Usage: "Define the number of cpu for new node(s); default: number used at cluster creation",
 			Value: 0,
 		},
-		cli.Float64Flag{
+		&cli.Float64Flag{
 			Name:  "ram",
 			Usage: "Define the size of RAM for new node(s) (in GB); default: size used at cluster creation",
 			Value: 0.0,
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "disk",
 			Usage: "Define the size of system disk for new node(s) (in GB); default: size used at cluster creation",
 			Value: 0,
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:   "gpu",
 			Usage:  "Ask for gpu capable host; default: no",
 			Hidden: true,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name: "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" where:
 	<component> can be cpu, cpufreq, gpu, ram, disk, os
@@ -688,7 +687,7 @@ var clusterExpandCommand = cli.Command{
 			nodesDef   string
 			nodesCount uint
 		)
-		nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+		nodesDef, err = constructHostDefinitionStringFromCLI(c, "node-sizing")
 		if err != nil {
 			return err
 		}
@@ -698,7 +697,7 @@ var clusterExpandCommand = cli.Command{
 
 		req := protocol.ClusterResizeRequest{
 			Name:       clusterName,
-			Action:     protocol.CRA_EXPAND,
+			Action:     protocol.ClusterResizeAction_CRA_EXPAND,
 			Count:      int32(count),
 			NodeSizing: nodesDef,
 			ImageId:    los,
@@ -713,18 +712,18 @@ var clusterExpandCommand = cli.Command{
 }
 
 // clusterShrinkCommand handles 'deploy cluster <clustername> shrink'
-var clusterShrinkCommand = cli.Command{
+var clusterShrinkCommand = &cli.Command{
 	Name:      "shrink",
 	Usage:     "shrink CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "count, n",
 			Usage: "Define the number of nodes to remove; default: 1",
 			Value: 1,
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "assume-yes, yes, y",
 			Usage: "Don't ask deletion confirmation",
 		},
@@ -765,7 +764,7 @@ var clusterShrinkCommand = cli.Command{
 
 		req := protocol.ClusterResizeRequest{
 			Name:   clusterName,
-			Action: protocol.CRA_SHRINK,
+			Action: protocol.ClusterResizeAction_CRA_SHRINK,
 			Count:  int32(count),
 		}
 		_, err = client.New().Cluster.Shrink(req, temporal.GetLongOperationTimeout())
@@ -777,7 +776,7 @@ var clusterShrinkCommand = cli.Command{
 	},
 }
 
-var clusterKubectlCommand = cli.Command{
+var clusterKubectlCommand = &cli.Command{
 	Name:      "kubectl",
 	Category:  "Administrative commands",
 	Usage:     "kubectl CLUSTERNAME [KUBECTL_COMMAND]... [-- [KUBECTL_OPTIONS]...]",
@@ -870,7 +869,7 @@ var clusterKubectlCommand = cli.Command{
 	},
 }
 
-var clusterHelmCommand = cli.Command{
+var clusterHelmCommand = &cli.Command{
 	Name:      "helm",
 	Category:  "Administrative commands",
 	Usage:     "helm CLUSTERNAME COMMAND [[--][PARAMS ...]]",
@@ -969,7 +968,7 @@ var clusterHelmCommand = cli.Command{
 	},
 }
 
-var clusterRunCommand = cli.Command{
+var clusterRunCommand = &cli.Command{
 	Name:      "run",
 	Aliases:   []string{"execute", "exec"},
 	Usage:     "run CLUSTERNAME COMMAND",
@@ -988,9 +987,10 @@ var clusterRunCommand = cli.Command{
 
 func executeCommand(task concurrency.Task, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
+	clusterName := clusterInstance.SafeGetName()
 	master, err := clusterInstance.FindAvailableMaster(task)
 	if err != nil {
-		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterInstance.Identity(concurrency.RootTask()).Name, err.Error()))
+		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 
@@ -1007,11 +1007,11 @@ func executeCommand(task concurrency.Task, command string, files *client.RemoteF
 	sshClient := client.New().SSH
 	retcode, stdout, stderr, err := sshClient.Run(task, master.SafeGetID(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
-		msg := fmt.Sprintf("failed to execute command on master '%s': %s", master.SafeGetID(), err.Error())
+		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.SafeGetID(), clusterName, err.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		msg := fmt.Sprintf("command executed on master '%s' with failure: %s", master.SafeGetID(), stdout)
+		msg := fmt.Sprintf("command executed on master '%s' of cluster '%s' with failure: %s", master.SafeGetID(), clusterName, stdout)
 		if stderr != "" {
 			if stdout != "" {
 				msg += "\n"
@@ -1023,15 +1023,15 @@ func executeCommand(task concurrency.Task, command string, files *client.RemoteF
 	return nil
 }
 
-// clusterCheckFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
-var clusterListFeaturesCommand = cli.Command{
+// clusterInstalledFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
+var clusterListFeaturesCommand = &cli.Command{
 	Name:      "list-features",
 	Aliases:   []string{"list-available-features"},
 	Usage:     "list-features",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "Allow to define content of feature parameters",
 		},
@@ -1039,7 +1039,11 @@ var clusterListFeaturesCommand = cli.Command{
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
-		features, err := clusterInstance.ListFeatures()
+		task, err := concurrency.RootTask()
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+		features, err := clusterInstance.ListInstalledFeatures(task)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
@@ -1049,18 +1053,18 @@ var clusterListFeaturesCommand = cli.Command{
 }
 
 // clusterAddFeatureCommand handles 'deploy cluster add-feature CLUSTERNAME FEATURENAME'
-var clusterAddFeatureCommand = cli.Command{
+var clusterAddFeatureCommand = &cli.Command{
 	Name:      "add-feature",
 	Aliases:   []string{"install-feature"},
 	Usage:     "add-feature CLUSTERNAME FEATURENAME",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "Allow to define content of feature parameters",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-proxy",
 			Usage: "Disables reverse proxy rules",
 		},
@@ -1077,7 +1081,7 @@ var clusterAddFeatureCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		values := data.Map{}
+		values := map[string]string{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")
@@ -1086,34 +1090,26 @@ var clusterAddFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := resources.InstallSettings{}
+		settings := protocol.FeatureSettings{}
 		settings.SkipProxy = c.Bool("skip-proxy")
-
-		results, err := clusterInstance.AddFeature(featureName, values, settings)
+		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, settings, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error installing feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
-		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("failed to install feature '%s' on cluster '%s'", featureName, clusterName)
-			if Debug || Verbose {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
-			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
 // clusterCheckFeatureCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
-var clusterCheckFeatureCommand = cli.Command{
+var clusterCheckFeatureCommand = &cli.Command{
 	Name:      "check-feature",
 	Aliases:   []string{"verify-feature"},
 	Usage:     "check-feature CLUSTERNAME FEATURENAME",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "Allow to define content of feature parameters",
 		},
@@ -1129,7 +1125,7 @@ var clusterCheckFeatureCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		values := data.Map{}
+		values := map[string]string{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")
@@ -1138,35 +1134,26 @@ var clusterCheckFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := resources.InstallSettings{}
-
-		results, err := clusterInstance.CheckFeature(concurrency.RootTask(), featureName, values, settings)
+		settings := protocol.FeatureSettings{}
+		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, settings, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error checking feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
-		}
-
-		if !results.Successful() {
-			msg := fmt.Sprintf("Feature '%s' not found on cluster '%s'", featureName, clusterName)
-			if Verbose || Debug {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
-			}
-			return clitools.FailureResponse(clitools.ExitOnNotFound(msg))
 		}
 		msg := fmt.Sprintf("Feature '%s' found on cluster '%s'", featureName, clusterName)
 		return clitools.SuccessResponse(msg)
 	},
 }
 
-// clusterFeatureDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
-var clusterDeleteFeatureCommand = cli.Command{
-	Name:      "delete-feature",
-	Aliases:   []string{"destroy-feature", "remove-feature", "rm-feature", "uninstall-feature"},
+// clusterRemoveFeatureCommand handles 'deploy host <host name or id> package <pkgname> delete'
+var clusterRemoveFeatureCommand = &cli.Command{
+	Name:      "remove-feature",
+	Aliases:   []string{"destroy-feature", "delete-feature", "rm-feature", "uninstall-feature"},
 	Usage:     "delete-feature CLUSTERNAME FEATURENAME",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "Allow to define content of feature parameters",
 		},
@@ -1182,7 +1169,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		values := data.Map{}
+		values := map[string]string{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")
@@ -1191,35 +1178,28 @@ var clusterDeleteFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := resources.InstallSettings{}
+		settings := protocol.FeatureSettings{}
 		// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
 		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 		settings.SkipProxy = true
 
-		results, err := clusterInstance.DeleteFeature(concurrency.RootTask(), featureName, values, settings)
+		err = client.New().Cluster.RemoveFeature(clusterName, featureName, values, settings, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error removing feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
-		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("failed to delete feature '%s' from cluster '%s'", featureName, clusterName)
-			if Verbose || Debug {
-				msg += fmt.Sprintf(":\n%s\n", results.AllErrorMessages())
-			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
 // clusterNodeCommand handles 'deploy cluster <name> node'
-var clusterNodeCommand = cli.Command{
+var clusterNodeCommand = &cli.Command{
 	Name:      "node",
 	Usage:     "manage cluster nodes",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		clusterNodeListCommand,
 		clusterNodeInspectCommand,
 		clusterNodeStartCommand,
@@ -1230,7 +1210,7 @@ var clusterNodeCommand = cli.Command{
 }
 
 // clusterNodeListCommand handles 'deploy cluster node list CLUSTERNAME'
-var clusterNodeListCommand = cli.Command{
+var clusterNodeListCommand = &cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "list CLUSTERNAME",
@@ -1245,7 +1225,11 @@ var clusterNodeListCommand = cli.Command{
 		hostClt := client.New().Host
 		var formatted []map[string]interface{}
 
-		list, err := clusterInstance.ListNodeIDs(concurrency.RootTask())
+		task, err := concurrency.RootTask()
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+		list, err := clusterInstance.ListNodeIDs(task)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1273,7 +1257,7 @@ var clusterNodeListCommand = cli.Command{
 // }
 
 // clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
-var clusterNodeInspectCommand = cli.Command{
+var clusterNodeInspectCommand = &cli.Command{
 	Name:      "inspect",
 	Usage:     "node inspect CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME is the name of the cluster\nHOSTNAME is the hostname of the host resource inside the cluster (ie. for a cluster called 'demo', hostname is 'node-1' and host resourcename is 'demo-node-1')",
@@ -1299,16 +1283,16 @@ var clusterNodeInspectCommand = cli.Command{
 }
 
 // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterNodeDeleteCommand = cli.Command{
+var clusterNodeDeleteCommand = &cli.Command{
 	Name:    "delete",
 	Aliases: []string{"destroy", "remove", "rm"},
 
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "yes, assume-yes, y",
 			Usage: "If set, respond automatically yes to all questions",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "force, f",
 			Usage: "If set, force node deletion no matter what (ie. metadata inconsistency)",
 		},
@@ -1335,7 +1319,11 @@ var clusterNodeDeleteCommand = cli.Command{
 			logrus.Println("'-f,--force' does nothing yet")
 		}
 
-		err = clusterInstance.Delete(concurrency.RootTask())
+		task, err := concurrency.RootTask()
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+		err = clusterInstance.Delete(task)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1345,7 +1333,7 @@ var clusterNodeDeleteCommand = cli.Command{
 }
 
 // clusterNodeStopCmd handles 'deploy cluster <clustername> node <nodename> stop'
-var clusterNodeStopCommand = cli.Command{
+var clusterNodeStopCommand = &cli.Command{
 	Name:    "stop",
 	Aliases: []string{"freeze"},
 	Usage:   "node stop CLUSTERNAME HOSTNAME",
@@ -1365,7 +1353,7 @@ var clusterNodeStopCommand = cli.Command{
 }
 
 // clusterNodeStartCmd handles 'deploy cluster <clustername> node <nodename> start'
-var clusterNodeStartCommand = cli.Command{
+var clusterNodeStartCommand = &cli.Command{
 	Name:    "start",
 	Aliases: []string{"unfreeze"},
 	Usage:   "node start CLUSTERNAME HOSTNAME",
@@ -1385,7 +1373,7 @@ var clusterNodeStartCommand = cli.Command{
 }
 
 // clusterNodeStateCmd handles 'deploy cluster <clustername> state'
-var clusterNodeStateCommand = cli.Command{
+var clusterNodeStateCommand = &cli.Command{
 	Name:  "state",
 	Usage: "node state CLUSTERNAME HOSTNAME",
 
@@ -1404,18 +1392,18 @@ var clusterNodeStateCommand = cli.Command{
 }
 
 // clusterMasterCommand handles 'safescale cluster master ...
-var clusterMasterCommand = cli.Command{
+var clusterMasterCommand = &cli.Command{
 	Name:      "master",
 	Usage:     "manage cluster masters",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		clusterMasterListCommand,
 	},
 }
 
 // clusterMasterListCommand handles 'safescale cluster master list CLUSTERNAME'
-var clusterMasterListCommand = cli.Command{
+var clusterMasterListCommand = &cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "list CLUSTERNAME",
@@ -1431,7 +1419,11 @@ var clusterMasterListCommand = cli.Command{
 		hostClt := client.New().Host
 		var formatted []map[string]interface{}
 
-		list, err := clusterInstance.ListMasterIDs(concurrency.RootTask())
+		task, err := concurrency.RootTask()
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+		list, err := clusterInstance.ListMasterIDs(task)
 		if err != nil {
 			return err
 		}

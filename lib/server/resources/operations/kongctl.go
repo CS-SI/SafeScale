@@ -26,7 +26,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	safescale "github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"

@@ -22,16 +22,13 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	featurefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/feature"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -40,10 +37,10 @@ import (
 var hostCmdName = "host"
 
 // HostCmd command
-var HostCmd = cli.Command{
+var HostCmd = &cli.Command{
 	Name:  hostCmdName,
 	Usage: "host COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		hostList,
 		hostCreate,
 		hostResize,
@@ -56,12 +53,12 @@ var HostCmd = cli.Command{
 		hostStop,
 		hostCheckFeatureCommand,
 		hostAddFeatureCommand,
-		hostDeleteFeatureCommand,
+		hostRemoveFeatureCommand,
 		hostListFeaturesCommand,
 	},
 }
 
-var hostStart = cli.Command{
+var hostStart = &cli.Command{
 	Name:      "start",
 	Usage:     "start Host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -81,7 +78,7 @@ var hostStart = cli.Command{
 	},
 }
 
-var hostStop = cli.Command{
+var hostStop = &cli.Command{
 	Name:      "stop",
 	Usage:     "stop Host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -101,7 +98,7 @@ var hostStop = cli.Command{
 	},
 }
 
-var hostReboot = cli.Command{
+var hostReboot = &cli.Command{
 	Name:      "reboot",
 	Usage:     "reboot Host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -122,12 +119,12 @@ var hostReboot = cli.Command{
 	},
 }
 
-var hostList = cli.Command{
+var hostList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available hosts (created by SafeScale)",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all hosts on tenant (not only those created by SafeScale)",
 		}},
@@ -153,7 +150,7 @@ var hostList = cli.Command{
 	},
 }
 
-var hostInspect = cli.Command{
+var hostInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "inspect Host",
@@ -173,7 +170,7 @@ var hostInspect = cli.Command{
 	},
 }
 
-var hostStatus = cli.Command{
+var hostStatus = &cli.Command{
 	Name:      "status",
 	Usage:     "status Host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -192,31 +189,31 @@ var hostStatus = cli.Command{
 	},
 }
 
-var hostCreate = cli.Command{
+var hostCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a new host",
 	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "net,network",
 			Value: "",
 			Usage: "network name or network id",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "os",
 			Value: "Ubuntu 18.04",
 			Usage: "Image name for the host",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "public",
 			Usage: "Create with public IP",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "f, force",
 			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name: "S, sizing",
 			Usage: `Describe sizing of host in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
@@ -239,25 +236,25 @@ var hostCreate = cli.Command{
 				--sizing "cpu <= 8, ram ~ 16"
 `,
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "cpu",
 			Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
 		},
-		cli.Float64Flag{
+		&cli.Float64Flag{
 			Name:  "cpu-freq, cpufreq",
 			Value: 0,
 			Usage: "DEPRECATED! uses --sizing! Minimum cpu frequency required for the host (GHz)",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "gpu",
 			Value: -1,
 			Usage: "DEPRECATED! uses --sizing! Number of GPU for the host (by default NO GPUs)",
 		},
-		cli.Float64Flag{
+		&cli.Float64Flag{
 			Name:  "ram",
 			Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
-		cli.UintFlag{
+		&cli.UintFlag{
 			Name:  "disk",
 			Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
 		},
@@ -279,11 +276,20 @@ var hostCreate = cli.Command{
 			}
 		}
 
-		def, _, err := constructPBHostDefinitionFromCLI(c, "sizing")
+		sizing, err := constructHostDefinitionStringFromCLI(c, "sizing")
 		if err != nil {
 			return err
 		}
-		resp, err := client.New().Host.Create(*def, temporal.GetExecutionTimeout())
+
+		req := protocol.HostDefinition{
+			Name:           c.Args().First(),
+			ImageId:        c.String("os"),
+			Network:        c.String("net"),
+			Public:         c.Bool("public"),
+			Force:          c.Bool("force"),
+			SizingAsString: sizing,
+		}
+		resp, err := client.New().Host.Create(req, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
@@ -292,33 +298,33 @@ var hostCreate = cli.Command{
 	},
 }
 
-var hostResize = cli.Command{
+var hostResize = &cli.Command{
 	Name:      "resize",
 	Aliases:   []string{"upgrade"},
 	Usage:     "resizes a host",
 	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "cpu",
 			Value: 1,
 			Usage: "Number of return CPU for the host",
 		},
-		cli.Float64Flag{
+		&cli.Float64Flag{
 			Name:  "ram",
 			Value: 1,
 			Usage: "RAM for the host (GB)",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "disk",
 			Value: 16,
 			Usage: "Disk space for the host (GB)",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "gpu",
 			Value: 0,
 			Usage: "Number of GPU for the host",
 		},
-		cli.Float64Flag{
+		&cli.Float64Flag{
 			Name:  "cpu-freq, cpufreq",
 			Value: 0,
 			Usage: "Minimum cpu frequency required for the host (GHz)",
@@ -353,7 +359,7 @@ var hostResize = cli.Command{
 	},
 }
 
-var hostDelete = cli.Command{
+var hostDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete host",
@@ -377,7 +383,7 @@ var hostDelete = cli.Command{
 	},
 }
 
-var hostSSH = cli.Command{
+var hostSSH = &cli.Command{
 	Name:      "ssh",
 	Usage:     "Get ssh config to connect to host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -396,19 +402,44 @@ var hostSSH = cli.Command{
 	},
 }
 
+// hostListFeaturesCommand handles 'safescale host list-features'
+var hostListFeaturesCommand = &cli.Command{
+	Name:      "list-features",
+	Aliases:   []string{"list-available-features"},
+	Usage:     "list-features",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:  "all, a",
+			Usage: "Lists all features available",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
+		features, err := client.New().Host.ListFeatures(c.Args().First(), c.Bool("all"))
+		if err != nil {
+			err = scerr.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+		return clitools.SuccessResponse(features)
+	},
+}
+
 // hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'
-var hostAddFeatureCommand = cli.Command{
+var hostAddFeatureCommand = &cli.Command{
 	Name:      "add-feature",
 	Aliases:   []string{"install-feature"},
 	Usage:     "add-feature HOSTNAME FEATURENAME",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "Allow to define content of feature parameters",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-proxy",
 			Usage: "Disable reverse proxy rules",
 		},
@@ -430,15 +461,8 @@ var hostAddFeatureCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
-		feat, err := featurefactory.New(task, featureName)
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		if feat == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
-		}
-		values := data.Map{}
+
+		values := map[string]string{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")
@@ -447,72 +471,35 @@ var hostAddFeatureCommand = cli.Command{
 			}
 		}
 
-		settings := resources.FeatureSettings{}
+		settings := protocol.FeatureSettings{}
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		// Wait for SSH service on remote host first
-		err = client.New().SSH.WaitServerReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
+		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
-
-		target, err := install.NewHostTarget(hostInstance)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		results, err := feature.Add(target, values, settings)
+		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, settings, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("failed to add feature '%s' on host '%s'", featureName, hostName)
-			if Debug || Verbose {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
-			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
-		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-// hostListFeaturesCommand handles 'safescale host list-features'
-var hostListFeaturesCommand = cli.Command{
-	Name:      "list-features",
-	Aliases:   []string{"list-available-features"},
-	Usage:     "list-features",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters",
-		},
-	},
-
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
-		features, err := install.ListFeatures("host")
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		return clitools.SuccessResponse(features)
-	},
-}
-
 // hostCheckFeatureCommand handles 'deploy host <host name or id> package <pkgname> check'
-var hostCheckFeatureCommand = cli.Command{
+var hostCheckFeatureCommand = &cli.Command{
 	Name:      "check-feature",
 	Aliases:   []string{"verify-feature"},
 	Usage:     "check-feature HOSTNAME FEATURENAME",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "Allow to define content of feature parameters",
 		},
@@ -534,17 +521,8 @@ var hostCheckFeatureCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
-		feature, err := install.NewFeature(task, featureName)
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
-		}
 
-		values := data.Map{}
+		values := map[string]string{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")
@@ -552,6 +530,7 @@ var hostCheckFeatureCommand = cli.Command{
 				values[res[0]] = strings.Join(res[1:], "=")
 			}
 		}
+		settings := protocol.FeatureSettings{}
 
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
@@ -560,37 +539,25 @@ var hostCheckFeatureCommand = cli.Command{
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
-
-		target, err := install.NewHostTarget(hostInstance)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		results, err := feature.Check(target, values, install.Settings{})
+		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, settings, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s", featureName, hostName, err.Error())
+			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
-		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("Feature '%s' not found on host '%s'", featureName, hostName)
-			if Verbose || Debug {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
-			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-// hostDeleteFeatureCommand handles 'deploy host delete-feature <host name> <feature name>'
-var hostDeleteFeatureCommand = cli.Command{
-	Name:      "rm-feature",
-	Aliases:   []string{"remove-feature", "delete-feature", "uninstall-feature"},
+// hostRemoveFeatureCommand handles 'deploy host delete-feature <host name> <feature name>'
+var hostRemoveFeatureCommand = &cli.Command{
+	Name:      "remove-feature",
+	Aliases:   []string{"rm-feature", "delete-feature", "uninstall-feature"},
 	Usage:     "Remove a feature from host.",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "Define value of feature parameter (can be used multiple times)",
 		},
@@ -612,17 +579,8 @@ var hostDeleteFeatureCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
-		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
-		if err != nil {
-			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		if feature == nil {
-			msg := fmt.Sprintf("failed to find a feature named '%s'.", featureName)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotFound, msg))
-		}
 
-		values := data.Map{}
+		values := map[string]string{}
 		params := c.StringSlice("param")
 		for _, k := range params {
 			res := strings.Split(k, "=")
@@ -630,6 +588,7 @@ var hostDeleteFeatureCommand = cli.Command{
 				values[res[0]] = strings.Join(res[1:], "=")
 			}
 		}
+		settings := protocol.FeatureSettings{}
 
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
@@ -639,22 +598,11 @@ var hostDeleteFeatureCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
-		target, err := install.NewHostTarget(hostInstance)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-		results, err := feature.Remove(target, values, install.Settings{})
+		err = client.New().Host.RemoveFeature(hostInstance.Id, featureName, values, settings, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error uninstalling feature '%s' on '%s': %s", featureName, hostName, err.Error())
+			msg := fmt.Sprintf("error removing feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
-		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", featureName, hostName)
-			if Verbose || Debug {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
-			}
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		return clitools.SuccessResponse(nil)
 	},

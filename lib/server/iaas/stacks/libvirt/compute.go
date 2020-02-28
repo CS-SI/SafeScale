@@ -806,9 +806,9 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, *abstract.HostTemplate, userData *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
 	defer scerr.OnPanic(&err)()
@@ -826,26 +826,26 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	//----Check Inputs----
 	if resourceName == "" {
-		return nil, nil, fmt.Errorf("The ResourceName is mandatory ")
+		return nil, nil, nil, fmt.Errorf("The ResourceName is mandatory ")
 	}
 	if hostName == "" {
 		hostName = resourceName
 	}
 	if networks == nil || len(networks) == 0 {
-		return nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
+		return nil, nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
 	}
 	if defaultGateway == nil && !publicIP {
-		return nil, userData, fmt.Errorf("the host %s must have a gateway or be public", resourceName)
+		return nil, nil, userData, fmt.Errorf("the host %s must have a gateway or be public", resourceName)
 	}
 	if templateID == "" {
-		return nil, userData, fmt.Errorf("the TemplateID is mandatory")
+		return nil, nil, userData, fmt.Errorf("the TemplateID is mandatory")
 	}
 	if imageID == "" {
-		return nil, userData, fmt.Errorf("the ImageID is mandatory")
+		return nil, nil, userData, fmt.Errorf("the ImageID is mandatory")
 	}
 	host, _, err = s.getHostAndDomainFromRef(resourceName)
 	if err == nil && host != nil {
-		return nil, userData, fmt.Errorf("the Host %s already exists", resourceName)
+		return nil, nil, userData, fmt.Errorf("the Host %s already exists", resourceName)
 	}
 
 	//----Initialize----
@@ -853,7 +853,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		var err error
 		keyPair, err = s.CreateKeyPair(fmt.Sprintf("key_%s", resourceName))
 		if err != nil {
-			return nil, userData, fmt.Errorf("KeyPair creation failed : %s", err.Error()
+			return nil, nil, userData, fmt.Errorf("KeyPair creation failed : %s", err.Error()
 		}
 		request.KeyPair = keyPair
 	}
@@ -865,22 +865,22 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		request.Password = password
 	}
 
-	template, err := s.Template(templateID)
+	template, err = s.GetTemplate(templateID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("GetTemplate failed : %s", err.Error()
+		return nil, nil, userData, fmt.Errorf("GetTemplate failed : %s", err.Error()
 	}
 	imagePath, err := getImagePathFromID(s, imageID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("GetImagePathFromID failled %s: ", err.Error()
+		return nil, nil, userData, fmt.Errorf("GetImagePathFromID failled %s: ", err.Error()
 	}
 	imageDisk, err := getDiskFromID(s, imageID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("GetDiskFromID failled %s: ", err.Error()
+		return nil, nil, userData, fmt.Errorf("GetDiskFromID failled %s: ", err.Error()
 	}
 
 	err = userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to prepare user data content: %+v", err)
+		return nil, nil, userData, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
 
 	//----Commands----
@@ -907,10 +907,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 						},
 					)
 					if err != nil {
-						return nil, userData, fmt.Errorf("failure To create network default : %s ", err.Error()
+						return nil, nil, userData, fmt.Errorf("failure To create network default : %s ", err.Error()
 					}
 				default:
-					return nil, userData, fmt.Errorf("failure To get network default : %s ", err.Error()
+					return nil, nil, userData, fmt.Errorf("failure To get network default : %s ", err.Error()
 				}
 			}
 
@@ -921,14 +921,14 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		cmd.Stdout = cmdOutput
 		err = cmd.Run()
 		if err != nil {
-			return nil, nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error()
+			return nil, nil, nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error()
 		}
 		ip := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 
 		if bridgedVMs {
 			infoWaiter, err := GetInfoWaiter()
 			if err != nil {
-				return nil, userData, fmt.Errorf("failed to get info waiter : %s", err.Error()
+				return nil, nil, userData, fmt.Errorf("failed to get info waiter : %s", err.Error()
 			}
 
 			userData.AddInTag("phase2", "insert_tag", fmt.Sprintf(`
@@ -941,7 +941,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			cmd.Stdout = cmdOutput
 			err = cmd.Run()
 			if err != nil {
-				return nil, userData, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error()
+				return nil, nil, userData, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error()
 			}
 			lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 			networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
@@ -954,18 +954,18 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	userDataPhase1, err := userData.Generate("phase1")
 	if err != nil {
-		return nil, userData, err
+		return nil, nil, userData, err
 	}
 	userdataFileName := s.LibvirtConfig.LibvirtStorage + "/" + resourceName + "_userdata.sh"
 	err = ioutil.WriteFile(userdataFileName, userDataPhase1, 0644)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to write userData in %s_userdata.sh file : %s", resourceName, err.Error()
+		return nil, nil, userData, fmt.Errorf("failed to write userData in %s_userdata.sh file : %s", resourceName, err.Error()
 	}
 
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
 	err = verifyVirtResizeCanAccessKernel()
 	if err != nil {
-		return nil, userData, fmt.Errorf("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+		return nil, nil, userData, fmt.Errorf("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
 	}
 
 	var commands []string
@@ -994,7 +994,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		err = cmd.Run()
 		if err != nil {
 			logrus.Errorf("Commands failed: [%s] with error [%s], stdOutput [%s] and stdError [%s]", command, err.Error(), cmdOutput.String(), cmdError.String()
-			return nil, userData, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error()
+			return nil, nil, userData, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error()
 		}
 	}
 
@@ -1012,12 +1012,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	domain, err := s.LibvirtService.LookupDomainByName(resourceName)
 	if err != nil {
-		return nil, userData, fmt.Errorf(fmt.Sprintf("Can't find domain %s : %s", resourceName, err.Error())
+		return nil, nil, userData, fmt.Errorf(fmt.Sprintf("Can't find domain %s : %s", resourceName, err.Error())
 	}
 
 	hostCore, err := s.getHostFromDomain(domain)
 	if err != nil {
-		return nil, userData, fmt.Errorf(fmt.Sprintf("failed to get host %s from domain : %s", resourceName, err.Error())
+		return nil, nil, userData, fmt.Errorf(fmt.Sprintf("failed to get host %s from domain : %s", resourceName, err.Error())
 	}
 
 	hostCore.PrivateKey = keyPair.PrivateKey
@@ -1040,24 +1040,16 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 		gateway, err := s.InspectHost(request.DefaultGateway)
 		if err != nil {
-			return nil, nil, scerr.Wrap(err, "failed to get gateway host"
+			return nil, nil, nil, scerr.Wrap(err, "failed to get gateway host"
 		}
 
 		hnV1.DefaultGatewayPrivateIP = gateway.PrivateIP()
 	}
 
-	hostSizing := abstract.NewHostEffectiveSizing()
-	hostSizing.RAMSize = float32(template.RAMSize * 1024)
-	hostSizing.Cores = template.Cores
-	hostSizing.DiskSize = template.DiskSize
-	// TODO GPU not implemented
-	hostSizing.GPUNumber = template.GPUNumber
-	hostSizing.GPUType = template.GPUType
-
 	host := abstract.NewHostFull()
 	host.Core = hostCore
 	host.Network = hostNetwork
-	host.Sizing = hostSizing
+	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 	return host, userData, nil
 }
 
@@ -1100,7 +1092,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (string, error) {
+func (s *Stack) GetHostByName(name string) (*abstract.HostCore, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -1109,7 +1101,7 @@ func (s *Stack) GetHostByName(name string) (string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return host.Core.ID, nil
+	return host.Core, nil
 }
 
 // DeleteHost deletes the host identified by id
@@ -1167,7 +1159,7 @@ func (s *Stack) DeleteHost(id string) error {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.HostFull, error) {
 	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
 }
 

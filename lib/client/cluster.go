@@ -140,6 +140,7 @@ func (c *cluster) Delete(name string, timeout time.Duration) error {
 	return err
 }
 
+// Expand ...
 func (c *cluster) Expand(def protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
@@ -152,6 +153,7 @@ func (c *cluster) Expand(def protocol.ClusterResizeRequest, duration time.Durati
 	return service.Expand(ctx, &def)
 }
 
+// Shrink ...
 func (c *cluster) Shrink(def protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
@@ -162,4 +164,67 @@ func (c *cluster) Shrink(def protocol.ClusterResizeRequest, duration time.Durati
 	}
 
 	return service.Shrink(ctx, &def)
+}
+
+// CheckFeature ...
+func (c *cluster) CheckFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	req := protocol.FeatureActionRequest{
+		Action:     protocol.FeatureAction_FA_CHECK,
+		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef:  &protocol.Reference{Name: clusterName},
+		Variables:  params,
+		Settings:   &settings,
+	}
+	_, err = service.Check(ctx, &req)
+	return err
+}
+
+// AddFeature ...
+func (c *cluster) AddFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	req := protocol.FeatureActionRequest{
+		Action:     protocol.FeatureAction_FA_ADD,
+		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef:  &protocol.Reference{Name: clusterName},
+		Variables:  params,
+		Settings:   &settings,
+	}
+	_, err = service.Add(ctx, &req)
+	return err
+}
+
+// RemoveFeature ...
+func (c *cluster) RemoveFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	req := protocol.FeatureActionRequest{
+		Action:     protocol.FeatureAction_FA_REMOVE,
+		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef:  &protocol.Reference{Name: clusterName},
+		Variables:  params,
+		Settings:   &settings,
+	}
+	_, err = service.Remove(ctx, &req)
+	return err
 }

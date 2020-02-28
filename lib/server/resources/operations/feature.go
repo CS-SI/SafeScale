@@ -56,6 +56,10 @@ type feature struct {
 	task  concurrency.Task
 }
 
+func nullFeature() *feature {
+	return &feature{}
+}
+
 // ListFeatures lists all features suitable for hosts or clusters
 func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, error) {
 	if task == nil {
@@ -130,10 +134,10 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, err
 //    - *scerr.ErrSyntax if feature found contains syntax error
 func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nullFeature(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nullFeature(), scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
@@ -147,7 +151,7 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err er
 	v.AddConfigPath("/etc/safescale/features")
 	v.SetConfigName(name)
 
-	var casted *feature
+	casted := nullFeature()
 	err = v.ReadInConfig()
 	if err != nil {
 		switch err.(type) {
@@ -181,17 +185,17 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err er
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (_ *feature, err error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nullFeature(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nullFeature(), scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	var casted *feature
+	casted := nullFeature()
 	if _, ok := allEmbeddedFeaturesMap[name]; !ok {
 		err = scerr.NotFoundError(fmt.Sprintf("failed to find a feature named '%s'", name))
 	} else {
@@ -202,9 +206,17 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ *feature, err err
 	return casted, err
 }
 
+// IsNull tells if the instance represents a null value
+func (f *feature) IsNull() bool {
+	return f == nil || f.displayName == ""
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (f *feature) Clone() data.Clonable {
+	if f.IsNull() {
+		return f
+	}
 	res := &feature{}
 	return res.Replace(f)
 }
@@ -212,6 +224,10 @@ func (f *feature) Clone() data.Clonable {
 // Replace ...
 // satisfies interface data.Clonable
 func (f *feature) Replace(p data.Clonable) data.Clonable {
+	if f.IsNull() {
+		return f
+	}
+
 	src := p.(*feature)
 	*f = *src
 	f.installers = make(map[installmethod.Enum]Installer, len(src.installers))
@@ -223,7 +239,7 @@ func (f *feature) Replace(p data.Clonable) data.Clonable {
 
 // GetName returns the display name of the feature, with error handling
 func (f *feature) GetName() (string, error) {
-	if f == nil {
+	if f.IsNull() {
 		return "", scerr.InvalidInstanceError()
 	}
 	return f.displayName, nil
@@ -231,15 +247,13 @@ func (f *feature) GetName() (string, error) {
 
 // SafeGetName returns the display name of the feature, without error handling
 func (f *feature) SafeGetName() string {
-	if f == nil {
-		return ""
-	}
-	return f.displayName
+	out, _ := f.GetName()
+	return out
 }
 
 // GetFilename returns the filename of the feature definition, with error handling
 func (f *feature) GetFilename() (string, error) {
-	if f == nil {
+	if f.IsNull() {
 		return "", scerr.InvalidInstanceError()
 	}
 	return f.fileName, nil
@@ -247,15 +261,13 @@ func (f *feature) GetFilename() (string, error) {
 
 // SafeGetFilename returns the filename of the feature definition, without error handling
 func (f *feature) SafeGetFilename() string {
-	if f == nil {
-		return ""
-	}
-	return f.fileName
+	out, _ := f.GetFilename()
+	return out
 }
 
 // GetDisplayFilename returns the filename of the feature definition, beautifulled, with error handling
 func (f *feature) GetDisplayFilename() (string, error) {
-	if f == nil {
+	if f.IsNull() {
 		return "", scerr.InvalidInstanceError()
 	}
 	return f.displayFileName, nil
@@ -263,10 +275,8 @@ func (f *feature) GetDisplayFilename() (string, error) {
 
 // SafeGetDisplayFilename returns the beautifulled filename of the feature definition, without error handling
 func (f *feature) SafeGetDisplayFilename() string {
-	if f == nil {
-		return ""
-	}
-	return f.displayFileName
+	out, _ := f.GetDisplayFilename()
+	return out
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
@@ -287,12 +297,18 @@ func (f *feature) installerOfMethod(m installmethod.Enum) Installer {
 
 // SafeGetSpecs returns a copy of the spec file (we don't want external use to modify Feature.specs)
 func (f *feature) SafeGetSpecs() *viper.Viper {
+	if f.IsNull() {
+		return &viper.Viper{}
+	}
 	roSpecs := *f.specs
 	return &roSpecs
 }
 
 // Applyable tells if the feature is installable on the target
 func (f *feature) Applyable(t resources.Targetable) bool {
+	if f.IsNull() {
+		return false
+	}
 	methods := t.SafeGetInstallMethods(f.task)
 	for _, k := range methods {
 		installer := f.installerOfMethod(k)
@@ -305,17 +321,17 @@ func (f *feature) Applyable(t resources.Targetable) bool {
 
 // Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (f *feature) Check(t resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
-	if f == nil {
+func (f *feature) Check(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
+	if f.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
-	if t == nil {
-		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	if target == nil {
+		return nil, scerr.InvalidParameterError("target", "cannot be nil")
 	}
 
 	featureName := f.SafeGetName()
-	targetName := t.SafeGetName()
-	targetType := t.SafeGetTargetType().String()
+	targetName := target.SafeGetName()
+	targetType := target.SafeGetTargetType().String()
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
@@ -326,7 +342,7 @@ func (f *feature) Check(t resources.Targetable, v data.Map, s resources.FeatureS
 	// 	return anon.(Results), nil
 	// }
 
-	methods := t.SafeGetInstallMethods(f.task)
+	methods := target.SafeGetInstallMethods(f.task)
 	var installer Installer
 	for _, meth := range methods {
 		if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
@@ -350,7 +366,7 @@ func (f *feature) Check(t resources.Targetable, v data.Map, s resources.FeatureS
 	myV := v.Clone()
 
 	// Inits target parameters
-	err = t.ComplementFeatureParameters(f.task, myV)
+	err = target.ComplementFeatureParameters(f.task, myV)
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +377,7 @@ func (f *feature) Check(t resources.Targetable, v data.Map, s resources.FeatureS
 		return nil, err
 	}
 
-	results, err := installer.Check(f, t, myV, s)
+	results, err := installer.Check(f, target, myV, s)
 	// _ = checkCache.ForceSet(cacheKey, results)
 	return results, err
 }
@@ -385,23 +401,23 @@ func checkParameters(f *feature, v data.Map) error {
 
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *feature) Add(t resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
-	if f == nil {
+func (f *feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
+	if f.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
-	if t == nil {
-		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	if target == nil {
+		return nil, scerr.InvalidParameterError("target", "cannot be nil")
 	}
 
 	featureName := f.SafeGetName()
-	targetName := t.SafeGetName()
-	targetType := t.SafeGetTargetType().String()
+	targetName := target.SafeGetName()
+	targetType := target.SafeGetTargetType().String()
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	methods := t.SafeGetInstallMethods(f.task)
+	methods := target.SafeGetInstallMethods(f.task)
 	var (
 		installer Installer
 		i         uint8
@@ -432,7 +448,7 @@ func (f *feature) Add(t resources.Targetable, v data.Map, s resources.FeatureSet
 	myV := v.Clone()
 
 	// Inits target parameters
-	err = t.ComplementFeatureParameters(f.task, myV)
+	err = target.ComplementFeatureParameters(f.task, myV)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +460,7 @@ func (f *feature) Add(t resources.Targetable, v data.Map, s resources.FeatureSet
 	}
 
 	if !s.AddUnconditionally {
-		results, err := f.Check(t, v, s)
+		results, err := f.Check(target, v, s)
 		if err != nil {
 			return nil, scerr.Wrap(err, "failed to check feature '%s'", featureName)
 		}
@@ -455,12 +471,12 @@ func (f *feature) Add(t resources.Targetable, v data.Map, s resources.FeatureSet
 	}
 
 	if !s.SkipFeatureRequirements {
-		err := f.installRequirements(t, v, s)
+		err := f.installRequirements(target, v, s)
 		if err != nil {
 			return nil, scerr.Wrap(err, "failed to install requirements")
 		}
 	}
-	results, err := installer.Add(f, t, myV, s)
+	results, err := installer.Add(f, target, myV, s)
 	if err == nil {
 		// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
 		return nil, err
@@ -470,17 +486,17 @@ func (f *feature) Add(t resources.Targetable, v data.Map, s resources.FeatureSet
 }
 
 // Remove uninstalls the feature from the target
-func (f *feature) Remove(t resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
-	if f == nil {
+func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
+	if f.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
-	if t == nil {
-		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+	if target == nil {
+		return nil, scerr.InvalidParameterError("target", "cannot be nil")
 	}
 
 	featureName := f.SafeGetName()
-	targetName := t.SafeGetName()
-	targetType := t.SafeGetTargetType().String()
+	targetName := target.SafeGetName()
+	targetType := target.SafeGetTargetType().String()
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
@@ -490,7 +506,7 @@ func (f *feature) Remove(t resources.Targetable, v data.Map, s resources.Feature
 		results   resources.Results
 		installer Installer
 	)
-	methods := t.SafeGetInstallMethods(f.task)
+	methods := target.SafeGetInstallMethods(f.task)
 	for _, meth := range methods {
 		if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
 			installer = f.installerOfMethod(meth)
@@ -518,7 +534,7 @@ func (f *feature) Remove(t resources.Targetable, v data.Map, s resources.Feature
 	// // Inits implicit parameters
 	// err = f.setImplicitParameters(t, myV)
 	// Inits target parameters
-	err = t.ComplementFeatureParameters(f.task, myV)
+	err = target.ComplementFeatureParameters(f.task, myV)
 	if err != nil {
 		return nil, err
 	}
@@ -529,13 +545,16 @@ func (f *feature) Remove(t resources.Targetable, v data.Map, s resources.Feature
 		return nil, err
 	}
 
-	results, err = installer.Remove(f, t, myV, s)
+	results, err = installer.Remove(f, target, myV, s)
 	// checkCache.Reset(f.DisplayName() + "@" + targetName)
 	return results, err
 }
 
 // GetRequirements returns a list of features needed as requirements
 func (f *feature) GetRequirements() ([]string, error) {
+	if f.IsNull() {
+		return nil, scerr.InvalidInstanceError()
+	}
 	return nil, scerr.NotImplementedError("GetRequirements() is not yet implemented")
 }
 
