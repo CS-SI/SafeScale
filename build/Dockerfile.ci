@@ -1,0 +1,18 @@
+FROM safescale:firewalld-issue
+LABEL maintainer="CS SI"
+ARG http_proxy=""
+ARG https_proxy=""
+ARG LC_ALL=C.UTF-8
+ARG LANG=C.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
+ENV BUILD_ENV docker
+
+RUN mkdir -p /etc/safescale
+RUN mkdir -p /root/.safescale/forensics
+
+COPY tenants.toml /etc/safescale/tenants.toml
+
+COPY kubeclu.sh /exported
+COPY minikube.sh /exported
+
+RUN cd /exported && ./kubeclu.sh
