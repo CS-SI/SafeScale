@@ -5,6 +5,7 @@ ARG https_proxy=""
 ARG LC_ALL=C.UTF-8
 ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
+ENV BUILD_ENV docker
 
 # -----------------
 # Standard packages
@@ -20,6 +21,7 @@ wget \
 unzip \
 vim \
 git \
+openssh-server \
 python3.6 \
 python3-pip \
 && apt-get autoclean -y \
@@ -29,7 +31,7 @@ python3-pip \
 WORKDIR /tmp
 
 # ----------------------
-# Install GO 1.10
+# Install GO 1.13
 # ----------------------
 RUN wget https://dl.google.com/go/go1.13.5.linux-amd64.tar.gz \
 && tar -C /usr/local -xzf go1.13.5.linux-amd64.tar.gz
