@@ -8,7 +8,7 @@ else
   diff ./marker ./newMarker 1>/dev/null && rm ./newMarker && echo "Nothing to do" && exit 0
 fi
 
-docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile -t safescale:$(git rev-parse --abbrev-ref HEAD) ${WRKDIR}
+docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile -t safescale:$(git rev-parse --abbrev-ref HEAD) $WRKDIR
 [ $? -ne 0 ] && echo "Docker build failed !!" && rm -f ./marker && exit 1
 
 echo "Docker build OK"
@@ -21,6 +21,8 @@ docker rm -f dummy
 [ $? -ne 0 ] && echo "Failure extracting binaries 3/3" && exit 1
 
 echo "Binaries extracted successfully"
-mv ./newMarker ./marker
+if [ -f ./newMarker ]; then
+  mv ./newMarker ./marker
+fi
 
 exit 0
