@@ -15,4 +15,4 @@ COPY tenants.toml /etc/safescale/tenants.toml
 COPY kubeclu.sh /exported
 COPY minikube.sh /exported
 
-RUN cd /exported && ./kubeclu.sh
+RUN cd /exported && ./minikube.sh

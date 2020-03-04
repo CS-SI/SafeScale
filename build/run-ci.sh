@@ -8,7 +8,7 @@ else
   diff ./markerCi ./newMarkerCi 1>/dev/null && rm ./newMarkerCi && echo "Nothing to do" && exit 0
 fi
 
-docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.ci -t safescale-ci:$(git rev-parse --abbrev-ref HEAD) ${WRKDIR}
+docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.ci -t safescale-ci:$(git rev-parse --abbrev-ref HEAD) $WRKDIR
 RC=$?
 [ $RC -ne 0 ] && echo "CI failed !!" && rm -f ./markerCi
 

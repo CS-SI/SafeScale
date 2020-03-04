@@ -21,6 +21,7 @@ wget \
 unzip \
 vim \
 git \
+jq \
 openssh-server \
 python3.6 \
 python3-pip \
