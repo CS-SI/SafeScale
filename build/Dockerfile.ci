@@ -1,4 +1,4 @@
-FROM safescale:$THISBRANCH
+FROM safescale:$THISBRANCH-$TENANT
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -19,3 +19,5 @@ COPY large.sh /exported
 COPY director.sh /exported
 
 RUN cd /exported && ./director.sh
+
+RUN rm -f /etc/safescale/tenants.toml
