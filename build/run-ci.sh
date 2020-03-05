@@ -26,14 +26,14 @@ else
 fi
 
 THISBRANCH=$(git rev-parse --abbrev-ref HEAD) TENANT=$1 envsubst <Dockerfile.ci > Dockerfile.cibranch
-docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.cibranch -t safescale-ci:$(git rev-parse --abbrev-ref HEAD) $WRKDIR
+docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.cibranch -t safescale-ci:$(git rev-parse --abbrev-ref HEAD)-$1 $WRKDIR
 RC=$?
 [ $RC -ne 0 ] && echo "CI failed !!" && rm -f ./markerCi
 
 stamp=`date +"%s"`
 mkdir -p ./ci-logs/$stamp
 
-docker create -ti --name dummy safescale-ci:$(git rev-parse --abbrev-ref HEAD) bash
+docker create -ti --name dummy safescale-ci:$(git rev-parse --abbrev-ref HEAD)-$1 bash
 [ $? -ne 0 ] && echo "Failure extracting logs 1/3" && exit 1
 docker cp dummy:/root/.safescale ci-logs/$stamp
 [ $? -ne 0 ] && echo "Failure extracting logs 2/3" && exit 1
