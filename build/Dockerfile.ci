@@ -1,4 +1,4 @@
-FROM safescale:$THISBRANCH-$TENANT
+FROM safescale:$THISBRANCH
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -12,6 +12,8 @@ RUN mkdir -p /etc/safescale
 RUN mkdir -p /root/.safescale/forensics
 
 COPY tenants.toml /etc/safescale/tenants.toml
+
+COPY markerCi /tmp
 
 COPY small.sh /exported
 COPY medium.sh /exported
