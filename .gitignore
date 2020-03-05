@@ -12,7 +12,7 @@ debug
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
+# Project-local glide cache
 .glide/
 .idea/workspace.xml
 .vscode
@@ -89,15 +89,16 @@ cli/scanner/scanner
 cli/scanner/scanner-cover
 lib/server/cluster/tests/create_cluster
 
-#ignore results from scanner
+# ignore results from scanner
 cli/scanner/Test*
 
+# ignore html output
 Test Results - client_test_go\.html
 
-
-
-lib/security/gateway/client/safe-security
-
+# versions
 lib/server/iaas/resources/userdata/version.go
-
 lib/system/version.go
+
+# secrets
+build/tenants.toml
+lib/security/gateway/client/safe-security
