@@ -1,4 +1,4 @@
-FROM safescale:firewalld-issue
+FROM safescale:$THISBRANCH
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -12,7 +12,9 @@ RUN mkdir -p /root/.safescale/forensics
 
 COPY tenants.toml /etc/safescale/tenants.toml
 
-COPY kubeclu.sh /exported
-COPY minikube.sh /exported
+COPY small.sh /exported
+COPY medium.sh /exported
+COPY large.sh /exported
+COPY director.sh /exported
 
-RUN cd /exported && ./minikube.sh
+RUN cd /exported && ./director.sh

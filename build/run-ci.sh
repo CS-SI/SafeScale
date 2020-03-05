@@ -1,6 +1,13 @@
 #!/bin/bash
 WRKDIR=$(readlink -f $(dirname "$0"))
 
+if [ ! -z "$1" ]
+then
+  if [[ $1 == "-f" ]]; then
+    date > markerCi
+  fi
+fi
+
 if [ ! -f ./markerCi ]; then
 	curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./markerCi
 else
@@ -8,7 +15,8 @@ else
   diff ./markerCi ./newMarkerCi 1>/dev/null && rm ./newMarkerCi && echo "Nothing to do" && exit 0
 fi
 
-docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.ci -t safescale-ci:$(git rev-parse --abbrev-ref HEAD) $WRKDIR
+THISBRANCH=$(git rev-parse --abbrev-ref HEAD) envsubst <Dockerfile.ci > Dockerfile.cibranch
+docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.cibranch -t safescale-ci:$(git rev-parse --abbrev-ref HEAD) $WRKDIR
 RC=$?
 [ $RC -ne 0 ] && echo "CI failed !!" && rm -f ./markerCi
 
@@ -24,5 +32,7 @@ echo "CI OK"
 if [ -f ./newMarkerCi ]; then
   mv ./newMarkerCi ./markerCi
 fi
+
+rm -f ./Dockerfile.cibranch
 
 exit 0
