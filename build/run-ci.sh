@@ -1,9 +1,19 @@
 #!/bin/bash
 WRKDIR=$(readlink -f $(dirname "$0"))
 
-if [ ! -z "$1" ]
+if [ -z "$1" ]
 then
-  if [[ $1 == "-f" ]]; then
+  echo "First parameter must be a tenant name..."
+  exit 1
+else
+  grep name.=..$1 tenants.toml || echo "Tenant $1 not found in tenants.toml"
+  grep name.=..$1 tenants.toml || exit 1
+  export TENANT=$1
+fi
+
+if [ ! -z "$2" ]
+then
+  if [[ $2 == "-f" ]]; then
     date > markerCi
   fi
 fi
@@ -12,17 +22,20 @@ if [ ! -f ./markerCi ]; then
 	curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./markerCi
 else
   curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./newMarkerCi
-  diff ./markerCi ./newMarkerCi 1>/dev/null && rm ./newMarkerCi && echo "Nothing to do" && exit 0
+  diff ./markerCi ./newMarkerCi 1>/dev/null && rm ./newMarkerCi && echo "Nothing to do !, if you want to force a ci test lauch with -f flag" && exit 0
 fi
 
-THISBRANCH=$(git rev-parse --abbrev-ref HEAD) envsubst <Dockerfile.ci > Dockerfile.cibranch
+THISBRANCH=$(git rev-parse --abbrev-ref HEAD) TENANT=$1 envsubst <Dockerfile.ci > Dockerfile.cibranch
 docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.cibranch -t safescale-ci:$(git rev-parse --abbrev-ref HEAD) $WRKDIR
 RC=$?
 [ $RC -ne 0 ] && echo "CI failed !!" && rm -f ./markerCi
 
+stamp=`date +"%s"`
+mkdir -p ./ci-logs/$stamp
+
 docker create -ti --name dummy safescale-ci:$(git rev-parse --abbrev-ref HEAD) bash
 [ $? -ne 0 ] && echo "Failure extracting logs 1/3" && exit 1
-docker cp dummy:/root/.safescale ci-logs
+docker cp dummy:/root/.safescale ci-logs/$stamp
 [ $? -ne 0 ] && echo "Failure extracting logs 2/3" && exit 1
 docker rm -f dummy
 [ $? -ne 0 ] && echo "Failure extracting logs 3/3" && exit 1
