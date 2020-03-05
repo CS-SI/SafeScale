@@ -1,6 +1,13 @@
 #!/bin/sh
 WRKDIR=$(readlink -f $(dirname "$0"))
 
+if [ ! -z "$1" ]
+then
+  if [[ $1 == "-f" ]]; then
+    date > marker
+  fi
+fi
+
 if [ ! -f ./marker ]; then
 	curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./marker
 else
