@@ -99,6 +99,12 @@ Test Results - client_test_go\.html
 lib/server/iaas/resources/userdata/version.go
 lib/system/version.go
 
+# ci and binaries
+build/exported
+build/marker
+build/markerCi
+build/Dockerfile.cibranch
+
 # secrets
 build/tenants.toml
 lib/security/gateway/client/safe-security
