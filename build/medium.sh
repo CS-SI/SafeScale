@@ -28,6 +28,7 @@ settos() {
         export SAFESCALE_HOST_CREATION_TIMEOUT=$1
         export SAFESCALE_SSH_CONNECT_TIMEOUT=$1
         export SAFESCALE_FORENSICS=True
+        export SAFESCALED_PORT=$((((RANDOM + RANDOM) % 43001) + 22000))
     fi
 }
 
@@ -53,6 +54,7 @@ sleep 3
 ROUNDS=5
 CODE=0
 RUN=0
+CLEAN=0
 
 ## declare an array variable
 declare -a flavor=("k8s" "boh" "swarm")
@@ -83,7 +85,11 @@ do
       done
     fi
     ./safescale-cover cluster delete clu-$TENANT-ubu-$fla-r$i -y
+    if [[ $? -ne 0 ]]; then
+      CLEAN=$((CLEAN + 1))
+    fi
     if [[ $RUN -eq 0 ]]; then
+      CODE=0
       break
     fi
   done
@@ -110,10 +116,18 @@ do
       done
     fi
     ./safescale-cover cluster delete clu-$TENANT-cent7-$fla-r$i -y
+    if [[ $? -ne 0 ]]; then
+      CLEAN=$((CLEAN + 1))
+    fi
     if [[ $RUN -eq 0 ]]; then
+      CODE=0
       break
     fi
   done
 done
 
-exit $CODE
+if [[ $CODE -eq 0 ]]; then
+  exit $CODE
+fi
+
+exit $((CLEAN + CODE))

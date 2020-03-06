@@ -57,7 +57,7 @@ RUN=0
 CLEAN=0
 
 ## declare an array variable
-declare -a flavor=("k8s" "boh" "swarm")
+declare -a flavor=("boh")
 
 for fla in "${flavor[@]}"
 do
@@ -85,38 +85,6 @@ do
       done
     fi
     ./safescale-cover cluster delete clu-$TENANT-ubu-$fla-r$i -y
-    if [[ $? -ne 0 ]]; then
-      CLEAN=$((CLEAN + 1))
-    fi
-
-    if [[ $RUN -eq 0 ]]; then
-      CODE=0
-      break
-    fi
-  done
-  
-  for i in $(seq $ROUNDS); do
-    ./safescale-cover cluster delete clu-$TENANT-cent7-$fla-r$i -y
-    ./safescale-cover cluster create -k -F $fla --os "centos 7" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.7.$i.0/24 clu-$TENANT-cent7-$fla-r$i
-    RUN=$?
-    if [[ $RUN -ne 0 ]]; then
-      CODE=$((CODE + 1))
-    fi
-    machines=$(./safescale host ls | tail -n 1 | jq '.result' | jq -r '.[] | .name')
-    stamp=`date +"%s"`
-    nmach=$(echo $machines | wc -w)
-    if [[ $nmach -ne 3 ]]; then
-      for machine in $machines
-      do
-          whydied $machine $stamp
-      done
-    else
-      for machine in $machines
-      do
-          whylives $machine $stamp
-      done
-    fi
-    ./safescale-cover cluster delete clu-$TENANT-cent7-$fla-r$i -y
     if [[ $? -ne 0 ]]; then
       CLEAN=$((CLEAN + 1))
     fi

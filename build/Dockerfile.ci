@@ -18,6 +18,8 @@ COPY markerCi /tmp
 COPY small.sh /exported
 COPY medium.sh /exported
 COPY large.sh /exported
+COPY poc.sh /exported
+
 COPY director.sh /exported
 
 RUN cd /exported && ./director.sh
