@@ -75,6 +75,52 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}
 }
 
+func TestNeverTimeouts(t *testing.T) {
+	retryErr := WhileUnsuccessful(
+		func() error {
+			time.Sleep(300 * time.Millisecond)
+			return nil
+		},
+		5*time.Millisecond,
+		20*time.Millisecond,
+	)
+
+	detectedTimeout := false
+
+	if retryErr != nil {
+		if _, ok := retryErr.(ErrTimeout); ok {
+			detectedTimeout = true
+		}
+	}
+
+	if !detectedTimeout {
+		t.FailNow()
+	}
+}
+
+func TestNeverTimeoutsAgain(t *testing.T) {
+	retryErr := WhileUnsuccessful(
+		func() error {
+			time.Sleep(300 * time.Millisecond)
+			return fmt.Errorf("forever fails")
+		},
+		5*time.Millisecond,
+		20*time.Millisecond,
+	)
+
+	detectedTimeout := false
+
+	if retryErr != nil {
+		if _, ok := retryErr.(ErrTimeout); ok {
+			detectedTimeout = true
+		}
+	}
+
+	if !detectedTimeout {
+		t.FailNow()
+	}
+}
+
 func TestDeath(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -84,7 +130,7 @@ func TestDeath(t *testing.T) {
 		defer wg.Done()
 		retryErr := WhileUnsuccessful(
 			func() error {
-				time.Sleep(30 * time.Hour)
+				time.Sleep(400 * time.Millisecond)
 				return nil
 			},
 			5*time.Millisecond,
@@ -108,7 +154,6 @@ func TestDeath(t *testing.T) {
 	if failure {
 		t.FailNow()
 	}
-
 }
 
 func TestSurviveDeath(t *testing.T) {
