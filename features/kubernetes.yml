@@ -445,7 +445,7 @@ feature:
                                 log /dev/log    local0
                                 log /dev/log    local1 notice
                                 chroot /var/lib/haproxy
-                                stats socket /var/run/haproxy/admin.sock mode 660 level admin
+                                stats socket /var/local/haproxy/admin.sock mode 660 level admin
                                 stats timeout 30s
                                 user haproxy
                                 group haproxy
@@ -493,7 +493,7 @@ feature:
                                 server cp{{ $i }} {{.}}:6444 check fall 3 rise 2
                                 {{- end }}
                             EOF
-                            mkdir -p /var/run/haproxy
+                            mkdir -p /var/local/haproxy
                             sfService enable haproxy
                             sfService restart haproxy || sfFail 205
                             {{ end }}
