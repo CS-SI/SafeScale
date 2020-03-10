@@ -27,7 +27,7 @@ else
   diff ./markerCi ./newMarkerCi 1>/dev/null && rm ./newMarkerCi && echo "Nothing to do !, if you want to force a ci test lauch with -f flag" && exit 0
 fi
 
-THISBRANCH=$(git rev-parse --abbrev-ref HEAD) TENANT=$1 envsubst <Dockerfile.ci > Dockerfile.cibranch-$1
+THISBRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') TENANT=$1 envsubst <Dockerfile.ci > Dockerfile.cibranch-$1
 docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.cibranch-$1 -t safescale-ci:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g')-$1 $WRKDIR
 RC=$?
 [ $RC -ne 0 ] && echo "CI failed !!" && rm -f ./markerCi
