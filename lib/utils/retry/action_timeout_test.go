@@ -18,13 +18,14 @@ package retry
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func randomErrGen() (string, int, error) {
@@ -64,14 +65,7 @@ func TestStraight(t *testing.T) {
 		20*time.Millisecond,
 	)
 
-	detectedTimeout := false
-
-	if retryErr != nil {
-		if _, ok := retryErr.(ErrTimeout); ok {
-			detectedTimeout = true
-		}
-	}
-
+	_, detectedTimeout := retryErr.(ErrTimeout)
 	if detectedTimeout {
 		t.FailNow()
 	}
@@ -103,14 +97,7 @@ func TestNeverTimeouts(t *testing.T) {
 		20*time.Millisecond,
 	)
 
-	detectedTimeout := false
-
-	if retryErr != nil {
-		if _, ok := retryErr.(ErrTimeout); ok {
-			detectedTimeout = true
-		}
-	}
-
+	_, detectedTimeout := retryErr.(ErrTimeout)
 	if detectedTimeout {
 		t.FailNow()
 	}
@@ -126,14 +113,7 @@ func TestNeverTimeoutsAgain(t *testing.T) {
 		20*time.Millisecond,
 	)
 
-	detectedTimeout := false
-
-	if retryErr != nil {
-		if _, ok := retryErr.(ErrTimeout); ok {
-			detectedTimeout = true
-		}
-	}
-
+	_, detectedTimeout := retryErr.(ErrTimeout)
 	if !detectedTimeout {
 		t.FailNow()
 	}
@@ -155,14 +135,7 @@ func TestDeath(t *testing.T) {
 			20*time.Millisecond,
 		)
 
-		detectedTimeout := false
-
-		if retryErr != nil {
-			if _, ok := retryErr.(ErrTimeout); ok {
-				detectedTimeout = true
-			}
-		}
-
+		_, detectedTimeout := retryErr.(ErrTimeout)
 		if !detectedTimeout {
 			t.FailNow()
 		}
@@ -184,14 +157,7 @@ func TestSurviveDeath(t *testing.T) {
 		20*time.Millisecond,
 	)
 
-	detectedTimeout := false
-
-	if retryErr != nil {
-		if _, ok := retryErr.(ErrTimeout); ok {
-			detectedTimeout = true
-		}
-	}
-
+	_, detectedTimeout := retryErr.(ErrTimeout)
 	if !detectedTimeout {
 		t.FailNow()
 	}
