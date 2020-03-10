@@ -69,10 +69,10 @@ func TestDoesItLeakWhenTimeouts(t *testing.T) {
 	require.Nil(t, err)
 
 	single, err = single.StartWithTimeout(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		forever := true
-		for forever {
-			aborted := t.Aborted()
-			forever = !aborted
+		for {
+			if t.Aborted() {
+				break
+			}
 			fmt.Println("Forever young...")
 			time.Sleep(time.Duration(10) * time.Millisecond)
 		}
@@ -81,7 +81,7 @@ func TestDoesItLeakWhenTimeouts(t *testing.T) {
 	require.Nil(t, err)
 
 	time.Sleep(time.Duration(200) * time.Millisecond)
-	// by now single should succeed
+	// by now single should finish on timeout
 	err = single.Abort()
 	fmt.Println("Aborted")
 
