@@ -145,8 +145,8 @@ func TestDeferredWrappedConsequence(t *testing.T) {
 func TestVerifyErrorType(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(*ErrTimeout); !ok {
-			t.Errorf("It should be a '*ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(ErrTimeout); !ok {
+			t.Errorf("It should be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
@@ -156,12 +156,12 @@ func TestVerifyErrorType(t *testing.T) {
 
 	recovered = CreateComplexErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(*ErrTimeout); !ok {
-			t.Errorf("It should be a '*ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(ErrTimeout); !ok {
+			t.Errorf("It should be a 'ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
-			if _, ok := cause.(*scerr.ErrNotFound); !ok {
+			if _, ok := cause.(scerr.ErrNotFound); !ok {
 				t.Errorf("It should be a '*scerr.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 			}
 		}
@@ -171,12 +171,12 @@ func TestVerifyErrorType(t *testing.T) {
 func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
 	if recovered != nil {
-		if _, ok := recovered.(*ErrTimeout); ok {
-			t.Errorf("It should NOT be a '*ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(ErrTimeout); ok {
+			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
-			if _, ok := cause.(*scerr.ErrNotFound); ok {
+			if _, ok := cause.(scerr.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
 				t.Errorf("This should be a '*scerr.ErrNotFound', it's instead a '%s'", reflect.TypeOf(cause).String())
@@ -317,8 +317,8 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(*ErrTimeout); !ok {
-						t.Errorf("'*ErrTimeout' not received...")
+					if _, ok := err.(ErrTimeout); !ok {
+						t.Errorf("'ErrTimeout' not received...")
 					}
 				}
 			}
@@ -363,7 +363,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(*ErrTimeout); !ok {
+					if _, ok := err.(ErrTimeout); !ok {
 						t.Errorf("Timeout error not received...")
 					}
 				}
@@ -422,9 +422,9 @@ func TestRefactorSwitch(t *testing.T) {
 
 	switch toe.(type) {
 	case ErrTimeout:
-		t.Error("No longer a timeout")
-	case *ErrTimeout:
 		fmt.Println("This requires looking for all the (type) out there...")
+	case *ErrTimeout:
+		t.Error("No longer a timeout")
 	default:
 		t.Error("Unexpected problem")
 	}

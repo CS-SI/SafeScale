@@ -1,9 +1,27 @@
+/*
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package retry
 
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -54,7 +72,7 @@ func TestStraight(t *testing.T) {
 		}
 	}
 
-	if !detectedTimeout {
+	if detectedTimeout {
 		t.FailNow()
 	}
 }
@@ -93,7 +111,7 @@ func TestNeverTimeouts(t *testing.T) {
 		}
 	}
 
-	if !detectedTimeout {
+	if detectedTimeout {
 		t.FailNow()
 	}
 }
@@ -131,7 +149,7 @@ func TestDeath(t *testing.T) {
 		retryErr := WhileUnsuccessful(
 			func() error {
 				time.Sleep(400 * time.Millisecond)
-				return nil
+				return fmt.Errorf("timeout")
 			},
 			5*time.Millisecond,
 			20*time.Millisecond,
@@ -150,8 +168,8 @@ func TestDeath(t *testing.T) {
 		}
 	}()
 
-	failure := waitTimeout(&wg, time.Millisecond*200)
-	if failure {
+	detectedTimeout := waitTimeout(&wg, time.Millisecond*200)
+	if !detectedTimeout {
 		t.FailNow()
 	}
 }
@@ -160,7 +178,7 @@ func TestSurviveDeath(t *testing.T) {
 	retryErr := WhileUnsuccessfulTimeout(
 		func() error {
 			time.Sleep(30 * time.Hour)
-			return nil
+			return fmt.Errorf("timeout")
 		},
 		5*time.Millisecond,
 		20*time.Millisecond,
@@ -185,7 +203,11 @@ func TestHitTimeoutBasic(t *testing.T) {
 	hitTimeout := false
 	notfound := false
 
-	for i := 0; i < 2000; i++ {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	for i := 0; i < 500; i++ {
 		fmt.Println("--> Begin")
 		var eserver string
 
@@ -250,7 +272,14 @@ func TestHitTimeoutBasic(t *testing.T) {
 		fmt.Println("This is it")
 	}
 
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	outString := string(out)
+
 	if !hitTimeout {
+		t.Error(outString)
 		t.FailNow()
 	}
 }
@@ -273,7 +302,11 @@ func TestHitTimeout(t *testing.T) {
 	hitTimeout := false
 	notfound := false
 
-	for i := 0; i < 2000; i++ {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	for i := 0; i < 500; i++ {
 		fmt.Println("--> Begin")
 		var eserver string
 
@@ -340,7 +373,14 @@ func TestHitTimeout(t *testing.T) {
 		fmt.Println("This is it")
 	}
 
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+
+	outString := string(out)
+
 	if !hitTimeout {
+		t.Error(outString)
 		t.FailNow()
 	}
 }
