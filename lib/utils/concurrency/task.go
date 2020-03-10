@@ -99,7 +99,7 @@ type task struct {
 
 	finishCh chan struct{} // Used to signal the routine that Wait() the go routine is done
 	doneCh   chan bool     // Used by routine to signal it has done its processing
-	abortCh  chan bool
+	abortCh  chan struct{}
 
 	err    error
 	result TaskResult
@@ -233,7 +233,7 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 // If timeout happens, error returned will be ErrTimeout
 // This function is useful when you know at the time you use it there will be a timeout to apply.
 func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 
 	if t.GetStatus() != READY {
 		return nil, fmt.Errorf("cannot start task '%s': not ready", tid)
@@ -247,7 +247,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	} else {
 		t.status = RUNNING
 		t.doneCh = make(chan bool, 1)
-		t.abortCh = make(chan bool, 1)
+		t.abortCh = make(chan struct{}, 1)
 		t.finishCh = make(chan struct{}, 1)
 		go t.controller(action, params, timeout)
 	}
@@ -258,7 +258,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
 	go t.run(action, params)
 
-	// tracer := NewTracer(true, t, "")
+	// tracer := NewTracer(t, "", true)
 	finish := false
 
 	if timeout > 0 {
@@ -269,7 +269,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// tracer.Trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
 				if t.status == RUNNING {
-					t.abortCh <- true
+					t.abortCh <- struct{}{}
 					close(t.abortCh)
 				}
 				t.lock.Unlock()
@@ -282,7 +282,6 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				finish = true
 			case <-t.abortCh:
 				// Abort signal received
-				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
 				if t.status != TIMEOUT {
 					t.status = ABORTED
@@ -292,12 +291,13 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				finish = true
 			case <-time.After(timeout):
 				t.lock.Lock()
-				if t.status == RUNNING {
-					t.abortCh <- true
-					close(t.abortCh)
-				}
+				st := t.status
 				t.status = TIMEOUT
 				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+				if st == RUNNING {
+					t.abortCh <- struct{}{}
+					close(t.abortCh)
+				}
 				t.lock.Unlock()
 			}
 		}
@@ -309,7 +309,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// tracer.Trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
 				if t.status == RUNNING {
-					t.abortCh <- true
+					t.abortCh <- struct{}{}
 					close(t.abortCh)
 				}
 				t.lock.Unlock()
@@ -483,8 +483,9 @@ func (t *task) Abort() error {
 		t.lock.Lock()
 		defer t.lock.Unlock()
 
-		// Tell controller to stop go routine
-		//		t.abortCh <- true
+		// // Tell controller to stop go routine
+		// t.abortCh <- true
+		// close(t.abortCh)
 
 		// Tell context to cancel
 		// VPL: normally this should trigger abort in controller...
@@ -497,7 +498,8 @@ func (t *task) Abort() error {
 
 // Aborted tells if task has been aborted
 func (t *task) Aborted() bool {
-	return t.GetStatus() == ABORTED
+	st := t.GetStatus()
+	return st == ABORTED || st == TIMEOUT
 }
 
 // StoreResult stores the result of the run
