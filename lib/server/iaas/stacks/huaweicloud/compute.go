@@ -634,11 +634,16 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			}
 
 			host.LastState = toHostState(server.Status)
-			if host.LastState != hoststate.ERROR && host.LastState != hoststate.STARTING {
+			if host.LastState == hoststate.ERROR {
+				return scerr.AbortedError("", fmt.Errorf("failure inspecting host '%s': it was in '%s' state", host.ID, server.Status))
+			}
+
+			if host.LastState != hoststate.STARTING {
 				log.Tracef("host status of '%s' is '%s'", host.ID, server.Status)
 				err = nil
 				return nil
 			}
+
 			return fmt.Errorf("server not ready yet")
 		},
 		temporal.GetMinDelay(),
@@ -695,6 +700,9 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	host.LastState = toHostState(server.Status)
+	if host.LastState != hoststate.STARTED {
+		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
+	}
 
 	// Updates Host Property propsv1.HostDescription
 	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
