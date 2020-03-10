@@ -20,7 +20,6 @@ package retry
 // delays and stop conditions
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -354,19 +353,19 @@ func (a action) loop() error {
 			var errLast error
 			if a.Last != nil {
 				errLast = a.Last()
+				if errLast != nil {
+					return scerr.ErrListError([]error{errLast, retryErr})
+				}
 			}
-			if errLast != nil {
-				return fmt.Errorf("%s + %s", err.Error(), errLast.Error())
-			}
-			return err
+			return retryErr
 		case verdict.Abort:
 			// Abort wanted, returns an error explaining why
 			var errLast error
 			if a.Last != nil {
 				errLast = a.Last()
-			}
-			if errLast != nil {
-				return fmt.Errorf("%s + %s", retryErr.Error(), errLast.Error())
+				if errLast != nil {
+					return scerr.ErrListError([]error{errLast, retryErr})
+				}
 			}
 			return retryErr
 		default:
@@ -410,9 +409,9 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 			err = response
 		case <-time.After(timeout):
 			// call timed out
-			err = fmt.Errorf("operation timeout")
+			err = scerr.TimeoutError("operation timeout", timeout, nil)
 		case <-desist:
-			err = fmt.Errorf("desist timeout")
+			err = scerr.TimeoutError("desist timeout", timeout, nil)
 		}
 
 		// Collects the result of the try
@@ -434,19 +433,19 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 			var errLast error
 			if a.Last != nil {
 				errLast = a.Last()
+				if errLast != nil {
+					return scerr.ErrListError([]error{errLast, retryErr})
+				}
 			}
-			if errLast != nil {
-				return fmt.Errorf("%s + %s", err.Error(), errLast.Error())
-			}
-			return err
+			return retryErr
 		case verdict.Abort:
 			// Abort wanted, returns an error explaining why
 			var errLast error
 			if a.Last != nil {
 				errLast = a.Last()
-			}
-			if errLast != nil {
-				return fmt.Errorf("%s + %s", retryErr.Error(), errLast.Error())
+				if errLast != nil {
+					return scerr.ErrListError([]error{errLast, retryErr})
+				}
 			}
 			return retryErr
 		default:
@@ -462,7 +461,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 					err = response
 					_ = err
 				case <-desist:
-					err = fmt.Errorf("desist timeout")
+					err = scerr.TimeoutError("desist timeout", timeout, nil)
 					_ = err
 				}
 			}
