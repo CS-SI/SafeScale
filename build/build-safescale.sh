@@ -18,7 +18,7 @@ rm -rf SafeScale
 # Get source code
 # ----------------------
 echo "Get source code"
-BRANCH_NAME=${BRANCH_NAME:="firewalld-issue"}
+BRANCH_NAME=${BRANCH_NAME:="develop"}
 GIT_REPO_URL=${GIT_REPO_URL:="https://github.com/CS-SI/SafeScale.git"}
 echo "Cloning branch '${BRANCH_NAME}' from repo '${GIT_REPO_URL}'"
 

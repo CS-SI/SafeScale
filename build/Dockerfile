@@ -6,6 +6,7 @@ ARG LC_ALL=C.UTF-8
 ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
+ENV BRANCH_NAME $BRANCH_NAME
 
 # -----------------
 # Standard packages
