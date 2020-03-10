@@ -14,7 +14,7 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
-BRANCH_NAME=${BRANCH_NAME:="develop"}
+BRANCH_NAME?="develop"
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
 UPSTREAM := $(shell git rev-parse origin/$(BRANCH_NAME))
