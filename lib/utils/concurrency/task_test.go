@@ -71,10 +71,8 @@ func TestDoesItLeakWhenTimeouts(t *testing.T) {
 	single, err = single.StartWithTimeout(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
 		forever := true
 		for forever {
-			if t.Aborted() {
-				forever = false
-				break
-			}
+			aborted := t.Aborted()
+			forever = !aborted
 			fmt.Println("Forever young...")
 			time.Sleep(time.Duration(10) * time.Millisecond)
 		}
@@ -85,7 +83,6 @@ func TestDoesItLeakWhenTimeouts(t *testing.T) {
 	time.Sleep(time.Duration(200) * time.Millisecond)
 	// by now single should succeed
 	err = single.Abort()
-
 	fmt.Println("Aborted")
 
 	// Nothing wrong should happen after this point...
@@ -103,7 +100,6 @@ func TestDoesItLeakWhenTimeouts(t *testing.T) {
 
 	outString := string(out)
 	nah := strings.Split(outString, "\n")
-
 	if !strings.Contains(nah[len(nah)-2], "Aborted") {
 		t.Fail()
 	}
