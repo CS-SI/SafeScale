@@ -446,10 +446,26 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	server, err := s.queryServer(host.ID)
-	if err != nil {
-		return nil, err
+	var server *servers.Server
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			var innerErr error
+			server, innerErr = s.queryServer(host.ID, temporal.GetHostTimeout())
+			if innerErr != nil {
+				return innerErr
+			}
+			return nil
+		},
+		temporal.GetDefaultDelay(),
+		temporal.GetBigDelay(),
+	)
+	if retryErr != nil {
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
+			return nil, resources.TimeoutError(fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.Name, temporal.GetBigDelay()), temporal.GetBigDelay())
+		}
+		return nil, retryErr
 	}
+
 	err = s.complementHost(host, server)
 	if err != nil {
 		return nil, err
@@ -462,14 +478,13 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	return host, nil
 }
 
-func (s *Stack) queryServer(id string) (*servers.Server, error) {
+func (s *Stack) queryServer(id string, timeout time.Duration) (*servers.Server, error) {
 	var (
 		server   *servers.Server
 		err      error
 		notFound bool
 	)
 
-	timeout := 2 * temporal.GetBigDelay()
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(s.ComputeClient, id).Extract()
@@ -496,18 +511,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 				return err
 			}
 
-			lastState := toHostState(server.Status)
-			if lastState == hoststate.ERROR {
-				return scerr.AbortedError("", fmt.Errorf("failure inspecting host '%s': it was in '%s' state", server.ID, server.Status))
-			}
-
-			if lastState != hoststate.STARTING {
-				logrus.Tracef("host status of '%s' is '%s'", id, server.Status)
-				err = nil
-				return nil
-			}
-
-			return fmt.Errorf("server not ready yet")
+			return nil
 		},
 		temporal.GetMinDelay(),
 		timeout,
@@ -521,11 +525,7 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	if notFound {
-		return nil, resources.ResourceNotFoundError("host", id)
-	}
-
-	if server == nil {
+	if notFound || server == nil {
 		return nil, resources.ResourceNotFoundError("host", id)
 	}
 
@@ -1052,21 +1052,25 @@ func (s *Stack) SelectedAvailabilityZone() (string, error) {
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (host *resources.Host, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	var host *resources.Host
 	switch hostParam := hostParam.(type) {
 	case string:
+		if hostParam == "" {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+		}
 		host = resources.NewHost()
 		host.ID = hostParam
 	case *resources.Host:
+		if hostParam == nil {
+			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+		}
 		host = hostParam
-	}
-	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")
+	default:
+		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 	hostRef := host.Name
 	if hostRef == "" {
@@ -1075,15 +1079,21 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
 
+	var server *servers.Server
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, err := s.InspectHost(host)
-			if err != nil {
-				return err
+			var innerErr error
+			server, innerErr = s.queryServer(host.ID, temporal.GetHostTimeout())
+			if innerErr != nil {
+				return innerErr
 			}
-			host = hostTmp
-			if host.LastState != hoststate.STARTED {
-				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
+			hostState := toHostState(server.Status)
+			// If host is in ERROR state, fails early
+			if hostState == hoststate.ERROR {
+				return scerr.AbortedError("", fmt.Errorf("failure inspecting host '%s': it was in '%s' state", server.ID, server.Status))
+			}
+			if hostState != hoststate.STARTED {
+				return fmt.Errorf("not in ready state (current state: %s)", hostState.String())
 			}
 			return nil
 		},
@@ -1094,8 +1104,9 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			return host, resources.TimeoutError(fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.Name, timeout), timeout)
 		}
-		return host, retryErr
+		return nil, retryErr
 	}
+
 	return host, nil
 }
 
