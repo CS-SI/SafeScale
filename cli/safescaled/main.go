@@ -30,7 +30,6 @@ import (
 	"github.com/dlespiau/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
-	"google.golang.org/appengine/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -61,7 +60,7 @@ func work() {
 	// If trace settings cannot be registered, report it but do not fail
 	err := debug.RegisterTraceSettings(appTrace)
 	if err != nil {
-		log.Errorf(err.Error())
+		logrus.Errorf(err.Error())
 	}
 
 	logrus.Infoln("Checking configuration")
@@ -135,28 +134,32 @@ func main() {
 	app.Usage = "safescaled [OPTIONS]"
 	app.Version = Version + ", build " + Revision + " (" + BuildDate + ")"
 
-	app.Authors = []cli.Author{
-		cli.Author{
+	app.Authors = []*cli.Author{
+		&cli.Author{
 			Name:  "CS-SI",
 			Email: "safescale@c-s.fr",
 		},
 	}
-	cli.VersionFlag = cli.BoolFlag{
-		Name:  "version, V",
-		Usage: "Print program version",
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "Print program version",
 	}
 
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "Increase verbosity",
+		&cli.BoolFlag{
+			Name:    "verbose",
+			Aliases: []string{"v"},
+			Usage:   "Increase verbosity",
 		},
-		cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "Show debug information",
+		&cli.BoolFlag{
+			Name:    "debug",
+			Aliases: []string{"d"},
+			Usage:   "Show debug information",
 		},
-		// cli.IntFlag{
-		// 	Name:  "port, p",
+		// &cli.IntFlag{
+		// 	Name:  "port",
+		// 	Aliases: []string{"p"},
 		// 	Usage: "Bind to specified port `PORT`",
 		// 	Value: 50051,
 		// },
@@ -170,12 +173,12 @@ func main() {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
 
-		if c.GlobalBool("verbose") {
+		if c.Bool("verbose") {
 			logrus.SetLevel(logrus.InfoLevel)
 			utils.Verbose = true
 		}
-		if c.GlobalBool("debug") {
-			if c.GlobalBool("verbose") {
+		if c.Bool("debug") {
+			if c.Bool("verbose") {
 				logrus.SetLevel(logrus.TraceLevel)
 			} else {
 				logrus.SetLevel(logrus.DebugLevel)

@@ -302,23 +302,27 @@ var clusterCreateCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "complexity, C",
-			Value: "Small",
-			Usage: "Defines the sizing of the cluster: Small, Normal, Large",
+			Name:    "complexity",
+			Aliases: []string{"C"},
+			Value:   "Small",
+			Usage:   "Defines the sizing of the cluster: Small, Normal, Large",
 		},
 		&cli.StringFlag{
-			Name:  "flavor, F",
-			Value: "K8S",
-			Usage: "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S",
+			Name:    "flavor",
+			Aliases: []string{"F"},
+			Value:   "K8S",
+			Usage:   "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S",
 		},
 		&cli.BoolFlag{
-			Name:  "keep-on-failure, k",
-			Usage: "If used, the resources are not deleted on failure (default: not set)",
+			Name:    "keep-on-failure",
+			Aliases: []string{"k"},
+			Usage:   "If used, the resources are not deleted on failure (default: not set)",
 		},
 		&cli.StringFlag{
-			Name:  "cidr, N",
-			Value: "192.168.0.0/16",
-			Usage: "Defines the CIDR of the network to use with cluster",
+			Name:    "cidr",
+			Aliases: []string{"N"},
+			Value:   "192.168.0.0/16",
+			Usage:   "Defines the CIDR of the network to use with cluster",
 		},
 		&cli.StringSliceFlag{
 			Name:  "disable",
@@ -522,10 +526,12 @@ var clusterDeleteCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name: "assume-yes, yes, y",
+			Name:    "assume-yes",
+			Aliases: []string{"yes", "y"},
 		},
 		&cli.BoolFlag{
-			Name: "force, f",
+			Name:    "force",
+			Aliases: []string{"f"},
 		},
 	},
 
@@ -634,33 +640,14 @@ var clusterExpandCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.UintFlag{
-			Name:  "count, n",
-			Usage: "Define the number of nodes wanted (default: 1)",
-			Value: 1,
+			Name:    "count",
+			Aliases: []string{"n"},
+			Usage:   "Define the number of nodes wanted (default: 1)",
+			Value:   1,
 		},
 		&cli.StringFlag{
 			Name:  "os",
 			Usage: "Define the Operating System wanted",
-		},
-		&cli.UintFlag{
-			Name:  "cpu",
-			Usage: "Define the number of cpu for new node(s); default: number used at cluster creation",
-			Value: 0,
-		},
-		&cli.Float64Flag{
-			Name:  "ram",
-			Usage: "Define the size of RAM for new node(s) (in GB); default: size used at cluster creation",
-			Value: 0.0,
-		},
-		&cli.UintFlag{
-			Name:  "disk",
-			Usage: "Define the size of system disk for new node(s) (in GB); default: size used at cluster creation",
-			Value: 0,
-		},
-		&cli.BoolFlag{
-			Name:   "gpu",
-			Usage:  "Ask for gpu capable host; default: no",
-			Hidden: true,
 		},
 		&cli.StringFlag{
 			Name: "node-sizing",
@@ -668,6 +655,26 @@ var clusterExpandCommand = &cli.Command{
 	<component> can be cpu, cpufreq, gpu, ram, disk, os
 	<operator> can be =,<,> (except for disk where valid operators are only = or >)
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
+		},
+		&cli.UintFlag{
+			Name:  "cpu",
+			Usage: "DEPRECATED! Define the number of cpu for new node(s); default: number used at cluster creation",
+			Value: 0,
+		},
+		&cli.Float64Flag{
+			Name:  "ram",
+			Usage: "DEPRECATED! Define the size of RAM for new node(s) (in GB); default: size used at cluster creation",
+			Value: 0.0,
+		},
+		&cli.UintFlag{
+			Name:  "disk",
+			Usage: "DEPRECATED! Define the size of system disk for new node(s) (in GB); default: size used at cluster creation",
+			Value: 0,
+		},
+		&cli.BoolFlag{
+			Name:   "gpu",
+			Usage:  "DEPRECATED! Ask for gpu capable host; default: no",
+			Hidden: true,
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -719,13 +726,15 @@ var clusterShrinkCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.UintFlag{
-			Name:  "count, n",
-			Usage: "Define the number of nodes to remove; default: 1",
-			Value: 1,
+			Name:    "count",
+			Aliases: []string{"n"},
+			Usage:   "Define the number of nodes to remove; default: 1",
+			Value:   1,
 		},
 		&cli.BoolFlag{
-			Name:  "assume-yes, yes, y",
-			Usage: "Don't ask deletion confirmation",
+			Name:    "assume-yes",
+			Aliases: []string{"yes", "y"},
+			Usage:   "Don't ask deletion confirmation",
 		},
 	},
 
@@ -1032,8 +1041,9 @@ var clusterListFeaturesCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters",
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define content of feature parameters",
 		},
 	},
 
@@ -1061,8 +1071,9 @@ var clusterAddFeatureCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters",
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define content of feature parameters",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -1110,8 +1121,9 @@ var clusterCheckFeatureCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters",
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define content of feature parameters",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -1154,8 +1166,9 @@ var clusterRemoveFeatureCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters",
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define content of feature parameters",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -1289,12 +1302,14 @@ var clusterNodeDeleteCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "yes, assume-yes, y",
-			Usage: "If set, respond automatically yes to all questions",
+			Name:    "assume-yes",
+			Aliases: []string{"yes", "y"},
+			Usage:   "If set, respond automatically yes to all questions",
 		},
 		&cli.BoolFlag{
-			Name:  "force, f",
-			Usage: "If set, force node deletion no matter what (ie. metadata inconsistency)",
+			Name:    "force",
+			Aliases: []string{"f"},
+			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
 		},
 	},
 

@@ -54,8 +54,9 @@ var networkList = &cli.Command{
 	Usage:   "List existing Networks (created by SafeScale)",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "all",
-			Usage: "List all Networks on tenant (not only those created by SafeScale)",
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "List all Networks on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
@@ -162,9 +163,10 @@ var networkCreate = &cli.Command{
 	ArgsUsage: "<network_name>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "cidr",
-			Value: "192.168.0.0/24",
-			Usage: "cidr of the network",
+			Name:    "cidr",
+			Aliases: []string{"N"},
+			Value:   "192.168.0.0/24",
+			Usage:   "cidr of the network",
 		},
 		&cli.StringFlag{
 			Name:  "os",
@@ -181,7 +183,8 @@ var networkCreate = &cli.Command{
 			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
 		},
 		&cli.StringFlag{
-			Name: "S, sizing",
+			Name:    "sizing",
+			Aliases: []string{"S"},
 			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
 			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
@@ -205,15 +208,15 @@ var networkCreate = &cli.Command{
 		},
 		&cli.UintFlag{
 			Name:  "cpu",
-			Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
+			Usage: "DEPRECATED! use --sizing! Defines the number of cpu of masters and nodes in the cluster",
 		},
 		&cli.Float64Flag{
 			Name:  "ram",
-			Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+			Usage: "DEPRECATED! use --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
 		&cli.UintFlag{
 			Name:  "disk",
-			Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
+			Usage: "DEPRECATED! use --sizing! Defines the size of system disk of masters and nodes (in GB)",
 		},
 	},
 	Action: func(c *cli.Context) error {

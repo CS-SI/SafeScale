@@ -125,8 +125,9 @@ var hostList = &cli.Command{
 	Usage:   "List available hosts (created by SafeScale)",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "all",
-			Usage: "List all hosts on tenant (not only those created by SafeScale)",
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "List all hosts on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
@@ -196,9 +197,10 @@ var hostCreate = &cli.Command{
 	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "net,network",
-			Value: "",
-			Usage: "network name or network id",
+			Name:    "network",
+			Aliases: []string{"net"},
+			Value:   "",
+			Usage:   "network name or network id",
 		},
 		&cli.StringFlag{
 			Name:  "os",
@@ -210,11 +212,13 @@ var hostCreate = &cli.Command{
 			Usage: "Create with public IP",
 		},
 		&cli.BoolFlag{
-			Name:  "f, force",
-			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
+			Name:    "force",
+			Aliases: []string{"f"},
+			Usage:   "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
 		&cli.StringFlag{
-			Name: "S, sizing",
+			Name:    "sizing",
+			Aliases: []string{"S"},
 			Usage: `Describe sizing of host in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
 			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
@@ -238,25 +242,25 @@ var hostCreate = &cli.Command{
 		},
 		&cli.UintFlag{
 			Name:  "cpu",
-			Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
+			Usage: "DEPRECATED! use --sizing! Defines the number of cpu of masters and nodes in the cluster",
 		},
 		&cli.Float64Flag{
 			Name:  "cpu-freq, cpufreq",
 			Value: 0,
-			Usage: "DEPRECATED! uses --sizing! Minimum cpu frequency required for the host (GHz)",
+			Usage: "DEPRECATED! use --sizing! Minimum cpu frequency required for the host (GHz)",
 		},
 		&cli.IntFlag{
 			Name:  "gpu",
 			Value: -1,
-			Usage: "DEPRECATED! uses --sizing! Number of GPU for the host (by default NO GPUs)",
+			Usage: "DEPRECATED! use --sizing! Number of GPU for the host (by default NO GPUs)",
 		},
 		&cli.Float64Flag{
 			Name:  "ram",
-			Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+			Usage: "DEPRECATED! use --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
 		},
 		&cli.UintFlag{
 			Name:  "disk",
-			Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
+			Usage: "DEPRECATED! use --sizing! Defines the size of system disk of masters and nodes (in GB)",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -436,8 +440,9 @@ var hostAddFeatureCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters",
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define content of feature parameters",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -500,8 +505,9 @@ var hostCheckFeatureCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters",
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define content of feature parameters",
 		},
 	},
 
@@ -558,8 +564,9 @@ var hostRemoveFeatureCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Define value of feature parameter (can be used multiple times)",
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Define value of feature parameter (can be used multiple times)",
 		},
 	},
 

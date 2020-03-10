@@ -84,18 +84,21 @@ func main() {
 	app.EnableBashCompletion = true
 
 	cli.VersionFlag = &cli.BoolFlag{
-		Name:  "version, V",
-		Usage: "Print program version",
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "Print program version",
 	}
 
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "Increase verbosity",
+			Name:    "verbose",
+			Aliases: []string{"v"},
+			Usage:   "Increase verbosity",
 		},
 		&cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "Show debug information",
+			Name:    "debug",
+			Aliases: []string{"d"},
+			Usage:   "Show debug information",
 		},
 		&cli.StringFlag{
 			Name:  "profile",
@@ -103,7 +106,8 @@ func main() {
 			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
 		},
 		// &cli.IntFlag{
-		// 	Name:  "server, S",
+		// 	Name:  "server",
+		// 	Aliases: []string{"S"},
 		// 	Usage: "Connect to daemon on 'server:port' (not honored yet...)",
 		// 	Value: "localhost:50051",
 		// },

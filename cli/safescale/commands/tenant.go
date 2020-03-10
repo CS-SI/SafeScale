@@ -37,9 +37,7 @@ var TenantCmd = &cli.Command{
 		tenantList,
 		tenantGet,
 		tenantSet,
-		// tenantStorageList,
-		// tenantStorageGet,
-		// tenantStorageSet,
+		tenantCleanup,
 	},
 }
 
@@ -83,6 +81,25 @@ var tenantSet = &cli.Command{
 
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 		err := client.New().Tenant.Set(c.Args().First(), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = scerr.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var tenantCleanup = &cli.Command{
+	Name:  "set",
+	Usage: "Cleanup tenant by removing SafeScale metadata",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+		}
+
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+		err := client.New().Tenant.Cleanup(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "set tenant", false).Error())))

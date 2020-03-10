@@ -151,14 +151,16 @@ var sshConnect = &cli.Command{
 	ArgsUsage: "<Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "u,username",
-			Value: "",
-			Usage: "Username to connect to",
+			Name:    "username",
+			Aliases: []string{"u"},
+			Value:   "",
+			Usage:   "Username to connect to",
 		},
 		&cli.StringFlag{
-			Name:  "s,shell",
-			Value: "bash",
-			Usage: "Shell to use (default: bash)",
+			Name:    "shell",
+			Aliases: []string{"s"},
+			Value:   "bash",
+			Usage:   "Shell to use (default: bash)",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -201,9 +203,10 @@ var sshTunnel = &cli.Command{
 			Usage: "remote tunnel's port, if not set all",
 		},
 		&cli.StringFlag{
-			Name:  "timeout",
-			Value: "1",
-			Usage: "timeout in minutes",
+			Name:    "timeout",
+			Aliases: []string{"t"},
+			Value:   "1",
+			Usage:   "timeout in minutes",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -251,9 +254,10 @@ var sshClose = &cli.Command{
 			Usage: "remote tunnel's port, if not set all",
 		},
 		&cli.StringFlag{
-			Name:  "timeout",
-			Value: "1",
-			Usage: "timeout in minutes",
+			Name:    "timeout",
+			Aliases: []string{"t"},
+			Value:   "1",
+			Usage:   "timeout in minutes",
 		},
 	},
 	Action: func(c *cli.Context) error {
