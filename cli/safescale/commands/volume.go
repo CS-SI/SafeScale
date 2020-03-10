@@ -54,8 +54,9 @@ var volumeList = &cli.Command{
 	Usage:   "List available volumes",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "all",
-			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", volumeCmdName, c.Command.Name, c.Args())
@@ -147,7 +148,7 @@ var volumeCreate = &cli.Command{
 		if volSize <= 0 {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize)))
 		}
-		def := protocol.VolumeDefinition{
+		def := protocol.VolumeCreateRequest{
 			Name:  c.Args().First(),
 			Size:  volSize,
 			Speed: protocol.VolumeSpeed(volSpeed),
@@ -188,7 +189,7 @@ var volumeAttach = &cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		}
-		def := protocol.VolumeAttachment{
+		def := protocol.VolumeAttachmentRequest{
 			Format:      c.String("format"),
 			DoNotFormat: c.Bool("do-not-format"),
 			MountPath:   c.String("path"),
@@ -242,7 +243,7 @@ type volumeDisplayable struct {
 	Size  int32
 }
 
-func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInfo) *volumeInfoDisplayable {
+func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInspectResponse) *volumeInfoDisplayable {
 	return &volumeInfoDisplayable{
 		volumeInfo.GetId(),
 		volumeInfo.GetName(),
@@ -255,7 +256,7 @@ func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInfo) *volumeInfoDisplay
 	}
 }
 
-func toDisplayableVolume(volumeInfo *protocol.Volume) *volumeDisplayable {
+func toDisplayableVolume(volumeInfo *protocol.VolumeInspectResponse) *volumeDisplayable {
 	return &volumeDisplayable{
 		volumeInfo.GetId(),
 		volumeInfo.GetName(),

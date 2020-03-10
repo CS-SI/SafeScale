@@ -92,7 +92,7 @@ var shareCreate = &cli.Command{
 		},
 		&cli.StringSliceFlag{
 			Name:  "securityModes",
-			Usage: "{sys(the default--no cryptographic security), krb5(authentication only), krb5i(integrity protection), and krb5p(privacy protection)}",
+			Usage: "{sys(the default, no security), krb5(authentication only), krb5i(integrity protection), and krb5p(privacy protection)}",
 		},
 	},
 	Action: func(c *cli.Context) error {
