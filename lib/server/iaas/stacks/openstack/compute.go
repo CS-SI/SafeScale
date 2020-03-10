@@ -497,13 +497,16 @@ func (s *Stack) queryServer(id string) (*servers.Server, error) {
 			}
 
 			lastState := toHostState(server.Status)
-			if lastState != hoststate.ERROR && lastState != hoststate.STARTING {
-				if lastState != hoststate.STARTED {
-					logrus.Warnf("unexpected: host status of '%s' is '%s'", id, server.Status)
-				}
+			if lastState == hoststate.ERROR {
+				return scerr.AbortedError("", fmt.Errorf("failure inspecting host '%s': it was in '%s' state", server.ID, server.Status))
+			}
+
+			if lastState != hoststate.STARTING {
+				logrus.Tracef("host status of '%s' is '%s'", id, server.Status)
 				err = nil
 				return nil
 			}
+
 			return fmt.Errorf("server not ready yet")
 		},
 		temporal.GetMinDelay(),
@@ -589,7 +592,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	host.LastState = toHostState(server.Status)
-	if host.LastState == hoststate.ERROR || host.LastState == hoststate.STARTING {
+	if host.LastState != hoststate.STARTED {
 		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
 	}
 
