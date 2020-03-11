@@ -4,12 +4,12 @@
 # Create working directory
 # ----------------------
 echo "Accessing working directory"
-BRANCH_NAME=${BRANCH_NAME:="firewalld-issue"}
+BRANCH_NAME=${BRANCH_NAME:="develop"}
 WRKDIR=${GOPATH=/go}/src/github.com/CS-SI
 cd ${WRKDIR}
 
 cd SafeScale
-sed -i "s/\(.*\)develop/\1${BRANCH_NAME}/" common.mk
+sed -i "s#\(.*\)develop#\1${BRANCH_NAME}#" common.mk
 
 # ----------------------
 # Compile
