@@ -6,8 +6,8 @@ then
   echo "First parameter must be a tenant name..."
   exit 1
 else
-  grep name.=..$1 tenants.toml || echo "Tenant $1 not found in tenants.toml"
-  grep name.=..$1 tenants.toml || exit 1
+  grep name.=..$1 tenants.toml 1>/dev/null || echo "Tenant $1 not found in tenants.toml"
+  grep name.=..$1 tenants.toml 1>/dev/null || exit 1
   export TENANT=$1
 fi
 
@@ -30,7 +30,7 @@ fi
 THISBRANCH=local-$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') TENANT=$1 envsubst <Dockerfile.ci > Dockerfile.cibranch-$1
 docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.cibranch-$1 -t safescale-ci:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g')-$1 $WRKDIR
 RC=$?
-[ $RC -ne 0 ] && echo "CI failed !!" && rm -f ./markerCi
+[ $RC -ne 0 ] && echo "CI failed !!" && rm -f ./Dockerfile.cibranch-$1 && rm -f ./markerCi
 
 mkdir -p ./ci-logs/$stamp
 
