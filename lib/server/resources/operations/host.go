@@ -208,6 +208,96 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	svc := rh.SafeGetService()
+	// _, err := svc.GetHostByName(hostReq.ResourceName)
+	// if err != nil {
+	// 	if _, ok := err.(scerr.ErrNotFound); !ok {
+	// 		return scerr.Wrap(err, fmt.Sprintf("failure creating host: failed to check if host resource name '%s' is already used", hostReq.ResourceName))
+	// 	}
+	// } else {
+	// 	return scerr.DuplicateError(fmt.Sprintf("failed to create host '%s': name is already used", hostReq.ResourceName))
+	// }
+
+	// var (
+	// 	// networkID, networkName string
+	// 	objn resources.Network
+	// 	// objpgw, objsgw *host
+	// )
+
+	// if len(hostReq.Networks) > 0 {
+	// 	// By convention, default network is the first of the list
+	// 	rn := hostReq.Networks[0]
+	// 	objn, err = LoadNetwork(task, svc, rn.ID)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// } else {
+	// 	objn, _, err = getOrCreateDefaultNetwork(task, svc)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	err = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	// 		rn, ok := clonable.(*abstract.Network)
+	// 		if !ok {
+	// 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	// 		hostReq.Networks = append(hostReq.Networks, rn)
+	// 		return nil
+	// 	})
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+	// // networkName := objn.Name()
+
+	// // if hostReq.DefaultGatewayID == "" {
+	// // 	hostReq.DefaultGatewayID = objpgw.GetID()task)
+	// // }
+
+	templates, err := svc.SelectTemplatesBySize(hostDef, hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0)
+	if err != nil {
+		return scerr.Wrap(err, "failed to find template corresponding to requested resources")
+	}
+	var template abstract.HostTemplate
+	if len(templates) > 0 {
+		template = *(templates[0])
+		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
+		if template.CPUFreq > 0 {
+			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+		}
+		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+		if template.GPUNumber > 0 {
+			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
+			if template.GPUType != "" {
+				msg += fmt.Sprintf(" %s", template.GPUType)
+			}
+		}
+		msg += ")"
+		logrus.Infof(msg)
+	} else {
+		logrus.Errorf("failed to find template corresponding to requested resources")
+		return scerr.Wrap(err, "failed to find template corresponding to requested resources")
+	}
+
+	return rh.CreateWithTemplateID(task, hostReq, hostDef, template.ID)
+}
+
+// CreateWithTemplate creates a host as requested with the template ID provided
+func (rh *host) CreateWithTemplateID(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, templateID string) error {
+	if rh.IsNull() {
+		return scerr.InvalidInstanceError()
+	}
+	if rh.IsNull() {
+		return scerr.NotAvailableError("cannot use Create() on NullHost")
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	hostname := rh.SafeGetName()
+	if hostname != "" {
+		return scerr.NotAvailableError(fmt.Sprintf("already carrying host '%s'", hostname))
+	}
+
+	svc := rh.SafeGetService()
 	_, err := svc.GetHostByName(hostReq.ResourceName)
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); !ok {
@@ -253,32 +343,8 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// 	hostReq.DefaultGatewayID = objpgw.GetID()task)
 	// }
 
-	templates, err := svc.SelectTemplatesBySize(hostDef, false)
-	if err != nil {
-		return scerr.Wrap(err, "failed to find template corresponding to requested resources")
-	}
-	var template abstract.HostTemplate
-	if len(templates) > 0 {
-		template = *(templates[0])
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
-		if template.CPUFreq > 0 {
-			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-		}
-		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-			if template.GPUType != "" {
-				msg += fmt.Sprintf(" %s", template.GPUType)
-			}
-		}
-		msg += ")"
-		logrus.Infof(msg)
-	} else {
-		logrus.Errorf("failed to find template corresponding to requested resources")
-		return scerr.Wrap(err, "failed to find template corresponding to requested resources")
-	}
-
 	var img *abstract.Image
+	hostDef.Image = hostReq.ImageID
 	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			var inErr error
@@ -290,11 +356,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	if err != nil {
 		return scerr.Wrap(err, "failed to find image to use on compute resource")
 	}
-
 	hostReq.ImageID = img.ID
-	hostReq.TemplateID = template.ID
+	hostReq.TemplateID = templateID
 
-	hf, userDataContent, err := svc.CreateHost(hostReq)
+	ahf, userDataContent, err := svc.CreateHost(hostReq)
 	if err != nil {
 		if _, ok := err.(scerr.ErrInvalidRequest); ok {
 			return err
@@ -304,16 +369,16 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	defer func() {
 		if err != nil {
-			derr := svc.DeleteHost(hf.Core.ID)
+			derr := svc.DeleteHost(ahf.Core.ID)
 			if derr != nil {
-				logrus.Errorf("after failure, failed to cleanup by deleting host '%s': %v", hf.Core.Name, derr)
+				logrus.Errorf("after failure, failed to cleanup by deleting host '%s': %v", ahf.Core.Name, derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
 	}()
 
 	// Creates metadata early to "reserve" host name
-	err = rh.Carry(task, hf.Core)
+	err = rh.Carry(task, ahf.Core)
 	if err != nil {
 		return err
 	}
@@ -325,7 +390,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			hostSizingV2.AllocatedSize = converters.HostEffectiveSizingFromAbstractToPropertyV2(hf.Sizing)
+			hostSizingV2.AllocatedSize = converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
 			hostSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(hostDef)
 			return nil
 		})

@@ -335,7 +335,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	there := true
 	var network *abstract.Network
 
-	netName := "net-safescale" // FIXME Hardcoded string
+	netName := "net-safescale" // FIXME: Hardcoded string
 	if network, err = serviceProvider.GetNetwork(netName); network != nil && err == nil {
 		logrus.Warnf("Network '%s' already there", netName)
 	} else {

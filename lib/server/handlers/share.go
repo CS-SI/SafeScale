@@ -506,7 +506,6 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 		}
 	}
 
-	var mountPath string
 	err = target.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -538,7 +537,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 			}
 
 			// Remove mount from mount list
-			mountPath = mount.Path
+			mountPath := mount.Path
 			delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
 			delete(targetMountsV1.RemoteMountsByPath, mountPath)
 			return nil
