@@ -29,7 +29,6 @@ const (
 	maxBucketNameLength = 63
 	// bucketNamePrefix is the beginning of the name of the bucket for Metadata
 	bucketNamePrefix = "0.safescale"
-	storageSuffix    = ".storage"
 	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 

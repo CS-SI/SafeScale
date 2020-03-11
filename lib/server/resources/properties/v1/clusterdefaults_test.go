@@ -4,14 +4,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
 
 func TestDefaults_Clone(t *testing.T) {
 	ct := newClusterDefaults()
 	ct.Image = "something"
-	ct.GatewaySizing = resources.HostDefinition{
+	ct.GatewaySizing = abstract.HostEffectiveSizing{
 		RAMSize: 3,
 		GPUType: "NVidia",
 	}

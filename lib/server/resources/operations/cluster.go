@@ -167,7 +167,7 @@ func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) error {
 					}
 					nodesV2.MasterLastIndex = nodesV1.MasterLastIndex
 					nodesV2.PrivateLastIndex = nodesV1.PrivateLastIndex
-					nodesV1 = &propertiesv1.ClusterNodes{}
+					// nodesV1 = &propertiesv1.ClusterNodes{}
 					return nil
 				})
 			})
@@ -897,6 +897,9 @@ func (c *cluster) Bootstrap(task concurrency.Task) error {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -1575,9 +1578,6 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
 		return nil, err
 	}
 	nodeDef = complementHostDefinition(def, *nodeDef)
-	if image == "" {
-		image = hostImage
-	}
 
 	var (
 		nodeTypeStr string
@@ -2492,43 +2492,43 @@ func (c *cluster) Delete(task concurrency.Task) error {
 	return c.Core.Delete(task)
 }
 
-func deleteNodes(task concurrency.Task, svc iaas.Service, nodes []*propertiesv2.ClusterNode) {
-	length := len(nodes)
-	if length > 0 {
-		subtasks := make([]concurrency.Task, 0, length)
-		for i := 0; i < length; i++ {
-			host, err := LoadHost(task, svc, nodes[i].ID)
-			if err != nil {
-				subtasks[i] = nil
-				logrus.Errorf(err.Error())
-				continue
-			}
-			subtask, err := task.StartInSubtask(
-				func(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-					return nil, host.Delete(task)
-				},
-				nil,
-			)
-			if err != nil {
-				subtasks[i] = nil
-				logrus.Errorf(err.Error())
-				continue
-			}
-			subtasks[i] = subtask
-		}
-		for i := 0; i < length; i++ {
-			if subtasks[i] != nil {
-				state, err := subtasks[i].Wait()
-				if err != nil {
-					logrus.Errorf(err.Error())
-				}
-				if state != nil {
-					logrus.Errorf("after failure, cleanup failed to delete node '%s': %v", nodes[i].Name, state)
-				}
-			}
-		}
-	}
-}
+// func deleteNodes(task concurrency.Task, svc iaas.Service, nodes []*propertiesv2.ClusterNode) {
+// 	length := len(nodes)
+// 	if length > 0 {
+// 		subtasks := make([]concurrency.Task, 0, length)
+// 		for i := 0; i < length; i++ {
+// 			host, err := LoadHost(task, svc, nodes[i].ID)
+// 			if err != nil {
+// 				subtasks[i] = nil
+// 				logrus.Errorf(err.Error())
+// 				continue
+// 			}
+// 			subtask, err := task.StartInSubtask(
+// 				func(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+// 					return nil, host.Delete(task)
+// 				},
+// 				nil,
+// 			)
+// 			if err != nil {
+// 				subtasks[i] = nil
+// 				logrus.Errorf(err.Error())
+// 				continue
+// 			}
+// 			subtasks[i] = subtask
+// 		}
+// 		for i := 0; i < length; i++ {
+// 			if subtasks[i] != nil {
+// 				state, err := subtasks[i].Wait()
+// 				if err != nil {
+// 					logrus.Errorf(err.Error())
+// 				}
+// 				if state != nil {
+// 					logrus.Errorf("after failure, cleanup failed to delete node '%s': %v", nodes[i].Name, state)
+// 				}
+// 			}
+// 		}
+// 	}
+// }
 
 func containsClusterNode(list []*propertiesv2.ClusterNode, hostID string) (bool, int) {
 	var idx int
@@ -2608,7 +2608,7 @@ func (c *cluster) determineRequiredNodes(task concurrency.Task) (uint, uint, uin
 func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (err error) {
 
 	var (
-		p                                = data.Map{}
+		p                                data.Map
 		ok                               bool
 		primaryGateway, secondaryGateway resources.Host
 	)

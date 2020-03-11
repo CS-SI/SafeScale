@@ -24,7 +24,7 @@ import "google/protobuf/timestamp.proto";
 
 // Common
 
-message Reference{
+message Reference {
     string tenant_id = 1;
     string id = 2;
     string name = 3;
@@ -47,17 +47,22 @@ message ClientRequest {
 
 // Tenant requests
 
-message Tenant{
+message Tenant {
     string name = 1;
     string provider = 2;
 }
 
-message TenantList{
+message TenantList {
     repeated Tenant tenants = 1;
 }
 
-message TenantName{
+message TenantName {
     string name = 1;
+}
+
+message TenantCleanupRequest {
+    string name = 1;
+    bool force = 2;
 }
 
 // VPL: not used ?
@@ -69,7 +74,7 @@ service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
-    rpc Cleanup (TenantName) returns (google.protobuf.Empty){}
+    rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
 }
 
 // Image
@@ -319,12 +324,12 @@ message VolumeCreateRequest {
     int32 size = 4;
 }
 
-message VolumeCreateResponse {
-    string id = 1;
-    string name = 2;
-    VolumeSpeed speed = 3;
-    int32 size = 4;
-}
+// message VolumeCreateResponse {
+//     string id = 1;
+//     string name = 2;
+//     VolumeSpeed speed = 3;
+//     int32 size = 4;
+// }
 
 message VolumeDetachmentRequest {
     Reference volume = 1;
@@ -336,11 +341,11 @@ message VolumeInspectResponse {
     string name = 2;
     VolumeSpeed speed = 3;
     int32 size = 4;
-    Reference host = 5; // Deprecated: replaced by attachment field
-    string mount_path = 6; // Deprecated: replaced by attachment field
-    string format = 7; // Deprecated: replaced by attachment field
-    string device = 8; // Deprecated: replaced by attachment field
-    repeated VolumeAttachment attachments = 10;
+    Reference host = 5; // Deprecated: replaced by attachments field
+    string mount_path = 6; // Deprecated: replaced by attachments field
+    string format = 7; // Deprecated: replaced by attachments field
+    string device = 8; // Deprecated: replaced by attachments field
+    repeated VolumeAttachmentResponse attachments = 10;
 }
 
 message VolumeAttachmentRequest {
@@ -352,7 +357,7 @@ message VolumeAttachmentRequest {
     bool do_not_format = 7;
 }
 
-message VolumeAttachment {
+message VolumeAttachmentResponse {
     Reference host = 1;
     string mount_path = 2;
     string format = 3;
@@ -368,9 +373,8 @@ message VolumeListResponse {
     repeated VolumeInspectResponse volumes = 1;
 }
 
-
 service VolumeService{
-    rpc Create(VolumeCreateRequest) returns (VolumeCreateResponse) {}
+    rpc Create(VolumeCreateRequest) returns (VolumeInspectResponse) {}
     rpc Attach(VolumeAttachmentRequest) returns (google.protobuf.Empty) {}
     rpc Detach(VolumeDetachmentRequest) returns (google.protobuf.Empty){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}

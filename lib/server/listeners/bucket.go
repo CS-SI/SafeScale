@@ -220,7 +220,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	if resp == nil {
 		return nil, scerr.NotFoundError(fmt.Sprintf("bucket '%s' not found", bucketName))
 	}
-	return converters.BucketMountPointFromAbstractToProtocol(*resp), nil
+	return converters.BucketMountPointFromResourceToProtocol(resp)
 }
 
 // Mount a bucket on the filesystem of the host

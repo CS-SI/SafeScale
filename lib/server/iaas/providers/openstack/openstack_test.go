@@ -117,31 +117,13 @@ func Test_HostTemplates(t *testing.T) {
 	tt.HostTemplates(t)
 }
 
-func Test_CreateKeyPair(t *testing.T) {
+func Test_KeyPairs(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.CreateKeyPair(t)
-}
-
-func Test_GetKeyPair(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.GetKeyPair(t)
-}
-
-func Test_ListKeyPairs(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.ListKeyPairs(t)
+	tt.KeyPairs(t)
 }
 
 func Test_Networks(t *testing.T) {

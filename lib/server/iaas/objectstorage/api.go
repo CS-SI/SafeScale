@@ -39,8 +39,8 @@ type Location interface {
 	ListBuckets(string) ([]string, error)
 	// FindBucket returns true of bucket exists in location
 	FindBucket(string) (bool, error)
-	// GetBucket returns info of the Bucket
-	GetBucket(string) (Bucket, error)
+	// InspectBucket returns info of the Bucket
+	InspectBucket(string) (Bucket, error)
 	// Create a bucket
 	CreateBucket(string) (Bucket, error)
 	// DeleteBucket removes a bucket (need to be cleared before)
@@ -50,8 +50,8 @@ type Location interface {
 
 	// ListObjects lists the objects in a Bucket
 	ListObjects(string, string, string) ([]string, error)
-	// GetObject ...
-	GetObject(string, string) (Object, error)
+	// InspectObject ...
+	InspectObject(string, string) (Object, error)
 	// ReadObject ...
 	ReadObject(string, string, io.Writer, int64, int64) error
 	// WriteMultiChunkObject ...
@@ -87,8 +87,8 @@ type Bucket interface {
 
 	// CreateObject creates a new object in the bucket
 	CreateObject(string) (Object, error)
-	// GetObject returns Object instance of an object in the Bucket
-	GetObject(string) (Object, error)
+	// InspectObject returns Object instance of an object in the Bucket
+	InspectObject(string) (Object, error)
 	// DeleteObject delete an object from a container
 	DeleteObject(string) error
 	// ReadObject reads the content of an object

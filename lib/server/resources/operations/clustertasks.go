@@ -246,7 +246,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		// timeout time.Duration
 		nokeep bool
 	)
-	if index, ok = p["index"].(uint); !ok {
+	if anon, ok = p["index"]; !ok {
 		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
 	}
 	if index, ok = anon.(uint); !ok || index < 1 {
@@ -760,6 +760,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.T
 		errs   []string
 	)
 
+	svc := c.SafeGetService()
 	var subtasks []concurrency.Task
 	for _, hostID = range list {
 		i++

@@ -50,7 +50,7 @@ import (
 // VolumeHandler defines API to manipulate hosts
 type VolumeHandler interface {
 	Delete(ref string) error
-	List(all bool) ([]abstract.Volume, error)
+	List(all bool) ([]resources.Volume, error)
 	Inspect(ref string) (resources.Volume, error)
 	Create(name string, size int, speed volumespeed.Enum) (resources.Volume, error)
 	Attach(volume string, host string, path string, format string, doNotFormat bool) error
@@ -72,7 +72,7 @@ func NewVolumeHandler(job server.Job) VolumeHandler {
 }
 
 // List returns the network list
-func (handler *volumeHandler) List(all bool) (volumes []abstract.Volume, err error) {
+func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -90,7 +90,11 @@ func (handler *volumeHandler) List(all bool) (volumes []abstract.Volume, err err
 		return nil, err
 	}
 	err = objv.Browse(task, func(volume *abstract.Volume) error {
-		volumes = append(volumes, *volume)
+		rv, innerErr := volumefactory.Load(task, handler.job.SafeGetService(), volume.ID)
+		if innerErr != nil {
+			return innerErr
+		}
+		volumes = append(volumes, rv)
 		return nil
 	})
 	if err != nil {
@@ -161,13 +165,13 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err error) {
 
 	if handler == nil {
-		return nil, nil, scerr.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, nil, scerr.InvalidParameterError("ref", "cannot be empty!")
+		return nil, scerr.InvalidParameterError("ref", "cannot be empty!")
 	}
 
 	task := handler.job.SafeGetTask()
@@ -179,9 +183,9 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err 
 	objv, err := volumefactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		if _, ok := err.(*scerr.ErrNotFound); ok {
-			return nil, nil, abstract.ResourceNotFoundError("volume", ref)
+			return nil, abstract.ResourceNotFoundError("volume", ref)
 		}
-		return nil, nil, err
+		return nil, err
 	}
 	return objv, nil
 	// volumeID := objv.SafeGetID()
@@ -299,7 +303,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	defer scerr.OnPanic(&err)()
 
 	// Get volume data
-	objv, _, err := handler.Inspect(volumeRef)
+	objv, err := handler.Inspect(volumeRef)
 	if err != nil {
 		return err
 	}

@@ -7,11 +7,14 @@ import (
 
 // Bucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {
-	Metadata
+	// Metadata
+	data.Identifyable
 	data.NullValue
 
-	List(concurrency.Task) ([]string, error)
+	SafeGetHost() string
+	SafeGetMountPoint() string
 	Create(concurrency.Task, string) error
-	Mount(concurrency.Task, string, string, string) error
-	Unmount(concurrency.Task, string, string) error
+	Delete(concurrency.Task) error
+	Mount(concurrency.Task, string, string) error
+	Unmount(concurrency.Task, string) error
 }

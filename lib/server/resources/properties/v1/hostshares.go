@@ -34,8 +34,8 @@ type HostShare struct {
 	Type          string            `json:"type,omitempty"`             // export type is lowercase (ie. nfs, glusterfs, ...)
 	ShareAcls     string            `json:"share_acls,omitempty"`       // the acls to set on the share
 	ShareOptions  string            `json:"share_options,omitempty"`    // the options (other than acls) to set on the share
-	ClientsByID   map[string]string `json:"clients_by_id,omit_empty"`   // contains the name of the hosts mounting the export, indexed by ID
-	ClientsByName map[string]string `json:"clients_by_name,omit_empty"` // contains the ID of the hosts mounting the export, indexed by Name
+	ClientsByID   map[string]string `json:"clients_by_id,omitempty"`   // contains the name of the hosts mounting the export, indexed by host ID
+	ClientsByName map[string]string `json:"clients_by_name,omitempty"` // contains the ID of the hosts mounting the export, indexed by host Name
 }
 
 // NewHostShare ...

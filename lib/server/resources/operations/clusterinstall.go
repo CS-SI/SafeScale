@@ -66,8 +66,8 @@ func (c *cluster) SafeGetInstallMethods(task concurrency.Task) map[uint8]install
 		return nil
 	}
 
-	c.Core.Lock(task)
-	defer c.Core.Unlock(task)
+	c.Lock(task)
+	defer c.Unlock(task)
 
 	if c.installMethods == nil {
 		c.installMethods = map[uint8]installmethod.Enum{}

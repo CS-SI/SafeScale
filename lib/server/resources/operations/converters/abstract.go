@@ -40,37 +40,13 @@ func HostTemplateToHostEffectiveSizing(ht *abstract.HostTemplate) *abstract.Host
 }
 
 // VolumeAttachmentFromAbstractToProtocol ...
-func VolumeAttachmentFromAbstractToProtocol(in *abstract.VolumeAttachment) *protocol.VolumeAttachment {
-	return &protocol.VolumeAttachment{
+func VolumeAttachmentFromAbstractToProtocol(in *abstract.VolumeAttachment) *protocol.VolumeAttachmentResponse {
+	return &protocol.VolumeAttachmentResponse{
 		Host:      &protocol.Reference{Id: in.ServerID},
 		MountPath: in.MountPoint,
 		Format:    in.Format,
 		Device:    in.Device,
 	}
-}
-
-// VolumeFromAbstractToProtocol converts an api.Volume to a *VolumeInfo
-func VolumeFromAbstractToProtocol(volume *abstract.Volume, mounts map[string]*propertiesv1.HostLocalMount) *protocol.VolumeInspectResponse {
-	pbvi := &protocol.VolumeInspectResponse{
-		Id:          volume.ID,
-		Name:        volume.Name,
-		Size:        int32(volume.Size),
-		Speed:       protocol.VolumeSpeed(volume.Speed),
-		Attachments: []*protocol.VolumeAttachment{},
-	}
-	if len(mounts) > 0 {
-		for k, mount := range mounts {
-			a := protocol.VolumeAttachment{
-				Host:      &protocol.Reference{Name: k},
-				MountPath: mount.Path,
-				Device:    mount.Device,
-				Format:    mount.FileSystem,
-			}
-			pbvi.Attachments = append(pbvi.Attachments, &a)
-			break
-		}
-	}
-	return pbvi
 }
 
 // HostEffectiveSizingFromAbstractToProtocol ...
@@ -89,17 +65,17 @@ func HostEffectiveSizingFromAbstractToProtocol(in *abstract.HostEffectiveSizing)
 	}
 }
 
-// GatewayDefinitionFromAbstractToProtocol ...
-func GatewayDefinitionFromAbstractToProtocol(in *abstract.HostEffectiveSizing) *protocol.GatewayDefinition {
-	return &protocol.GatewayDefinition{
-		Cpu:      int32(in.Cores),
-		Ram:      in.RAMSize,
-		Disk:     int32(in.DiskSize),
-		ImageId:  in.ImageID,
-		GpuCount: int32(in.GPUNumber),
-		GpuType:  in.GPUType,
-	}
-}
+// // GatewayDefinitionFromAbstractToProtocol ...
+// func GatewayDefinitionFromAbstractToProtocol(in *abstract.HostEffectiveSizing) *protocol.GatewayDefinition {
+// 	return &protocol.GatewayDefinition{
+// 		Cpu:      int32(in.Cores),
+// 		Ram:      in.RAMSize,
+// 		Disk:     int32(in.DiskSize),
+// 		ImageId:  in.ImageID,
+// 		GpuCount: int32(in.GPUNumber),
+// 		GpuType:  in.GPUType,
+// 	}
+// }
 
 // HostTemplateFromAbstractToProtocol ...
 func HostTemplateFromAbstractToProtocol(in abstract.HostTemplate) *protocol.HostTemplate {
@@ -263,14 +239,6 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketList {
 		out.Buckets = append(out.Buckets, &b)
 	}
 	return &out
-}
-
-func BucketMountPointFromAbstractToProtocol(in abstract.Bucket) *protocol.BucketMountingPoint {
-	return &protocol.BucketMountingPoint{
-		Bucket: in.Name,
-		Host:   &protocol.Reference{Name: in.Host},
-		Path:   in.MountPoint,
-	}
 }
 
 func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {

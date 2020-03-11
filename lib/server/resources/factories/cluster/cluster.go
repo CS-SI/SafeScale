@@ -29,7 +29,7 @@ func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err erro
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
-	return operations.New(task, svc)
+	return operations.NewCluster(task, svc)
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
@@ -41,5 +41,5 @@ func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Clu
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	return operations.Load(task, svc, name)
+	return operations.LoadCluster(task, svc, name)
 }
