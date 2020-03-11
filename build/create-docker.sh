@@ -9,7 +9,7 @@ then
 fi
 
 if [ ! -f ./marker ]; then
-	curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./marker
+  curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./marker
 else
   curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./newMarker
   diff ./marker ./newMarker 1>/dev/null && rm ./newMarker && echo "Nothing to do !, if you want to force a docker build launch with the -f flag" && exit 0
