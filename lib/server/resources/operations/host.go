@@ -208,14 +208,14 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	svc := rh.SafeGetService()
-	// _, err := svc.GetHostByName(hostReq.ResourceName)
-	// if err != nil {
-	// 	if _, ok := err.(scerr.ErrNotFound); !ok {
-	// 		return scerr.Wrap(err, fmt.Sprintf("failure creating host: failed to check if host resource name '%s' is already used", hostReq.ResourceName))
-	// 	}
-	// } else {
-	// 	return scerr.DuplicateError(fmt.Sprintf("failed to create host '%s': name is already used", hostReq.ResourceName))
-	// }
+	_, err := svc.GetHostByName(hostReq.ResourceName)
+	if err != nil {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
+			return scerr.Wrap(err, fmt.Sprintf("failure creating host: failed to check if host resource name '%s' is already used", hostReq.ResourceName))
+		}
+	} else {
+		return scerr.DuplicateError(fmt.Sprintf("failed to create host '%s': name is already used", hostReq.ResourceName))
+	}
 
 	// var (
 	// 	// networkID, networkName string
@@ -253,58 +253,34 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// // 	hostReq.DefaultGatewayID = objpgw.GetID()task)
 	// // }
 
-	templates, err := svc.SelectTemplatesBySize(hostDef, hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0)
-	if err != nil {
-		return scerr.Wrap(err, "failed to find template corresponding to requested resources")
-	}
-	var template abstract.HostTemplate
-	if len(templates) > 0 {
-		template = *(templates[0])
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
-		if template.CPUFreq > 0 {
-			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+	// If TemplateID is not explicitely provided, search the appropriate template to satisfy 'hostDef'
+	if hostReq.TemplateID == "" {
+		useScannerDB := hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0
+		templates, err := svc.SelectTemplatesBySize(hostDef, useScannerDB)
+		if err != nil {
+			return scerr.Wrap(err, "failed to find template corresponding to requested resources")
 		}
-		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-			if template.GPUType != "" {
-				msg += fmt.Sprintf(" %s", template.GPUType)
+		var template abstract.HostTemplate
+		if len(templates) > 0 {
+			template = *(templates[0])
+			msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
+			if template.CPUFreq > 0 {
+				msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 			}
+			msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+			if template.GPUNumber > 0 {
+				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
+				if template.GPUType != "" {
+					msg += fmt.Sprintf(" %s", template.GPUType)
+				}
+			}
+			msg += ")"
+			logrus.Infof(msg)
+		} else {
+			logrus.Errorf("failed to find template corresponding to requested resources")
+			return scerr.Wrap(err, "failed to find template corresponding to requested resources")
 		}
-		msg += ")"
-		logrus.Infof(msg)
-	} else {
-		logrus.Errorf("failed to find template corresponding to requested resources")
-		return scerr.Wrap(err, "failed to find template corresponding to requested resources")
-	}
-
-	return rh.CreateWithTemplateID(task, hostReq, hostDef, template.ID)
-}
-
-// CreateWithTemplate creates a host as requested with the template ID provided
-func (rh *host) CreateWithTemplateID(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, templateID string) error {
-	if rh.IsNull() {
-		return scerr.InvalidInstanceError()
-	}
-	if rh.IsNull() {
-		return scerr.NotAvailableError("cannot use Create() on NullHost")
-	}
-	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
-	}
-	hostname := rh.SafeGetName()
-	if hostname != "" {
-		return scerr.NotAvailableError(fmt.Sprintf("already carrying host '%s'", hostname))
-	}
-
-	svc := rh.SafeGetService()
-	_, err := svc.GetHostByName(hostReq.ResourceName)
-	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
-			return scerr.Wrap(err, fmt.Sprintf("failure creating host: failed to check if host resource name '%s' is already used", hostReq.ResourceName))
-		}
-	} else {
-		return scerr.DuplicateError(fmt.Sprintf("failed to create host '%s': name is already used", hostReq.ResourceName))
+		hostReq.TemplateID = template.ID
 	}
 
 	var (
@@ -343,23 +319,26 @@ func (rh *host) CreateWithTemplateID(task concurrency.Task, hostReq abstract.Hos
 	// 	hostReq.DefaultGatewayID = objpgw.GetID()task)
 	// }
 
-	var img *abstract.Image
-	hostDef.Image = hostReq.ImageID
-	err = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			var inErr error
-			img, inErr = svc.SearchImage(hostReq.ImageID)
-			return inErr
-		},
-		10*time.Second,
-	)
-	if err != nil {
-		return scerr.Wrap(err, "failed to find image to use on compute resource")
-	}
-	hostReq.ImageID = img.ID
-	hostReq.TemplateID = templateID
+	// If hostReq.ImageID is not explicitely defined, find an image ID corresponding to the content of hostDef.Image
+	if hostReq.ImageID == "" && hostDef.Image != "" {
+		var img *abstract.Image
 
-	ahf, userDataContent, err := svc.CreateHost(hostReq)
+		hostDef.Image = hostReq.ImageID
+		err = retry.WhileUnsuccessfulDelay1Second(
+			func() error {
+				var inErr error
+				img, inErr = svc.SearchImage(hostReq.ImageID)
+				return inErr
+			},
+			10*time.Second,
+		)
+		if err != nil {
+			return scerr.Wrap(err, "failed to find image to use on compute resource")
+		}
+		hostReq.ImageID = img.ID
+	}
+
+	ahf, userDataContent, err := svc.CreateHlslsost(hostReq)
 	if err != nil {
 		if _, ok := err.(scerr.ErrInvalidRequest); ok {
 			return err
