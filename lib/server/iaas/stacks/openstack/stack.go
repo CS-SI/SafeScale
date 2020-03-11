@@ -162,6 +162,9 @@ func New(
 	serviceVersions map[string]string,
 ) (*Stack, error) {
 
+	if auth.DomainName == "" && auth.DomainID == "" {
+		auth.DomainName = "Default"
+	}
 	gcOpts := gophercloud.AuthOptions{
 		IdentityEndpoint: auth.IdentityEndpoint,
 		Username:         auth.Username,
