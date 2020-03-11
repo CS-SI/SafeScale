@@ -305,6 +305,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 			MinDiskSize: int(in.GetDisk()),
 			MinGPU:      int(in.GetGpuCount()),
 			MinCPUFreq:  in.GetCpuFreq(),
+			Image:       in.GetImageId(),
 		}
 	} else {
 		s := converters.HostSizingRequirementsFromProtocolToAbstract(*in.Sizing)
@@ -318,7 +319,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 
 	hostReq := abstract.HostRequest{
 		ResourceName: name,
-		ImageID:      in.GetImageId(),
 		PublicIP:     in.GetPublic(),
 	}
 	err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {

@@ -72,9 +72,10 @@ message TenantCleanupRequest {
 
 service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
-    rpc Set (TenantName) returns (google.protobuf.Empty){}
-    rpc Get (google.protobuf.Empty) returns (TenantName){}
     rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
+    rpc Get (google.protobuf.Empty) returns (TenantName){}
+    rpc Scan (google.protobuf.Empty) returns (google.protobuf.Empty){}
+    rpc Set (TenantName) returns (google.protobuf.Empty){}
 }
 
 // Image
@@ -83,7 +84,6 @@ message Image{
     string id = 1;
     string name = 2;
 }
-
 
 message ImageList{
     repeated Image images= 1;

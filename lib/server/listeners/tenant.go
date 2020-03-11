@@ -256,3 +256,45 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	err = service.TenantCleanup(in.Force)
 	return empty, err
 }
+
+// Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
+func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (empty *googleprotobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "failed to scan tenant").ToGRPCStatus()
+		}
+	}()
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, scerr.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	// ctx, cancelFunc := context.WithCancel(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer task.Close()
+
+	name := in.GetName()
+
+	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	if currentTenant != nil && currentTenant.name == in.GetName() {
+		return empty, nil
+	}
+
+	service, err := iaas.UseService(in.GetName())
+	if err != nil {
+		return empty, err
+	}
+
+	err = service.TenantCleanup(in.Force)
+	return empty, err
+}
