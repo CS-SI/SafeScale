@@ -830,14 +830,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			server, err := servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
+			server, ierr := servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
 			}).Extract()
-			if err != nil {
+			if ierr != nil {
 				if server != nil {
 					servers.Delete(s.ComputeClient, server.ID)
 				}
-				msg := ProviderErrorToString(err)
+				msg := ProviderErrorToString(ierr)
 				logrus.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
@@ -859,21 +859,21 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 			host.ID = server.ID
 
+			defer func() {
+				if ierr != nil {
+					servers.Delete(s.ComputeClient, server.ID)
+				}
+			}()
+
 			// Wait that Host is ready, not just that the build is started
 			var srv *servers.Server
-			srv, err = s.waitHostState(host, hoststate.STARTED, temporal.GetHostTimeout())
-			if err != nil {
-				servers.Delete(s.ComputeClient, server.ID)
-				msg := ProviderErrorToString(err)
-				logrus.Warnf(msg)
-				return fmt.Errorf(msg)
+			srv, ierr = s.waitHostState(host, hoststate.STARTED, temporal.GetHostTimeout())
+			if ierr != nil {
+				return fmt.Errorf(ProviderErrorToString(ierr))
 			}
 
-			if err = s.complementHost(host, srv); err != nil {
-				servers.Delete(s.ComputeClient, server.ID)
-				msg := ProviderErrorToString(err)
-				logrus.Warnf(msg)
-				return fmt.Errorf(msg)
+			if ierr = s.complementHost(host, srv); ierr != nil {
+				return fmt.Errorf(ProviderErrorToString(ierr))
 			}
 
 			return nil
@@ -881,7 +881,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, userData, scerr.Wrap(retryErr, fmt.Sprintf("error creating host: timeout"))
+		return nil, userData, scerr.Wrap(retryErr, fmt.Sprintf("error creating host"))
 	}
 	logrus.Debugf("host resource created.")
 
@@ -1003,7 +1003,7 @@ func (s *Stack) SelectedAvailabilityZone() (string, error) {
 	return s.selectedAvailabilityZone, nil
 }
 
-// WaitHostReady waits an host achieve ready state
+// waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
 func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
 	if s == nil {
@@ -1038,14 +1038,14 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 				case gc.ErrDefault404:
 					// If error is "resource not found", we want to return GopherCloud error as-is to be able
 					// to behave differently in this special case. To do so, stop the retry
-					return scerr.AbortedError("", err)
+					return scerr.AbortedError("", resources.ResourceNotFoundError("host", host.ID))
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
 					return err
 				}
 
 				// Any other error stops the retry
-				return fmt.Errorf("error getting host '%s': %s", host.ID, ProviderErrorToString(err))
+				return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", host.ID, ProviderErrorToString(err)))
 			}
 
 			if server == nil {
@@ -1056,6 +1056,10 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 			// If state matches, we consider this a success no matter what
 			if lastState == state {
 				return nil
+			}
+
+			if lastState == hoststate.ERROR {
+				return scerr.AbortedError("", resources.ResourceNotAvailableError("host", host.ID))
 			}
 
 			if !((lastState == hoststate.STARTING) || (lastState == hoststate.STOPPING)) {
@@ -1071,7 +1075,10 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			return nil, resources.TimeoutError(fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.Name, timeout), timeout)
 		}
-		// FIXME Handle internal errrors
+
+		if aborted, ok := retryErr.(retry.ErrAborted); ok {
+			return nil, aborted.Cause()
+		}
 
 		return nil, retryErr
 	}
