@@ -5,6 +5,7 @@ ARG https_proxy=""
 ARG LC_ALL=C.UTF-8
 ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
+ENV BRANCH_NAME $BRANCH_NAME
 
 # -----------------
 # Standard packages
@@ -20,6 +21,7 @@ wget \
 unzip \
 vim \
 git \
+jq \
 python3.6 \
 python3-pip \
 && apt-get autoclean -y \
