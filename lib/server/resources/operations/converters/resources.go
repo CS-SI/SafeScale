@@ -16,6 +16,25 @@
 
 package converters
 
+import (
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+)
+
+func BucketMountPointFromResourceToProtocol(in resources.Bucket) (*protocol.BucketMountingPoint, error) {
+	if in.IsNull() {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
+
+	out := &protocol.BucketMountingPoint{
+		Bucket: in.SafeGetName(),
+		Host:   &protocol.Reference{Name: in.SafeGetHost()},
+		Path:   in.SafeGetMountPoint(),
+	}
+	return out, nil
+}
+
 // func VolumeFromResourceToProtocol(task concurrency.Task, in resources.Volume) (*protocol.VolumeInspectResponse, error) {
 // 	empty := &protocol.VolumeIspectResponse{}
 // 	if in.IsNull() {

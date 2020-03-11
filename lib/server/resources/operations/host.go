@@ -1150,7 +1150,7 @@ func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.
 
 // GetVolumes returns information about volumes attached to the host
 func (objh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, error) {
-	if objh.IsNUll() {
+	if objh.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1160,7 +1160,8 @@ func (objh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, 
 	var hvV1 *propertiesv1.HostVolumes
 	err := objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
-			va, ok := clonable.(*propertiesv1.HostVolumes)
+			var ok bool
+			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.Volumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -1171,6 +1172,12 @@ func (objh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, 
 		return nil, err
 	}
 	return hvV1, nil
+}
+
+// SafeGetVolumes returns information about volumes attached to the host
+func (objh *host) SafeGetVolumes(task concurrency.Task) *propertiesv1.HostVolumes {
+	out, _ := objh.GetVolumes(task)
+	return out
 }
 
 // // GetAttachedVolume returns information about where and how the volume referenced is attached to the host

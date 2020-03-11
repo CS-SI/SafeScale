@@ -158,7 +158,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot get tenant").ToGRPCStatus()
+			err = scerr.Wrap(err, "cannot set tenant").ToGRPCStatus()
 		}
 	}()
 
@@ -205,139 +205,23 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	return empty, nil
 }
 
-/*
-   VPL: disabled, waiting for strategic decision...
-
-//StorageTenants structure handle tenants names and storages services for a group of storage tenants
-type StorageTenants struct {
-	names           []string
-	StorageServices *iaas.StorageServices
-}
-
-var (
-	currentStorageTenants *StorageTenants
-)
-
-// GetCurrentStorageTenants contains the current tenant
-var GetCurrentStorageTenants = getCurrentStorageTenants
-
-// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
-func getCurrentStorageTenants() *StorageTenants {
-	//TODO-AJ should we select all tenants with storage, or still auto selecting tenant only when there is only one available tenant?
-	if currentStorageTenants == nil {
-		tenants, err := iaas.TenantNames()
-		if err != nil || len(tenants) != 1 {
-			return nil
+// Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
+func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot cleanup tenant").ToGRPCStatus()
 		}
-		// Set unique tenant as selected
-		logrus.Println("Unique tenant set")
-		for name := range tenants {
-			nameSlice := []string{name}
-			storageService, err := iaas.UseStorages(nameSlice)
-			if err != nil {
-				return nil
-			}
-			currentStorageTenants = &StorageTenants{names: nameSlice, StorageServices: storageService}
-		}
-	}
-	return currentStorageTenants
-}
+	}()
 
-
-// StorageList lists registered storage tenants
-func (s *TenantListener) StorageList(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
-	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error()
-	}
-	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
-	}
-
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageList"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	}
-
-	tenants, err := iaas.Tenants()
-	if err != nil {
-		return nil, scerr.Wrap(err, "cannot list storage tenants").ToGRPCStatus()
-	}
-
-	var tenantList []*protocol.Tenant
-	for _, tenant := range tenants {
-		tenantCast, ok := tenant.(map[string]interface{})
-		if ok {
-			if _, ok := tenantCast["objectstorage"]; ok {
-				tenantList = append(tenantList, &protocol.Tenant{
-					Name:     tenantCast["name"].(string),
-					Provider: tenantCast["client"].(string),
-				})
-			}
-		}
-	}
-
-	return &protocol.TenantList{Tenants: tenantList}, nil
-}
-
-// StorageGet returns the name of the current storage tenants used for data related commands
-func (s *TenantListener) StorageGet(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantNameList, err error) {
-	if s == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error()
-	}
-	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
-	}
-
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenant StorageGet"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	}
-
-	getCurrentStorageTenants()
-	if currentStorageTenants == nil {
-		msg := "cannot get storage tenants: no tenant set"
-		tracer.Trace(strprocess.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	return &protocol.TenantNameList{Names: currentStorageTenants.names}, nil
-}
-
-// StorageSet set the tenants to use for data related commands
-func (s *TenantListener) StorageSet(ctx context.Context, in *protocol.TenantNameList) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
-	}
-	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return empty, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -347,23 +231,28 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *protocol.TenantName
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().Entering()
+	// ctx, cancelFunc := context.WithCancel(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer task.Close()
+
+	name := in.GetName()
+
+	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames()); err == nil {
-		defer srvutils.JobDeregister(ctx)
+	if currentTenant != nil && currentTenant.name == in.GetName() {
+		return empty, nil
 	}
 
-	storageServices, err := iaas.UseStorages(in.GetNames()
+	service, err := iaas.UseService(in.GetName())
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot set storage tenants").ToGRPCStatus()
+		return empty, err
 	}
 
-	currentStorageTenants = &StorageTenants{names: in.GetNames(), StorageServices: storageServices}
-	tracer.Trace("Current storage tenants are now '%v'", in.GetNames()
-	return empty, nil
+	err = service.TenantCleanup(in.Force)
+	return empty, err
 }
-*/

@@ -14,41 +14,49 @@
  * limitations under the License.
  */
 
-package objectstorage
+package operations
+
+//go:generate rice embed-go
 
 import (
-	"context"
-	"fmt"
+	"bytes"
+	"html/template"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	rice "github.com/GeertJohan/go.rice"
 )
 
-// bucket describes a Bucket and satisfies interface resources.Bucket
+// bucket describes a bucket and satisfies interface resources.Bucket
 type bucket struct {
-	svc iaas.Service
-
 	ID         string `json:"id,omitempty"`
 	Name       string `json:"name,omitempty"`
 	Host       string `json:"host,omitempty"`
 	MountPoint string `json:"mountPoint,omitempty"`
 	// NbItems    int    `json:"nbitems,omitempty"`
+
+	svc iaas.Service
 }
 
-// New intanciantes bucket struct
-func New(svc iaas.Service) (*bucket, error) {
+// NewBucket intanciantes bucket struct
+func NewBucket(svc iaas.Service) (*bucket, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
-	return &bucket{svc: svc}, nil
+	b := &bucket{
+		svc: svc,
+	}
+	return b, nil
 }
 
-// Load instanciantes a bucket struct and fill it with Provider metadata of Object Storage Bucket
-func Load(svc iaas.Service, name string) (_ *bucket, err error) {
+// LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage Bucket
+func LoadBucket(svc iaas.Service, name string) (_ *bucket, err error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -60,22 +68,57 @@ func Load(svc iaas.Service, name string) (_ *bucket, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	b, err := New(svc)
+	b, err := NewBucket(svc)
 	if err != nil {
 		return nil, err
 	}
 
-	pb, err := svc.GetBucket(name)
+	_, err = svc.InspectBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
 			return nil, abstract.ResourceNotFoundError("bucket", name)
 		}
 		return nil, scerr.NewError(err, nil, "failed to read bucket information")
 	}
-	b.Name = pb.GetName()
-	b.ID = pb.GetID()
+	b.Name = name
+	b.ID = name
 
 	return b, nil
+}
+
+// IsNull tells if the instance corresponds to null value
+func (b *bucket) IsNull() bool {
+	return b == nil || b.svc == nil
+}
+
+// SafeGetID returns the ID of the bucket
+func (b *bucket) SafeGetID() string {
+	if b.IsNull() {
+		return ""
+	}
+	return b.ID
+}
+
+// SafeGetName returns the name of the bucket
+func (b *bucket) SafeGetName() string {
+	if b.IsNull() {
+		return ""
+	}
+	return b.Name
+}
+
+func (b *bucket) SafeGetHost() string {
+	if b.IsNull() {
+		return ""
+	}
+	return b.Host
+}
+
+func (b *bucket) SafeGetMountPoint() string {
+	if b.IsNull() {
+		return ""
+	}
+	return b.MountPoint
 }
 
 // Create a bucket
@@ -94,7 +137,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	bucket, err := b.svc.GetBucket(name)
+	bucket, err := b.svc.InspectBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
 			return err
@@ -107,40 +150,37 @@ func (b *bucket) Create(task concurrency.Task, name string) (err error) {
 	if err != nil {
 		return err
 	}
+	b.Name = name
+	b.ID = name
+
 	return nil
 }
 
 // Delete a bucket
-func (b *bucket) Delete(ctx context.Context, name string) (err error) {
-	tracer := concurrency.NewTracer(nil, true, "('"+name+"')").WithStopwatch().Entering()
+func (b *bucket) Delete(task concurrency.Task) (err error) {
+	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	return b.svc.DeleteBucket(name)
+	return b.svc.DeleteBucket(b.SafeGetName())
 }
 
 // Mount a bucket on an host on the given mount point
-func (b *bucket) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
-	tracer := concurrency.NewTracer(nil, true, "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
+func (b *bucket) Mount(task concurrency.Task, hostName, path string) (err error) {
+	tracer := concurrency.NewTracer(task, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	// Check bucket existence
-	_, err = b.svc.GetBucket(bucketName)
+	// Get Host data
+	host, err := LoadHost(task, b.svc, hostName)
 	if err != nil {
-		return err
-	}
-
-	// Get Host ID
-	host, err := operations.LoadHost(task, b.svc, hostName)
-	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return scerr.Wrap(err, "failed to mount bucket '%s' on host '%s'", b.SafeGetName(), hostName)
 	}
 
 	// Create mount point
 	mountPoint := path
-	if path == resources.DefaultBucketMountPoint {
-		mountPoint = resources.DefaultBucketMountPoint + bucketName
+	if path == abstract.DefaultBucketMountPoint {
+		mountPoint = abstract.DefaultBucketMountPoint + b.SafeGetName()
 	}
 
 	authOpts, _ := b.svc.GetAuthenticationOptions()
@@ -156,7 +196,7 @@ func (b *bucket) Mount(ctx context.Context, bucketName, hostName, path string) (
 	regionCfg, _ := authOpts.Config("Region")
 	region := regionCfg.(string)
 
-	objStorageProtocol := b.svc.GetObjectStorageProtocol()
+	objStorageProtocol := b.svc.SafeGetObjectStorageProtocol()
 	if objStorageProtocol == "swift" {
 		objStorageProtocol = "swiftks"
 	}
@@ -171,7 +211,7 @@ func (b *bucket) Mount(ctx context.Context, bucketName, hostName, path string) (
 		MountPoint string
 		Protocol   string
 	}{
-		Bucket:     bucketName,
+		Bucket:     b.SafeGetName(),
 		Tenant:     tenant,
 		Login:      login,
 		Password:   password,
@@ -181,40 +221,78 @@ func (b *bucket) Mount(ctx context.Context, bucketName, hostName, path string) (
 		Protocol:   objStorageProtocol,
 	}
 
-	rerr := exec(ctx, "mount_object_storage.sh", data, host.SafeGetID(), b.svc)
+	rerr := b.exec(task, host, "mount_object_storage.sh", data)
 	return rerr
 }
 
 // Unmount a bucket
-func (b *bucket) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
-	tracer := concurrency.NewTracer(nil, true, "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+func (b *bucket) Unmount(task concurrency.Task, hostName string) (err error) {
+	tracer := concurrency.NewTracer(task, true, "('%s')", hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	// Check bucket existence
-	_, err = b.svc.Inspect(ctx, bucketName)
-	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			return err
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "failed to unmount bucket '%s' from host '%s'", b.SafeGetName(), hostName)
 		}
+	}()
+
+	// Check bucket existence
+	_, err = b.svc.InspectBucket(b.SafeGetName())
+	if err != nil {
 		return err
 	}
 
 	// Get Host ID
-	host, err := operations.LoadHost(task, b.svc, hostName)
+	host, err := LoadHost(task, b.svc, hostName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			return err
-		}
 		return err
 	}
 
 	data := struct {
 		Bucket string
 	}{
-		Bucket: bucketName,
+		Bucket: b.SafeGetName(),
 	}
 
-	rerr := exec(ctx, "umount_object_storage.sh", data, host.SafeGetID(), b.svc)
+	rerr := b.exec(task, host, "umount_object_storage.sh", data)
 	return rerr
+}
+
+// Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
+func (b *bucket) exec(task concurrency.Task, host resources.Host, script string, data interface{}) error {
+	scriptCmd, err := getBoxContent(script, data)
+	if err != nil {
+		return err
+	}
+
+	_, _, _, err = host.Run(task, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	return err
+}
+
+// Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
+func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
+	defer scerr.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &err)()
+
+	box, err := rice.FindBox("../operations/scripts")
+	if err != nil {
+		return "", err
+	}
+	scriptContent, err := box.String(script)
+	if err != nil {
+		return "", err
+	}
+	tpl, err := template.New("TemplateName").Parse(scriptContent)
+	if err != nil {
+		return "", err
+	}
+
+	var buffer bytes.Buffer
+	if err = tpl.Execute(&buffer, data); err != nil {
+		return "", err
+	}
+
+	tplcmd = buffer.String()
+	// fmt.Println(tplcmd)
+	return tplcmd, nil
 }

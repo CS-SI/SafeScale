@@ -94,7 +94,7 @@ func (c *Core) SafeGetService() iaas.Service {
 	if !c.IsNull() && c.folder != nil {
 		return c.folder.SafeGetService()
 	}
-	return iaas.NullService()
+	return nil
 }
 
 // SafeGetID returns the id of the data protected
@@ -443,5 +443,27 @@ func (c *Core) Delete(task concurrency.Task) error {
 	}
 
 	c.shielded = nil
+	return nil
+}
+
+// Serialize serializes Host instance into bytes (output json code)
+func (c *Core) Serialize() ([]byte, error) {
+	return serialize.ToJSON(c)
+}
+
+// Deserialize reads json code and reinstantiates an Host
+func (c *Core) Deserialize(buf []byte) error {
+	var err error
+	if c.properties == nil {
+		c.properties, err = serialize.NewJSONProperties("resources." + c.kind)
+		if err != nil {
+			return err
+		}
+	}
+	err = serialize.FromJSON(buf, c)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

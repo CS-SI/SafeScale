@@ -20,6 +20,6 @@ package main
 var appTrace = `{
 	"concurrency": {
 		"task": {},
-		"lock": {},
-	},
+		"lock": {}
+	}
 }`

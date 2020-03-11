@@ -6,12 +6,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
 
 func TestControlPlane_Clone(t *testing.T) {
-	vip := resources.NewVirtualIP()
-	vip.Hosts = append(vip.Hosts, "Whatever")
+	vip := abstract.NewVirtualIP()
+	hc := abstract.NewHostCore()
+	hc.Name = "whatever"
+	vip.Hosts = append(vip.Hosts, hc)
 
 	ct := newClusterControlPlane()
 	ct.VirtualIP = vip

@@ -4,7 +4,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	objectstorageops "github.com/CS-SI/SafeScale/lib/server/resources/operations/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -26,7 +26,7 @@ func New(svc iaas.Service) (resources.Bucket, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
-	return objectstorageops.New(svc)
+	return operations.NewBucket(svc)
 }
 
 // Load initializes the bucket with metadata from provider
@@ -37,5 +37,5 @@ func Load(svc iaas.Service, name string) (resources.Bucket, error) {
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be emtpy string")
 	}
-	return objectstorageops.Load(svc, name)
+	return operations.LoadBucket(svc, name)
 }

@@ -71,6 +71,8 @@ type Service interface {
 
 	// --- from interface data.Identifyable ---
 	data.Identifyable
+
+	TenantCleanup(bool) error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 }
 
 // Service ...
@@ -124,8 +126,8 @@ func (a ByRankDRF) Less(i, j int) bool { return RankDRF(a[i]) < RankDRF(a[j]) }
 // 	return access.Host.AccessIP()
 // }
 
-// NullService creates a service instance corresponding to null value
-func NullService() *service {
+// nullService creates a service instance corresponding to null value
+func nullService() *service {
 	return &service{}
 }
 
@@ -676,6 +678,16 @@ func (svc *service) ListHostsByName(details bool) (map[string]*abstract.HostFull
 		hostMap[host.Core.Name] = host
 	}
 	return hostMap, nil
+}
+
+// TenantCleanup removes everything related to SafeScale from tenant (mainly metadata)
+// if force equals false and there is metadata, returns an error
+// WARNING: !!! this will make SafeScale unable to handle the resources !!!
+func (svc *service) TenantCleanup(force bool) error {
+	if svc.IsNull() {
+		return scerr.InvalidInstanceError()
+	}
+	return scerr.NotImplementedError("service.TenantCleanup() not yet implemented")
 }
 
 func runeIndexes(s string, r rune) []int {

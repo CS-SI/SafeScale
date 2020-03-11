@@ -42,19 +42,19 @@ func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
 	}
 }
 
-// FromProtocolHostDefinitionToProtocolGatewayDefinition converts a protocol.HostDefinition to protocol.GatewayDefinition
-func FromProtocolHostDefinitionToProtocolGatewayDefinition(in protocol.HostDefinition) protocol.GatewayDefinition {
-	def := protocol.GatewayDefinition{
-		ImageId:  in.ImageId,
-		Cpu:      in.CpuCount,
-		Ram:      in.Ram,
-		Disk:     in.Disk,
-		GpuCount: in.GpuCount,
-		Sizing:   &protocol.HostSizing{},
-	}
-	*def.Sizing = *in.Sizing
-	return def
-}
+// // FromProtocolHostDefinitionToProtocolGatewayDefinition converts a protocol.HostDefinition to protocol.GatewayDefinition
+// func FromProtocolHostDefinitionToProtocolGatewayDefinition(in protocol.HostDefinition) protocol.GatewayDefinition {
+// 	def := protocol.GatewayDefinition{
+// 		ImageId:  in.ImageId,
+// 		Cpu:      in.CpuCount,
+// 		Ram:      in.Ram,
+// 		Disk:     in.Disk,
+// 		GpuCount: in.GpuCount,
+// 		Sizing:   &protocol.HostSizing{},
+// 	}
+// 	*def.Sizing = *in.Sizing
+// 	return def
+// }
 
 func FeatureSettingsFromProtocolToResource(in protocol.FeatureSettings) resources.FeatureSettings {
 	return resources.FeatureSettings{
@@ -94,9 +94,9 @@ func NFSExportOptionsFromProtocolToString(in protocol.NFSExportOptions) string {
 		out += "insecure,"
 	}
 	if in.Async {
-		out = "async,"
+		out += "async,"
 	} else {
-		out = "sync,"
+		out += "sync,"
 	}
 	if in.NoHide {
 		out += "nohide,"

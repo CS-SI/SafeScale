@@ -72,3 +72,16 @@ func (t *tenant) Set(name string, timeout time.Duration) error {
 	return err
 }
 
+// Cleanup ...
+func (t *tenant) Cleanup(name string, timeout time.Duration) error {
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := protocol.NewTenantServiceClient(t.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = service.Cleanup(ctx, &protocol.TenantCleanupRequest{Name: name, Force: false})
+	return err
+}

@@ -33,7 +33,7 @@ type volume struct {
 }
 
 // List ...
-func (v *volume) List(all bool, timeout time.Duration) (*protocol.VolumeList, error) {
+func (v *volume) List(all bool, timeout time.Duration) (*protocol.VolumeListResponse, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := protocol.NewVolumeServiceClient(v.session.connection)
@@ -47,7 +47,7 @@ func (v *volume) List(all bool, timeout time.Duration) (*protocol.VolumeList, er
 }
 
 // Inspect ...
-func (v *volume) Inspect(name string, timeout time.Duration) (*protocol.VolumeInfo, error) {
+func (v *volume) Inspect(name string, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := protocol.NewVolumeServiceClient(v.session.connection)
@@ -101,7 +101,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 }
 
 // Create ...
-func (v *volume) Create(def protocol.VolumeDefinition, timeout time.Duration) (*protocol.Volume, error) {
+func (v *volume) Create(def protocol.VolumeCreateRequest, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := protocol.NewVolumeServiceClient(v.session.connection)
@@ -115,7 +115,7 @@ func (v *volume) Create(def protocol.VolumeDefinition, timeout time.Duration) (*
 }
 
 // Attach ...
-func (v *volume) Attach(def protocol.VolumeAttachment, timeout time.Duration) error {
+func (v *volume) Attach(def protocol.VolumeAttachmentRequest, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := protocol.NewVolumeServiceClient(v.session.connection)
@@ -139,7 +139,7 @@ func (v *volume) Detach(volumeName string, hostName string, timeout time.Duratio
 		return err
 	}
 
-	_, err = service.Detach(ctx, &protocol.VolumeDetachment{
+	_, err = service.Detach(ctx, &protocol.VolumeDetachmentRequest{
 		Volume: &protocol.Reference{Name: volumeName},
 		Host:   &protocol.Reference{Name: hostName},
 	})

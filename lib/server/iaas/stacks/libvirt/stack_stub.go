@@ -135,8 +135,8 @@ func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 }
 
 // BindHostToVIP stub
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (string, string, error) {
-	return "", "", fmt.Errorf(errorStr)
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
+	return fmt.Errorf(errorStr)
 }
 
 // UnbindHostFromVIP stub
@@ -175,7 +175,7 @@ func (s *Stack) GetHostState(interface{}) (hoststate.Enum, error) {
 }
 
 // ListHosts stub
-func (s *Stack) ListHosts(details bool) ([]*abstract.HostFull, error) {
+func (s *Stack) ListHosts(details bool) (abstract.HostList, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 

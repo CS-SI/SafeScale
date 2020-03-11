@@ -8,10 +8,11 @@ all: generate
 
 generate:
 	@(cd clusterflavors ; make $(@))
+	@$(GO) generate -run rice
 
 vet:
 	@$(GO) vet ./...
 
-clean: 
+clean:
 	@(cd clusterflavors ; make $(@))
 	@$(RM) rice-box.go

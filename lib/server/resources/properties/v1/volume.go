@@ -62,7 +62,7 @@ func (vd *VolumeDescription) Replace(p data.Clonable) data.Clonable {
 //       Create a new version instead with needed supplemental fields
 type VolumeAttachments struct {
 	Shareable bool              `json:"shareable,omitempty"` // Tells if the volume can be shared with multiple host
-	Hosts     map[string]string `json:"hosts,omitempty"`     // Contains the name of the hosts mounting the volume, indexed by ID
+	Hosts     map[string]string `json:"hosts,omitempty"`     // Contains the name of the hosts mounting the volume, indexed by host ID
 }
 
 // NewVolumeAttachments ...

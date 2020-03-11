@@ -183,15 +183,16 @@ func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeA
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	var vaV1 *properties.VolumeAttachments
+	var vaV1 *propertiesv1.VolumeAttachments
 	err := objv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
-			var ok error
+			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			return nil
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -199,7 +200,7 @@ func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeA
 	return vaV1, nil
 }
 
-// Browse walks through volume folder and executes a callback for each entries
+// Browse walks through volume folder and executes a callback for each entry
 func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume) error) error {
 	if objv.IsNull() {
 		return scerr.InvalidInstanceError()
@@ -212,12 +213,12 @@ func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume
 	}
 
 	return objv.Core.BrowseFolder(task, func(buf []byte) error {
-		volume := abstract.NewVolume()
-		err := volume.Deserialize(buf)
+		av := abstract.NewVolume()
+		err := av.Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		return callback(volume)
+		return callback(av)
 	})
 }
 
@@ -810,7 +811,8 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 	// }
 }
 
-func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.Volume, error) {
+// ToProtocol converts the volume to protocol message VolumeInspectResponse
+func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, error) {
 	if objv.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -818,11 +820,48 @@ func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.Volume, error) 
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	out := &protocol.Volume{
-		Id:    objv.SafeGetID(),
-		Name:  objv.SafeGetName(),
-		Speed: converters.VolumeSpeedFromAbstractToProtocol(objv.SafeGetSpeed(task)),
-		Size:  int32(objv.SafeGetSize(task)),
+	out := &protocol.VolumeInspectResponse{
+		Id:          objv.SafeGetID(),
+		Name:        objv.SafeGetName(),
+		Speed:       converters.VolumeSpeedFromAbstractToProtocol(objv.SafeGetSpeed(task)),
+		Size:        int32(objv.SafeGetSize(task)),
+		Attachments: []*protocol.VolumeAttachmentResponse{},
+	}
+
+	attachments, err := objv.GetAttachments(task)
+	if err != nil {
+		return nil, err
+	}
+
+	for k := range attachments.Hosts {
+		rh, err := LoadHost(task, objv.SafeGetService(), k)
+		if err != nil {
+			return nil, err
+		}
+		vols := rh.SafeGetVolumes(task)
+		device, ok := vols.DevicesByID[objv.SafeGetID()]
+		if !ok {
+			return nil, scerr.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+		}
+		mnts := rh.SafeGetMounts(task)
+		path, ok := mnts.LocalMountsByDevice[device]
+		if !ok {
+			return nil, scerr.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+		}
+		m, ok := mnts.LocalMountsByPath[path]
+		if !ok {
+			return nil, scerr.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+		}
+		a := &protocol.VolumeAttachmentResponse{
+			Host: &protocol.Reference{
+				Name: k,
+				Id:   rh.SafeGetID(),
+			},
+			MountPath: path,
+			Format:    m.FileSystem,
+			Device:    device,
+		}
+		out.Attachments = append(out.Attachments, a)
 	}
 	return out, nil
 }

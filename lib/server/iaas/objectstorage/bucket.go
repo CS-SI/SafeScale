@@ -65,8 +65,8 @@ func (b *bucket) CreateObject(objectName string) (Object, error) {
 	return newObject(b, objectName)
 }
 
-// GetObject ...
-func (b *bucket) GetObject(objectName string) (Object, error) {
+// InspectObject ...
+func (b *bucket) InspectObject(objectName string) (Object, error) {
 	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%s)", objectName).Entering().OnExitTrace()()
 
 	o, err := newObject(b, objectName)

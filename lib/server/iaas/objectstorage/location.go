@@ -60,9 +60,9 @@ func NewLocation(conf Config) (Location, error) {
 	return location, nil
 }
 
-func (l *location) getStowLocation() stow.Location {
-	return l.stowLocation
-}
+// func (l *location) getStowLocation() stow.Location {
+// 	return l.stowLocation
+// }
 
 // Connect connects to an Object Storage Location
 func (l *location) connect() error {
@@ -166,7 +166,7 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 }
 
 // GetBucket ...
-func (l *location) GetBucket(bucketName string) (Bucket, error) {
+func (l *location) InspectBucket(bucketName string) (Bucket, error) {
 	if l == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -228,8 +228,8 @@ func (l *location) DeleteBucket(bucketName string) error {
 	return nil
 }
 
-// GetObject ...
-func (l *location) GetObject(bucketName string, objectName string) (Object, error) {
+// InspectObject ...
+func (l *location) InspectObject(bucketName string, objectName string) (Object, error) {
 	if l == nil {
 		return nil, scerr.InvalidInstanceError()
 	}

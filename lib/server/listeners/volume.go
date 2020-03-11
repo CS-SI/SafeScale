@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -80,7 +79,8 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	defer job.Close()
 
 	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "(%v)", all).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -92,8 +92,12 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.VolumeInspectResponse
-	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, converters.VolumeFromAbstractToProtocol(&volume))
+	for _, v := range volumes {
+		pbVolume, err := v.ToProtocol(task)
+		if err != nil {
+			return nil, err
+		}
+		pbvolumes = append(pbvolumes, pbVolume)
 	}
 	rv := &protocol.VolumeListResponse{Volumes: pbvolumes}
 	return rv, nil
@@ -366,5 +370,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, err
 	}
 
-	return converters.VolumeInfoFromResourceToProtocol(task, volume)
+	return volume.ToProtocol(task)
 }

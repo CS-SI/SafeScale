@@ -35,7 +35,7 @@ type Host interface {
 	Targetable
 	data.NullValue
 
-	Browse(task concurrency.Task, callback func(*abstract.HostCore) error) error                               // Browse ...
+	Browse(task concurrency.Task, callback func(*abstract.HostCore) error) error                               // ...
 	Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) error // creates a new host and its metadata
 	GetAccessIP(task concurrency.Task) (string, error)                                                         // returns the IP to reach the host, with error handling
 	GetDefaultNetwork(task concurrency.Task) (Network, error)                                                  // returns the resources.Network object corresponding to the default network of the host, with error handling
