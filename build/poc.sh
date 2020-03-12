@@ -57,7 +57,7 @@ RUN=0
 CLEAN=0
 
 ## declare an array variable
-declare -a flavor=("boh")
+declare -a flavor=("k8s" "boh")
 
 for fla in "${flavor[@]}"
 do
