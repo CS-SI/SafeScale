@@ -643,7 +643,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError("timeout waiting for task '%s'", tid, duration, nil)
+			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
 		default:
 			ok, result, err := t.TryWait()
 			if ok {

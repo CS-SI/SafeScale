@@ -135,8 +135,8 @@ func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	c.RLock(task)
-	defer c.RUnlock(task)
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
 
 	// Check c.properties is populated
 	if c.properties == nil {
@@ -168,8 +168,8 @@ func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err er
 	if callback == nil {
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
-	c.Lock(task)
-	defer c.Unlock(task)
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
 
 	// Make sure c.properties is populated
 	if c.properties == nil {
@@ -215,11 +215,11 @@ func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
 		return scerr.NotAvailableError("already carrying a shielded value")
 	}
 
-	var err error
-	c.Lock(task)
-	defer c.Unlock(task)
-	c.shielded = concurrency.NewShielded(clonable)
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
 
+	var err error
+	c.shielded = concurrency.NewShielded(clonable)
 	err = c.updateIdentity(task)
 	if err != nil {
 		return err
@@ -263,8 +263,8 @@ func (c *Core) Read(task concurrency.Task, ref string) error {
 		return scerr.NotAvailableError("metadata is already carrying a value")
 	}
 
-	c.Lock(task)
-	defer c.Unlock(task)
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
 
 	err := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
@@ -400,8 +400,8 @@ func (c *Core) Delete(task concurrency.Task) error {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	c.Lock(task)
-	defer c.Unlock(task)
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
 
 	var idFound, nameFound bool
 	id := c.SafeGetID()

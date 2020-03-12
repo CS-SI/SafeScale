@@ -92,7 +92,10 @@ func Profile(what string) func() {
 
 	return func() {
 		if profileMemory {
-			defer memfile.Close()
+			defer func() {
+				_ = memfile.Close()
+			}()
+
 			runtime.GC() // get up-to-date statistics
 			if err := pprof.WriteHeapProfile(memfile); err != nil {
 				logrus.Errorf("could not write memory profile: %v", err)
