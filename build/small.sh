@@ -51,12 +51,14 @@ sleep 3
 
 sleep 3
 
+RETCODE=0
+
 ROUNDS=5
+
 CODE=0
 RUN=0
 CLEAN=0
 
-## declare an array variable
 declare -a flavor=("k8s" "boh" "swarm")
 
 for fla in "${flavor[@]}"
@@ -73,17 +75,20 @@ do
     machines=$(./safescale host ls | tail -n 1 | jq '.result' | jq -r '.[] | .name')
     stamp=`date +"%s"`
     nmach=$(echo $machines | wc -w)
-    if [[ $nmach -ne 3 ]]; then
-      for machine in $machines
-      do
-          whydied $machine $stamp
-      done
+
+    for machine in $machines
+    do
+    if [[ $RUN -eq 0 ]]; then
+      whylives $machine $stamp
     else
-      for machine in $machines
-      do
-          whylives $machine $stamp
-      done
+      whydied $machine $stamp
     fi
+    done
+
+    if [[ $nmach -ne 3 ]]; then
+      CLEAN=$((CLEAN + 1))
+    fi
+
     ./safescale-cover cluster delete clu-$TENANT-ubu-$fla-r$i -y
     if [[ $? -ne 0 ]]; then
       CLEAN=$((CLEAN + 1))
@@ -94,6 +99,10 @@ do
       break
     fi
   done
+
+  if [[ $CODE -ne 0 ]]; then
+    RETCODE=$((RETCODE + CODE))
+  fi
   
   for i in $(seq $ROUNDS); do
     ./safescale-cover cluster delete clu-$TENANT-cent7-$fla-r$i -y
@@ -105,17 +114,20 @@ do
     machines=$(./safescale host ls | tail -n 1 | jq '.result' | jq -r '.[] | .name')
     stamp=`date +"%s"`
     nmach=$(echo $machines | wc -w)
-    if [[ $nmach -ne 3 ]]; then
-      for machine in $machines
-      do
-          whydied $machine $stamp
-      done
+
+    for machine in $machines
+    do
+    if [[ $RUN -eq 0 ]]; then
+      whylives $machine $stamp
     else
-      for machine in $machines
-      do
-          whylives $machine $stamp
-      done
+      whydied $machine $stamp
     fi
+    done
+
+    if [[ $nmach -ne 3 ]]; then
+      CLEAN=$((CLEAN + 1))
+    fi
+
     ./safescale-cover cluster delete clu-$TENANT-cent7-$fla-r$i -y
     if [[ $? -ne 0 ]]; then
       CLEAN=$((CLEAN + 1))
@@ -126,10 +138,14 @@ do
       break
     fi
   done
+
+  if [[ $CODE -ne 0 ]]; then
+    RETCODE=$((RETCODE + CODE))
+  fi
 done
 
-if [[ $CODE -eq 0 ]]; then
-  exit $CODE
+if [[ $RETCODE -eq 0 ]]; then
+  exit $RETCODE
 fi
 
-exit $((CLEAN + CODE))
+exit $((CLEAN + RETCODE))
