@@ -21,7 +21,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/graymeta/stow"
+	"gomodules.xyz/stow"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
