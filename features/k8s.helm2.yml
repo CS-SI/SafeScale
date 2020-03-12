@@ -35,7 +35,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            [ -f /usr/local/bin/helm ] || sfFail 192
+                            [ -f /usr/local/bin/helm ] || sfFail 192 "Helm binary not found"
                             sfExit
 
             add:
@@ -230,25 +230,25 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            # Delete deployment
+                            ## Delete deployment
                             if sfKubectl -n kube-system get deployment tiller-deploy &>/dev/null; then
-                                sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192
+                                sfKubectl -n kube-system delete deployment tiller-deploy || sfFail 192 "Failure deleting k8s deployment"
                             fi
                             ## Delete service
                             if sfKubectl get service -n kube-system tiller-deploy &>/dev/null; then
-                                sfKubectl delete service -n kube-system tiller-deploy || sfFail 193
+                                sfKubectl delete service -n kube-system tiller-deploy || sfFail 193 "Failure deleting k8s service"
                             fi
                             ## Delete account
                             if sfKubectl get serviceaccount tiller -n kube-system &>/dev/null; then
-                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 194
+                                sfKubectl delete serviceaccount tiller -n kube-system || sfFail 194 "Failure deleting k8s account"
                             fi
                             ## Delete secret
                             if sfKubectl get secret -n kube-system tiller-secret &>/dev/null; then
-                                sfKubectl delete secret -n kube-system tiller-secret || sfFail 195
+                                sfKubectl delete secret -n kube-system tiller-secret || sfFail 195 "Failure deleting k8s secret"
                             fi
                             ## Delete RBAC policy
                             if sfKubectl get role tiller-rolebinding-secret -n kube-system &>/dev/null; then
-                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 196
+                                sfKubectl delete -f ${SF_ETCDIR}/helm/tiller-clusterrolebinding-admin.yaml || sfFail 196 "Failure deleting rbac policy"
                             fi
                             sfExit
 

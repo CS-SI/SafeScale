@@ -36,7 +36,7 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfFail 192
+                            [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfFail 192 "Certificate not found"
                             sfExit
 
             add:
