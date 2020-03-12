@@ -102,7 +102,7 @@ func nullShare() *share {
 }
 
 // NewShare creates an instance of Share
-func NewShare(svc iaas.Service) (*share, error) {
+func NewShare(svc iaas.Service) (resources.Share, error) {
 	if svc == nil {
 		return nullShare(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -119,7 +119,7 @@ func NewShare(svc iaas.Service) (*share, error) {
 //        If error is scerr.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return scerr.ErrTimeout
-func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (*share, error) {
+func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, error) {
 	if task == nil {
 		return nullShare(), scerr.InvalidParameterError("task", "cannot be nil")
 	}

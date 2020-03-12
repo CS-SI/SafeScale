@@ -66,8 +66,8 @@ type host struct {
 	sshProfile     *system.SSHConfig
 }
 
-// New ...
-func NewHost(svc iaas.Service) (*host, error) {
+// NewHost ...
+func NewHost(svc iaas.Service) (resources.Host, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -85,8 +85,8 @@ func nullHost() *host {
 	return &host{Core: nullCore()}
 }
 
-// Load ...
-func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (*host, error) {
+// LoadHost ...
+func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (resources.Host, error) {
 	if task == nil {
 		return nullHost(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -338,7 +338,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		hostReq.ImageID = img.ID
 	}
 
-	ahf, userDataContent, err := svc.CreateHlslsost(hostReq)
+	ahf, userDataContent, err := svc.CreateHost(hostReq)
 	if err != nil {
 		if _, ok := err.(scerr.ErrInvalidRequest); ok {
 			return err
@@ -393,7 +393,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*hf.Description))
+			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
 			creator := ""
 			hostname, _ := os.Hostname()
 			if curUser, err := user.Current(); err == nil {
@@ -424,7 +424,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*hf.Network))
+			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Network))
 			hostNetworkV1.DefaultNetworkID = objn.SafeGetID()
 			if objn.SafeGetName() != abstract.SingleHostNetworkName {
 				hostNetworkV1.IsGateway = (hostReq.DefaultRouteIP == "")
@@ -1193,8 +1193,8 @@ func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.
 }
 
 // GetVolumes returns information about volumes attached to the host
-func (objh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, error) {
-	if objh.IsNull() {
+func (rh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, error) {
+	if rh.IsNull() {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1202,7 +1202,7 @@ func (objh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, 
 	}
 
 	var hvV1 *propertiesv1.HostVolumes
-	err := objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+	err := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
@@ -1219,8 +1219,8 @@ func (objh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, 
 }
 
 // SafeGetVolumes returns information about volumes attached to the host
-func (objh *host) SafeGetVolumes(task concurrency.Task) *propertiesv1.HostVolumes {
-	out, _ := objh.GetVolumes(task)
+func (rh *host) SafeGetVolumes(task concurrency.Task) *propertiesv1.HostVolumes {
+	out, _ := rh.GetVolumes(task)
 	return out
 }
 

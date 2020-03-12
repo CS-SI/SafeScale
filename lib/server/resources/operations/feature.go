@@ -183,7 +183,7 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err er
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(task concurrency.Task, name string) (_ *feature, err error) {
+func NewEmbeddedFeature(task concurrency.Task, name string) (_ resources.Feature, err error) {
 	if task == nil {
 		return nullFeature(), scerr.InvalidParameterError("task", "cannot be nil")
 	}

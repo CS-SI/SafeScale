@@ -78,7 +78,7 @@ func nullCluster() *cluster {
 }
 
 // NewCluster ...
-func NewCluster(task concurrency.Task, svc iaas.Service) (_ *cluster, err error) {
+func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err error) {
 	if task == nil {
 		return nullCluster(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -96,7 +96,7 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ *cluster, err error)
 }
 
 // LoadCluster ...
-func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ *cluster, err error) {
+func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, err error) {
 	if task == nil {
 		return nullCluster(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -108,10 +108,12 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ *clust
 	}
 	defer scerr.OnPanic(&err)()
 
-	instance, err := NewCluster(task, svc)
+	anon, err := NewCluster(task, svc)
 	if err != nil {
-		return instance, err
+		return nullCluster(), err
 	}
+	instance := anon.(*cluster)
+
 	err = instance.Read(task, name)
 	if err != nil {
 		return nullCluster(), err

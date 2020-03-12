@@ -93,6 +93,9 @@ type TaskCore interface {
 	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, error)
 	StartInSubtask(TaskAction, TaskParameters) (Task, error)
 
+	SafeGetID() string
+	SafeGetSignature() string
+
 	Close()
 }
 
@@ -249,7 +252,7 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 
 // taskCancelReceiver captures cancel signal if it arrives and abort the task
 func (t *task) taskCancelReceiver() {
-	sig, _ := t.GetSignature()
+	sig := t.SafeGetSignature()
 	finish := false
 	for !finish {
 		select {
@@ -258,11 +261,11 @@ func (t *task) taskCancelReceiver() {
 		case <-t.context.Done(): // Cancel signal received, abort task
 			logrus.Debugf("%s: cancel received, aborting task", sig)
 			_ = t.Abort()
+			finish = true
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-	close(t.closeCh)
 }
 
 // GetID returns an unique id for the task
@@ -277,6 +280,12 @@ func (t *task) GetID() (string, error) {
 	return t.id, nil
 }
 
+// SafeGetID ...
+func (t *task) SafeGetID() string {
+	sig, _ := t.GetID()
+	return sig
+}
+
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
 func (t *task) GetSignature() (string, error) {
@@ -285,6 +294,12 @@ func (t *task) GetSignature() (string, error) {
 	}
 
 	return t.sig, nil
+}
+
+// SafeGetSignature ...
+func (t *task) SafeGetSignature() string {
+	sig, _ := t.GetSignature()
+	return sig
 }
 
 // GetStatus returns the current task status
@@ -348,7 +363,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 		return t, err
 	}
 	if status != READY {
-		return t, scerr.InvalidRequestError(fmt.Sprintf("cannot start task '%s': not ready", tid))
+		return t, scerr.InvalidRequestError("cannot start task '%s': not ready", tid)
 	}
 
 	t.mu.Lock()
@@ -628,7 +643,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
+			return false, nil, scerr.TimeoutError("timeout waiting for task '%s'", tid, duration, nil)
 		default:
 			ok, result, err := t.TryWait()
 			if ok {
@@ -690,7 +705,7 @@ func (t *task) Abort() (err error) {
 	defer t.mu.Unlock()
 
 	if t.abortDisengaged {
-		return scerr.NotAvailableError(fmt.Sprintf("abort signal is disengaged on task %s", id))
+		return scerr.NotAvailableError("abort signal is disengaged on task %s", id)
 	}
 
 	if status == RUNNING {
@@ -749,5 +764,8 @@ func (t *task) Close() {
 		_, _ = k.Wait()
 	}
 	_, _ = t.Wait()
-	t.closeCh <- struct{}{}
+	if t.context != nil && t.cancel != nil {
+		t.closeCh <- struct{}{}
+		close(t.closeCh)
+	}
 }

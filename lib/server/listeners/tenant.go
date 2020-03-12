@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -257,7 +258,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	return empty, err
 }
 
-// Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
+// Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
 func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
@@ -273,28 +274,27 @@ func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (em
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	job, err := PrepareJob(ctx, "", "host start")
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
+	defer job.Close()
 
-	name := in.GetName()
+	getCurrentTenant()
+	if currentTenant == nil {
+		return nil, scerr.NotFoundError("no tenant set")
+	}
 
-	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
+	name := currentTenant.name
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if currentTenant != nil && currentTenant.name == in.GetName() {
-		return empty, nil
-	}
-
-	service, err := iaas.UseService(in.GetName())
+	handler := handlers.NewScannerHandler(job)
 	if err != nil {
 		return empty, err
 	}
 
-	err = service.TenantCleanup(in.Force)
+	err = handler.Scan()
 	return empty, err
 }
