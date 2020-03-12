@@ -60,8 +60,10 @@ type Host interface {
 	SafeGetPrivateIPOnNetwork(task concurrency.Task, networkID string) string                                                                 // returns the IP address of the host on the local network requested, , without error handling (returning "" if cannot be defined)
 	SafeGetAccessIP(task concurrency.Task) string                                                                                             // returns the IP to reach the host, , without error handling (returning "" if cannot be defined)
 	SafeGetState(task concurrency.Task) hoststate.Enum                                                                                        // returns the latest retrieved state of the host, without error handling
-	Start(task concurrency.Task) error                                                                                                        // starts the host
-	Stop(task concurrency.Task) error                                                                                                         // stops the host
-	ToProtocol(task concurrency.Task) (*protocol.Host, error)                                                                                 // converts a host to equivalent gRPC message
-	WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err error)                                                     // WaitSSHReady ...
+	SafeGetVolumes(task concurrency.Task) *propertiesv1.HostVolumes
+	SafeGetMounts(task concurrency.Task) *propertiesv1.HostMounts
+	Start(task concurrency.Task) error                                                    // starts the host
+	Stop(task concurrency.Task) error                                                     // stops the host
+	ToProtocol(task concurrency.Task) (*protocol.Host, error)                             // converts a host to equivalent gRPC message
+	WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err error) // WaitSSHReady ...
 }

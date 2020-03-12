@@ -28,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
+// RetrieveForensicsData ...
+// FIXME: documentationÒ
 func RetrieveForensicsData(task concurrency.Task, host resources.Host) {
 	if host == nil {
 		return
@@ -41,6 +43,8 @@ func RetrieveForensicsData(task concurrency.Task, host resources.Host) {
 	}
 }
 
+// GetPhaseWarningsAndErrors ...
+// FIXME: documentation
 func GetPhaseWarningsAndErrors(task concurrency.Task, host resources.Host) ([]string, []string) {
 	if task == nil || host == nil {
 		return []string{}, []string{}

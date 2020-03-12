@@ -45,7 +45,7 @@ type bucket struct {
 }
 
 // NewBucket intanciantes bucket struct
-func NewBucket(svc iaas.Service) (*bucket, error) {
+func NewBucket(svc iaas.Service) (resources.Bucket, error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -56,7 +56,7 @@ func NewBucket(svc iaas.Service) (*bucket, error) {
 }
 
 // LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage Bucket
-func LoadBucket(svc iaas.Service, name string) (_ *bucket, err error) {
+func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, err error) {
 	if svc == nil {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -68,10 +68,11 @@ func LoadBucket(svc iaas.Service, name string) (_ *bucket, err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	b, err := NewBucket(svc)
+	anon, err := NewBucket(svc)
 	if err != nil {
 		return nil, err
 	}
+	b := anon.(*bucket)
 
 	_, err = svc.InspectBucket(name)
 	if err != nil {

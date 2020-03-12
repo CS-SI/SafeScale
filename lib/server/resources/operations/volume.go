@@ -62,7 +62,7 @@ func nullVolume() *volume {
 }
 
 // NewVolume creates an instance of Volume
-func NewVolume(svc iaas.Service) (_ *volume, err error) {
+func NewVolume(svc iaas.Service) (_ resources.Volume, err error) {
 	if svc == nil {
 		return nullVolume(), scerr.InvalidParameterError("svc", "can't be nil")
 	}
@@ -75,7 +75,7 @@ func NewVolume(svc iaas.Service) (_ *volume, err error) {
 }
 
 // LoadVolume loads the metadata of a network
-func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (*volume, error) {
+func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, error) {
 	if task != nil {
 		return nullVolume(), scerr.InvalidParameterError("task", "cannot be nil")
 	}

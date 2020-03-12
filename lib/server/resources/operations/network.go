@@ -60,7 +60,7 @@ func nullNetwork() *network {
 }
 
 // NewNetwork creates an instance of Network
-func NewNetwork(svc iaas.Service) (*network, error) {
+func NewNetwork(svc iaas.Service) (resources.Network, error) {
 	if svc == nil {
 		return nullNetwork(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -74,7 +74,7 @@ func NewNetwork(svc iaas.Service) (*network, error) {
 }
 
 // LoadNetwork loads the metadata of a network
-func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (*network, error) {
+func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, error) {
 	if task != nil {
 		return nullNetwork(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
