@@ -646,8 +646,8 @@ func (rh *host) Delete(task concurrency.Task) error {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	rh.Lock(task)
-	defer rh.Unlock(task)
+	rh.SafeLock(task)
+	defer rh.SafeUnlock(task)
 
 	svc := rh.SafeGetService()
 
@@ -1651,8 +1651,8 @@ func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installme
 		return map[uint8]installmethod.Enum{}
 	}
 
-	rh.Lock(task)
-	defer rh.Unlock(task)
+	rh.SafeLock(task)
+	defer rh.SafeUnlock(task)
 
 	if rh.installMethods == nil {
 		rh.installMethods = map[uint8]installmethod.Enum{}

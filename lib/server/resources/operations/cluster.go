@@ -895,16 +895,17 @@ func (c *cluster) Deserialize(buf []byte) error {
 }
 
 // Boostrap (re)connects controller with the appropriate Makers
-func (c *cluster) Bootstrap(task concurrency.Task) error {
+func (c *cluster) Bootstrap(task concurrency.Task) (err error) {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
+	defer scerr.OnPanic(&err)() // c.Lock()/Unlock() may panic
 
-	c.Lock(task)
-	defer c.Unlock(task)
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
 
 	switch c.ClusterIdentity.Flavor {
 	case clusterflavor.BOH:
@@ -941,8 +942,8 @@ func (c *cluster) GetIdentity(task concurrency.Task) (identity abstract.ClusterI
 		return abstract.ClusterIdentity{}, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	c.RLock(task)
-	defer c.RUnlock(task)
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
 
 	return c.ClusterIdentity, nil
 }
@@ -969,8 +970,8 @@ func (c *cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, e
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	c.RLock(task)
-	defer c.RUnlock(task)
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
 
 	return c.ClusterIdentity.Flavor, nil
 }
@@ -997,8 +998,8 @@ func (c *cluster) GetComplexity(task concurrency.Task) (complexity clustercomple
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	c.RLock(task)
-	defer c.RUnlock(task)
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
 
 	return c.ClusterIdentity.Complexity, nil
 }
@@ -1025,8 +1026,9 @@ func (c *cluster) GetAdminPassword(task concurrency.Task) (adminPassword string,
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	c.RLock(task)
-	defer c.RUnlock(task)
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
+
 	return c.ClusterIdentity.AdminPassword, nil
 }
 
@@ -1049,8 +1051,8 @@ func (c *cluster) GetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair, e
 		return keyPair, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	c.RLock(task)
-	defer c.RUnlock(task)
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
 
 	return *c.ClusterIdentity.Keypair, nil
 }

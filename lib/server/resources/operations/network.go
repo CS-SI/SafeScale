@@ -742,8 +742,8 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	objn.Lock(task)
-	defer objn.Unlock(task)
+	objn.SafeLock(task)
+	defer objn.SafeUnlock(task)
 
 	// var gwID string
 	err = objn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
