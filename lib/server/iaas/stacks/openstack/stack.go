@@ -162,6 +162,9 @@ func New(
 	serviceVersions map[string]string,
 ) (*Stack, error) {
 
+	if auth.DomainName == "" && auth.DomainID == "" {
+		auth.DomainName = "Default"
+	}
 	gcOpts := gophercloud.AuthOptions{
 		IdentityEndpoint: auth.IdentityEndpoint,
 		Username:         auth.Username,
@@ -181,6 +184,7 @@ func New(
 		cfgOpts:  cfg,
 	}
 
+	// FIXME: detect versions instead of statically declare them 
 	s.versions = map[string]string{
 		"compute": "v2",
 		"volume":  "v2",

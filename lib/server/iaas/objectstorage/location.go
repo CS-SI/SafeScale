@@ -21,14 +21,14 @@ import (
 	"io"
 	"strings"
 
-	"github.com/graymeta/stow"
 	"github.com/sirupsen/logrus"
+	"gomodules.xyz/stow"
 
 	// necessary for connect
-	// _ "github.com/graymeta/stow/azure"
-	_ "github.com/graymeta/stow/google"
-	_ "github.com/graymeta/stow/s3"
-	_ "github.com/graymeta/stow/swift"
+	// _ "gomodules.xyz/stow/azure"
+	_ "gomodules.xyz/stow/google"
+	_ "gomodules.xyz/stow/s3"
+	_ "gomodules.xyz/stow/swift"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
