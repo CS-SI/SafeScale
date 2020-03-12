@@ -5,7 +5,7 @@ if [ ! -f ./marker ]; then
   curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./marker
 else
   curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./newMarker
-  diff ./marker ./newMarker && rm ./newMarker || mv ./newMarker ./marker
+  diff ./marker ./newMarker 1>/dev/null && rm ./newMarker || mv ./newMarker ./marker
 fi
 
 stamp=`date +"%s"`
