@@ -44,14 +44,20 @@ fi
 settos 24m
 
 ./safescaled-cover&
+if [[ $? -ne 0 ]]; then
+  echo "Failure starting safescale demon..." && exit 1
+fi
 
 sleep 3
 
 ./safescale tenant set $TENANT
+if [[ $? -ne 0 ]]; then
+  echo "Failure setting TENANT..." && exit 1
+fi
 
 sleep 3
 
-ROUNDS=5
+ROUNDS=10
 
 RETCODE=0
 
@@ -59,21 +65,23 @@ CODE=0
 RUN=0
 CLEAN=0
 
-declare -a flavor=("k8s" "boh")
+frag=$(( $RANDOM % 250 ));
+
+declare -a flavor=($CLUTYPE)
 
 for fla in "${flavor[@]}"
 do
   RUN=0
 
   for i in $(seq $ROUNDS); do
-    ./safescale-cover cluster delete clu-$TENANT-ubu-$fla-r$i -y
-    ./safescale-cover cluster create -k -F $fla --os "ubuntu 18.04" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.4.$i.0/24 clu-$TENANT-ubu-$fla-r$i
+    stamp=`date +"%s"`
+    ./safescale-cover cluster delete clu-$TENANT-$stamp-ubu-$fla-r$i -y
+    ./safescale-cover cluster create -k -F $fla --os "ubuntu 18.04" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-ubu-$fla-r$i
     RUN=$?
     if [[ $RUN -ne 0 ]]; then
       CODE=$((CODE + 1))
     fi
-    machines=$(./safescale host ls | tail -n 1 | jq '.result' | jq -r '.[] | .name')
-    stamp=`date +"%s"`
+    machines=$(./safescale host ls | tail -n 1 | jq '.result' | jq -r '.[] | .name' | grep $stamp)
     nmach=$(echo $machines | wc -w)
 
     for machine in $machines
@@ -89,10 +97,14 @@ do
       CLEAN=$((CLEAN + 1))
     fi
 
-    ./safescale-cover cluster delete clu-$TENANT-ubu-$fla-r$i -y
-    if [[ $? -ne 0 ]]; then
-      CLEAN=$((CLEAN + 1))
-    fi
+    for j in $(seq $ROUNDS); do
+      ./safescale-cover cluster delete clu-$TENANT-$stamp-ubu-$fla-r$i -y
+      if [[ $? -ne 0 ]]; then
+        CLEAN=$((CLEAN + 1))
+      else
+        break
+      fi
+    done
 
     if [[ $RUN -eq 0 ]]; then
       CODE=0
@@ -106,7 +118,10 @@ do
 done
 
 if [[ $RETCODE -eq 0 ]]; then
+  touch $HOME/.safescale/success
   exit $RETCODE
+else
+  touch $HOME/.safescale/failure
 fi
 
 exit $((CLEAN + RETCODE))

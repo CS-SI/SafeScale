@@ -7,6 +7,7 @@ ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
 ENV TENANT $TENANT
+ENV CLUTYPE $CLUTYPE
 
 RUN mkdir -p /etc/safescale
 RUN mkdir -p /root/.safescale/forensics
