@@ -49,7 +49,7 @@ func newBucket(location stow.Location, bucketName string) (*bucket, error) {
 }
 
 // NullBucket returns a bucket instance corresponding to null value
-func NullBucket() *bucket {
+func NullBucket() Bucket {
 	return &bucket{}
 }
 

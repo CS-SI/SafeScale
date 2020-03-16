@@ -75,7 +75,7 @@ func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 	if vmInfoWaiter.listner == nil {
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			return nil, fmt.Errorf("failed to open a tcp connection : %s", err.Error()
+			return nil, fmt.Errorf("failed to open a tcp connection : %s", err.Error())
 		}
 		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
 		vmInfoWaiter.listner = &listener
@@ -91,13 +91,13 @@ func infoHandler() {
 	for {
 		conn, err := (*vmInfoWaiter.listner).Accept()
 		if err != nil {
-			panic(fmt.Sprintf("Info handler, Error accepting: %s", err.Error())
+			panic(fmt.Sprintf("Info handler, Error accepting: %s", err.Error()))
 		}
 
 		go func(net.Conn) {
 			defer func() {
 				if err := conn.Close(); err != nil {
-					fmt.Printf("failed to close the tcp connection: %s", err.Error()
+					fmt.Printf("failed to close the tcp connection: %s", err.Error())
 				}
 			}()
 
@@ -105,7 +105,7 @@ func infoHandler() {
 
 			nbChars, err := conn.Read(buffer)
 			if err != nil {
-				panic(fmt.Sprintf("Info handler, Error reading: %s", err.Error())
+				panic(fmt.Sprintf("Info handler, Error reading: %s", err.Error()))
 			}
 
 			message := string(buffer[0:nbChars])
@@ -126,7 +126,7 @@ func infoHandler() {
 			channel <- info
 			err = vmInfoWaiter.deregister(hostName)
 			if err != nil {
-				panic(fmt.Sprintf("Info handler, Error deregistering: %s", err.Error())
+				panic(fmt.Sprintf("Info handler, Error deregistering: %s", err.Error()))
 			}
 		}(conn)
 	}

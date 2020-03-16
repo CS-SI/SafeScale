@@ -73,12 +73,9 @@ func (c *cluster) SafeGetInstallMethods(task concurrency.Task) map[uint8]install
 		c.installMethods = map[uint8]installmethod.Enum{}
 		var index uint8
 		flavor, err := c.GetFlavor(task)
-		if err == nil {
-			switch flavor {
-			case clusterflavor.K8S:
-				index++
-				c.installMethods[index] = installmethod.Helm
-			}
+		if err == nil && flavor == clusterflavor.K8S {
+			index++
+			c.installMethods[index] = installmethod.Helm
 		}
 		index++
 		c.installMethods[index] = installmethod.Bash
@@ -303,7 +300,7 @@ func (c *cluster) ExecuteScript(
 	}
 
 	// err = UploadStringToRemoteFile(script, host, path, "", "")
-	rfcItem := remotefile.RemoteFileItem{Remote: path}
+	rfcItem := remotefile.Item{Remote: path}
 	err = rfcItem.UploadString(task, script, host)
 	_ = os.Remove(rfcItem.Local)
 	if err != nil {

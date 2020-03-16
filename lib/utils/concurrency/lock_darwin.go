@@ -35,4 +35,3 @@ func goid() int {
 	}
 	return id
 }
-

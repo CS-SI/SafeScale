@@ -184,7 +184,7 @@ func New(
 		cfgOpts:  cfg,
 	}
 
-	// FIXME: detect versions instead of statically declare them 
+	// FIXME: detect versions instead of statically declare them
 	s.versions = map[string]string{
 		"compute": "v2",
 		"volume":  "v2",

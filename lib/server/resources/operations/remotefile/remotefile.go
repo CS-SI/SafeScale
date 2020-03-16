@@ -30,8 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// RemoteFileItem is a helper struct to ease the copy of local files to remote
-type RemoteFileItem struct {
+// Item is a helper struct to ease the copy of local files to remote
+type Item struct {
 	Local        string
 	Remote       string
 	RemoteOwner  string
@@ -39,7 +39,7 @@ type RemoteFileItem struct {
 }
 
 // Upload transfers the local file to the hostname
-func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) (err error) {
+func (rfc Item) Upload(task concurrency.Task, host resources.Host) (err error) {
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
@@ -119,7 +119,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, host resources.Host) (er
 }
 
 // Upload transfers the local file to the hostname
-func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, host resources.Host) error {
+func (rfc Item) UploadString(task concurrency.Task, content string, host resources.Host) error {
 	if rfc.Remote == "" {
 		return scerr.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
@@ -137,7 +137,7 @@ func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, ho
 }
 
 // RemoveRemote deletes the remote file from host
-func (rfc RemoteFileItem) RemoveRemote(task concurrency.Task, host resources.Host) error {
+func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) error {
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
@@ -148,11 +148,11 @@ func (rfc RemoteFileItem) RemoveRemote(task concurrency.Task, host resources.Hos
 
 // RemoteFilesHandler handles the copy of files and cleanup
 type RemoteFilesHandler struct {
-	items []*RemoteFileItem
+	items []*Item
 }
 
-// Add adds a RemoteFileItem in the handler
-func (rfh *RemoteFilesHandler) Add(file *RemoteFileItem) {
+// Add adds an Item in the handler
+func (rfh *RemoteFilesHandler) Add(file *Item) {
 	rfh.items = append(rfh.items, file)
 }
 

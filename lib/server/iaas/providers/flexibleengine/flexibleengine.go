@@ -63,7 +63,7 @@ var gpuMap = map[string]gpuCfg{
 type provider struct {
 	*huaweicloud.Stack
 
-	defaultSecurityGroupName string
+	// defaultSecurityGroupName string
 
 	tenantParameters map[string]interface{}
 }

@@ -313,9 +313,7 @@ func (c *Core) readByID(task concurrency.Task, id string) error {
 		if !ok {
 			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		return c.folder.Read(byIDFolderName, id, func(buf []byte) error {
-			return data.Deserialize(buf)
-		})
+		return c.folder.Read(byIDFolderName, id, data.Deserialize)
 	})
 }
 
@@ -326,9 +324,7 @@ func (c *Core) readByName(task concurrency.Task, name string) error {
 		if !ok {
 			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		return c.folder.Read(byNameFolderName, name, func(buf []byte) error {
-			return data.Deserialize(buf)
-		})
+		return c.folder.Read(byNameFolderName, name, data.Deserialize)
 	})
 }
 

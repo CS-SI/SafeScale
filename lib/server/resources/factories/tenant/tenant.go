@@ -51,7 +51,7 @@ func GetCurrentTenant() *Tenant {
 				return nil
 			}
 			currentTenant.Store(&Tenant{Name: name, Service: service})
-			break
+			break // nolint
 		}
 		anon = currentTenant.Load()
 	}

@@ -80,7 +80,7 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 	// copy(n.PrivateNodes, src.PrivateNodes)
 	for _, v := range src.PrivateNodes {
 		node := *v
-		n.Masters = append(n.PrivateNodes, &node)
+		n.PrivateNodes = append(n.PrivateNodes, &node)
 	}
 	return n
 }
