@@ -23,4 +23,6 @@ if [[ $(echo $TENANT | grep lexible) ]]; then
   sed -i 's/10.7/192.168/' poc.sh
 fi
 
-./poc.sh
+./poc.sh || true
+
+exit 0
