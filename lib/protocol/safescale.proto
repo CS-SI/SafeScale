@@ -140,7 +140,6 @@ message NetworkDefinition{
     bool fail_over = 5;
 }
 
-// Deprecated: replaced by string representation of host sizing
 message GatewayDefinition{
     int32 cpu = 1;  // Deprecated: replaced by sizing field
     float ram = 2;  // Deprecated: replaced by sizing field

@@ -664,7 +664,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
-	const CANNOT = "cannot detach volume"
+	// const CANNOT = "cannot detach volume"
 
 	var (
 		volumeID, volumeName string

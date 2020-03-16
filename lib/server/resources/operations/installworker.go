@@ -439,7 +439,7 @@ func (w *worker) identifyAllGateways() ([]resources.Host, error) {
 			list = append(list, gw)
 		}
 	}
-	if len(list) <= 0 {
+	if len(list) == 0 {
 		return nil, scerr.NotAvailableError("no gateways currently available")
 	}
 	w.allGateways = list
@@ -872,7 +872,7 @@ func (w *worker) setReverseProxy() (err error) {
 		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
 	}
 	var secondaryKongController *KongController
-	if network.HasVirtualIP(w.feature.task) {
+	if network.HasVirtualIP() {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
 			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())

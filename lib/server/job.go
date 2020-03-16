@@ -84,7 +84,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		id = uuid.String()
 	} else {
 		u := md.Get("uuid")
-		if len(u) <= 0 {
+		if len(u) == 0 {
 			return nil, scerr.InvalidParameterError("ctx", "does not contain a grpc uuid")
 		}
 

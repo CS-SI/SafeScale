@@ -209,10 +209,8 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 	}
 	if taskInstance == nil || (taskInstance.context == nil && taskInstance.cancel == nil) {
 		needContext = (ctx == nil)
-	} else {
-		if taskInstance.context == nil && taskInstance.cancel == nil {
-			needContext = true
-		}
+	} else if taskInstance.context == nil && taskInstance.cancel == nil {
+		needContext = true
 	}
 	if needContext {
 		taskContext, taskCancel = context.WithCancel(context.Background())

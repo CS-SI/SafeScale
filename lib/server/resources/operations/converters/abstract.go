@@ -242,13 +242,20 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketList {
 }
 
 func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
+	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
+	if in.GatewayConfig != nil {
+		pbPrimaryGateway = SSHConfigFromAbstractToProtocol(*in.GatewayConfig)
+	}
+	if in.SecondaryGatewayConfig != nil {
+		pbSecondaryGateway = SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig)
+	}
 	return &protocol.SshConfig{
 		User:             in.User,
 		Host:             in.Host,
 		PrivateKey:       in.PrivateKey,
 		Port:             int32(in.Port),
-		Gateway:          SSHConfigFromAbstractToProtocol(*in.GatewayConfig),
-		SecondaryGateway: SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig),
+		Gateway:          pbPrimaryGateway,
+		SecondaryGateway: pbSecondaryGateway,
 	}
 }
 

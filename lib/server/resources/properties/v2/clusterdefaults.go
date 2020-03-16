@@ -37,8 +37,8 @@ func newClusterDefaults() *ClusterDefaults {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (d *ClusterDefaults) Clone() data.Clonable {
-	return newClusterDefaults().Replace(d)
+func (cd *ClusterDefaults) Clone() data.Clonable {
+	return newClusterDefaults().Replace(cd)
 }
 
 // Replace ...
