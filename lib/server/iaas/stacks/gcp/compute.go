@@ -679,6 +679,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	if err != nil {
 		return nil, err
 	}
+
+	host.Name = gcpHost.Name
+
 	var subnets []IPInSubnet
 
 	for _, nit := range gcpHost.NetworkInterfaces {
