@@ -305,7 +305,7 @@ func (k *KongController) addSourceControl(
 	url += "/plugins"
 	result, _, err := k.get(ruleName, url)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return err
 		}
 	}
@@ -344,14 +344,14 @@ func (k *KongController) addSourceControl(
 	return nil
 }
 
-func (k *KongController) buildSourceControlContent(rules map[string]interface{}) string {
-	kongdata := map[string]interface{}{
-		"config": rules,
-	}
-	kongdata["name"] = "ip-restriction"
-	jsoned, _ := json.Marshal(&kongdata)
-	return string(jsoned)
-}
+// func (k *KongController) buildSourceControlContent(rules map[string]interface{}) string {
+// 	kongdata := map[string]interface{}{
+// 		"config": rules,
+// 	}
+// 	kongdata["name"] = "ip-restriction"
+// 	jsoned, _ := json.Marshal(&kongdata)
+// 	return string(jsoned)
+// }
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlGet, url)

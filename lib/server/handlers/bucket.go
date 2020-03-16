@@ -79,7 +79,7 @@ func (handler *bucketHandler) Create(name string) (err error) {
 	svc := handler.job.SafeGetService()
 	rb, err := bucketfactory.Load(svc, name)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return err
 		}
 	}

@@ -54,7 +54,7 @@ func newFolder(svc iaas.Service, path string) (*folder, error) {
 
 	cryptKey, err := svc.GetMetadataKey()
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 	} else {

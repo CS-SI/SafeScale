@@ -93,7 +93,7 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if innerErr != nil {
-				if _, ok := innerErr.(*scerr.ErrTimeout); ok {
+				if _, ok := innerErr.(scerr.ErrTimeout); ok {
 					return innerErr
 				}
 				retcode = -1

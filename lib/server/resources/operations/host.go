@@ -397,7 +397,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			creator := ""
 			hostname, _ := os.Hostname()
 			if curUser, err := user.Current(); err == nil {
-				creator := curUser.Username
+				creator = curUser.Username
 				if hostname != "" {
 					creator += "@" + hostname
 				}
@@ -449,7 +449,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// TODO: configurable timeout here
 	status, err := rh.waitInstallPhase(task, "phase1")
 	if err != nil {
-		if _, ok := err.(*scerr.ErrTimeout); ok {
+		if _, ok := err.(scerr.ErrTimeout); ok {
 			return scerr.Wrap(err, "Timeout creating a host")
 		}
 		if abstract.IsProvisioningError(err) {
@@ -507,7 +507,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// Reboot host
 	command = "sudo systemctl reboot"
-	retcode, _, stderr, err = rh.Run(task, command, outputs.COLLECT, 0, 0)
+	_, _, _, err = rh.Run(task, command, outputs.COLLECT, 0, 0)
 	if err != nil {
 		return err
 	}
@@ -515,7 +515,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// FIXME: configurable timeout here
 	_, err = rh.waitInstallPhase(task, "ready")
 	if err != nil {
-		if _, ok := err.(*scerr.ErrTimeout); ok {
+		if _, ok := err.(scerr.ErrTimeout); ok {
 			return scerr.Wrap(err, "timeout creating a host")
 		}
 		if abstract.IsProvisioningError(err) {
@@ -547,7 +547,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase string) (string, e
 	// TODO: configurable timeout here
 	status, err := sshCfg.WaitServerReady(task, phase, time.Duration(sshDefaultTimeout)*time.Minute)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrTimeout); ok {
+		if _, ok := err.(scerr.ErrTimeout); ok {
 			return status, scerr.Wrap(err, "Timeout creating a host")
 		}
 		if abstract.IsProvisioningError(err) {
@@ -863,7 +863,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 	// Deletes metadata from Object Storage
 	err = rh.Core.Delete(task)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			// If entry not found, consider a success
 			return nil
 		}
@@ -1070,7 +1070,6 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 
 	retcode, stdout, stderr, err := sshCmd.RunWithTimeout(task, outs, timeout)
 	if err != nil {
-		retcode = -1
 		return -1, "", "", err
 	}
 	// If retcode == 255, ssh connection failed
@@ -1098,10 +1097,10 @@ func (rh *host) Pull(task concurrency.Task, target, source string, timeout time.
 		return 0, "", "", err
 	}
 
-	if timeout < temporal.GetHostTimeout() {
-		timeout = temporal.GetHostTimeout()
-	}
-
+	// FIXME: reintroduce timeout on ssh.Copy
+	// if timeout < temporal.GetHostTimeout() {
+	// 	timeout = temporal.GetHostTimeout()
+	// }
 	return ssh.Copy(task, target, source, false)
 }
 
@@ -1628,7 +1627,7 @@ func (rh *host) GetAccessIP(task concurrency.Task) (ip string, err error) {
 	if err == nil && ip == "" {
 		ip, err = rh.GetPrivateIP(task)
 	}
-	return ip, nil
+	return ip, err
 }
 
 // SafeGetAccessIP returns the IP to reach the host
@@ -1817,7 +1816,7 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) e
 
 	rgw, innerErr = rn.GetGateway(task, false)
 	if innerErr != nil {
-		if _, ok := innerErr.(*scerr.ErrNotFound); !ok {
+		if _, ok := innerErr.(scerr.ErrNotFound); !ok {
 			return innerErr
 		}
 	} else {
@@ -1912,8 +1911,7 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 	)
 	_ = os.Remove(f.Name())
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			return scerr.Wrap(retryErr, "timeout trying to copy temporary file to '%s'", to)
 		}
 		return err

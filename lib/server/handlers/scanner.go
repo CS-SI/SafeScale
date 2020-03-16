@@ -214,7 +214,7 @@ func (handler *scannerHandler) analyze() (err error) {
 	netName := "net-safescale" // FIXME: Hardcoded string
 	network, err := networkfactory.Load(task, svc, netName)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return err
 		}
 		network, err := networkfactory.New(svc)
@@ -304,7 +304,7 @@ func (handler *scannerHandler) analyze() (err error) {
 			}
 			err = host.Create(task, req, def) // hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
 			if err != nil {
-				logrus.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
+				logrus.Warnf("template [%s] host '%s': error creation: %v", template.Name, hostName, err.Error())
 				return err
 			}
 
@@ -319,7 +319,7 @@ func (handler *scannerHandler) analyze() (err error) {
 			// sshSvc := handlers.NewSSHHandler(job)
 			// ssh, err := sshSvc.GetConfig(host.SafeGetID())
 			// if err != nil {
-			// 	logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
+			// 	logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v", template.Name, hostName, err.Error())
 			// 	return err
 			// }
 			// _, nerr := ssh.WaitServerReady(job.SafeGetTask(), "ready", time.Duration(6+concurrency-1)*time.Minute)
@@ -339,7 +339,10 @@ func (handler *scannerHandler) analyze() (err error) {
 			// 	return err
 			// }
 			_, cout, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
-
+			if err != nil {
+				logrus.Warnf("template [%s] host '%s': failed to run collection script: %v", template.Name, hostName, err.Error())
+				return err
+			}
 			daCPU, err := createCPUInfo(cout)
 			if err != nil {
 				logrus.Warnf("template [%s]: Problem building cpu info: %v", template.Name, err)

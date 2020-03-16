@@ -130,8 +130,8 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, err
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 // error contains :
-//    - *scerr.ErrNotFound if no feature is found by its name
-//    - *scerr.ErrSyntax if feature found contains syntax error
+//    - scerr.ErrNotFound if no feature is found by its name
+//    - scerr.ErrSyntax if feature found contains syntax error
 func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err error) {
 	if task == nil {
 		return nullFeature(), scerr.InvalidParameterError("task", "cannot be nil")

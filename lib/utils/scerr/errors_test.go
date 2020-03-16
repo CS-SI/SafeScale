@@ -196,17 +196,17 @@ func getNotFoundError() error {
 
 func TestKeepErrorType(t *testing.T) {
 	mzb := getNotFoundError()
-	if cae, ok := mzb.(*ErrNotFound); !ok {
+	if cae, ok := mzb.(ErrNotFound); !ok {
 		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 
 	mzb = getNotFoundErrorWithFields()
-	if cae, ok := mzb.(*ErrNotFound); !ok {
+	if cae, ok := mzb.(ErrNotFound); !ok {
 		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 
 	mzb = getNotFoundErrorWithFieldsAndConsequences()
-	if cae, ok := mzb.(*ErrNotFound); !ok {
+	if cae, ok := mzb.(ErrNotFound); !ok {
 		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 }
