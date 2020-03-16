@@ -124,7 +124,7 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 	objv, err := volumefactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrNotFound:
+		case scerr.ErrNotFound:
 			return abstract.ResourceNotFoundError("volume", ref)
 		default:
 			logrus.Debugf("failed to delete volume: %+v", err)
@@ -182,7 +182,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err 
 
 	objv, err := volumefactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); ok {
+		if _, ok := err.(scerr.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
 		}
 		return nil, err
@@ -396,7 +396,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 						})
 						if err != nil {
 							switch err.(type) {
-							case *scerr.ErrNotFound, *scerr.ErrInvalidRequest, *scerr.ErrTimeout:
+							case scerr.ErrNotFound, scerr.ErrInvalidRequest, scerr.ErrTimeout:
 								return err
 							default:
 								return err
@@ -408,9 +408,9 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 								derr := handler.job.SafeGetService().DeleteVolumeAttachment(hostID, vaID)
 								if derr != nil {
 									switch derr.(type) {
-									case *scerr.ErrNotFound:
+									case scerr.ErrNotFound:
 										logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volumeName, hostName, derr)
-									case *scerr.ErrTimeout:
+									case scerr.ErrTimeout:
 										logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volumeName, hostName, derr)
 									default:
 										logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volumeName, hostName, derr)
@@ -575,7 +575,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 	// Load volume data
 	objv, err := volumefactory.Load(task, handler.job.SafeGetService(), volumeRef)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return err
 		}
 		return abstract.ResourceNotFoundError("volume", volumeRef)

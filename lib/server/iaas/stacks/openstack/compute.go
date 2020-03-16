@@ -254,7 +254,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, error) {
 	)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrTimeout:
+		case scerr.ErrTimeout:
 			return nil, err
 		default:
 			spew.Dump(pager.Err)
@@ -662,7 +662,7 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Serve
 			net, err := s.GetNetwork(netid)
 			if err != nil {
 				switch err.(type) {
-				case *scerr.ErrNotFound:
+				case scerr.ErrNotFound:
 					logrus.Errorf(err.Error())
 					errors = append(errors, err)
 				default:
@@ -906,9 +906,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			derr := s.DeleteHost(newHost.Core.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case *scerr.ErrNotFound:
+				case scerr.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
-				case *scerr.ErrTimeout:
+				case scerr.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)

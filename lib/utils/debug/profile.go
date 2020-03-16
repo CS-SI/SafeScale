@@ -19,7 +19,7 @@ package debug
 import (
 	"log"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // nolint
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	defaultCpuProfileFilename = "safescale_profile_cpu.pprof"
+	defaultCPUProfileFilename = "safescale_profile_cpu.pprof"
 	defaultMemProfileFilename = "safescale_profile_mem.pprof"
 )
 
@@ -51,7 +51,7 @@ func Profile(what string) func() {
 		content := strings.Split(v, ":")
 		switch content[0] {
 		case "cpu":
-			filename := constructProfileFilename(content[1], defaultCpuProfileFilename)
+			filename := constructProfileFilename(content[1], defaultCPUProfileFilename)
 			cpufile, err = os.Create(filename)
 			if err != nil {
 				logrus.Fatalf("Failed to create profile file '%s'", filename)
@@ -109,7 +109,7 @@ func Profile(what string) func() {
 
 func constructProfileFilename(path, complement string) string {
 	if path == "" {
-		path = "./" + defaultCpuProfileFilename
+		path = "./" + defaultCPUProfileFilename
 	}
 	path = strings.TrimSpace(path)
 	st, err := os.Stat(path)

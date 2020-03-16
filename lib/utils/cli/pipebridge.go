@@ -219,7 +219,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 			err = nil
 		} else {
 			switch err.(type) {
-			case *scerr.ErrAborted, *os.PathError:
+			case scerr.ErrAborted, *os.PathError:
 				err = nil
 			}
 		}
@@ -282,7 +282,7 @@ func (pbc *PipeBridgeController) Stop() error {
 		err = pbc.Wait()
 		if err != nil {
 			// In case of error, report only if error is not aborted error, as we triggered it
-			if _, ok = err.(*scerr.ErrAborted); !ok {
+			if _, ok = err.(scerr.ErrAborted); !ok {
 				return err
 			}
 		}

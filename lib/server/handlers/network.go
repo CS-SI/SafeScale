@@ -44,8 +44,8 @@ type NetworkHandler interface {
 
 // networkHandler an implementation of NetworkAPI
 type networkHandler struct {
-	job       server.Job
-	ipVersion ipversion.Enum
+	job server.Job
+	// ipVersion ipversion.Enum
 }
 
 // NewNetworkHandler Creates new Network service

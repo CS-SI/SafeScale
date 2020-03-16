@@ -277,7 +277,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	if err != nil {
 		err = TranslateProviderError(err)
 		switch err.(type) {
-		case *scerr.ErrNotFound:
+		case scerr.ErrNotFound:
 		default:
 			logrus.Errorf("failed to delete network: %+v", err)
 		}
@@ -294,7 +294,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		err := s.deleteSubnet(sn.ID)
 		if err != nil {
 			switch err.(type) {
-			case *scerr.ErrNotAvailable:
+			case scerr.ErrNotAvailable:
 				return err
 			default:
 				msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
@@ -306,7 +306,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	err = networks.Delete(s.NetworkClient, id).ExtractErr()
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrNotAvailable:
+		case scerr.ErrNotAvailable:
 			return err
 		default:
 			msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
@@ -363,9 +363,9 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostF
 			derr := s.DeleteHost(newHost.Core.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case *scerr.ErrNotFound:
+				case scerr.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Core.Name, derr)
-				case *scerr.ErrTimeout:
+				case scerr.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Core.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Core.Name, derr)
@@ -558,21 +558,22 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 // 	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
 // }
 
-// getSubnet returns the sub network identified by id
-func (s *Stack) getSubnet(id string) (*Subnet, error) {
-	// Execute the operation and get back a subnets.Subnet struct
-	subnet, err := subnets.Get(s.NetworkClient, id).Extract()
-	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting subnet: %s", ProviderErrorToString(err)))
-	}
-	return &Subnet{
-		ID:        subnet.ID,
-		Name:      subnet.Name,
-		IPVersion: FromIntIPversion(subnet.IPVersion),
-		Mask:      subnet.CIDR,
-		NetworkID: subnet.NetworkID,
-	}, nil
-}
+//VPL: not used
+// // getSubnet returns the sub network identified by id
+// func (s *Stack) getSubnet(id string) (*Subnet, error) {
+// 	// Execute the operation and get back a subnets.Subnet struct
+// 	subnet, err := subnets.Get(s.NetworkClient, id).Extract()
+// 	if err != nil {
+// 		return nil, scerr.Wrap(err, fmt.Sprintf("error getting subnet: %s", ProviderErrorToString(err)))
+// 	}
+// 	return &Subnet{
+// 		ID:        subnet.ID,
+// 		Name:      subnet.Name,
+// 		IPVersion: FromIntIPversion(subnet.IPVersion),
+// 		Mask:      subnet.CIDR,
+// 		NetworkID: subnet.NetworkID,
+// 	}, nil
+// }
 
 // listSubnets lists available sub networks of network net
 func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
@@ -658,7 +659,7 @@ func (s *Stack) deleteSubnet(id string) (err error) {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			// If we have the last error of the delete try, returns this error
 			if err != nil {
-				if _, ok := err.(*scerr.ErrNotAvailable); ok {
+				if _, ok := err.(scerr.ErrNotAvailable); ok {
 					return err
 				}
 				return abstract.ResourceTimeoutError("network", id, temporal.GetContextTimeout())
@@ -693,18 +694,19 @@ func (s *Stack) createRouter(req RouterRequest) (*Router, error) {
 	}, nil
 }
 
-// getRouter returns the router identified by id
-func (s *Stack) getRouter(id string) (*Router, error) {
-	r, err := routers.Get(s.NetworkClient, id).Extract()
-	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting Router: %s", ProviderErrorToString(err)))
-	}
-	return &Router{
-		ID:        r.ID,
-		Name:      r.Name,
-		NetworkID: r.GatewayInfo.NetworkID,
-	}, nil
-}
+// VPL: not used
+// // getRouter returns the router identified by id
+// func (s *Stack) getRouter(id string) (*Router, error) {
+// 	r, err := routers.Get(s.NetworkClient, id).Extract()
+// 	if err != nil {
+// 		return nil, scerr.Wrap(err, fmt.Sprintf("error getting Router: %s", ProviderErrorToString(err)))
+// 	}
+// 	return &Router{
+// 		ID:        r.ID,
+// 		Name:      r.Name,
+// 		NetworkID: r.GatewayInfo.NetworkID,
+// 	}, nil
+// }
 
 // ListRouters lists available routers
 func (s *Stack) ListRouters() ([]Router, error) {

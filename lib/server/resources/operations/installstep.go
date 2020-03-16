@@ -71,58 +71,58 @@ func (sr stepResult) ErrorMessage() string {
 	return ""
 }
 
-// stepResults contains the errors of the step for each host target
-type stepResults map[string]stepResult
+// // stepResults contains the errors of the step for each host target
+// type stepResults map[string]stepResult
 
-// ErrorMessages returns a string containing all the errors registered
-func (s stepResults) ErrorMessages() string {
-	output := ""
-	for h, k := range s {
-		val := k.ErrorMessage()
-		if val != "" {
-			output += h + ": " + val + "\n"
-		}
-	}
-	return output
-}
+// // ErrorMessages returns a string containing all the errors registered
+// func (s stepResults) ErrorMessages() string {
+// 	output := ""
+// 	for h, k := range s {
+// 		val := k.ErrorMessage()
+// 		if val != "" {
+// 			output += h + ": " + val + "\n"
+// 		}
+// 	}
+// 	return output
+// }
 
-// UncompletedEntries returns an array of string of all keys where the script
-// to run action wasn't completed
-func (s stepResults) UncompletedEntries() []string {
-	var output []string
-	for k, v := range s {
-		if !v.Completed() {
-			output = append(output, k)
-		}
-	}
-	return output
-}
+// // UncompletedEntries returns an array of string of all keys where the script
+// // to run action wasn't completed
+// func (s stepResults) UncompletedEntries() []string {
+// 	var output []string
+// 	for k, v := range s {
+// 		if !v.Completed() {
+// 			output = append(output, k)
+// 		}
+// 	}
+// 	return output
+// }
 
-// Successful tells if all the steps have been successful
-func (s stepResults) Successful() bool {
-	if len(s) == 0 {
-		return false
-	}
-	for _, k := range s {
-		if !k.Successful() {
-			return false
-		}
-	}
-	return true
-}
+// // Successful tells if all the steps have been successful
+// func (s stepResults) Successful() bool {
+// 	if len(s) == 0 {
+// 		return false
+// 	}
+// 	for _, k := range s {
+// 		if !k.Successful() {
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
 
-// Completed tells if all the scripts corresponding to action have been completed.
-func (s stepResults) Completed() bool {
-	if len(s) == 0 {
-		return false
-	}
-	for _, k := range s {
-		if !k.Completed() {
-			return false
-		}
-	}
-	return true
-}
+// // Completed tells if all the scripts corresponding to action have been completed.
+// func (s stepResults) Completed() bool {
+// 	if len(s) == 0 {
+// 		return false
+// 	}
+// 	for _, k := range s {
+// 		if !k.Completed() {
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
 
 type stepTargets map[string]string
 
@@ -419,7 +419,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
 		// err := UploadStringToRemoteFile(is.OptionsFileContent, host, utils.TempFolder+"/options.json", "cladm:safescale", "ug+rw-x,o-rwx")
-		rfcItem := remotefile.RemoteFileItem{
+		rfcItem := remotefile.Item{
 			Remote:       utils.TempFolder + "/options.json",
 			RemoteOwner:  "cladm:safescale",
 			RemoteRights: "ug+rw-x,o-rwx",
@@ -442,7 +442,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.SafeGetName(), strings.ToLower(is.Action.String()), is.Name)
 	// err = UploadStringToRemoteFile(command, host, filename, "", "")
-	rfcItem := remotefile.RemoteFileItem{
+	rfcItem := remotefile.Item{
 		Remote: filename,
 	}
 	err = rfcItem.UploadString(task, command, host)

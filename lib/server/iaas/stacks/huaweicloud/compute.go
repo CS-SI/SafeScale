@@ -456,7 +456,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			host.Core, err = s.WaitHostReady(host, temporal.GetHostTimeout())
 			if err != nil {
 				switch err.(type) {
-				case *scerr.ErrNotAvailable:
+				case scerr.ErrNotAvailable:
 					return fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
 				default:
 					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
@@ -482,9 +482,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			derr := s.DeleteHost(newHost.Core.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case *scerr.ErrNotFound:
+				case scerr.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Core.Name, derr)
-				case *scerr.ErrTimeout:
+				case scerr.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Core.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Core.Name, derr)
@@ -629,14 +629,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			msg := "failed to get host"
-			if hostCore != nil {
-				msg += fmt.Sprintf(" '%s'", hostCore.Name)
-			}
-			msg += fmt.Sprintf(" information after %v", temporal.GetHostTimeout())
-			if err != nil {
-				msg += fmt.Sprintf(": %v", err)
-			}
 			return nil, abstract.ResourceTimeoutError("host", hostCore.Name, temporal.GetHostTimeout())
 		}
 		return nil, retryErr

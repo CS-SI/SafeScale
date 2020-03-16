@@ -263,7 +263,7 @@ func (objs *share) Create(
 	// Check if a share already exists with the same name
 	_, err = server.GetShare(task, shareName)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return err
 		}
 	}
@@ -727,6 +727,9 @@ func (objs *share) Unmount(task concurrency.Task, targetName string) error {
 		shareName = si.ShareName
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	objserver, err := objs.GetServer(task)
 	if err != nil {
@@ -837,6 +840,9 @@ func (objs *share) Delete(task concurrency.Task) error {
 		shareName = si.ShareName
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	objserver, err := objs.GetServer(task)
 	if err != nil {

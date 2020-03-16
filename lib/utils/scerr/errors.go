@@ -142,34 +142,34 @@ func FromGRPCStatus(err error) Error {
 
 	message := grpcstatus.Convert(err).Message()
 	code := grpcstatus.Code(err)
-	common := &errCore{message: message, grpcCode: code}
+	common := errCore{message: message, grpcCode: code}
 	switch code {
 	case codes.DeadlineExceeded:
-		return &ErrTimeout{errCore: common}
+		return ErrTimeout{errCore: common}
 	case codes.Aborted:
-		return &ErrAborted{errCore: common}
+		return ErrAborted{errCore: common}
 	case codes.FailedPrecondition:
-		return &ErrInvalidParameter{errCore: common}
+		return ErrInvalidParameter{errCore: common}
 	case codes.AlreadyExists:
-		return &ErrDuplicate{errCore: common}
+		return ErrDuplicate{errCore: common}
 	case codes.InvalidArgument:
-		return &ErrInvalidRequest{errCore: common}
+		return ErrInvalidRequest{errCore: common}
 	case codes.NotFound:
-		return &ErrNotFound{errCore: common}
+		return ErrNotFound{errCore: common}
 	case codes.PermissionDenied:
-		return &ErrForbidden{errCore: common}
+		return ErrForbidden{errCore: common}
 	case codes.ResourceExhausted:
-		return &ErrOverload{errCore: common}
+		return ErrOverload{errCore: common}
 	case codes.OutOfRange:
-		return &ErrOverflow{errCore: common}
+		return ErrOverflow{errCore: common}
 	case codes.Unimplemented:
-		return &ErrNotImplemented{errCore: common}
+		return ErrNotImplemented{errCore: common}
 	case codes.Internal:
-		return &ErrRuntimePanic{errCore: common}
+		return ErrRuntimePanic{errCore: common}
 	case codes.DataLoss:
-		return &ErrInconsistent{errCore: common}
+		return ErrInconsistent{errCore: common}
 	case codes.Unauthenticated:
-		return &ErrNotAuthenticated{errCore: common}
+		return ErrNotAuthenticated{errCore: common}
 	}
 	return common
 }
@@ -194,7 +194,7 @@ type errCore struct {
 }
 
 // FieldsFormatter ...
-func (e *errCore) FieldsFormatter() string {
+func (e errCore) FieldsFormatter() string {
 	j, err := json.Marshal(e.fields)
 
 	if err != nil {
@@ -205,7 +205,7 @@ func (e *errCore) FieldsFormatter() string {
 }
 
 // CauseFormatter generates a string containing information about the causing error and the derived errors while trying to clean up
-func (e *errCore) CauseFormatter() string {
+func (e errCore) CauseFormatter() string {
 	msgFinal := ""
 
 	if e.Cause() != nil {
@@ -229,9 +229,9 @@ func (e *errCore) CauseFormatter() string {
 }
 
 // Reset imports content of error err to receiving error e
-func (e *errCore) Reset(err error) *errCore {
+func (e errCore) Reset(err error) errCore {
 	if err != nil {
-		if cerr, ok := err.(*errCore); ok {
+		if cerr, ok := err.(errCore); ok {
 			e.message = cerr.message
 			e.consequences = cerr.consequences
 			e.causer = cerr.causer
@@ -241,34 +241,34 @@ func (e *errCore) Reset(err error) *errCore {
 }
 
 // Cause returns an error's cause
-func (e *errCore) Cause() error {
+func (e errCore) Cause() error {
 	return e.causer
 }
 
 // Consequences returns the consequences of current error (detected teardown problems)
-func (e *errCore) Consequences() []error {
+func (e errCore) Consequences() []error {
 	return e.consequences
 }
 
 // Fields ...
-func (e *errCore) Fields() map[string]interface{} {
+func (e errCore) Fields() map[string]interface{} {
 	return e.fields
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *errCore) GRPCCode() codes.Code {
+func (e errCore) GRPCCode() codes.Code {
 	return e.grpcCode
 }
 
 // ToGRPCStatus returns a grpcstatus struct from error
-func (e *errCore) ToGRPCStatus() error {
+func (e errCore) ToGRPCStatus() error {
 	return grpcstatus.Errorf(e.GRPCCode(), e.Error())
 }
 
 // Wrap creates a new error with a message 'message' and a causer error 'causer'
 func Wrap(cause error, msg ...interface{}) Error {
-	newErr := &errCore{message: strprocess.FormatStrings(msg...), causer: cause, consequences: []error{}}
-	if casted, ok := cause.(*errCore); ok {
+	newErr := errCore{message: strprocess.FormatStrings(msg...), causer: cause, consequences: []error{}}
+	if casted, ok := cause.(errCore); ok {
 		newErr.grpcCode = casted.GRPCCode()
 	} else {
 		newErr.grpcCode = codes.Unknown
@@ -281,7 +281,7 @@ func NewError(cause error, consequences []error, msg ...interface{}) Error {
 	if consequences == nil {
 		consequences = []error{}
 	}
-	return &errCore{
+	return errCore{
 		message:      strprocess.FormatStrings(msg...),
 		causer:       cause,
 		consequences: consequences,
@@ -292,7 +292,7 @@ func NewError(cause error, consequences []error, msg ...interface{}) Error {
 
 // AddConsequence ...
 // AddConsequence adds an error 'err' to the list of consequences
-func (e *errCore) AddConsequence(err error) Error {
+func (e errCore) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -303,7 +303,7 @@ func (e *errCore) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *errCore) WithField(key string, value interface{}) Error {
+func (e errCore) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -312,7 +312,7 @@ func (e *errCore) WithField(key string, value interface{}) Error {
 }
 
 // Error returns a human-friendly error explanation
-func (e *errCore) Error() string {
+func (e errCore) Error() string {
 	msgFinal := e.message
 
 	msgFinal += e.CauseFormatter()
@@ -345,14 +345,14 @@ func Cause(err error) (resp error) {
 
 // ErrTimeout defines a Timeout error
 type ErrTimeout struct {
-	*errCore
+	errCore
 	dur time.Duration
 }
 
 // TimeoutError returns an ErrTimeout instance
-func TimeoutError(msg string, timeout time.Duration, cause error) *ErrTimeout {
-	return &ErrTimeout{
-		errCore: &errCore{
+func TimeoutError(msg string, timeout time.Duration, cause error) ErrTimeout {
+	return ErrTimeout{
+		errCore: errCore{
 			message:      msg,
 			causer:       cause,
 			consequences: []error{},
@@ -364,7 +364,7 @@ func TimeoutError(msg string, timeout time.Duration, cause error) *ErrTimeout {
 }
 
 // AddConsequence ...
-func (e *ErrTimeout) AddConsequence(err error) Error {
+func (e ErrTimeout) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -375,7 +375,7 @@ func (e *ErrTimeout) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrTimeout) WithField(key string, value interface{}) Error {
+func (e ErrTimeout) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -385,14 +385,14 @@ func (e *ErrTimeout) WithField(key string, value interface{}) Error {
 
 // ErrNotFound resource not found error
 type ErrNotFound struct {
-	*errCore
+	errCore
 }
 
 // NotFoundError creates a ErrNotFound error
-func NotFoundError(msg ...interface{}) *ErrNotFound {
+func NotFoundError(msg ...interface{}) ErrNotFound {
 
-	return &ErrNotFound{
-		errCore: &errCore{
+	return ErrNotFound{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -403,7 +403,7 @@ func NotFoundError(msg ...interface{}) *ErrNotFound {
 }
 
 // AddConsequence ...
-func (e *ErrNotFound) AddConsequence(err error) Error {
+func (e ErrNotFound) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -414,7 +414,7 @@ func (e *ErrNotFound) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrNotFound) WithField(key string, value interface{}) Error {
+func (e ErrNotFound) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -424,13 +424,13 @@ func (e *ErrNotFound) WithField(key string, value interface{}) Error {
 
 // ErrNotAvailable resource not available error
 type ErrNotAvailable struct {
-	*errCore
+	errCore
 }
 
 // NotAvailableError creates a NotAvailable error
-func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
-	return &ErrNotAvailable{
-		errCore: &errCore{
+func NotAvailableError(msg ...interface{}) ErrNotAvailable {
+	return ErrNotAvailable{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -441,7 +441,7 @@ func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
 }
 
 // AddConsequence ...
-func (e *ErrNotAvailable) AddConsequence(err error) Error {
+func (e ErrNotAvailable) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -452,7 +452,7 @@ func (e *ErrNotAvailable) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrNotAvailable) WithField(key string, value interface{}) Error {
+func (e ErrNotAvailable) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -462,13 +462,13 @@ func (e *ErrNotAvailable) WithField(key string, value interface{}) Error {
 
 // ErrDuplicate already exists error
 type ErrDuplicate struct {
-	*errCore
+	errCore
 }
 
 // DuplicateError creates a ErrDuplicate error
-func DuplicateError(msg ...interface{}) *ErrDuplicate {
-	return &ErrDuplicate{
-		errCore: &errCore{
+func DuplicateError(msg ...interface{}) ErrDuplicate {
+	return ErrDuplicate{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -479,7 +479,7 @@ func DuplicateError(msg ...interface{}) *ErrDuplicate {
 }
 
 // AddConsequence ...
-func (e *ErrDuplicate) AddConsequence(err error) Error {
+func (e ErrDuplicate) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -490,7 +490,7 @@ func (e *ErrDuplicate) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrDuplicate) WithField(key string, value interface{}) Error {
+func (e ErrDuplicate) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -500,13 +500,13 @@ func (e *ErrDuplicate) WithField(key string, value interface{}) Error {
 
 // ErrInvalidRequest ...
 type ErrInvalidRequest struct {
-	*errCore
+	errCore
 }
 
 // InvalidRequestError creates a ErrInvalidRequest error
-func InvalidRequestError(msg ...interface{}) *ErrInvalidRequest {
-	return &ErrInvalidRequest{
-		errCore: &errCore{
+func InvalidRequestError(msg ...interface{}) ErrInvalidRequest {
+	return ErrInvalidRequest{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -517,7 +517,7 @@ func InvalidRequestError(msg ...interface{}) *ErrInvalidRequest {
 }
 
 // AddConsequence ...
-func (e *ErrInvalidRequest) AddConsequence(err error) Error {
+func (e ErrInvalidRequest) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -528,7 +528,7 @@ func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrInvalidRequest) WithField(key string, value interface{}) Error {
+func (e ErrInvalidRequest) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -538,13 +538,13 @@ func (e *ErrInvalidRequest) WithField(key string, value interface{}) Error {
 
 // ErrSyntax ...
 type ErrSyntax struct {
-	*errCore
+	errCore
 }
 
 // SyntaxError creates a ErrSyntax error
-func SyntaxError(msg ...interface{}) *ErrSyntax {
-	return &ErrSyntax{
-		errCore: &errCore{
+func SyntaxError(msg ...interface{}) ErrSyntax {
+	return ErrSyntax{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -555,7 +555,7 @@ func SyntaxError(msg ...interface{}) *ErrSyntax {
 }
 
 // AddConsequence ...
-func (e *ErrSyntax) AddConsequence(err error) Error {
+func (e ErrSyntax) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -566,7 +566,7 @@ func (e *ErrSyntax) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrSyntax) WithField(key string, value interface{}) Error {
+func (e ErrSyntax) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -576,13 +576,13 @@ func (e *ErrSyntax) WithField(key string, value interface{}) Error {
 
 // ErrNotAuthenticated when action is done without being authenticated first
 type ErrNotAuthenticated struct {
-	*errCore
+	errCore
 }
 
 // NotAuthenticatedError creates a ErrNotAuthenticated error
-func NotAuthenticatedError(msg ...interface{}) *ErrNotAuthenticated {
-	return &ErrNotAuthenticated{
-		errCore: &errCore{
+func NotAuthenticatedError(msg ...interface{}) ErrNotAuthenticated {
+	return ErrNotAuthenticated{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -593,7 +593,7 @@ func NotAuthenticatedError(msg ...interface{}) *ErrNotAuthenticated {
 }
 
 // AddConsequence ...
-func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
+func (e ErrNotAuthenticated) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -604,7 +604,7 @@ func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrNotAuthenticated) WithField(key string, value interface{}) Error {
+func (e ErrNotAuthenticated) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -614,13 +614,13 @@ func (e *ErrNotAuthenticated) WithField(key string, value interface{}) Error {
 
 // ErrForbidden when action is not allowed.
 type ErrForbidden struct {
-	*errCore
+	errCore
 }
 
 // ForbiddenError creates a ErrForbidden error
-func ForbiddenError(msg ...interface{}) *ErrForbidden {
-	return &ErrForbidden{
-		errCore: &errCore{
+func ForbiddenError(msg ...interface{}) ErrForbidden {
+	return ErrForbidden{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -631,7 +631,7 @@ func ForbiddenError(msg ...interface{}) *ErrForbidden {
 }
 
 // AddConsequence ...
-func (e *ErrForbidden) AddConsequence(err error) Error {
+func (e ErrForbidden) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -642,7 +642,7 @@ func (e *ErrForbidden) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrForbidden) WithField(key string, value interface{}) Error {
+func (e ErrForbidden) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -652,16 +652,16 @@ func (e *ErrForbidden) WithField(key string, value interface{}) Error {
 
 // ErrAborted ...
 type ErrAborted struct {
-	*errCore
+	errCore
 }
 
 // AbortedError creates a ErrAborted error
-func AbortedError(msg string, err error) *ErrAborted {
+func AbortedError(msg string, err error) ErrAborted {
 	if msg == "" {
 		msg = "aborted"
 	}
-	return &ErrAborted{
-		errCore: &errCore{
+	return ErrAborted{
+		errCore: errCore{
 			message:      msg,
 			causer:       err,
 			consequences: []error{},
@@ -672,7 +672,7 @@ func AbortedError(msg string, err error) *ErrAborted {
 }
 
 // AddConsequence ...
-func (e *ErrAborted) AddConsequence(err error) Error {
+func (e ErrAborted) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -683,7 +683,7 @@ func (e *ErrAborted) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrAborted) WithField(key string, value interface{}) Error {
+func (e ErrAborted) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -693,12 +693,12 @@ func (e *ErrAborted) WithField(key string, value interface{}) Error {
 
 // ErrOverflow is used when a limit is reached
 type ErrOverflow struct {
-	*errCore
+	errCore
 	limit uint
 }
 
 // OverflowError creates a ErrOverflow error
-func OverflowError(msg string, limit uint, err error) *ErrOverflow {
+func OverflowError(msg string, limit uint, err error) ErrOverflow {
 	if limit > 0 {
 		limitMsg := fmt.Sprintf("(limit reached: %d)", limit)
 		if msg != "" {
@@ -706,8 +706,8 @@ func OverflowError(msg string, limit uint, err error) *ErrOverflow {
 		}
 		msg += limitMsg
 	}
-	return &ErrOverflow{
-		errCore: &errCore{
+	return ErrOverflow{
+		errCore: errCore{
 			message:      msg,
 			causer:       err,
 			consequences: []error{},
@@ -719,7 +719,7 @@ func OverflowError(msg string, limit uint, err error) *ErrOverflow {
 }
 
 // AddConsequence ...
-func (e *ErrOverflow) AddConsequence(err error) Error {
+func (e ErrOverflow) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -730,7 +730,7 @@ func (e *ErrOverflow) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrOverflow) WithField(key string, value interface{}) Error {
+func (e ErrOverflow) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -740,13 +740,13 @@ func (e *ErrOverflow) WithField(key string, value interface{}) Error {
 
 // ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occured in a given time).
 type ErrOverload struct {
-	*errCore
+	errCore
 }
 
 // OverloadError creates a ErrOverload error
-func OverloadError(msg ...interface{}) *ErrOverload {
-	return &ErrOverload{
-		errCore: &errCore{
+func OverloadError(msg ...interface{}) ErrOverload {
+	return ErrOverload{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -757,7 +757,7 @@ func OverloadError(msg ...interface{}) *ErrOverload {
 }
 
 // AddConsequence ...
-func (e *ErrOverload) AddConsequence(err error) Error {
+func (e ErrOverload) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -768,7 +768,7 @@ func (e *ErrOverload) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrOverload) WithField(key string, value interface{}) Error {
+func (e ErrOverload) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -778,13 +778,13 @@ func (e *ErrOverload) WithField(key string, value interface{}) Error {
 
 // ErrNotImplemented ...
 type ErrNotImplemented struct {
-	*errCore
+	errCore
 }
 
 // NotImplementedError creates a ErrNotImplemented error
-func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
-	return &ErrNotImplemented{
-		errCore: &errCore{
+func NotImplementedError(msg ...interface{}) ErrNotImplemented {
+	return ErrNotImplemented{
+		errCore: errCore{
 			message:      decorateWithCallTrace("not implemented yet:", strprocess.FormatStrings(msg...), ""),
 			causer:       nil,
 			consequences: []error{},
@@ -795,7 +795,7 @@ func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
 }
 
 // AddConsequence ...
-func (e *ErrNotImplemented) AddConsequence(err error) Error {
+func (e ErrNotImplemented) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -806,7 +806,7 @@ func (e *ErrNotImplemented) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrNotImplemented) WithField(key string, value interface{}) Error {
+func (e ErrNotImplemented) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -815,9 +815,9 @@ func (e *ErrNotImplemented) WithField(key string, value interface{}) Error {
 }
 
 // NotImplementedErrorWithReason creates a ErrNotImplemented error
-func NotImplementedErrorWithReason(what string, why string) *ErrNotImplemented {
-	return &ErrNotImplemented{
-		errCore: &errCore{
+func NotImplementedErrorWithReason(what string, why string) ErrNotImplemented {
+	return ErrNotImplemented{
+		errCore: errCore{
 			message:      decorateWithCallTrace("not implemented yet:", what, why),
 			causer:       nil,
 			consequences: []error{},
@@ -829,7 +829,7 @@ func NotImplementedErrorWithReason(what string, why string) *ErrNotImplemented {
 
 // ErrList ...
 type ErrList struct {
-	*errCore
+	errCore
 	errors []error
 }
 
@@ -839,14 +839,14 @@ func ErrListError(errors []error) error {
 		return nil
 	}
 
-	return &ErrList{
-		errCore: &errCore{},
+	return ErrList{
+		errCore: errCore{},
 		errors:  errors,
 	}
 }
 
 // AddConsequence ...
-func (e *ErrList) AddConsequence(err error) Error {
+func (e ErrList) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -857,7 +857,7 @@ func (e *ErrList) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrList) WithField(key string, value interface{}) Error {
+func (e ErrList) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -865,19 +865,19 @@ func (e *ErrList) WithField(key string, value interface{}) Error {
 	return e
 }
 
-func (e *ErrList) Error() string {
+func (e ErrList) Error() string {
 	return spew.Sdump(e.errors)
 }
 
 // ErrRuntimePanic ...
 type ErrRuntimePanic struct {
-	*errCore
+	errCore
 }
 
 // RuntimePanicError creates a ErrRuntimePanic error
-func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
-	return &ErrRuntimePanic{
-		errCore: &errCore{
+func RuntimePanicError(msg ...interface{}) ErrRuntimePanic {
+	return ErrRuntimePanic{
+		errCore: errCore{
 			message:      strprocess.FormatStrings(msg...),
 			causer:       nil,
 			consequences: []error{},
@@ -888,7 +888,7 @@ func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
 }
 
 // AddConsequence ...
-func (e *ErrRuntimePanic) AddConsequence(err error) Error {
+func (e ErrRuntimePanic) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -899,7 +899,7 @@ func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrRuntimePanic) WithField(key string, value interface{}) Error {
+func (e ErrRuntimePanic) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -909,13 +909,13 @@ func (e *ErrRuntimePanic) WithField(key string, value interface{}) Error {
 
 // ErrInvalidInstance has to be used when a method is called from an instance equal to nil
 type ErrInvalidInstance struct {
-	*errCore
+	errCore
 }
 
 // InvalidInstanceError creates a ErrInvalidInstance error
-func InvalidInstanceError() *ErrInvalidInstance {
-	return &ErrInvalidInstance{
-		errCore: &errCore{
+func InvalidInstanceError() ErrInvalidInstance {
+	return ErrInvalidInstance{
+		errCore: errCore{
 			message:      decorateWithCallTrace("invalid instance:", "", "calling method from a nil pointer"),
 			causer:       nil,
 			consequences: []error{},
@@ -926,7 +926,7 @@ func InvalidInstanceError() *ErrInvalidInstance {
 }
 
 // AddConsequence ...
-func (e *ErrInvalidInstance) AddConsequence(err error) Error {
+func (e ErrInvalidInstance) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -937,7 +937,7 @@ func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrInvalidInstance) WithField(key string, value interface{}) Error {
+func (e ErrInvalidInstance) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -947,13 +947,13 @@ func (e *ErrInvalidInstance) WithField(key string, value interface{}) Error {
 
 // ErrInvalidParameter ...
 type ErrInvalidParameter struct {
-	*errCore
+	errCore
 }
 
 // InvalidParameterError creates a ErrInvalidParameter error
-func InvalidParameterError(what, why string) *ErrInvalidParameter {
-	return &ErrInvalidParameter{
-		errCore: &errCore{
+func InvalidParameterError(what, why string) ErrInvalidParameter {
+	return ErrInvalidParameter{
+		errCore: errCore{
 			message:      decorateWithCallTrace("invalid parameter:", what, why),
 			causer:       nil,
 			consequences: []error{},
@@ -964,7 +964,7 @@ func InvalidParameterError(what, why string) *ErrInvalidParameter {
 }
 
 // AddConsequence ...
-func (e *ErrInvalidParameter) AddConsequence(err error) Error {
+func (e ErrInvalidParameter) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -975,7 +975,7 @@ func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrInvalidParameter) WithField(key string, value interface{}) Error {
+func (e ErrInvalidParameter) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -1020,13 +1020,13 @@ func decorateWithCallTrace(prefix, what, why string) string {
 
 // ErrInvalidInstanceContent has to be used when a property of an instance contains invalid property
 type ErrInvalidInstanceContent struct {
-	*errCore
+	errCore
 }
 
 // InvalidInstanceContentError returns an instance of ErrInvalidInstanceContent.
-func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
-	return &ErrInvalidInstanceContent{
-		errCore: &errCore{
+func InvalidInstanceContentError(what, why string) ErrInvalidInstanceContent {
+	return ErrInvalidInstanceContent{
+		errCore: errCore{
 			message:      decorateWithCallTrace("invalid instance content:", what, why),
 			causer:       nil,
 			consequences: []error{},
@@ -1037,7 +1037,7 @@ func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
 }
 
 // AddConsequence ...
-func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
+func (e ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -1048,7 +1048,7 @@ func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrInvalidInstanceContent) WithField(key string, value interface{}) Error {
+func (e ErrInvalidInstanceContent) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}
@@ -1058,13 +1058,13 @@ func (e *ErrInvalidInstanceContent) WithField(key string, value interface{}) Err
 
 // ErrInconsistent is used when data used is inconsistent
 type ErrInconsistent struct {
-	*errCore
+	errCore
 }
 
 // InconsistentError creates a ErrInconsistent error
-func InconsistentError(msg ...interface{}) *ErrInconsistent {
-	return &ErrInconsistent{
-		errCore: &errCore{
+func InconsistentError(msg ...interface{}) ErrInconsistent {
+	return ErrInconsistent{
+		errCore: errCore{
 			message:      decorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""),
 			causer:       nil,
 			consequences: []error{},
@@ -1075,7 +1075,7 @@ func InconsistentError(msg ...interface{}) *ErrInconsistent {
 }
 
 // AddConsequence ...
-func (e *ErrInconsistent) AddConsequence(err error) Error {
+func (e ErrInconsistent) AddConsequence(err error) Error {
 	if err != nil {
 		if e.consequences == nil {
 			e.consequences = []error{}
@@ -1086,7 +1086,7 @@ func (e *ErrInconsistent) AddConsequence(err error) Error {
 }
 
 // WithField ...
-func (e *ErrInconsistent) WithField(key string, value interface{}) Error {
+func (e ErrInconsistent) WithField(key string, value interface{}) Error {
 	if e.fields != nil {
 		e.fields[key] = value
 	}

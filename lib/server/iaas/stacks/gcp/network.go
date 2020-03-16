@@ -362,7 +362,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrTimeout:
+		case scerr.ErrTimeout:
 			logrus.Warnf("Timeout waiting for subnetwork deletion")
 			return err
 		default:
@@ -456,7 +456,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrInvalidRequest:
+		case scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
 			return nil, userData, fmt.Errorf("error creating gateway : %s", err)

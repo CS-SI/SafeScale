@@ -66,7 +66,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	pgw, userData, err := objn.SafeGetService().CreateGateway(request)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrNotFound, *scerr.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
@@ -81,9 +81,9 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
-				case *scerr.ErrNotFound:
+				case scerr.ErrNotFound:
 					logrus.Errorf(msgRoot+", resource not found: %v", request.Name, derr)
-				case *scerr.ErrTimeout:
+				case scerr.ErrTimeout:
 					logrus.Errorf(msgRoot+", timeout: %v", request.Name, derr)
 				default:
 					logrus.Errorf(msgRoot+": %v", request.Name, derr)
@@ -100,7 +100,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	pgw, err = objn.SafeGetService().InspectHost(pgw)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrNotFound, *scerr.ErrTimeout:
+		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err

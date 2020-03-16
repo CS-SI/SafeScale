@@ -567,7 +567,7 @@ func (c *cluster) createNetwork(
 			if !gwFailoverDisabled {
 				secondaryGateway, innerErr = network.GetGateway(task, false)
 				if innerErr != nil {
-					if _, ok := innerErr.(*scerr.ErrNotFound); !ok {
+					if _, ok := innerErr.(scerr.ErrNotFound); !ok {
 						return innerErr
 					}
 				}
@@ -616,7 +616,7 @@ func (c *cluster) createHosts(
 	keepOnFailure bool,
 ) error {
 
-	gwFailoverDisabled := network.HasVirtualIP(task)
+	gwFailoverDisabled := network.HasVirtualIP()
 
 	primaryGateway, err := network.GetGateway(task, true)
 	if err != nil {
@@ -624,7 +624,7 @@ func (c *cluster) createHosts(
 	}
 	secondaryGateway, err := network.GetGateway(task, false)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return err
 		}
 	}
@@ -1169,8 +1169,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 			5*time.Minute, // FIXME: static timeout
 		)
 		if err != nil {
-			switch err.(type) {
-			case retry.ErrTimeout:
+			if _, ok := err.(retry.ErrTimeout); ok {
 				err = scerr.Wrap(err, "timeout waiting cluster to become started")
 			}
 			return err
@@ -1341,8 +1340,7 @@ func (c *cluster) Stop(task concurrency.Task) (err error) {
 			5*time.Minute, // FIXME: static timeout
 		)
 		if err != nil {
-			switch err.(type) {
-			case retry.ErrTimeout:
+			if _, ok := err.(retry.ErrTimeout); ok {
 				err = scerr.Wrap(err, "timeout waiting cluster transitioning from state Stopping to Stopped")
 			}
 			return err
@@ -1862,7 +1860,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 		// Finally delete host
 		err = host.Delete(task)
 		if err != nil {
-			if _, ok := err.(*scerr.ErrNotFound); ok {
+			if _, ok := err.(scerr.ErrNotFound); ok {
 				// host seems already deleted, so it's a success (handles the case where )
 				return nil
 			}
@@ -2901,7 +2899,7 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 		host, err := LoadHost(task, c.service, hostID)
 		if err != nil {
 			// If host seems deleted, consider leaving as a success
-			if _, ok := err.(*scerr.ErrNotFound); ok {
+			if _, ok := err.(scerr.ErrNotFound); ok {
 				continue
 			}
 			return err

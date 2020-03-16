@@ -86,7 +86,7 @@ func Unsuccessful() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -94,7 +94,7 @@ func Unsuccessful() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -113,7 +113,7 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -121,7 +121,7 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -142,7 +142,7 @@ func Successful() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -150,7 +150,7 @@ func Successful() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -168,7 +168,7 @@ func Timeout(limit time.Duration) Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -176,7 +176,7 @@ func Timeout(limit time.Duration) Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -197,7 +197,7 @@ func Max(limit uint) Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*ErrStopRetry); ok {
+			if _, ok := t.Err.(ErrStopRetry); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -205,7 +205,7 @@ func Max(limit uint) Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 

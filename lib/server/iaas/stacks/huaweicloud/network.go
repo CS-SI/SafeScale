@@ -192,7 +192,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
-		if _, ok := err.(*scerr.ErrNotFound); !ok {
+		if _, ok := err.(scerr.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -473,7 +473,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	if err != nil {
 		tErr := openstack.TranslateProviderError(err)
 		switch tErr.(type) { // nolint
-		case *scerr.ErrInvalidRequest:
+		case scerr.ErrInvalidRequest:
 			body := map[string]interface{}{}
 			err = json.Unmarshal([]byte(tErr.Error()), &body)
 			if err != nil {
@@ -674,7 +674,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, 
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrInvalidRequest:
+		case scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
 			return nil, userData, fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))
