@@ -31,15 +31,28 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 
 	if oco.Operation != nil {
 		if oco.Operation.Zone != "" { // nolint
-			zoneURL, _ := url.Parse(oco.Operation.Zone)
+			zoneURL, ierr := url.Parse(oco.Operation.Zone)
+			if ierr != nil {
+				return res, ierr
+			}
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 		} else if oco.Operation.Region != "" {
-			regionURL, _ := url.Parse(oco.Operation.Region)
+			regionURL, ierr := url.Parse(oco.Operation.Region)
+			if ierr != nil {
+				return res, ierr
+			}
 			region := getResourceNameFromSelfLink(*regionURL)
 			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
 		} else {
 			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
+		}
+
+		if oco.Operation == nil {
+			if err == nil {
+				return res, fmt.Errorf("no operation")
+			}
+			return res, err
 		}
 
 		res.State = oco.Operation.Status
