@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,19 +19,18 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // safescale ssh connect host2
@@ -43,15 +42,21 @@ import (
 type SSHListener struct{}
 
 // Run executes an ssh command an an host
-func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshResponse, err error) {
+func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot run by ssh").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -61,36 +66,38 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 		}
 	}
 
-	host := in.GetHost().GetName()
+	hostRef := in.GetHost().GetName()
+	if hostRef == "" {
+		hostRef = in.GetHost().GetId()
+	}
+	if hostRef == "" {
+		return nil, scerr.InvalidParameterError("in.Host", "host reference is missing")
+	}
+
 	command := in.GetCommand()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>)", host), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "ssh run")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot execute ssh command: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewSSHHandler(tenant.Service)
-	retcode, stdout, stderr, err := handler.Run(ctx, host, command)
+	host, err := hostfactory.Load(job.SafeGetTask(), job.SafeGetService(), hostRef)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot run by ssh").ToGRPCStatus()
+		return nil, err
 	}
 
-	return &pb.SshResponse{
+	retcode, stdout, stderr, err := host.Run(job.SafeGetTask(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
 		OutputErr: stderr,
@@ -98,15 +105,21 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 }
 
 // Copy copy file from/to an host
-func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.SshResponse, err error) {
+func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot copy by ssh").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -116,35 +129,68 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 		}
 	}
 
+	job, err := PrepareJob(ctx, "", "ssh copy")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
 	source := in.Source
 	dest := in.Destination
-
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", source, dest), true).WithStopwatch().GoingIn()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH Copy "+source+" to "+dest); err == nil {
-		defer srvutils.JobDeregister(ctx)
+	var (
+		pull                bool
+		hostRef             string
+		hostPath, localPath string
+		retcode             int
+		stdout, stderr      string
+	)
+
+	// If source contains remote host, we pull
+	parts := strings.Split(source, ":")
+	if len(parts) > 1 {
+		pull = true
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		localPath = source
 	}
 
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot copy by ssh: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
+	// if destination contains remote host, we push (= !pull)
+	parts = strings.Split(dest, ":")
+	if len(parts) > 1 {
+		if pull {
+			return nil, scerr.InvalidRequestError("file copy from one remote host to another one is not supported")
+		}
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		if !pull {
+			return nil, scerr.InvalidRequestError("failed to find a remote host in the request")
+		}
+		localPath = dest
 	}
 
-	handler := handlers.NewSSHHandler(tenant.Service)
-	retcode, stdout, stderr, err := handler.Copy(ctx, source, dest)
+	host, err := hostfactory.Load(job.SafeGetTask(), job.SafeGetService(), hostRef)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot copy by ssh").ToGRPCStatus()
+		return nil, err
+	}
+	if pull {
+		retcode, stdout, stderr, err = host.Pull(job.SafeGetTask(), hostPath, localPath, temporal.GetLongOperationTimeout())
+	} else {
+		retcode, stdout, stderr, err = host.Push(job.SafeGetTask(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
+	}
+	if err != nil {
+		return nil, err
 	}
 	if retcode != 0 {
-		return nil, scerr.ToGRPCStatus(fmt.Errorf("cannot copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
+		return nil, scerr.NewError(fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
 	}
 
-	return &pb.SshResponse{
+	return &protocol.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
 		OutputErr: stderr,

@@ -1,8 +1,8 @@
-VERSION=20.1.0-alpha
+VERSION=20.04.0-alpha
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
-MAKE_LEVEL=-1
+MAKE_LEVEL=1
 MAKE_TRACE=""
 else
 MAKE_LEVEL+=1
@@ -18,7 +18,7 @@ MAKEFLAGS += -s
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
-UPSTREAM := $(shell git rev-parse origin/develop)
+UPSTREAM := $(shell git rev-parse origin/develop-vpl)
 LOCAL := $(shell git rev-parse HEAD)
 REMOTE := $(shell git rev-parse $(UPSTREAM))
 BASE := $(shell git merge-base HEAD $(UPSTREAM))

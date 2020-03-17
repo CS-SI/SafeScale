@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,17 +18,13 @@ package listeners
 
 import (
 	"context"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	pb "github.com/CS-SI/SafeScale/lib"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -39,12 +35,18 @@ import (
 type TemplateListener struct{}
 
 // List available templates
-func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (tl *pb.TemplateList, err error) {
+func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (tl *protocol.TemplateList, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot list templates").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -54,38 +56,28 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 		}
 	}
 
-	all := in.GetAll()
+	job, err := PrepareJob(ctx, "", "template list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	all := in.GetAll()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Templates List"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot list templates: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewTemplateHandler(tenant.Service)
-	templates, err := handler.List(ctx, all)
+	handler := handlers.NewTemplateHandler(job)
+	templates, err := handler.List(all)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot list templates").ToGRPCStatus()
+		return nil, err
 	}
 
-	// Map resources.Host to pb.Host
-	var pbTemplates []*pb.HostTemplate
+	// Build response mapping resources.Host to protocol.Host
+	var pbTemplates []*protocol.HostTemplate
 	for _, template := range templates {
-		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))
+		pbTemplates = append(pbTemplates, converters.HostTemplateFromAbstractToProtocol(template))
 	}
-	rv := &pb.TemplateList{Templates: pbTemplates}
+	rv := &protocol.TemplateList{Templates: pbTemplates}
 	return rv, nil
 }

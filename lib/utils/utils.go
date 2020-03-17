@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // AbsPathify ...
@@ -94,35 +96,11 @@ func ExtractRetCode(err error) (string, int, error) {
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
 			retCode = status.ExitStatus()
 		} else {
-			return msg, retCode, fmt.Errorf("ExitError.Sys is not a 'syscall.WaitStatus'")
+			return msg, retCode, scerr.NewError("ExitError.Sys is not a 'syscall.WaitStatus'")
 		}
 		//Retrieve error Message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}
-	return msg, retCode, fmt.Errorf("error is not an 'ExitError'")
-}
-
-// Plural returns 's' if value > 1, "" otherwise
-func Plural(value uint) string {
-	if value > 1 {
-		return "s"
-	}
-	return ""
-}
-
-// Capitalize makes the first letter of the first word uppercased
-func Capitalize(value string) string {
-	fields := strings.Fields(value)
-	if len(fields) > 0 {
-		// WORKAROUND: strings.Title consider ' as the beginning of a new word, so "cannot" becomes "Can'T"...
-		quoted := strings.Split(fields[0], "'")
-		if len(quoted) > 1 {
-			quoted[0] = strings.Title(quoted[0])
-			fields[0] = strings.Join(quoted, "'")
-		} else {
-			fields[0] = strings.Title(fields[0])
-		}
-	}
-	return strings.Join(fields, " ")
+	return msg, retCode, scerr.NewError("error is not an 'ExitError'")
 }

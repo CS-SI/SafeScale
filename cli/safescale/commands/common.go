@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,10 @@ package commands
 import (
 	"fmt"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -35,7 +35,7 @@ var (
 	Debug bool
 
 	hostName     string
-	hostInstance *pb.Host
+	hostInstance *protocol.Host
 	featureName  string
 )
 
@@ -61,7 +61,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	var err error
 	hostInstance, err = client.New().Host.Inspect(hostName, temporal.GetExecutionTimeout())
 	if err != nil {
-		//fmt.Printf("%s\n", err.Error())
+		//fmt.Printf("%s\n", err.Error()
 		return clitools.ExitOnRPC(err.Error())
 	}
 	if hostInstance == nil {

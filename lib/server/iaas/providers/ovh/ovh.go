@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,23 +23,49 @@ import (
 
 	"github.com/asaskevich/govalidator"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	filters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 type gpuCfg struct {
 	GPUNumber int
 	GPUType   string
 }
+
+var gpuMap = map[string]gpuCfg{
+	"g2-15": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1070",
+	},
+	"g2-30": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1070",
+	},
+	"g3-120": gpuCfg{
+		GPUNumber: 3,
+		GPUType:   "NVIDIA 1080 TI",
+	},
+	"g3-30": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1080 TI",
+	},
+}
+
+var (
+	identityEndpoint = "https://auth.cloud.ovh.net/v3"
+	externalNetwork  = "Ext-Net"
+	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
+)
 
 // OVH api credentials
 var (
@@ -88,17 +114,17 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		alternateAPIConsumerKey = val3.(string)
 	}
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
-			log.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 
 	authOptions := stacks.AuthenticationOptions{
-		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
+		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
 		Password:         openstackPassword,
 		TenantID:         applicationKey,
@@ -124,11 +150,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		ProviderNetwork:           "Ext-Net",
+		ProviderNetwork:           externalNetwork,
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
 		AutoHostNetworkInterfaces: false,
-		DNSList:                   []string{"213.186.33.99", "1.1.1.1"},
+		DNSList:                   dnsServers,
 		VolumeSpeeds: map[string]volumespeed.Enum{
 			"classic":    volumespeed.COLD,
 			"high-speed": volumespeed.HDD,
@@ -158,7 +184,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, fmt.Errorf("invalid Region: '%s'", region)
+			return nil, scerr.InvalidRequestError("invalid region '%s'", region)
 		}
 	}
 
@@ -181,7 +207,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+			return nil, scerr.InvalidRequestError("invalid availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 
@@ -203,6 +229,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	opts := p.Stack.GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("TenantID", opts.TenantID)
+	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
@@ -228,7 +255,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -236,26 +263,7 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return tpl, err
 }
 
-func addGPUCfg(tpl *resources.HostTemplate) {
-	var gpuMap = map[string]gpuCfg{
-		"g2-15": gpuCfg{
-			GPUNumber: 1,
-			GPUType:   "NVIDIA 1070",
-		},
-		"g2-30": gpuCfg{
-			GPUNumber: 1,
-			GPUType:   "NVIDIA 1070",
-		},
-		"g3-120": gpuCfg{
-			GPUNumber: 3,
-			GPUType:   "NVIDIA 1080 TI",
-		},
-		"g3-30": gpuCfg{
-			GPUNumber: 1,
-			GPUType:   "NVIDIA 1080 TI",
-		},
-	}
-
+func addGPUCfg(tpl *abstract.HostTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -263,12 +271,12 @@ func addGPUCfg(tpl *resources.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -283,7 +291,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	// check flavor disponibilities through OVH-API
 	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
-		log.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
+		logrus.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
 		return allTemplates, nil
 	}
 	service := authOpts.GetString("TenantID")
@@ -292,7 +300,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, err := p.requestOVHAPI(restURL, "GET")
 	if err != nil {
-		log.Warnf("Unable to request OVH API, flavors availability won't be checked: %v", err)
+		logrus.Warnf("Unable to request OVH API, flavors availability won't be checked: %v", err)
 		return allTemplates, nil
 	}
 
@@ -304,12 +312,12 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		}
 	}
 
-	var listAvailableTemplates []resources.HostTemplate
+	var listAvailableTemplates []abstract.HostTemplate
 	for _, template := range allTemplates {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)
 		} else {
-			log.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
+			logrus.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
 		}
 	}
 	allTemplates = listAvailableTemplates
@@ -317,16 +325,16 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	return allTemplates, nil
 }
 
-func isWindowsTemplate(t resources.HostTemplate) bool {
+func isWindowsTemplate(t abstract.HostTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
 
-func isFlexTemplate(t resources.HostTemplate) bool {
+func isFlexTemplate(t abstract.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
 	if len(req.DNSServers) == 0 {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@
 package api
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 )
 
 //go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
@@ -37,56 +38,56 @@ type Stack interface {
 	ListRegions() ([]string, error)
 
 	// GetImage returns the Image referenced by id
-	GetImage(id string) (*resources.Image, error)
+	GetImage(id string) (*abstract.Image, error)
 
 	// GetTemplate returns the Template referenced by id
-	GetTemplate(id string) (*resources.HostTemplate, error)
+	GetTemplate(id string) (*abstract.HostTemplate, error)
 
 	// CreateKeyPair creates and import a key pair
-	CreateKeyPair(name string) (*resources.KeyPair, error)
+	CreateKeyPair(name string) (*abstract.KeyPair, error)
 	// GetKeyPair returns the key pair identified by id
-	GetKeyPair(id string) (*resources.KeyPair, error)
+	GetKeyPair(id string) (*abstract.KeyPair, error)
 	// ListKeyPairs lists available key pairs
-	ListKeyPairs() ([]resources.KeyPair, error)
+	ListKeyPairs() ([]abstract.KeyPair, error)
 	// DeleteKeyPair deletes the key pair identified by id
 	DeleteKeyPair(id string) error
 
 	// CreateNetwork creates a network named name
-	CreateNetwork(req resources.NetworkRequest) (*resources.Network, error)
+	CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error)
 	// GetNetwork returns the network identified by id
-	GetNetwork(id string) (*resources.Network, error)
+	GetNetwork(id string) (*abstract.Network, error)
 	// GetNetworkByName returns the network identified by name)
-	GetNetworkByName(name string) (*resources.Network, error)
+	GetNetworkByName(name string) (*abstract.Network, error)
 	// ListNetworks lists all networks
-	ListNetworks() ([]*resources.Network, error)
+	ListNetworks() ([]*abstract.Network, error)
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	// CreateGateway creates a public Gateway for a private network
-	CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error)
+	CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error)
 	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 
 	// CreateVIP ...
-	CreateVIP(string, string) (*resources.VIP, error)
+	CreateVIP(string, string) (*abstract.VirtualIP, error)
 	// AddPublicIPToVIP adds a public IP to VIP
-	AddPublicIPToVIP(*resources.VIP) error
+	AddPublicIPToVIP(*abstract.VirtualIP) error
 	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-	BindHostToVIP(*resources.VIP, *resources.Host) error
+	BindHostToVIP(*abstract.VirtualIP, string) error
 	// UnbindHostFromVIP removes the bind between the VIP and a host
-	UnbindHostFromVIP(*resources.VIP, *resources.Host) error
+	UnbindHostFromVIP(*abstract.VirtualIP, string) error
 	// DeleteVIP deletes the port corresponding to the VIP
-	DeleteVIP(*resources.VIP) error
+	DeleteVIP(*abstract.VirtualIP) error
 
 	// CreateHost creates an host that fulfils the request
-	CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error)
-	// GetHost returns the host identified by id or updates content of a *resources.Host
-	InspectHost(interface{}) (*resources.Host, error)
-	// GetHostByName returns the host identified by name
-	GetHostByName(string) (*resources.Host, error)
+	CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, error)
+	// GetHost returns the host identified by id or updates content of a *abstract.HostFull
+	InspectHost(interface{}) (*abstract.HostFull, error)
+	// GetHostByName returns the ID of the host identified by name
+	GetHostByName(string) (*abstract.HostCore, error)
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(interface{}) (hoststate.Enum, error)
 	// ListHosts lists all hosts
-	ListHosts() ([]*resources.Host, error)
+	ListHosts(bool) (abstract.HostList, error)
 	// DeleteHost deletes the host identified by id
 	DeleteHost(id string) error
 	// StopHost stops the host identified by id
@@ -96,40 +97,34 @@ type Stack interface {
 	// Reboot host
 	RebootHost(id string) error
 	// Resize host
-	ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error)
+	ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, error)
 
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
-	WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error)
+	WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.HostCore, error)
 
 	// CreateVolume creates a block volume
-	CreateVolume(request resources.VolumeRequest) (*resources.Volume, error)
+	CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error)
 	// GetVolume returns the volume identified by id
-	GetVolume(id string) (*resources.Volume, error)
+	GetVolume(id string) (*abstract.Volume, error)
 	// ListVolumes list available volumes
-	ListVolumes() ([]resources.Volume, error)
+	ListVolumes() ([]abstract.Volume, error)
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) error
 
 	// CreateVolumeAttachment attaches a volume to an host
-	CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error)
+	CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error)
 	// GetVolumeAttachment returns the volume attachment identified by id
-	GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error)
+	GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error)
 	// ListVolumeAttachments lists available volume attachment
-	ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error)
+	ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error)
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) error
 }
 
 // Reserved is an interface about the methods only available to providers internally
 type Reserved interface {
-	// ListImages lists available OS images
-	ListImages() ([]resources.Image, error)
-
-	// ListTemplates lists available host templates
-	ListTemplates() ([]resources.HostTemplate, error)
-
-	// Returns a read-only struct containing configuration options
-	GetConfigurationOptions() stacks.ConfigurationOptions
-	// Returns a read-only struct containing authentication options
-	GetAuthenticationOptions() stacks.AuthenticationOptions
+	ListImages() ([]abstract.Image, error)                  // lists available OS images
+	ListTemplates() ([]abstract.HostTemplate, error)        // lists available host templates
+	GetConfigurationOptions() stacks.ConfigurationOptions   // Returns a read-only struct containing configuration options
+	GetAuthenticationOptions() stacks.AuthenticationOptions // Returns a read-only struct containing authentication options
 }

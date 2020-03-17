@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@ package concurrency
 
 import (
 	"fmt"
-	"github.com/gophercloud/gophercloud/acceptance/tools"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gophercloud/gophercloud/acceptance/tools"
+	"github.com/stretchr/testify/assert"
 )
 
 // waitTimeout waits for the waitgroup for the specified max timeout.
@@ -44,7 +45,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 func TestNewTaskedLock(t *testing.T) {
 	talo := NewTaskedLock()
 
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewUnbreakableTask()
 
 	num := 100
 	wg := sync.WaitGroup{}
@@ -103,7 +104,7 @@ func TestNewTaskedLock(t *testing.T) {
 func TestNewTaskedLockWait(t *testing.T) {
 	talo := NewTaskedLock()
 
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewUnbreakableTask()
 
 	num := 100
 	wg := sync.WaitGroup{}
@@ -162,7 +163,7 @@ func TestNewTaskedLockWait(t *testing.T) {
 func TestNewTaskedLockReadThenWrite(t *testing.T) {
 	talo := NewTaskedLock()
 
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewUnbreakableTask()
 
 	num := 1
 	wg := sync.WaitGroup{}
@@ -202,7 +203,7 @@ func TestNewTaskedLockReadThenWrite(t *testing.T) {
 
 func TestNewTaskedLockStereoS(t *testing.T) {
 	talo := NewTaskedLock()
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewUnbreakableTask()
 
 	err := talo.Lock(tawri)
 	assert.Nil(t, err)
@@ -217,7 +218,7 @@ func TestNewTaskedLockStereoS(t *testing.T) {
 func TestNewTaskedLockWriteThenRead(t *testing.T) {
 	talo := NewTaskedLock()
 
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewUnbreakableTask()
 
 	num := 1
 	wg := sync.WaitGroup{}
@@ -260,7 +261,7 @@ func TestNewTaskedLockWriteThenRead(t *testing.T) {
 func TestWriteThenWriteThenRead(t *testing.T) {
 	talo := NewTaskedLock()
 
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewUnbreakableTask()
 
 	reader := func() {
 		err := talo.RLock(tawri)
@@ -317,7 +318,7 @@ func TestWriteThenWriteThenRead(t *testing.T) {
 func TestWriteThenReadThenWrite(t *testing.T) {
 	talo := NewTaskedLock()
 
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewUnbreakableTask()
 
 	recall := func() string {
 		err := talo.Lock(tawri)
@@ -379,7 +380,7 @@ func TestWriteThenReadThenWrite(t *testing.T) {
 
 func TestRawCounter(t *testing.T) {
 	talo := NewTaskedLock()
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewTask()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

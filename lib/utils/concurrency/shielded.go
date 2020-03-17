@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ func (d *Shielded) Clone() *Shielded {
 // 	return &protector{shielded: d, readLock: true}, nil
 // }
 
-// Inspect is used to lock a cloneable for read
+// Inspect is used to lock a clonable for read
 func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) error) (err error) {
 	if d == nil {
 		return scerr.InvalidInstanceError()

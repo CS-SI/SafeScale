@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,22 +18,26 @@ package listeners
 
 import (
 	"context"
-	"fmt"
+	"reflect"
+
 	"github.com/asaskevich/govalidator"
-
-	"google.golang.org/grpc/status"
-
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostListener host service server grpc
@@ -63,17 +67,23 @@ type StoredCPUInfo struct {
 }
 
 // Start ...
-func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot start host").ToGRPCStatus()
+		}
+	}()
+
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.InvalidParameterError("ref", "cannot be empty string").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -83,26 +93,20 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "host start")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot start host: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	err = handler.Start(ctx, ref)
+	handler := handlers.NewHostHandler(job)
+	err = handler.Start(ref)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot start host").ToGRPCStatus()
+		return empty, err
 	}
 
 	tracer.Trace("Host '%s' successfully started", ref)
@@ -110,17 +114,23 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 }
 
 // Stop shutdowns a host.
-func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot stop host").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "can't be nil")
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.InvalidRequestError("cannot stop host: neither name nor id of host has been provided").ToGRPCStatus()
+		return empty, scerr.InvalidRequestError("cannot stop host: neither name nor id of host has been provided")
 	}
 	if ctx == nil {
 		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
@@ -133,29 +143,20 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "host stop")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Stop Host "+ref); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot stop host: no tenant set"
-		tracer.Trace(utils.Capitalize("Cannot stop host: no tenant set"))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	err = handler.Stop(ctx, ref)
+	handler := handlers.NewHostHandler(job)
+	err = handler.Stop(ref)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot stop host").ToGRPCStatus()
+		return empty, err
 	}
 
 	tracer.Trace("Host '%s' stopped", ref)
@@ -163,17 +164,23 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 }
 
 // Reboot reboots a host.
-func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot reboot host").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.InvalidParameterError("ref", "cannot be empty string").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -183,29 +190,20 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 		}
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "host reboot")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Reboot Host "+ref); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot reboot host: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	err = handler.Reboot(ctx, ref)
+	handler := handlers.NewHostHandler(job)
+	err = handler.Reboot(ref)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot reboot host").ToGRPCStatus()
+		return empty, err
 	}
 
 	tracer.Trace("Host '%s' successfully rebooted.", ref)
@@ -213,12 +211,18 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 }
 
 // List lists hosts managed by SafeScale only, or all hosts.
-func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb.HostList, err error) {
+func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (hl *protocol.HostList, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot list hosts").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -228,52 +232,48 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 		}
 	}
 
-	all := in.GetAll()
+	job, err := PrepareJob(ctx, "", "host list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	all := in.GetAll()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "List Hosts"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot list hosts: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	hosts, err := handler.List(ctx, all)
+	handler := handlers.NewHostHandler(job)
+	hosts, err := handler.List(all)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot list hosts").ToGRPCStatus()
+		return nil, err
 	}
 
-	// Map resources.Host to pb.Host
-	var pbhost []*pb.Host
+	// build response mapping abstract.Host to protocol.Host
+	var pbhost []*protocol.Host
 	for _, host := range hosts {
-		pbhost = append(pbhost, srvutils.ToPBHost(host))
+		pbhost = append(pbhost, converters.HostFullFromAbstractToProtocol(host))
 	}
-	rv := &pb.HostList{Hosts: pbhost}
+	rv := &protocol.HostList{Hosts: pbhost}
 	return rv, nil
 }
 
 // Create creates a new host
-func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb.Host, err error) {
+func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) (h *protocol.Host, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot create host").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -283,69 +283,78 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		}
 	}
 
-	name := in.GetName()
+	job, err := PrepareJob(ctx, "", "host create")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	name := in.GetName()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Create Host "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot create host: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	var sizing *resources.SizingRequirements
+	var sizing *abstract.HostSizingRequirements
 	if in.Sizing == nil {
-		sizing = &resources.SizingRequirements{
+		sizing = &abstract.HostSizingRequirements{
 			MinCores:    int(in.GetCpuCount()),
 			MaxCores:    int(in.GetCpuCount()),
 			MinRAMSize:  in.GetRam(),
 			MaxRAMSize:  in.GetRam(),
 			MinDiskSize: int(in.GetDisk()),
 			MinGPU:      int(in.GetGpuCount()),
-			MinFreq:     in.GetCpuFreq(),
+			MinCPUFreq:  in.GetCpuFreq(),
+			Image:       in.GetImageId(),
 		}
 	} else {
-		s := srvutils.FromPBHostSizing(*in.Sizing)
+		s := converters.HostSizingRequirementsFromProtocolToAbstract(*in.Sizing)
 		sizing = &s
 	}
 
-	handler := handlers.NewHostHandler(tenant.Service)
-	host, err := handler.Create(ctx,
-		name,
-		in.GetNetwork(),
-		in.GetImageId(),
-		in.GetPublic(),
-		sizing,
-		in.Force,
-	)
+	network, err := networkfactory.Load(task, job.SafeGetService(), in.GetNetwork())
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot create host").ToGRPCStatus()
+		return nil, err
+	}
+
+	hostReq := abstract.HostRequest{
+		ResourceName: name,
+		PublicIP:     in.GetPublic(),
+	}
+	err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		networkCore, ok := clonable.(*abstract.Network)
+		if !ok {
+			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		hostReq.Networks = []*abstract.Network{networkCore}
+		return nil
+	})
+
+	handler := handlers.NewHostHandler(job)
+	host, err := handler.Create(hostReq, *sizing, in.Force)
+	if err != nil {
+		return nil, err
 	}
 	logrus.Infof("Host '%s' created", name)
-	return srvutils.ToPBHost(host), nil
+	return host.ToProtocol(task)
 }
 
 // Resize an host
-func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb.Host, err error) {
+func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot resize host").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -355,53 +364,52 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (_ *pb
 		}
 	}
 
-	name := in.GetName()
+	job, err := PrepareJob(ctx, "", "host resize")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	name := in.GetName()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Resize Host "+name); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot resize host: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	host, err := handler.Resize(ctx,
+	handler := handlers.NewHostHandler(job)
+	host, err := handler.Resize(
 		name,
-		int(in.GetCpuCount()),
-		in.GetRam(),
-		int(in.GetDisk()),
-		int(in.GetGpuCount()),
-		float32(in.GetCpuFreq()),
+		abstract.HostSizingRequirements{
+			MinCores:    int(in.GetCpuCount()),
+			MinRAMSize:  in.GetRam(),
+			MinDiskSize: int(in.GetDisk()),
+			MinGPU:      int(in.GetGpuCount()),
+			MinCPUFreq:  in.GetCpuFreq(),
+		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot resize host").ToGRPCStatus()
+		return nil, err
 	}
 	tracer.Trace("Host '%s' successfully resized", name)
-	return srvutils.ToPBHost(host), nil
+	return host.ToProtocol(task)
 }
 
 // Status returns the status of a host (running or stopped mainly)
-func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.HostStatus, err error) {
+func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *protocol.HostStatus, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot get host status").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -416,43 +424,41 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 		return nil, scerr.InvalidRequestError("cannot get host status: neither name nor id given as reference").ToGRPCStatus()
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "host state")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Status of Host "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot get host status: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	host, err := handler.ForceInspect(ctx, ref)
+	handler := handlers.NewHostHandler(job)
+	host, err := handler.Inspect(ref)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot get host status").ToGRPCStatus()
+		return nil, err
 	}
-	return srvutils.ToHostStatus(host), nil
+	return converters.HostStatusFromAbstractToProtocol(host.SafeGetName(), host.SafeGetState(task)), nil
 }
 
 // Inspect an host
-func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Host, err error) {
+func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot inspect host").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -464,47 +470,45 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, scerr.InvalidRequestError("cannot get host status: neither name nor id given as reference").ToGRPCStatus()
+		return nil, scerr.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "host inspect")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Inspect Host "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot inspect host: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	host, err := handler.ForceInspect(ctx, ref)
+	handler := handlers.NewHostHandler(job)
+	host, err := handler.Inspect(ref)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot inspect host").ToGRPCStatus()
+		return nil, err
 	}
-	return srvutils.ToPBHost(host), nil
+	return host.ToProtocol(task)
 }
 
 // Delete an host
-func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
+func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot delete host").ToGRPCStatus()
+		}
+	}()
+
+	empty = &google_protobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -519,44 +523,41 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "host delete")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete Host "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot delete host: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(tenant.Service)
-	err = handler.Delete(ctx, ref)
+	handler := handlers.NewHostHandler(job)
+	err = handler.Delete(ref)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot delete host").ToGRPCStatus()
+		return empty, err
 	}
 	tracer.Trace("Host '%s' successfully deleted.", ref)
 	return empty, nil
 }
 
 // SSH returns ssh parameters to access an host
-func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshConfig, err error) {
+func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *protocol.SshConfig, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot get host ssh config").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -571,31 +572,22 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 		return nil, scerr.InvalidRequestError("cannot get ssh config of host: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "host ssh")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH config of Host "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot get ssh config of host: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewHostHandler(currentTenant.Service)
-	sshConfig, err := handler.SSH(ctx, ref)
+	handler := handlers.NewHostHandler(job)
+	sshConfig, err := handler.SSH(ref)
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot ssh host").ToGRPCStatus()
+		return nil, err
 	}
 
 	tracer.Trace("SSH config of host '%s' successfully loaded", ref)
-	return srvutils.ToPBSshConfig(sshConfig), nil
+	return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
 }

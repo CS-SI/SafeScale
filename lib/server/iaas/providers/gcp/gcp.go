@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,15 @@
 package gcp
 
 import (
-	"fmt"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // provider is the provider implementation of the Gcp provider
@@ -49,20 +46,18 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("section identity not found in tenants.toml")
+		return &provider{}, scerr.SyntaxError("section 'identity' not found in tenants.toml")
 	}
 
 	computeCfg, ok := params["compute"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("section compute not found in tenants.toml")
+		return &provider{}, scerr.SyntaxError("section 'compute' not found in tenants.toml")
 	}
 
 	networkName := "safescale"
 
 	networkCfg, ok := params["network"].(map[string]interface{})
-	if !ok {
-		logrus.Warnf("section network not found in tenants.toml !!")
-	} else {
+	if ok {
 		newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
 		if newNetworkName != "" {
 			networkName = newNetworkName
@@ -105,7 +100,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 	}
@@ -189,7 +184,7 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,24 +25,26 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var sshCmdName = "ssh"
 
 // SSHCmd ssh command
-var SSHCmd = cli.Command{
+var SSHCmd = &cli.Command{
 	Name:  "ssh",
 	Usage: "ssh COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		sshRun,
 		sshCopy,
 		sshConnect,
@@ -52,16 +53,16 @@ var SSHCmd = cli.Command{
 	},
 }
 
-var sshRun = cli.Command{
+var sshRun = &cli.Command{
 	Name:      "run",
 	Usage:     "Run a command on the host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "c",
 			Usage: "Command to execute",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "timeout",
 			Value: "5",
 			Usage: "timeout in minutes",
@@ -73,23 +74,25 @@ var sshRun = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
+		task, err := concurrency.NewTask()
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
 		var timeout time.Duration
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
 			timeout = temporal.GetHostTimeout()
-
 		}
-		retcode, stdout, stderr, err := client.New().SSH.Run(context.TODO(), c.Args().Get(0), c.String("c"), temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := client.New().SSH.Run(task, c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
-			fmt.Print(stderr)
-			return cli.NewExitError(stderr, retcode)
+			return cli.NewExitError("", retcode)
 		}
-		fmt.Print(stdout)
 		return nil
 	},
 }
@@ -102,12 +105,12 @@ func normalizeFileName(fileName string) string {
 	return absPath
 }
 
-var sshCopy = cli.Command{
+var sshCopy = &cli.Command{
 	Name:      "copy",
 	Usage:     "Copy a local file/directory to an host or copy from host to local",
 	ArgsUsage: "from to  Ex: /my/local/file.txt host1:/remote/path/",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "timeout",
 			Value: "5",
 			Usage: "timeout in minutes",
@@ -119,16 +122,21 @@ var sshCopy = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		}
 
+		task, err := concurrency.NewTask()
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
 		var timeout time.Duration
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
 			timeout = temporal.GetHostTimeout()
 		}
-		retcode, _, _, err := client.New().SSH.Copy(context.TODO(), normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := client.New().SSH.Copy(task, normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
 		}
 		if retcode != 0 {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode))))
@@ -137,44 +145,68 @@ var sshCopy = cli.Command{
 	},
 }
 
-var sshConnect = cli.Command{
+var sshConnect = &cli.Command{
 	Name:      "connect",
 	Usage:     "Connect to the host with interactive shell",
 	ArgsUsage: "<Host_name|Host_ID>",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "username",
+			Aliases: []string{"u"},
+			Value:   "",
+			Usage:   "Username to connect to",
+		},
+		&cli.StringFlag{
+			Name:    "shell",
+			Aliases: []string{"s"},
+			Value:   "bash",
+			Usage:   "Shell to use (default: bash)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("missing mandatory argument <Host_name>")
 		}
-		err := client.New().SSH.Connect(c.Args().Get(0), 0)
+		var (
+			username, shell string
+		)
+		if c.IsSet("username") {
+			username = c.String("username")
+		}
+		if c.IsSet("shell") {
+			shell = c.String("shell")
+		}
+		err := client.New().SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh connect", false).Error()))
+			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))
 		}
 		return nil
 	},
 }
 
-var sshTunnel = cli.Command{
+var sshTunnel = &cli.Command{
 	Name:      "tunnel",
 	Usage:     "Create a ssh tunnel between admin host and a host in the cloud",
 	ArgsUsage: "<Host_name|Host_ID --local local_port  --remote remote_port>",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "local",
 			Value: 8080,
 			Usage: "local tunnel's port, if not set all",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "remote",
 			Value: 8080,
 			Usage: "remote tunnel's port, if not set all",
 		},
-		cli.StringFlag{
-			Name:  "timeout",
-			Value: "1",
-			Usage: "timeout in minutes",
+		&cli.StringFlag{
+			Name:    "timeout",
+			Aliases: []string{"t"},
+			Value:   "1",
+			Usage:   "timeout in minutes",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -200,31 +232,32 @@ var sshTunnel = cli.Command{
 		err := client.New().SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh tunnel", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh tunnel", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var sshClose = cli.Command{
+var sshClose = &cli.Command{
 	Name:      "close",
 	Usage:     "Close one or several ssh tunnel",
 	ArgsUsage: "<Host_name|Host_ID> --local local_port --remote remote_port",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "local",
 			Value: ".*",
 			Usage: "local tunnel's port, if not set all",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "remote",
 			Value: ".*",
 			Usage: "remote tunnel's port, if not set all",
 		},
-		cli.StringFlag{
-			Name:  "timeout",
-			Value: "1",
-			Usage: "timeout in minutes",
+		&cli.StringFlag{
+			Name:    "timeout",
+			Aliases: []string{"t"},
+			Value:   "1",
+			Usage:   "timeout in minutes",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -253,7 +286,7 @@ var sshClose = cli.Command{
 		err := client.New().SSH.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh close", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh close", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

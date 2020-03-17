@@ -21,23 +21,21 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/sirupsen/logrus"
+
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -89,7 +87,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, err
 	}
 
-	net := resources.NewNetwork()
+	net := abstract.NewNetwork()
 	net.ID = strconv.FormatUint(necreated.Id, 10)
 	net.Name = necreated.Name
 
@@ -126,8 +124,8 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, err
 	}
 
-	// FIXME Add properties and GatewayID
-	subnet := resources.NewNetwork()
+	// FIXME: Add properties and GatewayID
+	subnet := abstract.NewNetwork()
 	subnet.ID = strconv.FormatUint(gcpSubNet.Id, 10)
 	subnet.Name = gcpSubNet.Name
 	subnet.CIDR = gcpSubNet.IpCidrRange
@@ -230,7 +228,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -245,11 +243,11 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 		}
 	}
 
-	return nil, resources.ResourceNotFoundError("network", ref)
+	return nil, abstract.ResourceNotFoundError("network", ref)
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -264,16 +262,16 @@ func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
 		}
 	}
 
-	return nil, resources.ResourceNotFoundError("network", ref)
+	return nil, abstract.ResourceNotFoundError("network", ref)
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	var networks []*resources.Network
+	var networks []*abstract.Network
 
 	compuService := s.ComputeService
 
@@ -281,11 +279,11 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 		if err != nil {
-			return networks, fmt.Errorf("cannot list networks ...: %s", err)
+			return networks, scerr.Wrap(err, "cannot list networks")
 		}
 
 		for _, nett := range resp.Items {
-			newNet := resources.NewNetwork()
+			newNet := abstract.NewNetwork()
 			newNet.Name = nett.Name
 			newNet.ID = strconv.FormatUint(nett.Id, 10)
 			newNet.CIDR = nett.IPv4Range
@@ -300,11 +298,11 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).PageToken(token).Do()
 		if err != nil {
-			return networks, fmt.Errorf("cannot list subnetworks ...: %s", err)
+			return networks, scerr.Wrap(err, "cannot list subnetworks")
 		}
 
 		for _, nett := range resp.Items {
-			newNet := resources.NewNetwork()
+			newNet := abstract.NewNetwork()
 			newNet.Name = nett.Name
 			newNet.ID = strconv.FormatUint(nett.Id, 10)
 			newNet.CIDR = nett.IpCidrRange
@@ -336,7 +334,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	if theNetwork == nil {
-		return fmt.Errorf("delete network failed: unexpected nil network when looking for [%s]", ref)
+		return scerr.NewError("delete network failed: unexpected nil network when looking for '%s'", ref)
 	}
 
 	if !theNetwork.OK() {
@@ -364,7 +362,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrTimeout:
+		case scerr.ErrTimeout:
 			logrus.Warnf("Timeout waiting for subnetwork deletion")
 			return err
 		default:
@@ -431,7 +429,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (_ *resources.Host, _ *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -446,43 +444,35 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (_ *resources.Host, 
 		gwname = "gw-" + req.Network.Name
 	}
 
-	hostReq := resources.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 	}
 
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrInvalidRequest:
+		case scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
+			return nil, userData, scerr.Wrap(err, "error creating gateway")
 		}
 	}
 
-	defer func() {
-		if err != nil {
-			derr := s.DeleteHost(host.ID)
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
-
-	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v interface{}) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
-		hostSizingV1.Template = req.TemplateID
-		return nil
-	})
-	if err != nil {
-		return nil, userData, err
-	}
+	// VPL: Moved in objects.Host
+	// // Updates Host Property propertiesv1.HostSizing
+	// err = host.Properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
+	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
+	// 	hostSizingV1.Template = req.TemplateID
+	// 	return nil
+	// })
+	// if err != nil {
+	// 	return nil, userData, err
+	// }
 
 	return host, userData, err
 }
@@ -494,26 +484,26 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
+	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
+	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
+	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

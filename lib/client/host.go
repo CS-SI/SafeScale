@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-
-	pb "github.com/CS-SI/SafeScale/lib"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
-
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
@@ -39,56 +37,56 @@ type host struct {
 }
 
 // List ...
-func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
+func (h *host) List(all bool, timeout time.Duration) (*protocol.HostList, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.List(ctx, &pb.HostListRequest{All: all})
+	return service.List(ctx, &protocol.HostListRequest{All: all})
 }
 
 // Inspect ...
-func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
+func (h *host) Inspect(name string, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	host, err := service.Inspect(ctx, &pb.Reference{Name: name})
-	return host, err
+	return service.Inspect(ctx, &protocol.Reference{Name: name})
+
 }
 
-// Get host status
-func (h *host) Status(name string, timeout time.Duration) (*pb.HostStatus, error) {
+// GetStatus gets host status
+func (h *host) GetStatus(name string, timeout time.Duration) (*protocol.HostStatus, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.Status(ctx, &pb.Reference{Name: name})
+	return service.Status(ctx, &protocol.Reference{Name: name})
 }
 
 // Reboots host
 func (h *host) Reboot(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Reboot(ctx, &pb.Reference{Name: name})
+	_, err = service.Reboot(ctx, &protocol.Reference{Name: name})
 	return err
 }
 
@@ -96,47 +94,47 @@ func (h *host) Reboot(name string, timeout time.Duration) error {
 func (h *host) Start(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Start(ctx, &pb.Reference{Name: name})
+	_, err = service.Start(ctx, &protocol.Reference{Name: name})
 	return err
 }
 
 func (h *host) Stop(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Stop(ctx, &pb.Reference{Name: name})
+	_, err = service.Stop(ctx, &protocol.Reference{Name: name})
 	return err
 }
 
 // Create ...
-func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
+func (h *host) Create(req protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.Create(ctx, &def)
+	return service.Create(ctx, &req)
 }
 
 // Delete deletes several hosts at the same time in goroutines
 func (h *host) Delete(names []string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -150,7 +148,7 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 
 	hostDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
+		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
@@ -178,17 +176,17 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	pbSSHCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
+	pbSSHCfg, err := service.SSH(ctx, &protocol.Reference{Name: name})
 	if err != nil {
 		return nil, err
 	}
-	sshCfg := conv.ToSystemSSHConfig(pbSSHCfg)
+	sshCfg := converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
 	// if err == nil {
 	// 	nerr := sshCfgCache.Set(name, sshCfg)
 	// 	if nerr != nil {
@@ -198,14 +196,91 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	return sshCfg, err
 }
 
-func (h *host) Resize(def pb.HostDefinition, duration time.Duration) (*pb.Host, error) {
+func (h *host) Resize(def protocol.HostDefinition, duration time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
+	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
 	return service.Resize(ctx, &def)
+}
+
+func (h *host) ListFeatures(hostRef string, installedOnly bool) (*protocol.FeatureListResponse, error) {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := protocol.NewFeatureServiceClient(h.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
+
+	req := protocol.FeatureListRequest{
+		TargetType:    protocol.FeatureTargetType_FT_HOST,
+		TargetRef:     &protocol.Reference{Name: hostRef},
+		InstalledOnly: installedOnly,
+	}
+	return service.List(ctx, &req)
+}
+
+func (h *host) CheckFeature(hostRef, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := protocol.NewFeatureServiceClient(h.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	req := protocol.FeatureActionRequest{
+		Action:     protocol.FeatureAction_FA_CHECK,
+		TargetType: protocol.FeatureTargetType_FT_HOST,
+		TargetRef:  &protocol.Reference{Name: hostRef},
+		Variables:  params,
+		Settings:   &settings,
+	}
+	_, err = service.Add(ctx, &req)
+	return err
+}
+
+func (h *host) AddFeature(hostRef, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := protocol.NewFeatureServiceClient(h.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	def := protocol.FeatureActionRequest{
+		Action:     protocol.FeatureAction_FA_ADD,
+		TargetType: protocol.FeatureTargetType_FT_HOST,
+		TargetRef:  &protocol.Reference{Name: hostRef},
+		Variables:  params,
+		Settings:   &settings,
+	}
+	_, err = service.Add(ctx, &def)
+	return err
+}
+
+func (h *host) RemoveFeature(hostRef, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := protocol.NewFeatureServiceClient(h.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	def := protocol.FeatureActionRequest{
+		Action:     protocol.FeatureAction_FA_REMOVE,
+		TargetType: protocol.FeatureTargetType_FT_HOST,
+		TargetRef:  &protocol.Reference{Name: hostRef},
+		Variables:  params,
+		Settings:   &settings,
+	}
+	_, err = service.Add(ctx, &def)
+	return err
 }

@@ -8,6 +8,7 @@
 # Test binary, build with `go test -c`
 *.test
 debug
+!lib/utils/debug
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
@@ -49,7 +50,7 @@ cli/perform/version.go
 cli/safescale/version.go
 cli/safescaled/version.go
 cli/scanner/version.go
-lib/server/iaas/resources/userdata/version.go
+lib/server/iaas/userdata/version.go
 
 vendor
 Gopkg.lock
@@ -102,5 +103,6 @@ Test Results - client_test_go\.html
 
 
 lib/system/version.go
-
 cli/safescaled/__debug_bin
+lib/security/gateway/client/safe-security
+go.sum

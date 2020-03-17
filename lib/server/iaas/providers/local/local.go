@@ -20,15 +20,16 @@ package local
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
 
 // provider is the provider implementation of the local provider
@@ -64,7 +65,7 @@ type CfgOptions struct {
 	TemplatesJSONPath string
 	// Local Path of the libvirt pool where all disks created by libvirt come from and are stored
 	LibvirtStorage string
-	// Connection identifier to the visualisation device
+	// Connection identifier to the virtualisation device
 	URI string
 }
 
@@ -75,7 +76,7 @@ type CfgOptions struct {
 // }
 
 // Build Create and initialize a ClientAPI
-func (prov *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	authOptions := stacks.AuthenticationOptions{}
 	localConfig := stacks.LocalConfiguration{}
 	config := stacks.ConfigurationOptions{}
@@ -85,7 +86,7 @@ func (prov *provider) Build(params map[string]interface{}) (providerapi.Provider
 	config.UseLayer3Networking = false
 	bucketName, err := objectstorage.BuildMetadataBucketName("local", "", "", "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
+		return nil, scerr.Wrap(err, "failed to build metadata bucket name")
 	}
 	config.MetadataBucket = bucketName
 
@@ -94,31 +95,31 @@ func (prov *provider) Build(params map[string]interface{}) (providerapi.Provider
 
 	compute, _ := params["compute"].(map[string]interface{})
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 	config.OperatorUsername = operatorUsername
 
 	uri, found := compute["uri"].(string)
 	if !found {
-		return nil, fmt.Errorf("URI is not set")
+		return nil, scerr.SyntaxError("URI is not set")
 	}
 	imagesJSONPath, found := compute["imagesJSONPath"].(string)
 	if !found {
-		return nil, fmt.Errorf("imagesJsonPath is not set")
+		return nil, scerr.SyntaxError("imagesJsonPath is not set")
 	}
 	templatesJSONPath, found := compute["templatesJSONPath"].(string)
 	if !found {
-		return nil, fmt.Errorf("templatesJsonPath is not set")
+		return nil, scerr.SyntaxError("templatesJsonPath is not set")
 	}
 	libvirtStorage, found := compute["libvirtStorage"].(string)
 	if !found {
-		return nil, fmt.Errorf("libvirtStorage is not set")
+		return nil, scerr.SyntaxError("libvirtStorage is not set")
 	}
 
 	localConfig.ImagesJSONPath = imagesJSONPath
@@ -128,7 +129,7 @@ func (prov *provider) Build(params map[string]interface{}) (providerapi.Provider
 
 	libvirtStack, err := libStack.New(authOptions, localConfig, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a new libvirt Stack : %v", err)
+		return nil, scerr.Wrap(err, "failed to create a new libvirt Stack")
 	}
 
 	localProvider := &provider{
@@ -140,50 +141,50 @@ func (prov *provider) Build(params map[string]interface{}) (providerapi.Provider
 }
 
 // GetAuthOpts returns authentication options as a Config
-func (prov *provider) GetAuthenticationOptions() (providers.Config, error) {
-	cfg := resources.ConfigMap{}
+func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+	cfg := abstract.ConfigMap{}
 	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
-func (prov *provider) GetConfigurationOptions() (providers.Config, error) {
-	config := resources.ConfigMap{}
+func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+	config := abstract.ConfigMap{}
 
-	config.Set("AutoHostNetworkInterfaces", prov.Config.AutoHostNetworkInterfaces)
-	config.Set("UseLayer3Networking", prov.Config.UseLayer3Networking)
-	config.Set("MetadataBucketName", prov.Config.MetadataBucket)
-	config.Set("ProviderNetwork", prov.Config.ProviderNetwork)
-	config.Set("OperatorUsername", prov.Config.OperatorUsername)
+	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
+	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
+	config.Set("MetadataBucketName", p.Config.MetadataBucket)
+	config.Set("ProviderNetwork", p.Config.ProviderNetwork)
+	config.Set("OperatorUsername", p.Config.OperatorUsername)
 
 	return config, nil
 }
 
-func (prov *provider) GetName() string {
+func (p *provider) GetName() string {
 	return "local"
 }
 
 // ListImages ...
-func (prov *provider) ListImages(all bool) ([]resources.Image, error) {
-	return prov.Stack.ListImages()
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+	return p.Stack.ListImages()
 }
 
 // ListTemplates ...
-func (prov *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	return prov.Stack.ListTemplates()
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+	return p.Stack.ListTemplates()
 }
 
-func (prov *provider) ListAvailabilityZones() (map[string]bool, error) {
-	return prov.Stack.ListAvailabilityZones()
+func (p *provider) ListAvailabilityZones() (map[string]bool, error) {
+	return p.Stack.ListAvailabilityZones()
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-func (prov *provider) GetTenantParameters() map[string]interface{} {
-	return prov.tenantParameters
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (prov *provider) GetCapabilities() providers.Capabilities {
+func (p *provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{}
 }
 

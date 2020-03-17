@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
@@ -32,10 +32,10 @@ type jobManager struct {
 }
 
 // List ...
-func (c *jobManager) List(timeout time.Duration) (*pb.JobList, error) {
+func (c *jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewJobServiceClient(c.session.connection)
+	service := protocol.NewJobServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(false)
 	if err != nil {
 		return nil, err
@@ -48,12 +48,12 @@ func (c *jobManager) List(timeout time.Duration) (*pb.JobList, error) {
 func (c *jobManager) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := pb.NewJobServiceClient(c.session.connection)
+	service := protocol.NewJobServiceClient(c.session.connection)
 	ctx, err := utils.GetContext(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Stop(ctx, &pb.JobDefinition{Uuid: uuid})
+	_, err = service.Stop(ctx, &protocol.JobDefinition{Uuid: uuid})
 	return err
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,20 @@
 package cloudferro
 
 import (
-	"fmt"
 	"regexp"
+
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/asaskevich/govalidator"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 var (
@@ -70,12 +71,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	if defaultImage == "" {
 		defaultImage = cloudferroDefaultImage
 	}
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 
@@ -144,7 +145,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, fmt.Errorf("invalid Region: '%s'", region)
+			return nil, scerr.InvalidRequestError("invalid Region '%s'", region)
 		}
 	}
 
@@ -167,7 +168,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+			return nil, scerr.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 
@@ -207,7 +208,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -217,7 +218,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	allImages, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err

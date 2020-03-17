@@ -1,0 +1,312 @@
+#
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        cluster: all
+    requirements:
+        features:
+            - postgres4gateway
+
+    install:
+        bash:
+            check:
+                pace: curl
+                steps:
+                    curl:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null || sfFail 192
+
+            add:
+#                pace: config,secret,networks,start
+                pace: config,networks,start
+                steps:
+                    config:
+                        timeout: 10
+                        targets:
+                            gateways: all
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/edgeproxy4network/includes
+                            ln -s ${SF_ETCDIR}/edgeproxy4network ${SF_ETCDIR}/kong4gateway
+                            ln -s ${SF_ETCDIR}/edgeproxy4network ${SF_ETCDIR}/kong
+
+                            KONG_PG_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+                            ADMIN_PG_PASSWORD="$(cat ${SF_ETCDIR}/postgres4gateway/password)"
+
+                            cat >${SF_ETCDIR}/edgeproxy4network/my-docker-entrypoint.sh <<-'EOF'
+                            #!/bin/sh
+
+                            case $KONG_DATABASE in
+                                postgres) # gets passwords from docker secrets
+                                        #   ADMIN_PG_PASSWORD="$(cat /run/secrets/safescale.postgresxl.password)"
+                                        #   KONG_PG_PASSWORD="$(cat /run/secrets/safescale.edgeproxy.db_password)"
+                                        #   export KONG_PG_PASSWORD
+
+                                          # creates /root/.pgpass
+                                          cat >/root/.pgpass <<-EOF2
+                            *:5432:*:postgres:$ADMIN_PG_PASSWORD
+                            *:5432:edgeproxy4network:edgeproxy4network:$KONG_PG_PASSWORD
+                            EOF2
+                                          chmod 0600 /root/.pgpass && chown root:root /root/.pgpass
+
+                                          # wait for database server
+                                          while ! psql -h $KONG_PG_HOST -U postgres -c 'select 1' >/dev/null; do
+                                              sleep 5
+                                          done
+
+                                          # Create database if needed
+                                          if ! psql -h $KONG_PG_HOST -U postgres ${KONG_PG_DATABASE} -c '\q' &>/dev/null; then
+                                              psql -h $KONG_PG_HOST -U postgres <<-EOSQL
+                            CREATE DATABASE ${KONG_PG_DATABASE};
+                            CREATE USER ${KONG_PG_USER};
+                            #CREATE DATABASE ${KONG_PG_DATABASE}-gui;
+                            EOSQL
+                                          fi
+
+                                          # init/reset KONG_PG_USER password and db ownership
+                                          psql -h $KONG_PG_HOST -U postgres <<-EOSQL
+                            ALTER USER ${KONG_PG_USER} PASSWORD '${KONG_PG_PASSWORD}';
+                            ALTER DATABASE ${KONG_PG_DATABASE} OWNER TO ${KONG_PG_USER};
+                            #ALTER DATABASE ${KONG_PG_DATABASE}-gui OWNER TO ${KONG_PG_USER};
+                            EOSQL
+                                          ;;
+                            esac
+
+                            # 2nd kong migration
+                            /docker-entrypoint.sh kong migrations bootstrap >/dev/null
+                            /docker-entrypoint.sh kong migrations up >/dev/null
+                            /docker-entrypoint.sh kong migrations finish >/dev/null
+
+                            # 3nd starts kong
+                            exec /docker-entrypoint.sh $*
+                            EOF
+
+                            cat >${SF_ETCDIR}/edgeproxy4network/Dockerfile <<-EOF
+                            FROM kong:1.3
+                            RUN apk update && apk add git unzip postgresql-client
+                            RUN luarocks install kong-oidc \
+                             && luarocks install kong-prometheus-plugin
+                            RUN mkdir -p /etc/kong/includes
+                            RUN setcap CAP_NET_BIND_SERVICE=+ep /usr/local/openresty/nginx/sbin/nginx
+                            COPY my-docker-entrypoint.sh /
+                            RUN chmod a+rx /my-docker-entrypoint.sh
+                            ENTRYPOINT ["/my-docker-entrypoint.sh"]
+                            CMD ["kong", "docker-start"]
+                            EOF
+                            docker build -t edgeproxy4network:latest ${SF_ETCDIR}/edgeproxy4network
+
+                            # cat >${SF_ETCDIR}/edgeproxy4network/konga.userdb.data <<-EOF
+                            # module.exports = [
+                            #     {
+                            #         "username": "safescale",
+                            #         "email": "{{ .ClusterAdminUsername }}@safescale",
+                            #         "firstName": "SafeScale",
+                            #         "lastName": "Administrator",
+                            #         "node_id": "https://127.0.0.1:8444",
+                            #         "admin": true,
+                            #         "active" : true,
+                            #         "password": "{{.Password}}"
+                            #     }
+                            # ]
+                            # EOF
+                            # chmod go-rwx ${SF_ETCDIR}/edgeproxy4network/konga.userdb.data
+
+                            cat >${SF_ETCDIR}/edgeproxy4network/docker-compose.yml <<-EOF
+                            version: '2.1'
+                            services:
+                                proxy:
+                                    image: edgeproxy4network:latest
+                                    environment:
+                                        - KONG_DATABASE=postgres
+                                        - KONG_PG_HOST={{ .HostIP }}
+                                        - KONG_PG_DATABASE=edgeproxy4network
+                                        - KONG_PG_USER=edgeproxy4network
+                                        - KONG_PG_PASSWORD=${KONG_PG_PASSWORD}
+                                        - ADMIN_PG_PASSWORD=${ADMIN_PG_PASSWORD}
+                                        - KONG_PROXY_ACCESS_LOG=/dev/stdout
+                                        - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+                                        - KONG_PROXY_ERROR_LOG=/dev/stderr
+                                        - KONG_ADMIN_ERROR_LOG=/dev/stderr
+                                        - KONG_ADMIN_LISTEN=0.0.0.0:8444 ssl
+                                        - KONG_PROXY_LISTEN=0.0.0.0:443 ssl
+                                        - KONG_PLUGINS=oidc,prometheus,ip-restriction
+                                    volumes:
+                                        - ${SF_ETCDIR}/edgeproxy4network/kong.conf:/etc/kong/kong.conf:ro
+                                        - ${SF_ETCDIR}/edgeproxy4network/includes:/etc/kong/includes:ro
+                                    network_mode: "host"
+                                    ports:
+                                        - "0.0.0.0:443:443"
+                                        - "{{ .HostIP }}:6443:6443"
+                                        - "127.0.0.1:8444:8444"
+                                    restart: always
+                                    healthcheck:
+                                        test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || sfFail 1"]
+                                        interval: 5s
+                                        retries: 10
+                            #         secrets:
+                            #             - safescale.postgresxl.password
+                            #             - safescale.edgeproxy.db_password
+
+                            # secrets:
+                            #     safescale.postgresxl.password:
+                            #         external: true
+                            #     safescale.edgeproxy.db_password:
+                            #         external: true
+
+                            # networks:
+                            #     safescale-gw:
+                            #         external: true
+                            EOF
+
+                                # gui:
+                                #     image: pantsel/konga
+                                #     volumes:
+                                #         - ${SF_ETCDIR}/edgeproxy4network/konga.userdb.data:/usr/local/etc/userdb.data:ro
+                                #     environment:
+                                #         - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
+                                #         - DB_ADAPTER=postgres
+                                #         - DB_DATABASE=edgeproxy4network-gui
+                                #         - DB_USER=edgeproxy4network
+                                #         - DB_PASSWORD="${DB_PASSWORD}"
+                                #         - NODE_ENV=production
+                                #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
+                                #     network:
+                                #         - safescale-gw
+                                #     ports:
+                                #         - target: 1337
+                                #           published: 1337
+                                #           protocol: tcp
+                                #           mode: "host"
+                                #     deploy:
+                                #         mode: global
+                                #         placement:
+                                #             constraints:
+                                #                 - node.role == manager
+                                #         restart_policy:
+                                #             condition: on-failure
+                                #             delay: 5s
+                                #             max_attempts: 3
+                                #             window: 120s
+
+                            chmod go-rwx ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml
+
+                            cat >${SF_ETCDIR}/edgeproxy4network/kong.conf <<-EOF
+                            trusted_ips=0.0.0.0/0,::/0
+                            real_ip_header=X-Forwarded-For
+                            real_ip_recursive=on
+                            stream_listen = 0.0.0.0:6442
+                            nginx_stream_include = /etc/kong/includes/*.conf
+                            anonymous_reports = off
+                            EOF
+                            sfExit
+
+                    # secret:
+                    #     targets:
+                    #         hosts: no
+                    #         gateways: any
+                    #         masters: no
+                    #         nodes: no
+                    #     run: |
+                    #         docker secret rm safescale.edgeproxy.db_password &>/dev/null || true
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.edgeproxy.db_password - &>/dev/null || sfFail 192
+                    #         sfExit
+
+                    networks:
+                        targets:
+                            gateways: all
+                        run: |
+                            # {{ if .ClusterFlavor }}
+                            # IMAGE=kong4safescale
+                            # KONG_PUB_BRIDGE=br_k4s_pub
+                            # KONG_DB_BRIDGE=br_k4s_db
+                            # {{ else }}
+                            # IMAGE=kong
+                            # KONG_PUB_BRIDGE=br_k_pub
+                            # KONG_DB_BRIDGE=br_k_db
+                            # {{ end}}
+                            # KONG_PUB_NET="${IMAGE}_pubnet"
+                            # KONG_DB_NET="${IMAGE}_dbnet"
+
+                            # docker network create --driver bridge --attachable --opt "com.docker.network.bridge.name=${KONG_PUB_BRIDGE}" ${KONG_PUB_NET}
+                            # docker network create --driver bridge --attachable --internal --opt "com.docker.network.bridge.name=${KONG_DB_BRIDGE}" ${KONG_DB_NET}
+
+                            # sfFirewallAdd --zone=trusted --add-interface=${KONG_PUB_BRIDGE} && \
+                            # sfFirewallAdd --zone=trusted --add-interface=${KONG_DB_BRIDGE} && \
+                            sfFirewallAdd --zone=public --add-service=https && sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfExit
+
+                    start:
+                        targets:
+                            gateways: all
+                        run: |
+                            docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network up -d || sfFail 193
+                            sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || sfFail 194
+                            sfExit
+
+            remove:
+                pace: compose,networks
+                steps:
+                    compose:
+                        targets:
+                            gateways: all
+                        run: |
+                            if [ -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml ]; then
+                                docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network rm --stop --force || sfFail 195
+                                # docker secret rm safescale.edgeproxy.db_password &>/dev/null
+                                docker image rm -f edgeproxy4network:latest
+                                rm -rf ${SF_ETCDIR}/edgeproxy4network
+
+                            else
+                                if [ -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml ]; then
+                                    docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force || sfFail 196
+                                    docker image rm -f kong4gateway:latest
+                                    rm -rf ${SF_ETCDIR}/kong4gateway
+                                fi
+                                if [ -f ${SF_ETCDIR}/kong/docker-compose.yml ]; then
+                                    docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force || sfFail 197
+                                    docker image rm -f kong:latest
+                                    rm -rf ${SF_ETCDIR}/kong
+                                fi
+                            fi
+                            sfExit
+
+                    networks:
+                        targets:
+                            gateways: all
+                        run: |
+                            # {{ if .ClusterFlavor }}
+                            # KONG_PUB_BRIDGE=br_k4s_pub
+                            # KONG_DB_BRIDGE=br_k4s_db
+                            # {{ else }}
+                            # KONG_PUB_BRIDGE=br_k_pub
+                            # KONG_BRIDGE=br_k_db
+                            # {{ end}}
+
+                            # sfFirewallAdd --zone=trusted --remove-interface=${KONG_PUB_BRIDGE} && \
+                            # sfFirewallAdd --zone=trusted --remove-interface=${KONG_DB_BRIDGE} && \
+                            sfFirewallAdd --zone=public --remove-service=https && sfFirewallReload || sfFail 204 "Firewall problem"
+
+                            # docker network rm ${KONG_PUB_BRIDGE}
+                            # docker network rm ${KONG_DB_BRIDGE}
+                            sfExit
+
+...

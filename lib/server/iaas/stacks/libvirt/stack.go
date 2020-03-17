@@ -3,13 +3,13 @@
 package local
 
 import (
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/libvirt/libvirt-go"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 type Stack struct {
@@ -19,7 +19,7 @@ type Stack struct {
 	AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.Host, error) {
 	return nil, scerr.NotImplementedError("WaitHostReady not implemented yet!") // FIXME Technical debt
 }
 
@@ -33,14 +33,14 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, 
 
 	libvirtConnection, err := libvirt.NewConnect(stack.LibvirtConfig.URI)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to libvirt : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to connect to libvirt")
 	}
 	stack.LibvirtService = libvirtConnection
 
 	if stack.LibvirtConfig.LibvirtStorage != "" {
 		err := stack.CreatePoolIfUnexistant(stack.LibvirtConfig.LibvirtStorage)
 		if err != nil {
-			return nil, fmt.Errorf("unable to create StoragePool : %s", err.Error())
+			return nil, scerr.Wrap(err, "unable to create StoragePool")
 		}
 	}
 

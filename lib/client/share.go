@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,10 @@ package client
 import (
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // share is the part of the safescale client handilng Shares
@@ -31,10 +31,10 @@ type share struct {
 }
 
 // Create ...
-func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
+func (n *share) Create(def protocol.ShareDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewShareServiceClient(n.session.connection)
+	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
 
 	_, err = service.Create(ctx, &def)
 	if err != nil {
-		return DecorateError(err, "creation of share", true)
+		return DecorateTimeoutError(err, "creation of share", true)
 	}
 	return nil
 }
@@ -51,24 +51,24 @@ func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
 func (n *share) Delete(name string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewShareServiceClient(n.session.connection)
+	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.Delete(ctx, &pb.Reference{Name: name})
+	_, err = service.Delete(ctx, &protocol.Reference{Name: name})
 	if err != nil {
-		return DecorateError(err, "deletion of share", true)
+		return DecorateTimeoutError(err, "deletion of share", true)
 	}
 	return nil
 }
 
 // List ...
-func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
+func (n *share) List(timeout time.Duration) (*protocol.ShareList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewShareServiceClient(n.session.connection)
+	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
@@ -76,16 +76,16 @@ func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
 
 	list, err := service.List(ctx, &googleprotobuf.Empty{})
 	if err != nil {
-		return nil, DecorateError(err, "list of shares", true)
+		return nil, DecorateTimeoutError(err, "list of shares", true)
 	}
 	return list, nil
 }
 
 // Mount ...
-func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error {
+func (n *share) Mount(def protocol.ShareMountDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewShareServiceClient(n.session.connection)
+	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -93,16 +93,16 @@ func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error 
 
 	_, err = service.Mount(ctx, &def)
 	if err != nil {
-		return DecorateError(err, "mount of share", true)
+		return DecorateTimeoutError(err, "mount of share", true)
 	}
 	return nil
 }
 
 // Unmount ...
-func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) error {
+func (n *share) Unmount(def protocol.ShareMountDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewShareServiceClient(n.session.connection)
+	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return err
@@ -110,24 +110,24 @@ func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) erro
 
 	_, err = service.Unmount(ctx, &def)
 	if err != nil {
-		return DecorateError(err, "unmount of share", true)
+		return DecorateTimeoutError(err, "unmount of share", true)
 	}
 	return nil
 }
 
 // Inspect ...
-func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareMountList, error) {
+func (n *share) Inspect(name string, timeout time.Duration) (*protocol.ShareMountList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := pb.NewShareServiceClient(n.session.connection)
+	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	list, err := service.Inspect(ctx, &pb.Reference{Name: name})
+	list, err := service.Inspect(ctx, &protocol.Reference{Name: name})
 	if err != nil {
-		return nil, DecorateError(err, "inspection of share", true)
+		return nil, DecorateTimeoutError(err, "inspection of share", true)
 	}
 	return list, nil
 }

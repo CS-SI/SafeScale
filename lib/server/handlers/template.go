@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,42 +17,46 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateAPI
+//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateHandler
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-//TemplateAPI defines API to manipulate hosts
-type TemplateAPI interface {
-	List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
+//TemplateHandler defines API to manipulate hosts
+type TemplateHandler interface {
+	List(all bool) ([]abstract.HostTemplate, error)
 }
 
-// TemplateHandler template service
-type TemplateHandler struct {
-	service iaas.Service
+// templateHandler template service
+type templateHandler struct {
+	job server.Job
 }
 
 // NewTemplateHandler creates a template service
-func NewTemplateHandler(svc iaas.Service) TemplateAPI {
-	return &TemplateHandler{
-		service: svc,
-	}
+//FIXME: what to do if job == nil ?
+func NewTemplateHandler(job server.Job) TemplateHandler {
+	return &templateHandler{job: job}
 }
 
 // List returns the template list
-func (handler *TemplateHandler) List(_ context.Context, all bool) (tlist []resources.HostTemplate, err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, err error) {
+	if handler == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	tlist, err = handler.service.ListTemplates(all)
+	tlist, err = handler.job.SafeGetService().ListTemplates(all)
 	return tlist, err
 }

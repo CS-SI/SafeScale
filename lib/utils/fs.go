@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"fmt"
 	"os"
 	"reflect"
 
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,7 +18,7 @@ func LazyRemove(path string) error {
 			// File not found, that's ok because we wanted to remove it...
 		default:
 			logrus.Errorf("LazyRemove(): err is type '%s'", reflect.TypeOf(err).String())
-			return fmt.Errorf("error removing file '%s': %v", path, err)
+			return scerr.Wrap(err, "failed to remove file '%s'", path)
 		}
 	}
 	return nil

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -70,7 +70,7 @@ func CreateErrorWithNConsequences(n uint) (err error) {
 func CreateSkippableError() (err error) {
 	err = WhileSuccessfulDelay1Second(func() error {
 		fmt.Println("Around the world...")
-		return AbortedError("no more", scerr.NotFoundError("wrong place"))
+		return StopRetryError(scerr.NotFoundError("wrong place"), "no more")
 	}, 60*time.Millisecond)
 	return err
 }
@@ -91,11 +91,11 @@ func JustThrowBasicError() (err error) {
 }
 
 func JustThrowError() (err error) {
-	return resources.ResourceDuplicateError("host", "boo")
+	return abstract.ResourceDuplicateError("host", "boo")
 }
 
 func JustThrowComplexError() (err error) {
-	err = resources.ResourceDuplicateError("host", "booboo")
+	err = abstract.ResourceDuplicateError("host", "booboo")
 	err = scerr.AddConsequence(err, fmt.Errorf("cleanup error"))
 	return err
 }
@@ -145,8 +145,8 @@ func TestDeferredWrappedConsequence(t *testing.T) {
 func TestVerifyErrorType(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(*scerr.ErrTimeout); !ok {
-			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(ErrTimeout); !ok {
+			t.Errorf("It should be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
@@ -156,13 +156,13 @@ func TestVerifyErrorType(t *testing.T) {
 
 	recovered = CreateComplexErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(*scerr.ErrTimeout); !ok {
-			t.Errorf("It should be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(ErrTimeout); !ok {
+			t.Errorf("It should be a 'ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
-			if _, ok := cause.(*scerr.ErrNotFound); !ok {
-				t.Errorf("It should be a ErrNotFound, but it's [%s]", reflect.TypeOf(recovered).String())
+			if _, ok := cause.(scerr.ErrNotFound); !ok {
+				t.Errorf("It should be a 'scerr.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 			}
 		}
 	}
@@ -171,15 +171,15 @@ func TestVerifyErrorType(t *testing.T) {
 func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
 	if recovered != nil {
-		if _, ok := recovered.(*scerr.ErrTimeout); ok {
-			t.Errorf("It should NOT be a timeout, but it's [%s]", reflect.TypeOf(recovered).String())
+		if _, ok := recovered.(ErrTimeout); ok {
+			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := scerr.Cause(recovered); cause != nil {
-			if _, ok := cause.(*scerr.ErrNotFound); ok {
+			if _, ok := cause.(scerr.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
-				t.Errorf("This should be a NotFound error...")
+				t.Errorf("This should be a 'scerr.ErrNotFound', it's instead a '%s'", reflect.TypeOf(cause).String())
 			}
 		}
 	}
@@ -317,8 +317,8 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(*ErrTimeout); !ok {
-						t.Errorf("Timeout error not received...")
+					if _, ok := err.(ErrTimeout); !ok {
+						t.Errorf("'ErrTimeout' not received...")
 					}
 				}
 			}
@@ -363,7 +363,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(*ErrTimeout); !ok {
+					if _, ok := err.(ErrTimeout); !ok {
 						t.Errorf("Timeout error not received...")
 					}
 				}
@@ -377,7 +377,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 }
 
 func genErr() error {
-	return resources.ResourceNotFoundError("host", "whatever")
+	return abstract.ResourceNotFoundError("host", "whatever")
 }
 
 func genTimeout() error {
@@ -389,31 +389,30 @@ func genLimit() error {
 }
 
 func genAbort() error {
-	return AbortedError("bizarre provider error", fmt.Errorf("4hJx7NGwyH7dPGQNY3WG happened !! "))
+	return StopRetryError(fmt.Errorf("4hJx7NGwyH7dPGQNY3WG happened !! "), "weird provider error")
 }
 
 func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
-
-	if _, ok := nerr.(*scerr.ErrNotFound); !ok {
-		t.Errorf("Is not a resourceNotFound")
+	if _, ok := nerr.(scerr.ErrNotFound); !ok {
+		t.Errorf("Is not a 'ErrNotFound', it's instead a '%s'", reflect.TypeOf(nerr).String())
 	}
 }
 
 func TestKeepType(t *testing.T) {
 	toe := genTimeout()
-	if _, ok := toe.(*scerr.ErrTimeout); !ok {
-		t.Errorf("Is not a timeout")
+	if _, ok := toe.(ErrTimeout); !ok {
+		t.Errorf("Is not a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(toe).String())
 	}
 
 	leo := genLimit()
-	if _, ok := leo.(*scerr.ErrOverflow); !ok {
-		t.Errorf("Is not a limit error")
+	if _, ok := leo.(ErrLimit); !ok {
+		t.Errorf("Is not a 'ErrLimit', it's instead a '%s'", reflect.TypeOf(leo).String())
 	}
 
 	abo := genAbort()
-	if _, ok := abo.(*scerr.ErrAborted); !ok {
-		t.Errorf("Is not a aborted")
+	if _, ok := abo.(ErrStopRetry); !ok {
+		t.Errorf("Is not a 'ErrStopRetry', it's instead a '%s'", reflect.TypeOf(abo).String())
 	}
 }
 
@@ -422,8 +421,6 @@ func TestRefactorSwitch(t *testing.T) {
 
 	switch toe.(type) {
 	case ErrTimeout:
-		t.Error("No longer a timeout")
-	case *ErrTimeout:
 		fmt.Println("This requires looking for all the (type) out there...")
 	default:
 		t.Error("Unexpected problem")

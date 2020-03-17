@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +77,53 @@ func (m Map) Keys() []string {
 func (m Map) Values() []interface{} {
 	values := make([]interface{}, 0, len(m))
 	for _, v := range m {
+		values = append(values, v)
+	}
+	return values
+}
+
+// IndexedListOfStrings contains a list of string (being ID, IP, ...) of nodes indexed by node Numerical ID.
+type IndexedListOfStrings map[uint]string
+
+// KeysAndValues returns a slice with keys and a slice with values from map[uint]string
+func (ilos IndexedListOfStrings) KeysAndValues() ([]uint, []string) {
+	length := len(ilos)
+	if length <= 0 {
+		return []uint{}, []string{}
+	}
+
+	keys := make([]uint, 0, length)
+	values := make([]string, 0, length)
+	for k, v := range ilos {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	return keys, values
+}
+
+// Keys returns a slice with keys from map[uint]string
+func (ilos IndexedListOfStrings) Keys() []uint {
+	length := len(ilos)
+	if length <= 0 {
+		return []uint{}
+	}
+
+	keys := make([]uint, 0, length)
+	for k := range ilos {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Values returns a slice with values from map[uint]string
+func (ilos IndexedListOfStrings) Values() []string {
+	length := len(ilos)
+	if length <= 0 {
+		return []string{}
+	}
+
+	values := make([]string, 0, length)
+	for _, v := range ilos {
 		values = append(values, v)
 	}
 	return values

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,9 @@
 package nfs
 
 import (
-	"context"
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Client defines the structure of a Client object
@@ -32,7 +31,7 @@ type Client struct {
 // NewNFSClient creates a new NFS client instance
 func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 	if sshconfig == nil {
-		return nil, fmt.Errorf("invalid parameter: 'sshconfig' cannot be nil")
+		return nil, scerr.InvalidParameterError("sshconfig", "cannot be nil")
 	}
 
 	client := &Client{
@@ -42,27 +41,27 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 }
 
 // Install installs NFS client on remote host
-func (c *Client) Install(ctx context.Context) error {
-	retcode, stdout, stderr, err := executeScript(ctx, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install NFS client")
+func (c *Client) Install(task concurrency.Task) error {
+	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
+	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to install NFS client")
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(ctx context.Context, export string, mountPoint string, withCache bool) error {
+func (c *Client) Mount(task concurrency.Task, export string, mountPoint string, withCache bool) error {
 	data := map[string]interface{}{
 		"Export":      export,
 		"MountPoint":  mountPoint,
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
-	retcode, stdout, stderr, err := executeScript(ctx, *c.SSHConfig, "nfs_client_share_mount.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
+	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_share_mount.sh", data)
+	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
 }
 
 // Unmount a nfs share from NFS server
-func (c *Client) Unmount(ctx context.Context, export string) error {
+func (c *Client) Unmount(task concurrency.Task, export string) error {
 	data := map[string]interface{}{
 		"Export": export,
 	}
-	retcode, stdout, stderr, err := executeScript(ctx, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unmount remote NFS share")
+	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
+	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to unmount remote NFS share")
 }
