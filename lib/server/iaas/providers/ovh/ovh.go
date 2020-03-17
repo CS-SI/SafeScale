@@ -34,6 +34,7 @@ import (
 	filters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 type gpuCfg struct {
@@ -352,7 +353,39 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
-	return providers.Capabilities{}
+	return providers.Capabilities{
+		PrivateVirtualIP: true,
+	}
+}
+
+// BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+func (p *provider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
+	if p == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if vip == nil {
+		return scerr.InvalidParameterError("vip", "cannot be nil")
+	}
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
+	}
+
+	return nil
+}
+
+// UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+func (p *provider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
+	if p == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if vip == nil {
+		return scerr.InvalidParameterError("vip", "cannot be nil")
+	}
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
+	}
+
+	return nil
 }
 
 func init() {
