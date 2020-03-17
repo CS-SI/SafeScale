@@ -270,7 +270,7 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 	// 	logrus.Warnf("Volume deletion cancelled by user")
 	// 	volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
 	// 	if err != nil {
-	// 		return fmt.Errorf("failed to stop volume deletion")
+	// 		return scerr.NewError("failed to stop volume deletion")
 	// 	}
 	// 	buf, err := volumeBis.Serialize()
 	// 	if err != nil {
@@ -470,7 +470,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 			// Isolate the new device
 			newDisk = newDiskSet.Difference(oldDiskSet)
 			if newDisk.Cardinality() == 0 {
-				return fmt.Errorf("disk not yet attached, retrying")
+				return scerr.NotAvailableError("disk not yet attached, retrying")
 			}
 			return nil
 		},
@@ -633,9 +633,9 @@ func (objv *volume) listAttachedDevices(task concurrency.Task, host resources.Ho
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					return fmt.Errorf("failed to reach SSH service of host '%s', retrying", hostName)
+					return scerr.NotAvailableError("failed to reach SSH service of host '%s', retrying", hostName)
 				}
-				return fmt.Errorf(stderr)
+				return scerr.NewError(stderr)
 			}
 			return nil
 		},

@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/asaskevich/govalidator"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -33,6 +32,10 @@ import (
 
 // PrepareJob creates a new job
 func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (server.Job, error) {
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
+
 	var tenant *Tenant
 	if tenantName != "" {
 		service, err := iaas.UseService(tenantName)
@@ -43,7 +46,7 @@ func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (
 	} else {
 		tenant = GetCurrentTenant()
 		if tenant == nil {
-			return nil, fmt.Errorf("no tenant set")
+			return nil, scerr.NotFoundError("no tenant set")
 		}
 	}
 	newctx, cancel := context.WithCancel(ctx)

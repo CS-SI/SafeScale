@@ -213,7 +213,7 @@ func (c *cluster) taskCreateMasters(task concurrency.Task, params concurrency.Ta
 	}
 	if len(errs) > 0 {
 		msg := strings.Join(errs, "\n")
-		return nil, fmt.Errorf("[cluster %s] failed to create master(s): %s", clusterName, msg)
+		return nil, scerr.NewError("[cluster %s] failed to create master(s): %s", clusterName, msg)
 	}
 
 	logrus.Debugf("[cluster %s] masters creation successful.", clusterName)
@@ -558,15 +558,15 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 		subtasks = append(subtasks, subtask)
 	}
 
-	var errs []string
+	var errs []error
 	for _, s := range subtasks {
 		_, state := s.Wait()
 		if state != nil {
-			errs = append(errs, state.Error())
+			errs = append(errs, state)
 		}
 	}
 	if len(errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(errs, "\n"))
+		return nil, scerr.ErrListError(errs)
 	}
 
 	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, strprocess.Plural(count))
@@ -757,7 +757,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.T
 		host   resources.Host
 		i      uint
 		hostID string
-		errs   []string
+		errs   []error
 	)
 
 	svc := c.SafeGetService()
@@ -766,7 +766,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.T
 		i++
 		host, err = LoadHost(task, svc, hostID)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("failed to get metadata of host '%s': %s", hostID, err.Error()))
+			errs = append(errs, scerr.Wrap(err, "failed to get metadata of host '%s'", hostID))
 			continue
 		}
 		subtask, err := task.StartInSubtask(c.taskConfigureNode, data.Map{
@@ -782,11 +782,11 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.T
 	for _, s := range subtasks {
 		_, err := s.Wait()
 		if err != nil {
-			errs = append(errs, err.Error())
+			errs = append(errs, err)
 		}
 	}
 	if len(errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(errs, "\n"))
+		return nil, scerr.ErrListError(errs)
 	}
 
 	logrus.Debugf("[cluster %s] nodes configuration successful.", clusterName)

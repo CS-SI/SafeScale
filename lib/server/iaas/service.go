@@ -235,7 +235,7 @@ func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, tim
 		select {
 		case res := <-cout:
 			if res == 0 {
-				return nil, fmt.Errorf("error getting host state")
+				return nil, scerr.NewError("error getting host state")
 			}
 			if res == 1 {
 				return <-vc, nil
@@ -361,8 +361,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 				} else {
 					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 				}
-				logrus.Error(noHostError)
-				return nil, fmt.Errorf(noHostError)
+				return nil, scerr.NewError(noHostError)
 			}
 		} else {
 			authOpts, err := svc.GetAuthenticationOptions()
@@ -371,7 +370,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 			}
 			region, ok := authOpts.Get("Region")
 			if !ok {
-				return nil, fmt.Errorf("region value unset")
+				return nil, scerr.SyntaxError("region value unset")
 			}
 			folder := fmt.Sprintf("images/%s/%s", svc.SafeGetName(), region)
 
@@ -387,14 +386,14 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 					}
 					logrus.Error(noHostError)
-					return nil, fmt.Errorf(noHostError)
+					return nil, scerr.NewError(noHostError)
 				}
 			} else {
 				var images []abstract.StoredCPUInfo
 				for _, f := range imageList {
 					imageFound := abstract.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-						logrus.Error(fmt.Sprintf("error unmarsalling image %s : %v", f, err))
+						return nil, scerr.Wrap(err, "error unmarsalling image '%s'")
 					}
 
 					// if the user asked explicitly no gpu
@@ -421,7 +420,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinCPUFreq)
 					}
 					logrus.Error(noHostError)
-					return nil, fmt.Errorf(noHostError)
+					return nil, scerr.NewError(noHostError)
 				}
 
 				for _, image := range images {
@@ -614,7 +613,7 @@ func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
 	//fmt.Println(fields, len(fields))
 	//fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
-		return nil, fmt.Errorf("unable to find an image matching %s", osname)
+		return nil, scerr.NotFoundError("unable to find an image matching '%s'", osname)
 	}
 
 	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
@@ -801,11 +800,11 @@ func InitializeBucket(svc *service, location objectstorage.Location) error {
 
 	cfg, err := svc.Provider.GetConfigurationOptions()
 	if err != nil {
-		return fmt.Errorf("failed to get client options: %s", err.Error())
+		return scerr.Wrap(err, "failed to get client options: %s")
 	}
 	anon, found := cfg.Get("MetadataBucket")
 	if !found || anon.(string) == "" {
-		return fmt.Errorf("failed to get value of option 'MetadataBucket'")
+		return scerr.SyntaxError("failed to get value of option 'MetadataBucket'")
 	}
 	_, err = location.CreateBucket(anon.(string))
 	if err != nil {

@@ -17,8 +17,6 @@
 package nfs
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -56,7 +54,7 @@ func (s *Server) Install(task concurrency.Task) error {
 func (s *Server) AddShare(task concurrency.Task, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) error {
 	share, err := NewShare(s, path, options)
 	if err != nil {
-		return fmt.Errorf("failed to create the share : %s", err.Error())
+		return scerr.Wrap(err, "failed to create the share")
 	}
 
 	// acl := ExportACL{

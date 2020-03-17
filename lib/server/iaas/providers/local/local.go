@@ -86,7 +86,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	config.UseLayer3Networking = false
 	bucketName, err := objectstorage.BuildMetadataBucketName("local", "", "", "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
+		return nil, scerr.Wrap(err, "failed to build metadata bucket name")
 	}
 	config.MetadataBucket = bucketName
 
@@ -107,19 +107,19 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	uri, found := compute["uri"].(string)
 	if !found {
-		return nil, fmt.Errorf("URI is not set")
+		return nil, scerr.SyntaxError("URI is not set")
 	}
 	imagesJSONPath, found := compute["imagesJSONPath"].(string)
 	if !found {
-		return nil, fmt.Errorf("imagesJsonPath is not set")
+		return nil, scerr.SyntaxError("imagesJsonPath is not set")
 	}
 	templatesJSONPath, found := compute["templatesJSONPath"].(string)
 	if !found {
-		return nil, fmt.Errorf("templatesJsonPath is not set")
+		return nil, scerr.SyntaxError("templatesJsonPath is not set")
 	}
 	libvirtStorage, found := compute["libvirtStorage"].(string)
 	if !found {
-		return nil, fmt.Errorf("libvirtStorage is not set")
+		return nil, scerr.SyntaxError("libvirtStorage is not set")
 	}
 
 	localConfig.ImagesJSONPath = imagesJSONPath
@@ -129,7 +129,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	libvirtStack, err := libStack.New(authOptions, localConfig, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a new libvirt Stack : %v", err)
+		return nil, scerr.Wrap(err, "failed to create a new libvirt Stack")
 	}
 
 	localProvider := &provider{

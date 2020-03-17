@@ -222,7 +222,7 @@ func (objs *share) Browse(task concurrency.Task, callback func(string, string) e
 // 		return nil, err
 // 	}
 // 	if client == nil {
-// 		return nil, fmt.Errorf("no client found for nas '%s' on host '%s'", *m.name, hostName)
+// 		return nil, scerr.NotFoundError("no client found for nas '%s' on host '%s'", *m.name, hostName)
 // 	}
 // 	return client, nil
 // }

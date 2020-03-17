@@ -119,9 +119,8 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, err
 				}
 			}
 		default:
-			return nil, fmt.Errorf("unknown parameter value : %s \n (should be host or cluster)", suitableFor)
+			return nil, scerr.SyntaxError("unknown parameter value: %s (should be 'host' or 'cluster')", suitableFor)
 		}
-
 	}
 
 	return cfgFiles, nil
@@ -353,7 +352,7 @@ func (f *feature) Check(target resources.Targetable, v data.Map, s resources.Fea
 		}
 	}
 	if installer == nil {
-		return nil, fmt.Errorf("failed to find a way to check '%s'", featureName)
+		return nil, scerr.NewError("failed to find a way to check '%s'", featureName)
 	}
 
 	logrus.Debugf("Checking if feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
@@ -390,7 +389,7 @@ func checkParameters(f *feature, v data.Map) error {
 			splitted := strings.Split(k, "=")
 			if _, ok := v[splitted[0]]; !ok {
 				if len(splitted) == 1 {
-					return fmt.Errorf("missing value for parameter '%s'", k)
+					return scerr.InvalidRequestError("missing value for parameter '%s'", k)
 				}
 				v[splitted[0]] = strings.Join(splitted[1:], "=")
 			}
@@ -590,7 +589,7 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 					return scerr.Wrap(err, "failed to install required feature '%s'", requirement)
 				}
 				if !results.Successful() {
-					return scerr.NewError(nil, nil, "failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
+					return scerr.NewError("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
 				}
 			}
 		}

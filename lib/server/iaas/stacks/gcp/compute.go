@@ -102,7 +102,7 @@ func (s *Stack) GetImage(id string) (*abstract.Image, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("image with id [%s] not found", id)
+	return nil, scerr.NotFoundError("image with id '%s' not found", id)
 }
 
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
@@ -169,7 +169,7 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("template with id [%s] not found", id)
+	return nil, scerr.NotFoundError("template with id '%s' not found", id)
 }
 
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
@@ -234,30 +234,30 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	hostMustHavePublicIP := request.PublicIP
 
 	if len(networks) == 0 {
-		return nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
+		return nil, userData, scerr.InvalidRequestError("the host %s must be on at least one network (even if public)", resourceName)
 	}
 
 	// If no key pair is supplied create one
 	if request.KeyPair == nil {
 		id, err := uuid.NewV4()
 		if err != nil {
-			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
+			msg := fmt.Sprintf("failed to create host UUID: %+s", err.Error())
 			logrus.Debugf(strprocess.Capitalize(msg))
-			return nil, userData, fmt.Errorf(msg)
+			return nil, userData, scerr.NewError(msg)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
 		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
+			msg := fmt.Sprintf("failed to create host key pair: %+s", err.Error())
 			logrus.Debugf(strprocess.Capitalize(msg))
-			return nil, userData, fmt.Errorf(msg)
+			return nil, userData, scerr.NewError(msg)
 		}
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, userData, scerr.NewError("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
@@ -284,7 +284,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	// if defaultGateway == nil && !hostMustHavePublicIP {
 	if request.DefaultRouteIP == "" && !hostMustHavePublicIP {
-		return nil, userData, fmt.Errorf("the host '%s' must have a gateway or be public", resourceName)
+		return nil, userData, scerr.InvalidRequestError("the host '%s' must have a gateway or be public", resourceName)
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -292,15 +292,15 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// Constructs userdata content
 	err = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
 	if err != nil {
-		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		logrus.Debugf(strprocess.Capitalize(msg))
-		return nil, userData, fmt.Errorf(msg)
+		err = scerr.Wrap(err, "failed to prepare user data content")
+		logrus.Debugf(strprocess.Capitalize(err.Error()))
+		return nil, userData, err
 	}
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to get image: %s", err)
+		return nil, userData, scerr.Wrap(err, "failed to get image")
 	}
 	if request.DiskSize > template.DiskSize {
 		template.DiskSize = request.DiskSize
@@ -413,7 +413,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			}
 
 			if server == nil {
-				return fmt.Errorf("failed to create server")
+				return scerr.NewError("failed to create server")
 			}
 
 			hostCore.ID = server.ID
@@ -529,7 +529,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 			}
 
 			if hostComplete.Core.LastState != hoststate.STARTED {
-				return fmt.Errorf("not in ready state (current state: %s)", hostComplete.Core.LastState.String())
+				return scerr.NotAvailableError("not in ready state (current state: %s)", hostComplete.Core.LastState.String())
 			}
 			return nil
 		},
@@ -802,7 +802,7 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, error) {
 	case "TERMINATED":
 		return hoststate.STOPPED, nil
 	default:
-		return -1, fmt.Errorf("unexpected host status: [%s]", gcpHostStatus)
+		return -1, scerr.NewError("unexpected host status: [%s]", gcpHostStatus)
 	}
 }
 
@@ -870,7 +870,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 					return nil
 				}
 			}
-			return fmt.Errorf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr)
+			return scerr.Wrap(recErr, "error waiting for instance '%s' to disappear", instanceName)
 		},
 		temporal.GetContextTimeout(),
 	)
@@ -899,7 +899,7 @@ func (s *Stack) ListHosts(detailed bool) (abstract.HostList, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Instances.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 		if err != nil {
-			return hostList, fmt.Errorf("cannot list hosts: %v", err)
+			return hostList, scerr.Wrap(err, "cannot list hosts")
 		}
 		for _, instance := range resp.Items {
 			nhost := abstract.NewHostCore()

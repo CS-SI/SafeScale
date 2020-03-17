@@ -19,8 +19,9 @@ package clustercomplexity
 //go:generate stringer -type=Enum
 
 import (
-	"fmt"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Enum represents the complexity of a cluster
@@ -59,7 +60,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Complexity.Enum corresponding to '%s'", v)
+		return e, scerr.NotFoundError("failed to find a Complexity.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 

@@ -49,7 +49,7 @@ func ReturnedValuesFromShellToError(retcode int, stdout string, stderr string, e
 		if err != nil {
 			return Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
 		}
-		return NewError(nil, nil, "%s: std error [%s]", msg, strings.Join(collected, ";"))
+		return NewError("%s: std error [%s]", msg, strings.Join(collected, ";"))
 	}
 
 	return nil

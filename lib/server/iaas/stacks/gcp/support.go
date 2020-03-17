@@ -10,6 +10,7 @@ import (
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // OpContext ...
@@ -51,7 +52,7 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 		return res, err
 	}
 
-	return res, fmt.Errorf("no operation")
+	return res, scerr.NewError("no operation")
 }
 
 func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, duration time.Duration) (err error) {
@@ -114,14 +115,13 @@ func getRegionFromSelfLink(link SelfLink) (string, error) {
 				return parts[regionPos+1], nil
 			}
 		}
-		return "", fmt.Errorf("not a region link")
 	}
-	return "", fmt.Errorf("not a region link")
+	return "", scerr.InvalidRequestError("not a region link")
 }
 
 func assertEq(exp, got interface{}) error { // nolint
 	if !reflect.DeepEqual(exp, got) {
-		return fmt.Errorf("wanted %v; Got %v", exp, got)
+		return scerr.InconsistentError("wanted %v; Got %v", exp, got)
 	}
 	return nil
 }

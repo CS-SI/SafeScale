@@ -273,7 +273,7 @@ func (c *Core) Read(task concurrency.Task, ref string) error {
 				if _, ok := inErr.(scerr.ErrNotFound); ok {
 					return inErr
 				}
-				return retry.StopRetryError("", inErr)
+				return retry.StopRetryError(inErr)
 			}
 			return nil
 		},

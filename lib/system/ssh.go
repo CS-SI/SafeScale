@@ -167,7 +167,7 @@ func (tunnel *SSHTunnel) Close() error {
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
 		logrus.Errorf("tunnel.cmd.Process.Kill() failed: %s", reflect.TypeOf(err).String())
-		return fmt.Errorf("unable to close tunnel :%s", err.Error())
+		return scerr.Wrap(err, "unable to close tunnel")
 	}
 	// Kills remaining processes if there are some
 	bytesCmd, err := exec.Command("pgrep", "-f", tunnel.cmdString).Output()
@@ -178,7 +178,7 @@ func (tunnel *SSHTunnel) Close() error {
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
 				logrus.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
-				return fmt.Errorf("unable to close tunnel :%s", err.Error())
+				return scerr.Wrap(err, "unable to close tunnel")
 			}
 		}
 	}
@@ -199,7 +199,7 @@ func getFreePort() (int, error) {
 	}
 	tcp, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
-		return 0, fmt.Errorf("invalid listener.Addr()")
+		return 0, scerr.NewError("invalid listener.Addr()")
 	}
 
 	port := tcp.Port
@@ -661,10 +661,10 @@ func (sc *SSHCommand) cleanup() error {
 	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
 		logrus.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
-		return fmt.Errorf("unable to close SSH tunnels: %s", err1.Error())
+		return scerr.Wrap(err1, "unable to close SSH tunnels")
 	}
 	if err2 != nil {
-		return fmt.Errorf("unable to close SSH tunnels: %s", err2.Error())
+		return scerr.Wrap(err2, "unable to close SSH tunnels")
 	}
 	return nil
 }
@@ -699,7 +699,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create SSH Tunnels : %s", err.Error())
+		return nil, nil, scerr.Wrap(err, "unable to create SSH Tunnels")
 	}
 	sshConfig := *ssh
 	if tunnel == nil {
@@ -716,7 +716,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 func createSSHCmd(sshConfig *SSHConfig, cmdString, username, shell string, withTty, withSudo bool) (string, *os.File, error) {
 	f, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
-		return "", nil, fmt.Errorf("unable to create temporary key file: %s", err.Error())
+		return "", nil, scerr.Wrap(err, "unable to create temporary key file")
 	}
 
 	options := sshOptions + " -oLogLevel=error"
@@ -784,11 +784,11 @@ func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, 
 
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create command : %s", err.Error())
+		return nil, scerr.Wrap(err, "unable to create command")
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, "", "", withTty, withSudo)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create command : %s", err.Error())
+		return nil, scerr.Wrap(err, "unable to create command")
 	}
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", sshCmdString)
@@ -836,7 +836,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			if task.Aborted() {
-				return retry.StopRetryError("operation aborted by user", nil)
+				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
 			cmd, err := ssh.Command(task, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
@@ -850,9 +850,9 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
+					return scerr.NewError("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 				}
-				return fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
+				return scerr.NewError("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
 			}
 			return nil
 		},
@@ -885,17 +885,17 @@ func (ssh *SSHConfig) copy(
 
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
-		return 0, "", "", fmt.Errorf("unable to create tunnels : %s", err.Error())
+		return 0, "", "", scerr.Wrap(err, "unable to create tunnels")
 	}
 
 	identityfile, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
-		return 0, "", "", fmt.Errorf("unable to create temporary key file: %s", err.Error())
+		return 0, "", "", scerr.Wrap(err, "unable to create temporary key file")
 	}
 
 	cmdTemplate, err := template.New("Command").Parse(`scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}'"{{.LocalPath}}"' {{.User}}@{{.Host}}:'"{{.RemotePath}}"'{{else}}{{.User}}@{{.Host}}:'"{{.RemotePath}}"' '"{{.LocalPath}}"'{{end}}`)
 	if err != nil {
-		return 0, "", "", fmt.Errorf("error parsing command template: %s", err.Error())
+		return 0, "", "", scerr.Wrap(err, "error parsing command template")
 	}
 
 	options := sshOptions + " -oLogLevel=error"
@@ -919,7 +919,7 @@ func (ssh *SSHConfig) copy(
 		LocalPath:    localPath,
 		IsUpload:     isUpload,
 	}); err != nil {
-		return 0, "", "", fmt.Errorf("error executing template: %s", err.Error())
+		return 0, "", "", scerr.Wrap(err, "error executing template")
 	}
 
 	sshCmdString := copyCommand.String()
@@ -943,7 +943,7 @@ func (ssh *SSHConfig) Enter(username, shell string) error {
 				logrus.Warnf("Error closing ssh tunnel: %v", nerr)
 			}
 		}
-		return fmt.Errorf("unable to create command : %s", err.Error())
+		return scerr.Wrap(err, "unable to create command")
 	}
 
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", username, shell, true, false)
@@ -960,7 +960,7 @@ func (ssh *SSHConfig) Enter(username, shell string) error {
 				logrus.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fmt.Errorf("unable to create command : %s", err.Error())
+		return scerr.Wrap(err, "unable to create command")
 	}
 
 	bash, err := exec.LookPath("bash")
@@ -977,7 +977,7 @@ func (ssh *SSHConfig) Enter(username, shell string) error {
 				logrus.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fmt.Errorf("unable to create command : %s", err.Error())
+		return scerr.Wrap(err, "unable to create command")
 	}
 
 	proc := exec.Command(bash, "-c", sshCmdString)

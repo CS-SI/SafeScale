@@ -32,15 +32,15 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 
 	alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
 	if alternateAPIApplicationKey == "" {
-		return nil, fmt.Errorf("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
+		return nil, scerr.SyntaxError("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
 	}
 	alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
 	if alternateAPIApplicationSecret == "" {
-		return nil, fmt.Errorf("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
+		return nil, scerr.SyntaxError("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
 	}
 	alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
 	if alternateAPIConsumerKey == "" {
-		return nil, fmt.Errorf("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
+		return nil, scerr.SyntaxError("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
 	}
 
 	client, err := ovh.NewClient(
@@ -66,7 +66,7 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 	case "DELETE":
 		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
 	default:
-		return nil, fmt.Errorf("unexpected HTTP code : %s", httpCode)
+		return nil, scerr.NewError("unexpected HTTP code : %s", httpCode)
 	}
 
 	return result, nil

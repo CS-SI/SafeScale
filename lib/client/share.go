@@ -42,7 +42,7 @@ func (n *share) Create(def protocol.ShareDefinition, timeout time.Duration) erro
 
 	_, err = service.Create(ctx, &def)
 	if err != nil {
-		return DecorateError(err, "creation of share", true)
+		return DecorateTimeoutError(err, "creation of share", true)
 	}
 	return nil
 }
@@ -59,7 +59,7 @@ func (n *share) Delete(name string, timeout time.Duration) error {
 
 	_, err = service.Delete(ctx, &protocol.Reference{Name: name})
 	if err != nil {
-		return DecorateError(err, "deletion of share", true)
+		return DecorateTimeoutError(err, "deletion of share", true)
 	}
 	return nil
 }
@@ -76,7 +76,7 @@ func (n *share) List(timeout time.Duration) (*protocol.ShareList, error) {
 
 	list, err := service.List(ctx, &googleprotobuf.Empty{})
 	if err != nil {
-		return nil, DecorateError(err, "list of shares", true)
+		return nil, DecorateTimeoutError(err, "list of shares", true)
 	}
 	return list, nil
 }
@@ -93,7 +93,7 @@ func (n *share) Mount(def protocol.ShareMountDefinition, timeout time.Duration) 
 
 	_, err = service.Mount(ctx, &def)
 	if err != nil {
-		return DecorateError(err, "mount of share", true)
+		return DecorateTimeoutError(err, "mount of share", true)
 	}
 	return nil
 }
@@ -110,7 +110,7 @@ func (n *share) Unmount(def protocol.ShareMountDefinition, timeout time.Duration
 
 	_, err = service.Unmount(ctx, &def)
 	if err != nil {
-		return DecorateError(err, "unmount of share", true)
+		return DecorateTimeoutError(err, "unmount of share", true)
 	}
 	return nil
 }
@@ -127,7 +127,7 @@ func (n *share) Inspect(name string, timeout time.Duration) (*protocol.ShareMoun
 
 	list, err := service.Inspect(ctx, &protocol.Reference{Name: name})
 	if err != nil {
-		return nil, DecorateError(err, "inspection of share", true)
+		return nil, DecorateTimeoutError(err, "inspection of share", true)
 	}
 	return list, nil
 }

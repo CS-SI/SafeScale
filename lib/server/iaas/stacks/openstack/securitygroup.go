@@ -17,13 +17,12 @@
 package openstack
 
 import (
-	"fmt"
-
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // GetSecurityGroup returns the default security group
@@ -48,7 +47,7 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
 		return nil, err
 	}
 	if len(sgList) > 1 {
-		return nil, fmt.Errorf("several security groups named '%s' found", name)
+		return nil, scerr.OverflowError(1, nil, "several security groups named '%s' found", name)
 	}
 
 	return &sgList[0], nil
@@ -57,7 +56,7 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
 func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 	sg, err := s.GetSecurityGroup(s.DefaultSecurityGroupName)
 	if err != nil {
-		return nil, fmt.Errorf("error listing routers: %s", ProviderErrorToString(err))
+		return nil, scerr.NewError("error listing routers: %s", ProviderErrorToString(err))
 	}
 
 	return sg, nil

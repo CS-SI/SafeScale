@@ -210,7 +210,7 @@ func (tg *taskGroup) WaitGroup() (TaskGroupResult, error) {
 		return nil, scerr.AbortedError("aborted", nil)
 	}
 	if taskStatus != RUNNING {
-		return nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
+		return nil, scerr.NewError("cannot wait task group '%s': not running", tid)
 	}
 
 	tg.mu.Lock()
@@ -261,7 +261,7 @@ func (tg *taskGroup) TryWaitGroup() (bool, TaskGroupResult, error) {
 		return false, nil, err
 	}
 	if taskStatus != RUNNING {
-		return false, nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
+		return false, nil, scerr.NewError("cannot wait task group '%s': not running", tid)
 	}
 	for _, s := range tg.subtasks {
 		ok, _, _ := s.TryWait()
@@ -293,7 +293,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult
 		return false, nil, err
 	}
 	if taskStatus != RUNNING {
-		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
+		return false, nil, scerr.InvalidRequestError("cannot wait task '%s': not running", tid)
 	}
 
 	var results TaskGroupResult
@@ -328,7 +328,7 @@ func (tg *taskGroup) Reset() error {
 		return err
 	}
 	if taskStatus == RUNNING {
-		return fmt.Errorf("cannot reset task group '%s': group is running", tid)
+		return scerr.InvalidRequestError("cannot reset task group '%s': group is running", tid)
 	}
 
 	tg.task.mu.Lock()

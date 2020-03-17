@@ -52,7 +52,7 @@ var templateList = &cli.Command{
 		templates, err := client.New().Template.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of templates", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
 		}
 		return clitools.SuccessResponse(templates.GetTemplates())
 	},

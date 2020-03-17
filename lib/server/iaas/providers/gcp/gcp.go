@@ -17,10 +17,6 @@
 package gcp
 
 import (
-	"fmt"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -29,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // provider is the provider implementation of the Gcp provider
@@ -49,20 +46,18 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("section identity not found in tenants.toml")
+		return &provider{}, scerr.SyntaxError("section 'identity' not found in tenants.toml")
 	}
 
 	computeCfg, ok := params["compute"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("section compute not found in tenants.toml")
+		return &provider{}, scerr.SyntaxError("section 'compute' not found in tenants.toml")
 	}
 
 	networkName := "safescale"
 
 	networkCfg, ok := params["network"].(map[string]interface{})
-	if !ok {
-		logrus.Warnf("section network not found in tenants.toml !!")
-	} else {
+	if ok {
 		newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
 		if newNetworkName != "" {
 			networkName = newNetworkName

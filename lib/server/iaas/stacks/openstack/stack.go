@@ -85,12 +85,12 @@ func TranslateProviderError(err error) error {
 	case *gophercloud.ErrDefault500:
 		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
+		return scerr.NewError("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return fmt.Errorf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
+		return scerr.NewError("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
 	default:
 		logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
-		return fmt.Errorf("unhandled error received from provider: %s", err.Error())
+		return scerr.NewError("unhandled error received from provider: %s", err.Error())
 	}
 }
 
@@ -199,7 +199,7 @@ func New(
 	// Openstack client
 	s.Driver, err = openstack.AuthenticatedClient(gcOpts)
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Compute API
@@ -209,11 +209,11 @@ func New(
 			Region: auth.Region,
 		})
 	default:
-		return nil, fmt.Errorf("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
+		return nil, scerr.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
 
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Network API
@@ -223,10 +223,10 @@ func New(
 			Region: auth.Region,
 		})
 	default:
-		return nil, fmt.Errorf("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		return nil, scerr.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Volume API
@@ -240,17 +240,17 @@ func New(
 			Region: auth.Region,
 		})
 	default:
-		return nil, fmt.Errorf("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
+		return nil, scerr.NotImplementedError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
 		s.ProviderNetworkID, err = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
 		if err != nil {
-			return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+			return nil, scerr.NewError(ProviderErrorToString(err))
 		}
 	}
 

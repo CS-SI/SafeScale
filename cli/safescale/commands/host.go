@@ -72,7 +72,7 @@ var hostStart = &cli.Command{
 		err := client.New().Host.Start(hostRef, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "start of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -92,7 +92,7 @@ var hostStop = &cli.Command{
 		err := client.New().Host.Stop(hostRef, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "stop of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "stop of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -113,7 +113,7 @@ var hostReboot = &cli.Command{
 		err := client.New().Host.Reboot(hostRef, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "reboot of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "reboot of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -134,13 +134,13 @@ var hostList = &cli.Command{
 		hosts, err := client.New().Host.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 		jsoned, _ := json.Marshal(hosts.GetHosts())
 		var result []map[string]interface{}
 		err = json.Unmarshal([]byte(jsoned), &result)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 		for _, v := range result {
 			delete(v, "private_key")
@@ -184,7 +184,7 @@ var hostStatus = &cli.Command{
 		resp, err := client.New().Host.GetStatus(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "status of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
@@ -296,7 +296,7 @@ var hostCreate = &cli.Command{
 		resp, err := client.New().Host.Create(req, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
@@ -357,7 +357,7 @@ var hostResize = &cli.Command{
 		resp, err := client.New().Host.Resize(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
@@ -381,7 +381,7 @@ var hostDelete = &cli.Command{
 		err := client.New().Host.Delete(hostList, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "deletion of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -400,7 +400,7 @@ var hostSSH = &cli.Command{
 		resp, err := client.New().Host.SSHConfig(c.Args().First())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "ssh config of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
@@ -483,7 +483,7 @@ var hostAddFeatureCommand = &cli.Command{
 		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, settings, 0)
@@ -542,7 +542,7 @@ var hostCheckFeatureCommand = &cli.Command{
 		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, settings, 0)
@@ -601,7 +601,7 @@ var hostRemoveFeatureCommand = &cli.Command{
 		err = client.New().SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 

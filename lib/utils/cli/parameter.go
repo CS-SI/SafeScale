@@ -229,7 +229,7 @@ func ParseParameter(request string) (map[string]*Token, error) {
 				continue
 			}
 			p := s.Pos()
-			return nil, fmt.Errorf("misplace separator ',' at line %d, column %d", p.Line, p.Column)
+			return nil, scerr.SyntaxError("misplace separator ',' at line %d, column %d", p.Line, p.Column)
 		}
 
 		if mytoken == nil {
@@ -250,7 +250,7 @@ func ParseParameter(request string) (map[string]*Token, error) {
 		err := mytoken.Push(t)
 		if err != nil {
 			p := s.Pos()
-			return nil, fmt.Errorf("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+			return nil, scerr.NewError("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
 		}
 
 		// handles the cases >= or <=
@@ -262,7 +262,7 @@ func ParseParameter(request string) (map[string]*Token, error) {
 					err = mytoken.Push(s.TokenText())
 					if err != nil {
 						p := s.Pos()
-						return nil, fmt.Errorf("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+						return nil, scerr.NewError("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
 					}
 				}
 			}

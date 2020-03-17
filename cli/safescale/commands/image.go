@@ -52,7 +52,7 @@ var imageList = &cli.Command{
 		images, err := client.New().Image.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of images", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))
 		}
 		return clitools.SuccessResponse(images.GetImages())
 	},

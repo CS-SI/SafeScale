@@ -23,6 +23,9 @@ import (
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/sirupsen/logrus"
 )
 
 // VMInfo represents the useful informations package send from each new local vm
@@ -64,9 +67,9 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	iw.mutex.Unlock()
 
 	if !found {
-		return fmt.Errorf("nothing registered with the name %s", name)
+		return scerr.NotFoundError("nothing registered with the name %s", name)
 	}
-	fmt.Println("Deregistered : ", name)
+	logrus.Infof("Deregistered: %s", name)
 	return nil
 }
 
@@ -75,7 +78,7 @@ func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 	if vmInfoWaiter.listner == nil {
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			return nil, fmt.Errorf("failed to open a tcp connection : %s", err.Error())
+			return nil, scerr.Wrap(err, "failed to open a tcp connection")
 		}
 		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
 		vmInfoWaiter.listner = &listener

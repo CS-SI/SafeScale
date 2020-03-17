@@ -233,7 +233,7 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 
 	u, err := uuid.NewV4()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a new task: %v", err)
+		return nil, scerr.Wrap(err, "failed to create a new task")
 	}
 
 	t.id = u.String()
@@ -488,7 +488,7 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 			t.mu.Lock()
 			defer t.mu.Unlock()
 
-			t.err = fmt.Errorf("panic happened: %v", err)
+			t.err = scerr.RuntimePanicError("panic happened: %v", err)
 			t.result = nil
 			t.doneCh <- false
 			close(t.doneCh)
@@ -559,7 +559,7 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, t.err
 	}
 	if status != RUNNING {
-		return nil, fmt.Errorf("cannot wait task '%s': not running (%d)", tid, status)
+		return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
 	}
 
 	<-t.finishCh
@@ -599,7 +599,7 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
+		return false, nil, scerr.InconsistentError("cannot wait task '%s': not running", tid)
 	}
 	if len(t.finishCh) == 1 {
 		_, err := t.Wait()
@@ -635,7 +635,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
+		return false, nil, scerr.InconsistentError("cannot wait task '%s': not running", tid)
 	}
 
 	for {
@@ -670,7 +670,7 @@ func (t *task) Reset() error {
 	}
 
 	if status == RUNNING {
-		return fmt.Errorf("cannot reset task '%s': task running", tid)
+		return scerr.InconsistentError("cannot reset task '%s': task running", tid)
 	}
 
 	t.mu.Lock()

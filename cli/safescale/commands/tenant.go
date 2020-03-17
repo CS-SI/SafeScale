@@ -50,7 +50,7 @@ var tenantList = &cli.Command{
 		tenants, err := client.New().Tenant.List(temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of tenants", false).Error())))
 		}
 		return clitools.SuccessResponse(tenants.GetTenants())
 	},
@@ -64,7 +64,7 @@ var tenantGet = &cli.Command{
 		tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "get tenant", false).Error())))
 		}
 		return clitools.SuccessResponse(tenant)
 	},
@@ -83,7 +83,7 @@ var tenantSet = &cli.Command{
 		err := client.New().Tenant.Set(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -102,7 +102,7 @@ var tenantCleanup = &cli.Command{
 		err := client.New().Tenant.Cleanup(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

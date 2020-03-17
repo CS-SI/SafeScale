@@ -17,8 +17,6 @@
 package operations
 
 import (
-	"fmt"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -47,7 +45,7 @@ func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v dat
 	yamlKey := "feature.install.bash.check"
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-		return nil, fmt.Errorf(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, installmethod.Bash, installaction.Check, nil)
@@ -77,7 +75,7 @@ func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 	if !f.SafeGetSpecs().IsSet("feature.install.bash.add") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.add' found`
-		return nil, fmt.Errorf(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
+		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
 	}
 
 	worker, err := newWorker(f, t, installmethod.Bash, installaction.Add, nil)
@@ -109,7 +107,7 @@ func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v da
 	if !f.SafeGetSpecs().IsSet("feature.install.bash.remove") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.remove' found`
-		return nil, fmt.Errorf(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
+		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
 	}
 
 	worker, err := newWorker(f, t, installmethod.Bash, installaction.Remove, nil)

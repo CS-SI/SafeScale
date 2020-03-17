@@ -253,7 +253,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return scerr.Wrap(err, "invalid value '%s' for field 'WhitelistTemplateRegexp'")
+			return scerr.SyntaxError("invalid value '%s' for field 'WhitelistTemplateRegexp': %s", reStr, err.Error())
 		}
 		svc.whitelistTemplateRE = re
 	}
@@ -261,7 +261,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return scerr.Wrap(err, "invalid value '%s' for field 'BlacklistTemplateRegexp'")
+			return scerr.SyntaxError("invalid value '%s' for field 'BlacklistTemplateRegexp': %s", reStr, err.Error())
 		}
 		svc.blacklistTemplateRE = re
 	}
@@ -269,7 +269,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return scerr.Wrap(err, "invalid value '%s' for field 'WhitelistImageRegexp'", reStr)
+			return scerr.SyntaxError("invalid value '%s' for field 'WhitelistImageRegexp': %s", reStr, err.Error())
 		}
 		svc.whitelistImageRE = re
 	}
@@ -277,7 +277,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fmt.Errorf("invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error())
+			return scerr.SyntaxError("invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error())
 		}
 		svc.blacklistImageRE = re
 	}
@@ -296,7 +296,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{})
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
-		return config, fmt.Errorf("missing setting 'Type' in 'objectstorage' section")
+		return config, scerr.SyntaxError("missing setting 'Type' in 'objectstorage' section")
 	}
 
 	if config.Domain, ok = ostorage["Domain"].(string); !ok {
@@ -371,7 +371,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
 			if _, ok = identity[key].(string); !ok {
-				return config, fmt.Errorf("problem parsing %s", key)
+				return config, scerr.SyntaxError("problem parsing %s", key)
 			}
 		}
 
@@ -427,7 +427,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
-			return config, fmt.Errorf("missing setting 'Type' in 'metadata' section")
+			return config, scerr.SyntaxError("missing setting 'Type' in 'metadata' section")
 		}
 	}
 
@@ -542,7 +542,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
 			if _, ok = identity[key].(string); !ok {
-				return config, fmt.Errorf("problem parsing %s", key)
+				return config, scerr.SyntaxError("problem parsing %s", key)
 			}
 		}
 
@@ -583,10 +583,10 @@ func loadConfig() error {
 			if provider, ok := tenant["client"].(string); ok {
 				allTenants[name] = provider
 			} else {
-				return fmt.Errorf("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
+				return scerr.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}
 		} else {
-			return fmt.Errorf("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
+			return scerr.SyntaxError("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
 		}
 	}
 	return nil
@@ -603,7 +603,7 @@ func getTenantsFromCfg() ([]interface{}, *viper.Viper, error) {
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
 		logrus.Errorf(msg)
-		return nil, v, fmt.Errorf(msg)
+		return nil, v, scerr.SyntaxError(msg)
 	}
 	settings := v.AllSettings()
 	tenantsCfg, _ := settings["tenants"].([]interface{})

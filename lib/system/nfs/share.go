@@ -17,7 +17,6 @@
 package nfs
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
@@ -60,10 +59,10 @@ type Share struct {
 // NewShare creates a share struct corresponding to the export of path on server
 func NewShare(server *Server, path, options string) (*Share, error) {
 	if path == "" {
-		return nil, fmt.Errorf("invalid parameter: 'path' cannot be empty")
+		return nil, scerr.InvalidParameterError("path", "cannot be empty")
 	}
 	if !filepath.IsAbs(path) {
-		return nil, fmt.Errorf("invalid parameter: 'path' must be absolute")
+		return nil, scerr.InvalidParameterError("path", "must be absolute")
 	}
 	share := Share{
 		Server: server,

@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 type gpuCfg struct {
@@ -183,7 +184,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, fmt.Errorf("invalid Region: '%s'", region)
+			return nil, scerr.InvalidRequestError("invalid region '%s'", region)
 		}
 	}
 
@@ -206,7 +207,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+			return nil, scerr.InvalidRequestError("invalid availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 

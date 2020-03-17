@@ -177,7 +177,7 @@ func (objn *network) taskWaitForInstallPhase1OnGateway(task concurrency.Task, pa
 			return nil, err
 		}
 		if abstract.IsProvisioningError(err) {
-			return nil, fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH: [%+v]", gwname, err)
+			return nil, scerr.Wrap(err, "error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gwname)
 		}
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func (objn *network) taskInstallPhase2OnGateway(task concurrency.Task, params co
 	if returnCode != 0 {
 		RetrieveForensicsData(task, objgw)
 		warnings, errs := GetPhaseWarningsAndErrors(task, objgw)
-		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gwname, returnCode, warnings, errs)
+		return nil, scerr.NewError("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gwname, returnCode, warnings, errs)
 	}
 	logrus.Infof("Gateway '%s' successfully configured.", gwname)
 
@@ -257,7 +257,7 @@ func (objn *network) taskInstallPhase2OnGateway(task concurrency.Task, params co
 		}
 		if abstract.IsProvisioningError(err) {
 			logrus.Errorf("%+v", err)
-			return nil, fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gwname)
+			return nil, scerr.NewError("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gwname)
 		}
 		return nil, err
 	}

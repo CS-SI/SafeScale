@@ -47,7 +47,7 @@ func hash(s string) string {
 func getVolumeID(volume *libvirt.StorageVol) (string, error) {
 	volumeName, err := volume.Name()
 	if err != nil {
-		return "", fmt.Errorf("failed to get volume name : %s", err.Error())
+		return "", scerr.Wrap(err, "failed to get volume name")
 	}
 
 	return hash(volumeName), nil
@@ -56,11 +56,11 @@ func getVolumeID(volume *libvirt.StorageVol) (string, error) {
 func getAttachmentID(volume *libvirt.StorageVol, domain *libvirt.Domain) (string, error) {
 	volumeName, err := volume.Name()
 	if err != nil {
-		return "", fmt.Errorf("failed to get volume name : %s", err.Error())
+		return "", scerr.Wrap(err, "failed to get volume name")
 	}
 	domainName, err := domain.Name()
 	if err != nil {
-		return "", fmt.Errorf("failed to get volume name : %s", err.Error())
+		return "", scerr.Wrap(err, "failed to get volume name")
 	}
 
 	return hash(volumeName) + "-" + hash(domainName), nil
@@ -69,13 +69,13 @@ func getAttachmentID(volume *libvirt.StorageVol, domain *libvirt.Domain) (string
 func (s *Stack) getStoragePoolByPath(path string) (*libvirt.StoragePool, error) {
 	storagePools, err := s.LibvirtService.ListAllStoragePools(3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all storagePools: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to list all storagePools")
 	}
 
 	for _, storagePool := range storagePools {
 		storagePoolXML, err := storagePool.GetXMLDesc(0)
 		if err != nil {
-			return nil, fmt.Errorf("failed get xml description of the storage pool: %s", err.Error())
+			return nil, scerr.Wrap(err, "failed get xml description of the storage pool")
 		}
 		storagePoolDescription := &libvirtxml.StoragePool{}
 		err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
@@ -85,7 +85,7 @@ func (s *Stack) getStoragePoolByPath(path string) (*libvirt.StoragePool, error) 
 		}
 	}
 
-	return nil, fmt.Errorf("no matching storage pool found")
+	return nil, scerr.NotFoundError("no matching storage pool found")
 }
 
 func (s *Stack) CreatePoolIfUnexistant(path string) error {
@@ -100,7 +100,7 @@ func (s *Stack) CreatePoolIfUnexistant(path string) error {
 		 </pool>`
 		_, err = s.LibvirtService.StoragePoolCreateXML(requestXML, 0)
 		if err != nil {
-			return fmt.Errorf("failed to create pool with path %s : %s", path, err.Error())
+			return scerr.Wrap(err, "failed to create pool with path '%s'")
 		}
 	}
 	return nil
@@ -109,17 +109,17 @@ func (s *Stack) CreatePoolIfUnexistant(path string) error {
 func (s *Stack) getLibvirtVolume(ref string) (*libvirt.StorageVol, error) {
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get storage pool from path : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get storage pool from path")
 	}
 
 	libvirtVolumes, err := storagePool.ListAllStorageVolumes(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all storages volumes : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to list all storages volumes")
 	}
 	for _, libvirtVolume := range libvirtVolumes {
 		name, err := libvirtVolume.Name()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get volume name : %s", err.Error())
+			return nil, scerr.Wrap(err, "failed to get volume name")
 		}
 		if hash, _ := getVolumeID(&libvirtVolume); ref == hash || ref == name {
 			return &libvirtVolume, nil
@@ -134,14 +134,14 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*abstract.Vo
 
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed get xml description of the volume : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed get xml description of the volume")
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
 
 	hash, err := getVolumeID(libvirtVolume)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash the volume : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to hash the volume")
 	}
 
 	volume.Name = volumeDescription.Name
@@ -158,14 +158,14 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed get xml description of the domain: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed get xml description of the domain")
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 
 	volumeXML, err := volume.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed get xml description of the domain: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed get xml description of the domain")
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -173,7 +173,7 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 	//----ID----
 	id, err := getAttachmentID(volume, domain)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash attachement: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to hash attachement")
 	}
 	attachment.ID = id
 
@@ -186,20 +186,20 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 		}
 	}
 	if attachment.Name == "" {
-		return nil, fmt.Errorf("no attachments found")
+		return nil, scerr.NotFoundError("no attachments found")
 	}
 
 	//----VolumeID----
 	volumeID, err := getVolumeID(volume)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash volume: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to hash volume")
 	}
 	attachment.VolumeID = volumeID
 
 	//----ServerID----
 	ServerID, err := domain.GetUUIDString()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get UUID from domain : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get UUID from domain")
 	}
 	attachment.ServerID = ServerID
 
@@ -222,26 +222,27 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%d)", request.Name, request.Size), true).Entering().OnExitTrace()()
 
 	//volume speed is ignored
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get storage pool from path: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get storage pool from path")
 	}
 
 	info, err := storagePool.GetInfo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get storagePool name: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get storagePool name")
 	}
 
 	if info.Available < uint64(request.Size)*1024*1024*1024 {
-		return nil, fmt.Errorf("free disk space is not sufficient to create a new volume, only %f GB left", float32(info.Available)/1024/1024/1024)
+		return nil, scerr.OverflowError(info.Available, nil, "free disk space is not sufficient to create a new volume, only %f GB left", float32(info.Available)/1024/1024/1024)
 	}
 
 	storagePoolXML, err := storagePool.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed get xml description of the storage pool: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed get xml description of the storage pool")
 	}
 	storagePoolDescription := &libvirtxml.StoragePool{}
 	err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
@@ -258,12 +259,12 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 
 	libvirtVolume, err := storagePool.StorageVolCreateXML(requestXML, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create the volume %s on pool %s: %s", request.Name, storagePoolDescription.Name, err.Error())
+		return nil, scerr.Wrap(err, "failed to create the volume '%s' on pool '%s'", request.Name, storagePoolDescription.Name)
 	}
 
 	volume, err := getVolumeFromLibvirtVolume(libvirtVolume)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert libvirt.Volume %s to abstract.Volume on pool %s: %s", request.Name, storagePoolDescription.Name, err.Error())
+		return nil, scerr.Wrap(err, "failed to convert libvirt.Volume '%s' to abstract.Volume on pool '%s'", request.Name, storagePoolDescription.Name)
 	}
 
 	return volume, nil
@@ -271,6 +272,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().OnExitTrace()()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
@@ -280,7 +282,7 @@ func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
 
 	volume, err := getVolumeFromLibvirtVolume(libvirtVolume)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get abstract.volume from libvirt.Volume : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get abstract.volume from libvirt.Volume")
 	}
 
 	return volume, nil
@@ -288,22 +290,23 @@ func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
 
 //ListVolumes return the list of all volume known on the current tenant
 func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
 
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get storage pool from path : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get storage pool from path")
 	}
 
 	var volumes []abstract.Volume
 	libvirtVolumes, err := storagePool.ListAllStorageVolumes(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all storages volumes : %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to list all storages volumes")
 	}
 	for _, libvirtVolume := range libvirtVolumes {
 		volume, err := getVolumeFromLibvirtVolume(&libvirtVolume)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get abstract.Valume from libvirt.Volume : %s", err.Error())
+			return nil, scerr.Wrap(err, "failed to get abstract.Valume from libvirt.Volume")
 		}
 		volumes = append(volumes, *volume)
 	}
@@ -313,6 +316,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(ref string) error {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().OnExitTrace()()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
@@ -322,7 +326,7 @@ func (s *Stack) DeleteVolume(ref string) error {
 
 	err = libvirtVolume.Delete(0)
 	if err != nil {
-		return fmt.Errorf("failed to delete volume %s : %s", ref, err.Error())
+		return scerr.Wrap(err, "failed to delete volume '%s'", ref)
 	}
 
 	return nil
@@ -333,15 +337,16 @@ func (s *Stack) DeleteVolume(ref string) error {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s'", request.Name, request.VolumeID, request.HostID), true).Entering().OnExitTrace()()
 
 	_, domain, err := s.getHostAndDomainFromRef(request.HostID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get domain from request.HostID: %s", err.Error())
+		return "", scerr.Wrap(err, "failed to get domain from request.HostID")
 	}
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return "", fmt.Errorf("failed get xml description of the volume: %s", err.Error())
+		return "", scerr.Wrap(err, "failed get xml description of the volume")
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
@@ -352,7 +357,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 	}
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return "", fmt.Errorf("failed get xml description of the volume: %s", err.Error())
+		return "", scerr.Wrap("failed get xml description of the volume")
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -376,12 +381,12 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 
 	err = domain.AttachDevice(requestXML)
 	if err != nil {
-		return "", fmt.Errorf("failed to attach the device to the domain: %s", err.Error())
+		return "", scerr.Wrap(err, "failed to attach the device to the domain")
 	}
 
 	attachment, err := getAttachmentFromVolumeAndDomain(libvirtVolume, domain)
 	if err != nil {
-		return "", fmt.Errorf("failed to get attachment from domain and volume: %s", err.Error())
+		return "", scerr.Wrap(err, "failed to get attachment from domain and volume")
 	}
 
 	return attachment.ID, nil
@@ -389,11 +394,12 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().OnExitTrace()()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get domain from ref: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get domain from ref")
 	}
 
 	libvirtVolume, err := s.getLibvirtVolume(strings.Split(id, "-")[0])
@@ -403,7 +409,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 
 	attachment, err := getAttachmentFromVolumeAndDomain(libvirtVolume, domain)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get attachment from domain and volume: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get attachment from domain and volume")
 	}
 
 	return attachment, nil
@@ -411,11 +417,12 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 
 // DeleteVolumeAttachment ...
 func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().OnExitTrace()()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {
-		return fmt.Errorf("failed to get domain from ref: %s", err.Error())
+		return scerr.Wrap(err, "failed to get domain from ref")
 	}
 
 	libvirtVolume, err := s.getLibvirtVolume(strings.Split(id, "-")[0])
@@ -425,14 +432,14 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return fmt.Errorf("failed get xml description of the domain: %s", err.Error())
+		return scerr.Wrap(err, "failed get xml description of the domain")
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return fmt.Errorf("failed get xml description of the volume: %s", err.Error())
+		return scerr.Wrap(err, "failed get xml description of the volume")
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -454,11 +461,12 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 		}
 	}
 
-	return fmt.Errorf("failed to find volume attachment to delete")
+	return scerr.NotFoundError("failed to find volume attachment to delete")
 }
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", serverID), true).Entering().OnExitTrace()()
 
 	var volumes []*libvirt.StorageVol
@@ -466,12 +474,12 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get domain from ref: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed to get domain from ref")
 	}
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed get xml description of the domain: %s", err.Error())
+		return nil, scerr.Wrap(err, "failed get xml description of the domain")
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
@@ -483,7 +491,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
 		if strings.Split(diskName, ".")[0] != domainDescription.Name {
 			volume, err := s.getLibvirtVolume(diskName)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get volume: %s", err.Error())
+				return nil, scerr.Wrap(err, "failed to get volume")
 			}
 			volumes = append(volumes, volume)
 		}
@@ -492,7 +500,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
 	for _, volume := range volumes {
 		volumeAttachment, err := getAttachmentFromVolumeAndDomain(volume, domain)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get Attachment from volume and domain : %s", err.Error())
+			return nil, scerr.Wrap(err, "failed to get attachment from volume and domain")
 		}
 		volumeAttachments = append(volumeAttachments, *volumeAttachment)
 	}
