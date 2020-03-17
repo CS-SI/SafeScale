@@ -23,8 +23,6 @@ generate:
 gensrc:
 	@(cd safescale && $(MAKE) $(@))
 	@(cd safescaled && $(MAKE) $(@))
-	@(cd scanner && $(MAKE) $(@))
-	@(cd perform && $(MAKE) $(@))
 
 clean:
 	@(cd safescale && $(MAKE) $(@))

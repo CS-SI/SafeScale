@@ -20,7 +20,6 @@ package retry
 // delays and stop conditions
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
