@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,13 @@ package retry
 // delays and stop conditions
 
 import (
+	"fmt"
+	"time"
+
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
-	"time"
 )
 
 // Try keeps track of the number of tries, starting from 1. Action is valid only when Err is nil.
@@ -318,7 +320,7 @@ func (a action) loop() error {
 		start   = time.Now()
 	)
 	if arbiter == nil {
-		arbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
+		arbiter = DefaultArbiter
 	}
 
 	if a.First != nil {
@@ -384,7 +386,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 		start   = time.Now()
 	)
 	if arbiter == nil {
-		arbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
+		arbiter = DefaultArbiter
 	}
 
 	if a.First != nil {

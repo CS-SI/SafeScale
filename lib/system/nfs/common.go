@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package nfs
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,15 +25,16 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
-	log "github.com/sirupsen/logrus"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate rice embed-go
@@ -57,7 +57,7 @@ func getTemplateBox() (*rice.Box, error) {
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
+func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
 	bashLibrary, err := system.GetBashLibrary()
 	if err != nil {
 		return 255, "", "", err
@@ -97,7 +97,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Execute(&buffer, data); err != nil {
-		return 255, "", "", fmt.Errorf("failed to execute template: %s", err.Error())
+		return 255, "", "", scerr.Wrap(err, "failed to execute template")
 	}
 	content := buffer.String()
 
@@ -114,51 +114,40 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	// Copy script to remote host with retries if needed
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
-		return 255, "", "", fmt.Errorf("failed to create temporary file: %s", err.Error())
+		return 255, "", "", scerr.Wrap(err, "failed to create temporary file")
 	}
-	filename := "/opt/safescale/var/tmp/" + name
+	filename := utils.TempFolder + "/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, stdout, stderr, err := sshconfig.Copy(ctx, filename, f.Name(), true)
+			retcode, stdout, stderr, err := sshconfig.Copy(task, filename, f.Name(), true)
 			if err != nil {
-				return fmt.Errorf("ssh operation failed: %s", err.Error())
+				return scerr.Wrap(err, "ssh operation failed")
 			}
 			if retcode != 0 {
-				return fmt.Errorf("script copy failed: %s, %s", stdout, stderr)
+				return scerr.NewError("script copy failed: %s, %s", stdout, stderr)
 			}
 			return nil
 		},
 		temporal.GetHostTimeout(),
 	)
 	if retryErr != nil {
-		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
+		return 255, "", "", scerr.Wrap(err, "failed to copy script to remote host")
 	}
 
-	k, uperr := sshconfig.Command("which scp")
+	k, uperr := sshconfig.SudoCommand(task, "which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(context.TODO(), nil, temporal.GetBigDelay())
+		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
-				log.Warn("SSH problem ?")
-			}
-		}
-	}
-
-	k, uperr = sshconfig.SudoCommand("which scp")
-	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(context.TODO(), nil, temporal.GetBigDelay())
-		if kerr == nil {
-			connected := strings.Contains(uptext, "/scp")
-			if !connected {
-				log.Warn("SUDO problem ?")
+				logrus.Warn("SUDO problem ?")
 			}
 		}
 	}
 
 	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
-		log.Warnf("Error deleting file: %v", nerr)
+		logrus.Warnf("Error deleting file: %v", nerr)
 	}
 
 	// Execute script on remote host with retries if needed
@@ -179,7 +168,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			stderr = ""
 			retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(cmd)
+			sshCmd, err := sshconfig.SudoCommand(task, cmd)
 			if err != nil {
 				return err
 			}
@@ -204,7 +193,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			log.Errorf("Timeout running remote script '%s'", name)
+			logrus.Errorf("Timeout running remote script '%s'", name)
 			return 255, stdout, stderr, retryErr
 		default:
 			return 255, stdout, stderr, retryErr
@@ -214,47 +203,14 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	/*
 		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
 		if uperr != nil {
-			log.Warn("Network problem...")
+			logrus.Warn("Network problem...")
 		} else {
 			_, uptext, _, kerr := k.Run()
 			if kerr == nil {
-				log.Warnf("Network working !!: %s", uptext)
+				logrus.Warnf("Network working !!: %s", uptext)
 			}
 		}
 	*/
 
 	return retcode, stdout, stderr, err
-}
-
-func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
-	var collected []string
-	if stdout != "" {
-		errLines := strings.Split(stdout, "\n")
-		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred") {
-				collected = append(collected, errline)
-			}
-		}
-	}
-	if stderr != "" {
-		errLines := strings.Split(stderr, "\n")
-		for _, errline := range errLines {
-			if strings.Contains(errline, "An error occurred") {
-				collected = append(collected, errline)
-			}
-		}
-	}
-
-	if len(collected) > 0 {
-		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("%s: return code [%d], std error [%s]", msg, retcode, collected))
-		}
-		return fmt.Errorf("%s: return code [%d], std error [%s]", msg, retcode, strings.Join(collected, ";"))
-	}
-
-	if retcode != 0 {
-		return fmt.Errorf("%s: nonzero return code [%d]", msg, retcode)
-	}
-
-	return nil
 }

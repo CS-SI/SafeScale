@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -36,11 +35,10 @@ import (
 
 // ProviderErrorToString creates an error string from openstack api error
 func ProviderErrorToString(err error) string {
+	if err == nil {
+		return ""
+	}
 	switch e := err.(type) {
-	case gophercloud.ErrDefault400:
-		return fmt.Sprintf("code: 400, reason: %s", string(e.Body))
-	case *gophercloud.ErrDefault400:
-		return fmt.Sprintf("code: 400, reason: %s", string(e.Body))
 	case gophercloud.ErrDefault401:
 		return fmt.Sprintf("code: 401, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault401:
@@ -58,19 +56,14 @@ func ProviderErrorToString(err error) string {
 	case *gophercloud.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
 	default:
-		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)", reflect.TypeOf(err).String(), err)
-
-		return e.Error()
+		logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)\n", reflect.TypeOf(err).String(), err)
+		return err.Error()
 	}
 }
 
 // TranslateProviderError translates gophercloud or openstack error to SafeScale error
 func TranslateProviderError(err error) error {
 	switch e := err.(type) {
-	case gophercloud.ErrDefault400:
-		return scerr.InvalidRequestError(string(e.Body))
-	case *gophercloud.ErrDefault400:
-		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrDefault401:
 		return scerr.NotAuthenticatedError(string(e.Body))
 	case *gophercloud.ErrDefault401:
@@ -92,13 +85,13 @@ func TranslateProviderError(err error) error {
 	case *gophercloud.ErrDefault500:
 		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), nil, nil)
+		return scerr.NewError("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return scerr.NewError(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), nil, nil)
+		return scerr.NewError("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body))
+	default:
+		logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
+		return scerr.NewError("unhandled error received from provider: %s", err.Error())
 	}
-
-	logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
-	return fmt.Errorf("unhandled error received from provider: %s", err.Error())
 }
 
 // ParseNeutronError parses neutron json error and returns fields
@@ -108,7 +101,7 @@ func ParseNeutronError(neutronError string) map[string]string {
 	unjsoned := map[string]map[string]interface{}{}
 	err := json.Unmarshal([]byte(jsonError), &unjsoned)
 	if err != nil {
-		log.Debugf(err.Error())
+		logrus.Debugf(err.Error())
 		return nil
 	}
 	if content, ok := unjsoned["NeutronError"]; ok {
@@ -169,6 +162,9 @@ func New(
 	serviceVersions map[string]string,
 ) (*Stack, error) {
 
+	if auth.DomainName == "" && auth.DomainID == "" {
+		auth.DomainName = "Default"
+	}
 	gcOpts := gophercloud.AuthOptions{
 		IdentityEndpoint: auth.IdentityEndpoint,
 		Username:         auth.Username,
@@ -188,6 +184,7 @@ func New(
 		cfgOpts:  cfg,
 	}
 
+	// FIXME: detect versions instead of statically declare them
 	s.versions = map[string]string{
 		"compute": "v2",
 		"volume":  "v2",
@@ -202,7 +199,7 @@ func New(
 	// Openstack client
 	s.Driver, err = openstack.AuthenticatedClient(gcOpts)
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Compute API
@@ -212,11 +209,11 @@ func New(
 			Region: auth.Region,
 		})
 	default:
-		return nil, fmt.Errorf("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
+		return nil, scerr.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
 
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Network API
@@ -226,10 +223,10 @@ func New(
 			Region: auth.Region,
 		})
 	default:
-		return nil, fmt.Errorf("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		return nil, scerr.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Volume API
@@ -243,17 +240,17 @@ func New(
 			Region: auth.Region,
 		})
 	default:
-		return nil, fmt.Errorf("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
+		return nil, scerr.NotImplementedError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+		return nil, scerr.NewError(ProviderErrorToString(err))
 	}
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
 		s.ProviderNetworkID, err = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
 		if err != nil {
-			return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+			return nil, scerr.NewError(ProviderErrorToString(err))
 		}
 	}
 

@@ -4,7 +4,6 @@ GO?=go
 
 generate: clean
 	@(cd cloudferro && $(MAKE) $(@))
-	@(cd cloudwatt && $(MAKE) $(@))
 	@(cd flexibleengine && $(MAKE) $(@))
 	@(cd openstack && $(MAKE) $(@))
 	@(cd opentelekom && $(MAKE) $(@))
@@ -17,7 +16,6 @@ vet:
 
 all: generate
 	@(cd cloudferro && $(MAKE) $(@))
-	@(cd cloudwatt && $(MAKE) $(@))
 	@(cd flexibleengine && $(MAKE) $(@))
 	@(cd openstack && $(MAKE) $(@))
 	@(cd opentelekom && $(MAKE) $(@))
@@ -27,7 +25,6 @@ all: generate
 
 clean:
 	@(cd cloudferro && $(MAKE) $(@))
-	@(cd cloudwatt && $(MAKE) $(@))
 	@(cd flexibleengine && $(MAKE) $(@))
 	@(cd openstack && $(MAKE) $(@))
 	@(cd opentelekom && $(MAKE) $(@))

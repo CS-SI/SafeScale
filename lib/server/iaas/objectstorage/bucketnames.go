@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,13 +23,14 @@ import (
 	"strings"
 
 	"hash/fnv"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 const (
 	maxBucketNameLength = 63
 	// bucketNamePrefix is the beginning of the name of the bucket for Metadata
 	bucketNamePrefix = "0.safescale"
-	storageSuffix    = ".storage"
 	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 
@@ -48,7 +49,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
 		name += "." + suffix
 		if len(name) > maxBucketNameLength {
-			return "", fmt.Errorf("suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
+			return "", scerr.OverflowError(maxBucketNameLength, nil, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
 		}
 	}
 
@@ -57,23 +58,6 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 		name = strings.Replace(name, ".", "-", -1)
 	}
 
-	name = strings.ToLower(name)
-
-	return name, nil
-}
-
-// BuildStorageBucketName builds the name of the bucket/container that will store metadata
-func BuildStorageBucketName(driver, region, domain, project string) (name string, err error) {
-	hash := fnv.New128a()
-	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
-	_, err = hash.Write([]byte(sig))
-	if err != nil {
-		return "", err
-	}
-	hashed := hex.EncodeToString(hash.Sum(nil))
-	name = bucketNamePrefix + "-" + hashed + storageSuffix
-
-	// TODO-AJ : user specific storage ?
 	name = strings.ToLower(name)
 
 	return name, nil

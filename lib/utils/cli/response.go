@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-	urfcli "github.com/urfave/cli"
+	"github.com/sirupsen/logrus"
+	urfcli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/cmdstatus"
 )
@@ -79,7 +79,7 @@ func (r *response) Failure(err error) error {
 			r.Display()
 			return r.GetError()
 		}
-		log.Error("err is not an urfave/cli.ExitCoder")
+		logrus.Error("err is not an urfave/cli.ExitCoder")
 		return err
 	}
 	return nil
@@ -89,15 +89,15 @@ func (r *response) Failure(err error) error {
 func (r *response) Display() {
 	out, err := json.Marshal(r.getDisplayResponse())
 	if err != nil {
-		log.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
+		logrus.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
 		return
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		if r.Status == cmdstatus.FAILURE {
-			log.Error(string(out))
+			logrus.Error(string(out))
 		} else {
-			log.Warn(string(out))
+			logrus.Warn(string(out))
 		}
 	}
 

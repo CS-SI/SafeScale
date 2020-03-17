@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package api
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
 
 //go:generate mockgen -destination=../mocks/mock_providerapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/providers/api Provider
@@ -32,11 +32,11 @@ type Provider interface {
 	stacks.Stack
 
 	// ListImages lists available OS images
-	ListImages(all bool) ([]resources.Image, error)
+	ListImages(all bool) ([]abstract.Image, error)
 
 	// ListTemplates lists available host templates
 	// Host templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates(all bool) ([]resources.HostTemplate, error)
+	ListTemplates(all bool) ([]abstract.HostTemplate, error)
 
 	// GetAuthenticationOptions returns authentication options as a Config
 	GetAuthenticationOptions() (providers.Config, error)

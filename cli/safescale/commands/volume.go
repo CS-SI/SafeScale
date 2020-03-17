@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,25 +20,25 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var volumeCmdName = "volume"
 
 //VolumeCmd volume command
-var VolumeCmd = cli.Command{
+var VolumeCmd = &cli.Command{
 	Name:  "volume",
 	Usage: "volume COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		volumeList,
 		volumeInspect,
 		volumeDelete,
@@ -48,27 +48,28 @@ var VolumeCmd = cli.Command{
 	},
 }
 
-var volumeList = cli.Command{
+var volumeList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available volumes",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all",
-			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", volumeCmdName, c.Command.Name, c.Args())
 		volumes, err := client.New().Volume.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of volumes", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of volumes", false).Error())))
 		}
 		return clitools.SuccessResponse(volumes.Volumes)
 	},
 }
 
-var volumeInspect = cli.Command{
+var volumeInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
@@ -83,13 +84,13 @@ var volumeInspect = cli.Command{
 		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of volume", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of volume", false).Error())))
 		}
-		return clitools.SuccessResponse(toDisplaybleVolumeInfo(volumeInfo))
+		return clitools.SuccessResponse(toDisplayableVolumeInfo(volumeInfo))
 	},
 }
 
-var volumeDelete = cli.Command{
+var volumeDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete volume",
@@ -108,24 +109,24 @@ var volumeDelete = cli.Command{
 		err := client.New().Volume.Delete(volumeList, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of volume", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of volume", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var volumeCreate = cli.Command{
+var volumeCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a volume",
 	ArgsUsage: "<Volume_name>",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "size",
 			Value: 10,
 			Usage: "Size of the volume (in Go)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "speed",
 			Value: "HDD",
 			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
@@ -139,7 +140,7 @@ var volumeCreate = cli.Command{
 		}
 
 		speed := c.String("speed")
-		volSpeed, ok := pb.VolumeSpeed_value[speed]
+		volSpeed, ok := protocol.VolumeSpeed_value[speed]
 		if !ok {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
 		}
@@ -147,37 +148,37 @@ var volumeCreate = cli.Command{
 		if volSize <= 0 {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize)))
 		}
-		def := pb.VolumeDefinition{
+		def := protocol.VolumeCreateRequest{
 			Name:  c.Args().First(),
 			Size:  volSize,
-			Speed: pb.VolumeSpeed(volSpeed),
+			Speed: protocol.VolumeSpeed(volSpeed),
 		}
 
 		volume, err := client.New().Volume.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of volume", true).Error())))
 		}
-		return clitools.SuccessResponse(toDisplaybleVolume(volume))
+		return clitools.SuccessResponse(toDisplayableVolume(volume))
 	},
 }
 
-var volumeAttach = cli.Command{
+var volumeAttach = &cli.Command{
 	Name:      "attach",
 	Usage:     "Attach a volume to an host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultVolumeMountPoint,
+			Value: abstract.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "format",
 			Value: "ext4",
 			Usage: "Filesystem format",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "do-not-format",
 			Usage: "Prevent the volume to be formated (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so cannot be attach with this option)",
 		},
@@ -188,23 +189,23 @@ var volumeAttach = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		}
-		def := pb.VolumeAttachment{
+		def := protocol.VolumeAttachmentRequest{
 			Format:      c.String("format"),
 			DoNotFormat: c.Bool("do-not-format"),
 			MountPath:   c.String("path"),
-			Host:        &pb.Reference{Name: c.Args().Get(1)},
-			Volume:      &pb.Reference{Name: c.Args().Get(0)},
+			Host:        &protocol.Reference{Name: c.Args().Get(1)},
+			Volume:      &protocol.Reference{Name: c.Args().Get(0)},
 		}
 		err := client.New().Volume.Attach(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "attach of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "attach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var volumeDetach = cli.Command{
+var volumeDetach = &cli.Command{
 	Name:      "detach",
 	Usage:     "Detach a volume from an host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
@@ -218,7 +219,7 @@ var volumeDetach = cli.Command{
 		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unattach of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unattach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -242,11 +243,11 @@ type volumeDisplayable struct {
 	Size  int32
 }
 
-func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
+func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInspectResponse) *volumeInfoDisplayable {
 	return &volumeInfoDisplayable{
 		volumeInfo.GetId(),
 		volumeInfo.GetName(),
-		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 		srvutils.GetReference(volumeInfo.GetHost()),
 		volumeInfo.GetMountPath(),
@@ -255,11 +256,11 @@ func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
 	}
 }
 
-func toDisplaybleVolume(volumeInfo *pb.Volume) *volumeDisplayable {
+func toDisplayableVolume(volumeInfo *protocol.VolumeInspectResponse) *volumeDisplayable {
 	return &volumeDisplayable{
 		volumeInfo.GetId(),
 		volumeInfo.GetName(),
-		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
 	}
 }
@@ -267,7 +268,7 @@ func toDisplaybleVolume(volumeInfo *pb.Volume) *volumeDisplayable {
 func getAllowedSpeeds() string {
 	speeds := ""
 	i := 0
-	for k := range pb.VolumeSpeed_value {
+	for k := range protocol.VolumeSpeed_value {
 		if i > 0 {
 			speeds += ", "
 		}

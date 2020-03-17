@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"fmt"
 	"io"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Key ...
@@ -42,7 +43,7 @@ func NewEncryptionKey(text []byte) (*Key, error) {
 	if len(text) == 0 {
 		_, err := io.ReadFull(rand.Reader, key[:])
 		if err != nil {
-			return nil, fmt.Errorf("cannot read enough random bytes (you should consider to stop using this computer): %v", err)
+			return nil, scerr.Wrap(err, "cannot read enough random bytes (you should consider to stop using this computer)")
 		}
 	} else {
 		n := nBytes
@@ -97,7 +98,7 @@ func Decrypt(ciphertext []byte, key *Key) ([]byte, error) {
 	}
 
 	if len(ciphertext) < gcm.NonceSize() {
-		return nil, fmt.Errorf("malformed ciphertext")
+		return nil, scerr.InvalidParameterError("ciphertext", "malformed (corrupted?)")
 	}
 
 	return gcm.Open(nil,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,54 +94,36 @@ func Test_Template(t *testing.T) {
 	err := userData.Prepare(client, dataBuffer, data)
 	assert.Nil(t, err)
 	output := userData.Generate("phase1")
-	fmt.Println(output.String())
+	fmt.Println(output.String()
 	output = userData.Generate("phase2")
-	fmt.Println(output.String())
+	fmt.Println(output.String()
 }*/
 
-func Test_ListImages(t *testing.T) {
+func Test_Images(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.ListImages(t)
+	tt.Images(t)
 }
 
-func Test_ListHostTemplates(t *testing.T) {
+func Test_HostTemplates(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.ListHostTemplates(t)
+	tt.HostTemplates(t)
 }
 
-func Test_CreateKeyPair(t *testing.T) {
+func Test_KeyPairs(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.CreateKeyPair(t)
-}
-
-func Test_GetKeyPair(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.GetKeyPair(t)
-}
-
-func Test_ListKeyPairs(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.ListKeyPairs(t)
+	tt.KeyPairs(t)
 }
 
 func Test_Networks(t *testing.T) {
@@ -171,31 +153,22 @@ func Test_StartStopHost(t *testing.T) {
 	tt.StartStopHost(t)
 }
 
-func Test_Volume(t *testing.T) {
+func Test_Volumes(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.Volume(t)
+	tt.Volumes(t)
 }
 
-func Test_VolumeAttachment(t *testing.T) {
+func Test_VolumeAttachments(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.VolumeAttachment(t)
-}
-
-func Test_Containers(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.Containers(t)
+	tt.VolumeAttachments(t)
 }
 
 // func Test_Objects(t *testing.T) {

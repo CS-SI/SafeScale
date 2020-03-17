@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,55 +17,58 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageAPI
+//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageHandler
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-// ImageAPI defines API to manipulate images
-type ImageAPI interface {
-	List(ctx context.Context, all bool) ([]resources.Image, error)
-	Select(ctx context.Context, osfilter string) (*resources.Image, error)
-	Filter(ctx context.Context, osfilter string) ([]resources.Image, error)
+// ImageHandler defines API to manipulate images
+type ImageHandler interface {
+	List(all bool) ([]abstract.Image, error)
+	Select(osfilter string) (*abstract.Image, error)
+	Filter(osfilter string) ([]abstract.Image, error)
 }
 
 // FIXME ROBUSTNESS All functions MUST propagate context
 
-// ImageHandler image service
-type ImageHandler struct {
-	service iaas.Service
+// imageHandler image service
+type imageHandler struct {
+	job server.Job
 }
 
 // NewImageHandler creates an host service
-func NewImageHandler(svc iaas.Service) ImageAPI {
-	return &ImageHandler{
-		service: svc,
-	}
+func NewImageHandler(job server.Job) ImageHandler {
+	return &imageHandler{job: job}
 }
 
 // List returns the image list
-func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) { // FIXME Unused ctx
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+func (handler *imageHandler) List(all bool) (images []abstract.Image, err error) {
+	if handler == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	return handler.service.ListImages(all)
+	return handler.job.SafeGetService().ListImages(all)
 }
 
 // Select selects the image that best fits osname
-func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *resources.Image, err error) { // FIXME Unused ctx
-	return nil, nil
+func (handler *imageHandler) Select(osname string) (image *abstract.Image, err error) {
+	return nil, scerr.NotImplementedError("ImageHandler.Select() not yet implemented")
 }
 
 // Filter filters the images that do not fit osname
-func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []resources.Image, err error) { // FIXME Unused ctx
-	return nil, nil
+func (handler *imageHandler) Filter(osname string) (image []abstract.Image, err error) {
+	return nil, scerr.NotImplementedError("ImageHandler.Filter() not yet implemented")
 }

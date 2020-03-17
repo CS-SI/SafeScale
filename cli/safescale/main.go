@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +27,13 @@ import (
 	"strings"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/sirupsen/logrus"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	// Autoload embedded provider drivers
@@ -40,7 +41,7 @@ import (
 )
 
 func cleanup() {
-	fmt.Println("\nBe careful stopping safescale will not stop the execution on safescaled, but will try to go back to the previous state as much as possible!")
+	fmt.Println("\nBe careful stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible!")
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
@@ -73,8 +74,8 @@ func main() {
 	app.Name = "safescale"
 	app.Usage = "safescale COMMAND"
 	app.Version = Version + ", build " + Revision + " (" + BuildDate + ")"
-	app.Authors = []cli.Author{
-		cli.Author{
+	app.Authors = []*cli.Author{
+		&cli.Author{
 			Name:  "CS-SI",
 			Email: "safescale@c-s.fr",
 		},
@@ -82,47 +83,80 @@ func main() {
 
 	app.EnableBashCompletion = true
 
-	cli.VersionFlag = cli.BoolFlag{
-		Name:  "version, V",
-		Usage: "Print program version",
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "Print program version",
 	}
 
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "Increase verbosity",
+		&cli.BoolFlag{
+			Name:    "verbose",
+			Aliases: []string{"v"},
+			Usage:   "Increase verbosity",
 		},
-		cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "Show debug information",
+		&cli.BoolFlag{
+			Name:    "debug",
+			Aliases: []string{"d"},
+			Usage:   "Show debug information",
 		},
-		// cli.IntFlag{
-		// 	Name:  "port, p",
-		// 	Usage: "Bind to specified port `PORT`",
-		// 	Value: 50051,
+		&cli.StringFlag{
+			Name:  "profile",
+			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
+			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
+		},
+		// &cli.IntFlag{
+		// 	Name:  "server",
+		// 	Aliases: []string{"S"},
+		// 	Usage: "Connect to daemon on 'server:port' (not honored yet...)",
+		// 	Value: "localhost:50051",
 		// },
 	}
 
+	var profileCloseFunc func()
+
 	app.Before = func(c *cli.Context) error {
-		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			log.SetLevel(log.TraceLevel)
-			utils.Verbose = true
-		} else {
-			log.SetLevel(log.WarnLevel)
+		// Define trace settings of the application (what to trace if trace is wanted)
+		// NOTE: is it the good behavior ? Shouldn't we fail ?
+		// If trace settings cannot be registered, report it but do not fail
+		err := debug.RegisterTraceSettings(appTrace)
+		if err != nil {
+			logrus.Errorf(err.Error())
 		}
 
-		if c.GlobalBool("verbose") {
-			log.SetLevel(log.InfoLevel)
+		// Sets profiling
+		if c.IsSet("profile") {
+			what := c.String("profile")
+			profileCloseFunc = debug.Profile(what)
+		} else {
+			profileCloseFunc = func() {}
+		}
+
+		if strings.Contains(path.Base(os.Args[0]), "-cover") {
+			logrus.SetLevel(logrus.TraceLevel)
+			utils.Verbose = true
+		} else {
+			logrus.SetLevel(logrus.WarnLevel)
+		}
+
+		// Defines trace level wanted by user
+		if utils.Verbose = c.Bool("verbose"); utils.Verbose {
+			logrus.SetLevel(logrus.InfoLevel)
 			utils.Verbose = true
 		}
-		if c.GlobalBool("debug") {
-			if c.GlobalBool("verbose") {
-				log.SetLevel(log.TraceLevel)
+		if utils.Debug = c.Bool("debug"); utils.Debug {
+			if utils.Verbose {
+				logrus.SetLevel(logrus.TraceLevel)
 			} else {
-				log.SetLevel(log.DebugLevel)
+				logrus.SetLevel(logrus.DebugLevel)
 			}
-			utils.Debug = true
 		}
+
+		return nil
+	}
+
+	app.After = func(c *cli.Context) error {
+		profileCloseFunc()
 		return nil
 	}
 
@@ -144,10 +178,6 @@ func main() {
 	app.Commands = append(app.Commands, commands.BucketCmd)
 	sort.Sort(cli.CommandsByName(commands.BucketCmd.Subcommands))
 
-	//VPL: data disabled, not ready
-	// app.Commands = append(app.Commands, commands.DataCmd)
-	// sort.Sort(cli.CommandsByName(commands.DataCmd.Subcommands))
-
 	app.Commands = append(app.Commands, commands.ShareCmd)
 	sort.Sort(cli.CommandsByName(commands.ShareCmd.Subcommands))
 
@@ -161,6 +191,8 @@ func main() {
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
+
+	// TODO: enables performance profiling
 
 	err := app.Run(os.Args)
 	if err != nil {

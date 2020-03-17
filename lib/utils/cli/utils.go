@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@
 package cli
 
 import (
-	"fmt"
 	"os/exec"
 	"syscall"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ExtractRetCode extracts info from the error
@@ -31,11 +32,11 @@ func ExtractRetCode(err error) (string, int, error) {
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
 			retCode = status.ExitStatus()
 		} else {
-			return msg, retCode, fmt.Errorf("ExitError.Sys is not a 'syscall.WaitStatus'")
+			return msg, retCode, scerr.InvalidParameterError("err", "must be a *exec.ExitError and err.Sys() must be a 'syscall.WaitStatus'")
 		}
 		//Retrieve error message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}
-	return msg, retCode, fmt.Errorf("error is not an 'ExitError'")
+	return msg, retCode, scerr.InvalidParameterError("err", "is not an 'ExitError'")
 }

@@ -5,14 +5,12 @@ GO?=go
 all: generate
 
 generate: clean
-	@(cd resources && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
+	@(cd userdata && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...
 
 clean:
-	@(cd resources && $(MAKE) $(@))
-	@(cd stacks && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true

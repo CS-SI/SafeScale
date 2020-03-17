@@ -27,7 +27,7 @@ clean:
 	@$(RM) $(EXEC-COVER) || true
 	@$(RM) $(EXEC) || true
 
-generate: clean gensrc
+generate: gensrc
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true

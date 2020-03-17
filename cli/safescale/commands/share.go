@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,25 +23,25 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var shareCmdName = "share"
 
 // ShareCmd ssh command
-var ShareCmd = cli.Command{
+var ShareCmd = &cli.Command{
 	Name:    "share",
 	Aliases: []string{"nas"},
 	Usage:   "share COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		shareCreate,
 		shareDelete,
 		shareMount,
@@ -51,48 +51,48 @@ var ShareCmd = cli.Command{
 	},
 }
 
-var shareCreate = cli.Command{
+var shareCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a nfs server on an host and exports a directory",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultShareExportedPath,
+			Value: abstract.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "readonly",
 			Usage: "Disallow write requests on this NFS volume",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rootsquash",
 			Usage: "Map requests from uid/gid 0 to the anonymous uid/gid",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "secure",
 			Usage: "Requires that requests originate on an Internet port less than IPPORT_RESERVED (1024).",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "async",
 			Usage: "This option allows the NFS server to violate the NFS protocol and reply to requests before any changes made by that request have been committed to stable storage",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "nohide",
 			Usage: "Enable exports of volumes mounted in the share export path",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "crossmount",
 			Usage: "Similar to nohide but it makes it possible for clients to move from the filesystem marked with crossmnt to exported filesystems mounted on it",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "subtreecheck",
 			Usage: "Enable subtree checking",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "securityModes",
-			Usage: "{sys(the default--no cryptographic security), krb5(authentication only), krb5i(integrity protection), and krb5p(privacy protection)}",
+			Usage: "{sys(the default, no security), krb5(authentication only), krb5i(integrity protection), and krb5p(privacy protection)}",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -103,11 +103,11 @@ var shareCreate = cli.Command{
 		}
 
 		shareName := c.Args().Get(0)
-		def := pb.ShareDefinition{
+		def := protocol.ShareDefinition{
 			Name: shareName,
-			Host: &pb.Reference{Name: c.Args().Get(1)},
+			Host: &protocol.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
-			Options: &pb.ExportOptions{
+			Options: &protocol.NFSExportOptions{
 				ReadOnly:     c.Bool("readonly"),
 				RootSquash:   c.Bool("rootsquash"),
 				Secure:       c.Bool("secure"),
@@ -121,13 +121,13 @@ var shareCreate = cli.Command{
 		err := client.New().Share.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "creation of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var shareDelete = cli.Command{
+var shareDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete a share",
@@ -156,7 +156,7 @@ var shareDelete = cli.Command{
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
 				msgs := errMessage.Load().(string)
-				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, utils.Capitalize(err.Error()))
+				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, strprocess.Capitalize(err.Error()))
 				errMessage.Store(msgs)
 				atomic.AddInt32(&errs, 1)
 			}
@@ -175,7 +175,7 @@ var shareDelete = cli.Command{
 	},
 }
 
-var shareList = cli.Command{
+var shareList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List all created shared",
@@ -184,23 +184,23 @@ var shareList = cli.Command{
 		list, err := client.New().Share.List(0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "list of shares", false).Error()))
 		}
 		return clitools.SuccessResponse(list.ShareList)
 	},
 }
 
-var shareMount = cli.Command{
+var shareMount = &cli.Command{
 	Name:      "mount",
 	Usage:     "Mount an exported nfs directory on an host",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultShareMountPath,
+			Value: abstract.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "ac",
 			Usage: "Disable cache coherence to improve performances",
 		},
@@ -215,9 +215,9 @@ var shareMount = cli.Command{
 		shareName := c.Args().Get(0)
 		hostName := c.Args().Get(1)
 		path := c.String("path")
-		def := pb.ShareMountDefinition{
-			Host:      &pb.Reference{Name: hostName},
-			Share:     &pb.Reference{Name: shareName},
+		def := protocol.ShareMountDefinition{
+			Host:      &protocol.Reference{Name: hostName},
+			Share:     &protocol.Reference{Name: shareName},
 			Path:      path,
 			Type:      "nfs",
 			WithCache: c.Bool("ac"),
@@ -225,13 +225,13 @@ var shareMount = cli.Command{
 		err := client.New().Share.Mount(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "mount of nas", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var shareUnmount = cli.Command{
+var shareUnmount = &cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a share from an host",
@@ -245,20 +245,20 @@ var shareUnmount = cli.Command{
 
 		shareName := c.Args().Get(0)
 		hostName := c.Args().Get(1)
-		def := pb.ShareMountDefinition{
-			Host:  &pb.Reference{Name: hostName},
-			Share: &pb.Reference{Name: shareName},
+		def := protocol.ShareMountDefinition{
+			Host:  &protocol.Reference{Name: hostName},
+			Share: &protocol.Reference{Name: shareName},
 		}
 		err := client.New().Share.Unmount(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "unmount of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var shareInspect = cli.Command{
+var shareInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "List the share information and clients connected to it",
@@ -273,7 +273,7 @@ var shareInspect = cli.Command{
 		list, err := client.New().Share.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "inspection of share", false).Error()))
 		}
 		return clitools.SuccessResponse(list)
 	},

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,23 +18,23 @@ package commands
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var bucketCmdName = "bucket"
 
 // BucketCmd bucket command
-var BucketCmd = cli.Command{
+var BucketCmd = &cli.Command{
 	Name:  "bucket",
 	Usage: "bucket COMMAND",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		bucketList,
 		bucketCreate,
 		bucketDelete,
@@ -44,7 +44,7 @@ var BucketCmd = cli.Command{
 	},
 }
 
-var bucketList = cli.Command{
+var bucketList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List buckets",
@@ -53,13 +53,13 @@ var bucketList = cli.Command{
 		resp, err := client.New().Bucket.List(0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of buckets", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
 }
 
-var bucketCreate = cli.Command{
+var bucketCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Creates a bucket",
@@ -74,13 +74,13 @@ var bucketCreate = cli.Command{
 		err := client.New().Bucket.Create(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var bucketDelete = cli.Command{
+var bucketDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Delete a bucket",
@@ -99,13 +99,13 @@ var bucketDelete = cli.Command{
 		err := client.New().Bucket.Delete(bucketList, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var bucketInspect = cli.Command{
+var bucketInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "detail"},
 	Usage:     "Inspect a bucket",
@@ -120,20 +120,20 @@ var bucketInspect = cli.Command{
 		resp, err := client.New().Bucket.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
 }
 
-var bucketMount = cli.Command{
+var bucketMount = &cli.Command{
 	Name:      "mount",
 	Usage:     "Mount a bucket on the filesystem of an host",
 	ArgsUsage: "<Bucket_name> <Host_name>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultBucketMountPoint,
+			Value: abstract.DefaultBucketMountPoint,
 			Usage: "Mount point of the bucket",
 		},
 	},
@@ -147,13 +147,13 @@ var bucketMount = cli.Command{
 		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "mount of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var bucketUnmount = cli.Command{
+var bucketUnmount = &cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a bucket from the filesystem of an host",
@@ -168,7 +168,7 @@ var bucketUnmount = cli.Command{
 		err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

@@ -62,7 +62,7 @@ feature:
                             elasticsearch:
                             {{- if .ClusterFlavor }}
                                 hosts:
-                                {{- range .MasterIPs }}
+                                {{- range .ClusterMasterIPs }}
                                     - "http://{{ . }}:9200/"
                                 {{ end}}
                             {{ else }}

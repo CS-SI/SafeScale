@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,17 +19,18 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"github.com/gophercloud/gophercloud/acceptance/tools"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gophercloud/gophercloud/acceptance/tools"
+	"github.com/stretchr/testify/require"
 )
 
 // NOTICE The whole file task_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
 
 func TestNewTask(t *testing.T) {
-	got, err := NewTask(nil)
+	got, err := NewTask()
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
@@ -53,13 +54,13 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, err)
 	require.Nil(t, what)
 
-	what, err = got.Reset()
-	require.Nil(t, err)
-	require.NotNil(t, what)
+	// err = got.Reset()
+	// require.Nil(t, err)
+	// require.NotNil(t, got)
 }
 
 func TestWaitingGame(t *testing.T) {
-	got, err := NewTask(nil)
+	got, err := NewTask()
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
@@ -70,7 +71,7 @@ func TestWaitingGame(t *testing.T) {
 	var tarray []Task
 
 	for ind := 0; ind < 800; ind++ {
-		got, err := NewTask(nil)
+		got, err := NewTask()
 		require.Nil(t, err)
 		require.NotNil(t, got)
 
@@ -99,7 +100,7 @@ func TestWaitingGame(t *testing.T) {
 }
 
 func TestSingleTaskTryWait(t *testing.T) {
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -123,7 +124,7 @@ func TestSingleTaskTryWait(t *testing.T) {
 }
 
 func TestSingleTaskTryWaitCoreTask(t *testing.T) {
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -144,20 +145,22 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	if end >= (time.Millisecond * 15) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
+	single.Close()
 
-	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		time.Sleep(time.Duration(30) * time.Millisecond)
-		return "Ahhhh", nil
-	}, nil)
-	require.NotNil(t, err)
+	// VPL: Task.Reset() removed, don't understand the goal of this test to update it...
+	// _, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
+	// 	time.Sleep(time.Duration(30) * time.Millisecond)
+	// 	return "Ahhhh", nil
+	// }, nil)
+	// require.NotNil(t, err)
 
 	err = nil
 	for {
 		time.Sleep(time.Duration(80) * time.Millisecond)
-		ctx, err := single.GetContext()
+		ctx, cancel, err := single.GetContext()
 		require.Nil(t, err)
 
-		if singleReplacement, err := NewTaskWithContext(ctx, single); err == nil {
+		if singleReplacement, err := NewTaskWithContext(ctx, cancel); err == nil {
 			single = singleReplacement
 			break
 		}
@@ -170,19 +173,27 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	}, nil)
 	require.Nil(t, err)
 
+	// err = single.Reset()
+	// require.NotNil(t, single)
+	// require.Nil(t, err)
+
+	single, err = NewTask()
+	require.NotNil(t, single)
+	require.Nil(t, err)
 	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
 		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.NotNil(t, err)
+	single.Close()
 }
 
 func TestSingleTaskTryWaitUsingSubtasks(t *testing.T) {
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
-	_, err = single.StartInSubTask(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
+	_, err = single.StartInSubtask(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
 		time.Sleep(time.Duration(3) * time.Second)
 		return "Ahhhh", nil
 	}, nil)
@@ -196,10 +207,11 @@ func TestSingleTaskTryWaitUsingSubtasks(t *testing.T) {
 
 	require.Nil(t, res)
 	require.NotNil(t, err)
+	single.Close()
 }
 
 func TestSingleTaskTryWaitOK(t *testing.T) {
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -223,10 +235,12 @@ func TestSingleTaskTryWaitOK(t *testing.T) {
 	if end >= (time.Millisecond * 100) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
+
+	single.Close()
 }
 
 func TestSingleTaskTryWaitKO(t *testing.T) {
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -250,10 +264,11 @@ func TestSingleTaskTryWaitKO(t *testing.T) {
 	if end >= (time.Millisecond * 150) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
+	single.Close()
 }
 
 func TestSingleTaskWait(t *testing.T) {
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -273,6 +288,7 @@ func TestSingleTaskWait(t *testing.T) {
 	if end >= (time.Millisecond*50) || end < (time.Millisecond*20) {
 		t.Errorf("It should have finished near 30 ms but it didn't !!")
 	}
+	single.Close()
 }
 
 func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
@@ -306,13 +322,15 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		}
 
 		if witherror {
-			st, _ := single.GetStatus()
+			st, err := single.GetStatus()
+			require.Nil(t, err)
 			if st != ABORTED {
 				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
 			}
 			require.True(t, st == ABORTED)
 		} else {
-			st, _ := single.GetStatus()
+			st, err := single.GetStatus()
+			require.Nil(t, err)
 			if st == ABORTED {
 				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
 			}
@@ -425,7 +443,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 }
 
 func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
-	overlord, err := NewTask(nil)
+	overlord, err := NewTask()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -435,7 +453,7 @@ func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 
 	var tasks []Task
 	for ind := 0; ind < 10; ind++ {
-		incentive, err := overlord.StartInSubTask(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
+		incentive, err := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
 			rint := tools.RandomInt(3, 5)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
 
@@ -451,6 +469,7 @@ func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 	begin := time.Now()
 	for _, war := range tasks {
 		_, err = war.Wait()
+		war.Close()
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}

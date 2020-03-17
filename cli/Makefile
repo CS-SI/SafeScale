@@ -1,14 +1,12 @@
 include ../common.mk
 
-.PHONY:	cli/safescale cli/safescaled cli/perform cli/scanner clean vet
+.PHONY:	cli/safescale cli/safescaled clean vet
 
-all:	cli/safescale cli/safescaled cli/perform cli/scanner
+all:	cli/safescale cli/safescaled
 
 vet:
 	@(cd safescale && $(MAKE) $@)
 	@(cd safescaled && $(MAKE) $@)
-	@(cd scanner && $(MAKE) $@)
-	@(cd perform && $(MAKE) $@)
 
 cli/safescale:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building binary safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -18,19 +16,9 @@ cli/safescaled:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building binary safescaled, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd safescaled && $(MAKE))
 
-cli/scanner:
-	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building binary scanner, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd scanner && $(MAKE))
-
-cli/perform:
-	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building binary perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd perform && $(MAKE))
-
-generate: clean gensrc
+generate:
 	@(cd safescale && $(MAKE) $(@))
 	@(cd safescaled && $(MAKE) $(@))
-	@(cd scanner && $(MAKE) $(@))
-	@(cd perform && $(MAKE) $(@))
 
 gensrc:
 	@(cd safescale && $(MAKE) $(@))
@@ -41,5 +29,3 @@ gensrc:
 clean:
 	@(cd safescale && $(MAKE) $(@))
 	@(cd safescaled && $(MAKE) $(@))
-	@(cd scanner && $(MAKE) $(@))
-	@(cd perform && $(MAKE) $(@))

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,20 +32,15 @@ const (
 
 // Location ...
 type Location interface {
-	// ReadTenant(projectName string, provider string) (Config, error)
-	GetType() string
-	//Inspect() (map[string][]string, error)
-	// SumSize() string
-	// Count(key string, pattern string) (int, error)
-	// WaitAllPutITemTerminated(key string, valuePattern string) error
-	// FilterByMetadata(key string, valuePattern string) (map[string][]string, error)
+	// SafeGetObjectStorageProtocol returns the name of the Object Storage protocol corresponding to this location
+	SafeGetObjectStorageProtocol() string
 
 	// ListBuckets returns all bucket prefixed by a string given as a parameter
 	ListBuckets(string) ([]string, error)
 	// FindBucket returns true of bucket exists in location
 	FindBucket(string) (bool, error)
-	// GetBucket returns info of the Bucket
-	GetBucket(string) (Bucket, error)
+	// InspectBucket returns info of the Bucket
+	InspectBucket(string) (Bucket, error)
 	// Create a bucket
 	CreateBucket(string) (Bucket, error)
 	// DeleteBucket removes a bucket (need to be cleared before)
@@ -55,8 +50,8 @@ type Location interface {
 
 	// ListObjects lists the objects in a Bucket
 	ListObjects(string, string, string) ([]string, error)
-	// GetObject ...
-	GetObject(string, string) (Object, error)
+	// InspectObject ...
+	InspectObject(string, string) (Object, error)
 	// ReadObject ...
 	ReadObject(string, string, io.Writer, int64, int64) error
 	// WriteMultiChunkObject ...
@@ -92,8 +87,8 @@ type Bucket interface {
 
 	// CreateObject creates a new object in the bucket
 	CreateObject(string) (Object, error)
-	// GetObject returns Object instance of an object in the Bucket
-	GetObject(string) (Object, error)
+	// InspectObject returns Object instance of an object in the Bucket
+	InspectObject(string) (Object, error)
 	// DeleteObject delete an object from a container
 	DeleteObject(string) error
 	// ReadObject reads the content of an object
@@ -106,11 +101,13 @@ type Bucket interface {
 	// CopyObject(string, string) error
 
 	// GetName returns the name of the bucket
-	GetName() string
+	GetName() (string, error)
 	// GetCount returns the number of objects in the Bucket
 	GetCount(string, string) (int64, error)
 	// GetSize returns the total size of all objects in the bucket
 	GetSize(string, string) (int64, string, error)
+	// SafeeGetName returns the name of the bucket
+	SafeGetName() string
 }
 
 // ObjectMetadata ...
@@ -136,19 +133,26 @@ type Object interface {
 	WriteMultiPart(io.Reader, int64, int) error
 	Reload() error
 	Delete() error
-	AddMetadata(ObjectMetadata)
-	ForceAddMetadata(ObjectMetadata)
-	ReplaceMetadata(ObjectMetadata)
+	AddMetadata(ObjectMetadata) error
+	ForceAddMetadata(ObjectMetadata) error
+	ReplaceMetadata(ObjectMetadata) error
 
-	GetID() string
-	GetName() string
+	GetID() (string, error)
+	GetName() (string, error)
 	GetLastUpdate() (time.Time, error)
-	GetSize() int64
-	GetETag() string
-	GetMetadata() ObjectMetadata
+	GetSize() (int64, error)
+	GetETag() (string, error)
+	GetMetadata() (ObjectMetadata, error)
+
+	SafeGetID() string
+	SafeGetName() string
+	SafeGetLastUpdate() time.Time
+	SafeGetSize() int64
+	SafeGetETag() string
+	SafeGetMetadata() ObjectMetadata
 }
 
-// FIXME GCP Remove specific driver code
+// FIXME: GCP Remove specific driver code
 
 // Config ...
 type Config struct {

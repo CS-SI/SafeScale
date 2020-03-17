@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,8 @@ type Stopwatch interface {
 	Stop()
 	// Pause stops temporarily the stopwatch, allowing to start it again, suming up the time intervals
 	Pause()
-	// Duration returns the current elapsed time measured by the Stopwatch
-	Duration() time.Duration
+	// GetDuration returns the current elapsed time measured by the Stopwatch
+	GetDuration() time.Duration
 	// String returns a printable representation of the current elapsed time
 	String() string
 	// OnExitLogWithLevel returns a function that will log start and end of Stopwatch, intended tto be used with defer
@@ -89,8 +89,8 @@ func (sw *stopwatch) Pause() {
 	}
 }
 
-// Duration returns the time elapsed since the Stopwatch has been started
-func (sw *stopwatch) Duration() time.Duration {
+// GetDuration returns the time elapsed since the Stopwatch has been started
+func (sw *stopwatch) GetDuration() time.Duration {
 	if sw.stopped {
 		return sw.duration
 	}
@@ -102,7 +102,7 @@ func (sw *stopwatch) Duration() time.Duration {
 
 // String returns a string representation of duration
 func (sw *stopwatch) String() string {
-	return FormatDuration(sw.Duration())
+	return FormatDuration(sw.GetDuration())
 }
 
 // OnExitLogWithLevel logs 'in' with log level 'level', then returns a function (to be used with defer for example)
@@ -121,7 +121,7 @@ func (sw *stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func
 	sw.Start()
 	return func() {
 		sw.Stop()
-		logLevelFn(fmt.Sprintf(outputStopwatchTemplate, out, FormatDuration(sw.Duration())))
+		logLevelFn(fmt.Sprintf(outputStopwatchTemplate, out, FormatDuration(sw.GetDuration())))
 	}
 }
 

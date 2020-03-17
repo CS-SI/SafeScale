@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,19 @@ package temporal
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestFormatDuration(t *testing.T) {
 	stowa := NewStopwatch()
 
-	res := FormatDuration(stowa.Duration())
+	res := FormatDuration(stowa.GetDuration())
 	if !strings.Contains(res, "00h00m00.001s") {
 		t.Errorf("This should be 1 ms and it isn't: %s", res)
 	}
@@ -41,7 +42,7 @@ func TestStopDuration(t *testing.T) {
 	stowa.Stop()
 	stowa.Stop()
 
-	res := FormatDuration(stowa.Duration())
+	res := FormatDuration(stowa.GetDuration())
 	if !strings.Contains(res, "00h00m00.001s") {
 		t.Errorf("This should be 1 ms and it isn't: %s", res)
 	}
@@ -54,7 +55,7 @@ func TestStartStopDuration(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	stowa.Stop()
 
-	res := FormatDuration(stowa.Duration())
+	res := FormatDuration(stowa.GetDuration())
 	if !strings.Contains(res, "0.01") {
 		t.Errorf("This should be 10 ms and it isn't: %s", res)
 	}
@@ -72,7 +73,7 @@ func TestStartStopDurationAgain(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	stowa.Stop()
 
-	res := FormatDuration(stowa.Duration())
+	res := FormatDuration(stowa.GetDuration())
 	if !strings.Contains(res, "0.01") {
 		t.Errorf("This should be near 10 ms and it isn't: %s", res)
 	}
@@ -90,7 +91,7 @@ func TestStartStopDurationWithPause(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	stowa.Stop()
 
-	res := FormatDuration(stowa.Duration())
+	res := FormatDuration(stowa.GetDuration())
 	if !strings.Contains(res, "0.03") {
 		t.Errorf("This should be near 30 ms and it isn't: %s", res)
 	}

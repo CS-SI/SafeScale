@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package data
 
 //go:generate mockgen -destination=../mocks/mock_identifyable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Identifyable
 
-// Identifyable ...
+// Identifyable proposes methods to identify a struct
 type Identifyable interface {
-	GetName() string
-	GetID() string
+	SafeGetName() string // Returns the name
+	SafeGetID() string   // Returns the ID
 }

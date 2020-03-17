@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 // Stack ...

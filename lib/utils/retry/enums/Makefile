@@ -4,7 +4,7 @@ GO?=go
 
 all: generate
 
-generate: clean
+generate:
 	@$(GO) generate -run stringer ./...
 
 vet:

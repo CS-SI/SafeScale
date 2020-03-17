@@ -58,7 +58,7 @@ feature:
 
                             {{ if .ClusterFlavor }}
                             HOSTNAME_PREFIX=elasticsearch4safescale
-                            SEEDS="{{- range .MasterIPs }}{{.}},{{ end -}}"
+                            SEEDS="{{- range .ClusterMasterIPs }}{{.}},{{ end -}}"
                             {{ else }}
                             HOSTNAME_PREFIX=elasticsearch
                             SEEDS="{{.HostIP}}"
@@ -71,7 +71,7 @@ feature:
                             network.host: {{ .HostIP }}
                             discovery:
                             {{- if .ClusterFlavor}}
-                                {{- if eq (len .MasterIPs) 1 }}
+                                {{- if eq (len .ClusterMasterIPs) 1 }}
                                 type: single-node
                                 zen.minimum_master_nodes: 1
                                 {{ else }}

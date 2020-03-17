@@ -38,9 +38,9 @@ feature:
     install:
         bash:
             check:
-                pace: docker
+                pace: image
                 steps:
-                    docker:
+                    image:
                         targets:
                             hosts: no
                             gateways: no
@@ -660,7 +660,7 @@ feature:
                         run: |
                             docker network rm postgresxl_net || true
                             sfRemoveDockerImage postgresxl:latest
-                            sfRetry 5m 5 "docker secret rm postgresxl.password &>/dev/null"
+                            docker secret rm postgresxl.password &>/dev/null
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
                             rm -rf ${SF_ETCDIR}/postgresxl ${SF_LOGDIR}/postgresxl
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" -o "${PURGE_ON_REMOVAL,,}" = "true" ]; then

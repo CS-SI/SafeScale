@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,20 +18,15 @@ package listeners
 
 import (
 	"context"
-	"fmt"
+
 	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -46,19 +41,28 @@ import (
 // FIXME Think about this
 // //go:generate mockgen -destination=../mocks/mock_volumeserviceserver.go -package=mocks github.com/CS-SI/SafeScale/lib VolumeServiceServer
 
-// VolumeListener is the volume service grpc server
+// VolumeHandler ...
+var VolumeHandler = handlers.NewVolumeHandler
+
+// VolumeListener is the volume service gRPC server
 type VolumeListener struct{}
 
 // List the available volumes
-func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ *pb.VolumeList, err error) {
+func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot list volumes").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -68,52 +72,53 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 		}
 	}
 
-	all := in.GetAll()
+	job, err := PrepareJob(ctx, "", "volume list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	all := in.GetAll()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes List"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot list volumes: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewVolumeHandler(tenant.Service)
-	volumes, err := handler.List(ctx, in.GetAll())
+	handler := VolumeHandler(job)
+	volumes, err := handler.List(in.GetAll())
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot list volumes").ToGRPCStatus()
+		return nil, err
 	}
 
-	// Map resources.Volume to pb.Volume
-	var pbvolumes []*pb.Volume
-	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, conv.ToPBVolume(&volume))
+	// Map resources.Volume to protocol.Volume
+	var pbvolumes []*protocol.VolumeInspectResponse
+	for _, v := range volumes {
+		pbVolume, err := v.ToProtocol(task)
+		if err != nil {
+			return nil, err
+		}
+		pbvolumes = append(pbvolumes, pbVolume)
 	}
-	rv := &pb.VolumeList{Volumes: pbvolumes}
+	rv := &protocol.VolumeListResponse{Volumes: pbvolumes}
 	return rv, nil
 }
 
 // Create a new volume
-func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_ *pb.Volume, err error) {
+func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRequest) (_ *protocol.VolumeInspectResponse, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot create volume").ToGRPCStatus()
+		}
+	}()
+
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -123,48 +128,47 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 		}
 	}
 
+	job, err := PrepareJob(ctx, "", "volume create")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
 	name := in.GetName()
 	speed := in.GetSpeed()
 	size := in.GetSize()
-
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Sprintf("failed to register the process : %s", err.Error()))
-	}
-	defer srvutils.JobDeregister(ctx)
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot create volume: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewVolumeHandler(tenant.Service)
-	vol, err := handler.Create(ctx, name, int(size), volumespeed.Enum(speed))
+	handler := handlers.NewVolumeHandler(job)
+	vol, err := handler.Create(name, int(size), volumespeed.Enum(speed))
 	if err != nil {
-		return nil, scerr.Wrap(err, "cannot create volume").ToGRPCStatus()
+		return nil, err
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return conv.ToPBVolume(vol), nil
+	return vol.ToProtocol(task)
 }
 
 // Attach a volume to an host and create a mount point
-func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot attach volume").ToGRPCStatus()
+		}
+	}()
+
 	empty := &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -176,11 +180,11 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
-		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference for volume"), "cannot attach volume").ToGRPCStatus()
+		return empty, scerr.InvalidRequestError("neither name nor id given as reference for volume")
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference for host"), "cannot attach volume").ToGRPCStatus()
+		return empty, scerr.InvalidRequestError("neither name nor id given as reference for host")
 	}
 	mountPath := in.GetMountPath()
 	// FIXME: change Format to Filesystem in protobuf
@@ -194,44 +198,42 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 		doNotFormatStr = "FORMAT"
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr), true)
-	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
+	job, err := PrepareJob(ctx, "", "volume attach")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	err = srvutils.JobRegister(ctx, cancelFunc, "Volumes Attach "+volumeRef+" to host "+hostRef)
+	handler := VolumeHandler(job)
+	err = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat)
 	if err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
-	}
-	defer srvutils.JobDeregister(ctx)
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot attach volume: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewVolumeHandler(tenant.Service)
-	err = handler.Attach(ctx, volumeRef, hostRef, mountPath, filesystem, doNotFormat)
-	if err != nil {
-		return empty, scerr.Wrap(err, "cannot attach volume").ToGRPCStatus()
+		return empty, err
 	}
 
 	return empty, nil
 }
 
 // Detach a volume from an host. It umount associated mountpoint
-func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot detach volume").ToGRPCStatus()
+		}
+	}()
+
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -243,36 +245,27 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
-		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference for volume"), "cannot detach volume").ToGRPCStatus()
+		return empty, scerr.InvalidRequestError("neither name nor id given as reference for volume")
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference for host"), "cannot detach volume").ToGRPCStatus()
+		return empty, scerr.InvalidRequestError("neither name nor id given as reference for host")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "volume detach")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume detach "+volumeRef+" from host "+hostRef); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot detach volume: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewVolumeHandler(tenant.Service)
-	err = handler.Detach(ctx, volumeRef, hostRef)
+	handler := VolumeHandler(job)
+	err = handler.Detach(volumeRef, hostRef)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot detach volume").ToGRPCStatus()
+		return empty, err
 	}
 
 	tracer.Trace("Volume '%s' successfully detached from '%s'.", volumeRef, hostRef)
@@ -280,16 +273,22 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (e
 }
 
 // Delete a volume
-func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot delete volume").ToGRPCStatus()
+		}
+	}()
+
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError().ToGRPCStatus()
+		return empty, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -301,32 +300,23 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference"), "cannot delete volume").ToGRPCStatus()
+		return empty, scerr.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "volume delete")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume delete "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := "cannot delete volume: no tenant set"
-		tracer.Trace(utils.Capitalize(msg))
-		return empty, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewVolumeHandler(tenant.Service)
-	err = handler.Delete(ctx, ref)
+	handler := VolumeHandler(job)
+	err = handler.Delete(ref)
 	if err != nil {
-		return empty, scerr.Wrap(err, "cannot delete volume").ToGRPCStatus()
+		return empty, err
 	}
 
 	tracer.Trace("Volume '%s' successfully deleted.", ref)
@@ -334,17 +324,21 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (empty *g
 }
 
 // Inspect a volume
-func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.VolumeInfo, err error) {
-	const CANNOT = "cannot inspect volume"
+func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInspectResponse, err error) {
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "cannot inspect volume").ToGRPCStatus()
+		}
+	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError().ToGRPCStatus()
+		return nil, scerr.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -356,37 +350,25 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, scerr.Wrap(scerr.InvalidRequestError("neither name nor id given as reference"), CANNOT).ToGRPCStatus()
+		return nil, scerr.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	job, err := PrepareJob(ctx, "", "volume inspect")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// LATER: handle jobregister error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	} /* else {
-		return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	}*/
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		msg := CANNOT + ": no tenant set"
-		tracer.Trace(msg)
-		return nil, status.Errorf(codes.FailedPrecondition, msg)
-	}
-
-	handler := handlers.NewVolumeHandler(tenant.Service)
-	volume, mounts, err := handler.Inspect(ctx, ref)
+	handler := VolumeHandler(job)
+	volume, err := handler.Inspect(ref)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
-	}
-	// this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	if volume == nil {
-		return nil, scerr.Wrap(scerr.NotFoundError(fmt.Sprintf("volume '%s' not found", ref)), "cannot inspect volume").ToGRPCStatus()
+		return nil, err
 	}
 
-	return conv.ToPBVolumeInfo(volume, mounts), nil
+	return volume.ToProtocol(task)
 }

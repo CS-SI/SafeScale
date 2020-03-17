@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,11 @@
 package concurrency
 
 import (
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
@@ -30,6 +32,12 @@ type TaskedLock interface {
 	RUnlock(Task) error
 	Lock(Task) error
 	Unlock(Task) error
+	SafeLock(Task)    // To be used when instance and parameter are notoriously not nil
+	SafeUnlock(Task)  // To be used when instance and parameter are notoriously not nil
+	SafeRLock(Task)   // To be used when instance and parameter are notoriously not nil
+	SafeRUnlock(Task) // To be used when instance and parameter are notoriously not nil
+	IsRLocked(Task) (bool, error)
+	IsLocked(Task) (bool, error)
 }
 
 // taskedLock ...
@@ -54,70 +62,73 @@ func NewTaskedLock() TaskedLock {
 // 1. registers the lock for read only if a lock for write is already registered in the context
 // 2. registers the lock for read AND effectively lock for read otherwise
 func (tm *taskedLock) RLock(task Task) error {
+	if tm == nil {
+		return scerr.InvalidInstanceError()
+	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil!")
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	tracer := NewTracer(task, "", Trace.Locks)
-	defer tracer.GoingIn().OnExitTrace()()
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "")
+	defer tracer.Entering().OnExitTrace()()
 
 	tid, err := task.GetID()
 	if err != nil {
 		return err
 	}
 
-	// logrus.Warnf("Calling rlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.RLock()
-		}
-	}()
 
 	if _, ok := tm.readLocks[tid]; ok {
 		tm.readLocks[tid]++
+		tm.lock.Unlock()
 		return nil
 	}
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
 		tracer.Trace("really RLocking...")
-		access = true
+		tm.lock.Unlock()
+		tm.rwmutex.RLock()
 		return nil
 	}
 	tracer.Trace("using running write lock...")
+
+	tm.lock.Unlock()
 	return nil
+}
+
+// SafeRUnlock ...
+func (tm *taskedLock) SafeRLock(task Task) {
+	err := tm.RLock(task)
+	if err != nil {
+		logrus.Errorf(scerr.Wrap(err, "cannot use SafeRLock() when obviously it's not safe").Error())
+	}
 }
 
 // RUnlock unregisters the lock for read for the context and unlock for read
 // only if no lock for write is registered for the context
-func (tm *taskedLock) RUnlock(task Task) error {
-	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
-	defer tracer.OnExitTrace()()
-
-	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil!")
+func (tm *taskedLock) RUnlock(task Task) (err error) {
+	if tm == nil {
+		return scerr.InvalidInstanceError()
 	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError("", &err)()
 
 	tid, err := task.GetID()
 	if err != nil {
 		return err
 	}
 
-	// logrus.Warnf("Calling runlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.RUnlock()
-		}
-	}()
+	defer tm.lock.Unlock()
 
 	if _, ok := tm.readLocks[tid]; !ok {
-		tracer.Trace("Can't RUnlock, not RLocked")
-		return fmt.Errorf("can't RUnlock task %s: not RLocked", tid)
+		return scerr.InconsistentError("cannot RUnlock task %s: not RLocked", tid)
 	}
 	tm.readLocks[tid]--
 	if tm.readLocks[tid] == 0 {
@@ -127,20 +138,28 @@ func (tm *taskedLock) RUnlock(task Task) error {
 			tracer.Trace("in running write lock, doing nothing")
 		} else {
 			tracer.Trace("really RUnlocking...")
-			access = true
+			tm.rwmutex.RUnlock()
 		}
 	}
 
 	return nil
 }
 
+// SafeRUnlock ...
+func (tm *taskedLock) SafeRUnlock(task Task) {
+	err := tm.RUnlock(task)
+	if err != nil {
+		logrus.Errorf(scerr.Wrap(err, "cannot use SafeRUnlock() when obviously it's not safe").Error())
+	}
+}
+
 // Lock acquires a write lock.
 func (tm *taskedLock) Lock(task Task) error {
-	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil!")
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tid, err := task.GetID()
@@ -150,38 +169,40 @@ func (tm *taskedLock) Lock(task Task) error {
 
 	// logrus.Warnf("Calling lock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.Lock()
-		}
-	}()
 
 	// If already locked for write, increments counter for the task
 	if _, ok := tm.writeLocks[tid]; ok {
 		tm.writeLocks[tid]++
+		tm.lock.Unlock()
 		return nil
 	}
 	// If already lock for read, returns an error
 	if _, ok := tm.readLocks[tid]; ok {
-		tracer.Trace("Can't Lock, already RLocked")
+		tracer.Trace("Cannot Lock, already RLocked")
 		taskID, _ := task.GetID()
-		return fmt.Errorf("cannot Lock task '%s': already RLocked", taskID)
+		return scerr.InconsistentError("cannot Lock task '%s': already RLocked", taskID)
 	}
 	// registers lock for read for the task and actively lock the RWMutex
 	tm.writeLocks[tid] = 1
-	access = true
+	tm.lock.Unlock()
+	tm.rwmutex.Lock()
 	return nil
+}
+
+func (tm *taskedLock) SafeLock(task Task) {
+	err := tm.Lock(task)
+	if err != nil {
+		logrus.Errorf(scerr.Wrap(err, "cannot use SafeLock() when obviously it's not safe").Error())
+	}
 }
 
 // Unlock releases a write lock
 func (tm *taskedLock) Unlock(task Task) error {
-	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
+	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil!")
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tid, err := task.GetID()
@@ -189,30 +210,68 @@ func (tm *taskedLock) Unlock(task Task) error {
 		return err
 	}
 
-	// logrus.Warnf("Calling unlock from %d, with tid %s", goid(), tid)
 	tm.lock.Lock()
-	access := false
-	defer func() {
-		tm.lock.Unlock()
-		if access {
-			tm.rwmutex.Unlock()
-		}
-	}()
+	defer tm.lock.Unlock()
 
 	// a TaskedLock can be Locked then RLocked without problem,
 	// but RUnlocks must have been done before Unlock.
 	if _, ok := tm.readLocks[tid]; ok {
-		tracer.Trace(fmt.Sprintf("Can't Unlock, %d remaining RLock inside", tm.readLocks[tid]))
-		return fmt.Errorf("can't Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid])
+		return scerr.InconsistentError("cannot Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid])
 	}
 	if _, ok := tm.writeLocks[tid]; !ok {
-		tracer.Trace("Can't Unlock, not Locked")
-		return fmt.Errorf("can't Unlock task '%s': not Locked", tid)
+		return scerr.InconsistentError("cannot Unlock task '%s': not Locked", tid)
 	}
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {
 		delete(tm.writeLocks, tid)
-		access = true
+		tm.rwmutex.Unlock()
 	}
 	return nil
+}
+
+// SafeUnlock unlocks a previously lock without possible failure, but will log if something is wrong
+func (tm *taskedLock) SafeUnlock(task Task) {
+	err := tm.Unlock(task)
+	if err != nil {
+		logrus.Errorf(scerr.Wrap(err, "cannot use SafeUnlock() when obviously it's not safe").Error())
+	}
+}
+
+// IsRLocked tells if the task is owning a read lock
+func (tm *taskedLock) IsRLocked(task Task) (bool, error) {
+	if tm == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return false, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	tid, err := task.GetID()
+	if err != nil {
+		return false, err
+	}
+	tm.rwmutex.RLock()
+	defer tm.rwmutex.RUnlock()
+	_, ok := tm.readLocks[tid]
+	return ok, nil
+}
+
+// IsLocked tells if the task is owning a write lock
+func (tm *taskedLock) IsLocked(task Task) (bool, error) {
+	if tm == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return false, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	tid, err := task.GetID()
+	if err != nil {
+		return false, err
+	}
+
+	tm.rwmutex.RLock()
+	defer tm.rwmutex.RUnlock()
+	_, ok := tm.writeLocks[tid]
+	return ok, nil
 }

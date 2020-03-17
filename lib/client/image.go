@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package client
 import (
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
@@ -30,14 +30,14 @@ type image struct {
 }
 
 // List return the list of availble images on the current tenant
-func (img *image) List(all bool, timeout time.Duration) (*pb.ImageList, error) {
+func (img *image) List(all bool, timeout time.Duration) (*protocol.ImageList, error) {
 	img.session.Connect()
 	defer img.session.Disconnect()
-	service := pb.NewImageServiceClient(img.session.connection)
+	service := protocol.NewImageServiceClient(img.session.connection)
 	ctx, err := utils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return service.List(ctx, &pb.ImageListRequest{All: all})
+	return service.List(ctx, &protocol.ImageListRequest{All: all})
 }
