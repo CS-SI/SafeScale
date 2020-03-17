@@ -453,7 +453,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	if primaryUserdata == nil {
-		return fmt.Errorf("error creating network: primaryUserdata is nil")
+		return scerr.NewError("error creating network: primaryUserdata is nil")
 	}
 
 	// Complement userdata for gateway(s) with allocated IP
@@ -465,7 +465,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.SafeGetPublicIP(task)
 
 		if secondaryUserdata == nil {
-			return fmt.Errorf("error creating network: secondaryUserdata is nil")
+			return scerr.NewError("error creating network: secondaryUserdata is nil")
 		}
 
 		secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
@@ -528,7 +528,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	// select {
 	// case <-ctx.Done():
 	// 	logrus.Warnf("Network creation cancelled by user")
-	// 	return nil, fmt.Errorf("network creation cancelled by user")
+	// 	return nil, scerr.AbortedError("network creation cancelled by user")
 	// default:
 	// }
 
@@ -884,7 +884,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 					if _, ok := recErr.(scerr.ErrNotFound); ok {
 						return nil
 					}
-					return fmt.Errorf("another kind of error")
+					return scerr.Wrap(recErr, "another kind of error")
 				},
 				temporal.GetContextTimeout(),
 			)

@@ -139,7 +139,7 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	if !f.SafeGetSpecs().IsSet(w.rootKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), w.rootKey)
+		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), w.rootKey)
 	}
 
 	return &w, nil
@@ -456,14 +456,14 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 	// 'pace' tells the order of execution
 	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
 	if pace == "" {
-		return nil, fmt.Errorf("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
+		return nil, scerr.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
 	}
 
 	// 'steps' describes the steps of the action
 	stepsKey := w.rootKey + "." + yamlStepsKeyword
 	steps := w.feature.specs.GetStringMap(stepsKey)
 	if len(steps) == 0 {
-		return nil, fmt.Errorf("nothing to do")
+		return nil, scerr.InvalidRequestError("nothing to do")
 	}
 	order := strings.Split(pace, ",")
 
@@ -483,7 +483,7 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-			return outcomes, fmt.Errorf(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey)
+			return outcomes, scerr.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey)
 		}
 		params := data.Map{
 			"stepName":  k,
@@ -598,7 +598,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		} else {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fmt.Errorf(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlTargetsKeyword)
+			return nil, scerr.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlTargetsKeyword)
 		}
 
 		hostsList, err = w.identifyHosts(stepT)
@@ -629,7 +629,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fmt.Errorf(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlRunKeyword)
+		return nil, scerr.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlRunKeyword)
 	}
 
 	// If there is an options file (for now specific to DCOS), upload it to the remote host
@@ -728,7 +728,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
 			logrus.Warnf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.Uncompleted())
-			return &r, fmt.Errorf(r.ErrorMessages())
+			return &r, scerr.NewError(r.ErrorMessages())
 		}
 		// not successful but completed, if action is check means the feature is not install, it's an information not a failure
 		if strings.Contains(w.action.String(), "Check") {
@@ -736,7 +736,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 
 		// For any other situations, raise error and break
-		return &r, fmt.Errorf(r.ErrorMessages())
+		return &r, scerr.NewError(r.ErrorMessages())
 	}
 
 	return &r, nil
@@ -763,7 +763,7 @@ func (w *worker) validateContextForCluster() error {
 		}
 	}
 	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.SafeGetName(), clusterFlavor.String())
-	return fmt.Errorf(msg)
+	return scerr.NotAvailableError(msg)
 }
 
 // validateContextForHost ...
@@ -782,7 +782,7 @@ func (w *worker) validateContextForHost() error {
 	}
 	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.SafeGetName())
 	// logrus.Println(msg)
-	return fmt.Errorf(msg)
+	return scerr.NotAvailableError(msg)
 }
 
 func (w *worker) validateClusterSizing() error {
@@ -799,7 +799,7 @@ func (w *worker) validateClusterSizing() error {
 	if anon, ok := sizing["masters"]; ok {
 		request, ok := anon.(string)
 		if !ok {
-			return fmt.Errorf("invalid masters key")
+			return scerr.SyntaxError("invalid masters key")
 		}
 		count, _, _, err := w.parseClusterSizingRequest(request)
 		if err != nil {
@@ -811,13 +811,13 @@ func (w *worker) validateClusterSizing() error {
 		}
 		curMasters := len(masters)
 		if curMasters < count {
-			return fmt.Errorf("cluster doesn't meet the minimum number of masters (%d < %d)", curMasters, count)
+			return scerr.NotAvailableError("cluster does not meet the minimum number of masters (%d < %d)", curMasters, count)
 		}
 	}
 	if anon, ok := sizing["nodes"]; ok {
 		request, ok := anon.(string)
 		if !ok {
-			return fmt.Errorf("invalid nodes key")
+			return scerr.SyntaxError("invalid nodes key")
 		}
 		count, _, _, err := w.parseClusterSizingRequest(request)
 		if err != nil {
@@ -829,7 +829,7 @@ func (w *worker) validateClusterSizing() error {
 		}
 		curNodes := len(list)
 		if curNodes < count {
-			return fmt.Errorf("cluster doesn't meet the minimum number of nodes (%d < %d)", curNodes, count)
+			return scerr.NotAvailableError("cluster does not meet the minimum number of nodes (%d < %d)", curNodes, count)
 		}
 	}
 
@@ -869,13 +869,13 @@ func (w *worker) setReverseProxy() (err error) {
 
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
-		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+		return scerr.Wrap(err, "failed to apply reverse proxy rules")
 	}
 	var secondaryKongController *KongController
 	if network.HasVirtualIP() {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
-			return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
+			return scerr.Wrap(err, "failed to apply reverse proxy rules")
 		}
 	}
 
@@ -985,9 +985,9 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 		if ruleName != "" {
 			msg += " '" + ruleName + "'"
 		}
-		msg += " for host '" + hostName + "': " + err.Error()
-		logrus.Error(msg)
-		return nil, fmt.Errorf(msg)
+		msg += " for host '" + hostName
+		logrus.Error(msg + "': " + err.Error())
+		return nil, scerr.Wrap(err, msg)
 	}
 	logrus.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 	return nil, nil
@@ -1091,7 +1091,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
 		result, err := template.New("normalize_script").Parse(tmpl)
 		if err != nil {
-			return "", fmt.Errorf("error parsing bash template: %s", err.Error())
+			return "", scerr.SyntaxError("error parsing bash template: %s", err.Error())
 		}
 		featureScriptTemplate.Store(result)
 		anon = featureScriptTemplate.Load()

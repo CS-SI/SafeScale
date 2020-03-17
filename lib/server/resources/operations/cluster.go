@@ -1164,7 +1164,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 				if state == clusterstate.Nominal || state == clusterstate.Degraded {
 					return nil
 				}
-				return fmt.Errorf("current state of cluster is '%s'", state.String())
+				return scerr.NewError("current state of cluster is '%s'", state.String())
 			},
 			5*time.Minute, // FIXME: static timeout
 		)
@@ -1214,7 +1214,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 			return nil
 		})
 		if innerErr != nil {
-			return fmt.Errorf("failed to get list of hosts: %v", err)
+			return scerr.Wrap(err, "failed to get list of hosts")
 		}
 		if props.Lookup(clusterproperty.NetworkV2) {
 			innerErr = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
@@ -1479,10 +1479,10 @@ func (c *cluster) State(task concurrency.Task) (state clusterstate.Enum, err err
 		state, err = c.makers.GetState(task, c)
 	} else {
 		state = clusterstate.Unknown
-		err = fmt.Errorf("no maker defined for 'GetState'")
+		err = scerr.NotImplementedError("cluster maker does not define 'GetState'")
 	}
 	if err != nil {
-		return clusterstate.Unknown, fmt.Errorf("no maker defined for 'GetState'")
+		return clusterstate.Unknown, err
 	}
 	return state, c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
@@ -1627,7 +1627,7 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
 	}()
 
 	if len(errors) > 0 {
-		err = fmt.Errorf("errors occurred on %s node%s addition: %s", nodeTypeStr, strprocess.Plural(uint(len(errors))), strings.Join(errors, "\n"))
+		err = scerr.NewError("errors occurred on %s node%s addition: %s", nodeTypeStr, strprocess.Plural(uint(len(errors))), strings.Join(errors, "\n"))
 		return nil, err
 	}
 
@@ -2035,7 +2035,7 @@ func (c *cluster) FindAvailableMaster(task concurrency.Task) (master resources.H
 		break
 	}
 	if !found {
-		return nil, fmt.Errorf("failed to find available master: %v", lastError)
+		return nil, scerr.NotAvailableError("failed to find available master: %v", lastError)
 	}
 	return master, nil
 }
@@ -2198,7 +2198,7 @@ func (c *cluster) FindAvailableNode(task concurrency.Task) (node resources.Host,
 		break
 	}
 	if !found {
-		return nil, fmt.Errorf("failed to find available node")
+		return nil, scerr.NotAvailableError("failed to find available node")
 	}
 	return node, nil
 }
@@ -2299,7 +2299,7 @@ func (c *cluster) Node(task concurrency.Task, hostID string) (host resources.Hos
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
+		return nil, scerr.NotFoundError("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
 	}
 	return LoadHost(task, c.SafeGetService(), hostID)
 }
@@ -2645,11 +2645,11 @@ func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskPara
 			retcode, _, _, err := master.Run(task, "docker swarm init && docker node update "+master.SafeGetName()+" --label-add safescale.host.role=master",
 				outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to init docker swarm")
+				return scerr.NewError("failed to init docker swarm")
 			}
 			retcode, token, stderr, err := master.Run(task, "docker swarm join-token manager -q", outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 			if err != nil || retcode != 0 {
-				return scerr.NewError(nil, nil, "failed to generate token to join swarm as manager: %s", stderr)
+				return scerr.NewError("failed to generate token to join swarm as manager: %s", stderr)
 			}
 			token = strings.Trim(token, "\n")
 			ip, err := master.GetPrivateIP(task)
@@ -2661,14 +2661,14 @@ func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskPara
 			masterJoinCmd := joinCmd + " && docker node update " + master.SafeGetName() + " --label-add safescale.host.role=master"
 			retcode, _, stderr, err := master.Run(task, masterJoinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", master.SafeGetName(), stderr)
+				return scerr.NewError("failed to join host '%s' to swarm as manager: %s", master.SafeGetName(), stderr)
 			}
 		}
 	}
 
 	master, err := c.FindAvailableMaster(task)
 	if err != nil {
-		return fmt.Errorf("failed to find an available docker manager: %v", err)
+		return scerr.Wrap(err, "failed to find an available docker manager")
 	}
 
 	// build command to join Docker Swarm as workers
@@ -2685,35 +2685,35 @@ func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	for _, node := range nodes {
 		retcode, _, stderr, err := node.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", node.SafeGetName(), stderr)
+			return scerr.NewError("failed to join host '%s' to swarm as worker: %s", node.SafeGetName(), stderr)
 		}
 		labelCmd := "docker node update " + node.SafeGetName() + " --label-add safescale.host.role=node"
 		retcode, _, stderr, err = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to label swarm worker '%s' as node: %s", node.SafeGetName(), stderr)
+			return scerr.NewError("failed to label swarm worker '%s' as node: %s", node.SafeGetName(), stderr)
 		}
 	}
 
 	// Join gateways in Docker Swarm as workers
 	retcode, _, stderr, err := primaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.SafeGetName(), stderr)
+		return scerr.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.SafeGetName(), stderr)
 	}
 	labelCmd := "docker node update " + primaryGateway.SafeGetName() + " --label-add safescale.host.role=gateway"
 	retcode, _, stderr, err = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.SafeGetName(), stderr)
+		return scerr.NewError("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.SafeGetName(), stderr)
 	}
 
 	if secondaryGateway != nil {
 		retcode, _, stderr, err := secondaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.SafeGetName(), stderr)
+			return scerr.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.SafeGetName(), stderr)
 		}
 		labelCmd := "docker node update " + secondaryGateway.SafeGetName() + " --label-add safescale.host.role=gateway"
 		retcode, _, stderr, err = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.SafeGetName(), stderr)
+			return scerr.NewError("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.SafeGetName(), stderr)
 		}
 	}
 
@@ -2737,7 +2737,7 @@ func (c *cluster) getSwarmJoinCommand(task concurrency.Task, selectedMaster reso
 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
 	retcode, token, stderr, err := selectedMaster.Run(task, tokenCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
-		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
+		return "", scerr.NewError("failed to generate token to join swarm as worker: %s", stderr)
 	}
 	token = strings.Trim(token, "\n")
 	return fmt.Sprintf("docker swarm join --token %s %s", token, masterIP), nil
@@ -2779,7 +2779,7 @@ func (c *cluster) configureNodesFromList(task concurrency.Task, hosts []resource
 
 	var (
 		hostID string
-		errs   []string
+		errs   []error
 	)
 
 	var subtasks []concurrency.Task
@@ -2796,17 +2796,17 @@ func (c *cluster) configureNodesFromList(task concurrency.Task, hosts []resource
 	}
 	// Deals with the metadata read failure
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("failed to get metadata of host '%s': %s", hostID, err.Error()))
+		errs = append(errs, scerr.Wrap(err, "failed to get metadata of host '%s'", hostID))
 	}
 
 	for _, s := range subtasks {
 		_, state := s.Wait()
 		if state != nil {
-			errs = append(errs, state.Error())
+			errs = append(errs, state)
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf(strings.Join(errs, "\n"))
+		return scerr.ErrListError(errs)
 	}
 	return nil
 }
@@ -2824,7 +2824,7 @@ func (c *cluster) joinNodesFromList(task concurrency.Task, hosts []resources.Hos
 
 	master, err := c.FindAvailableMaster(task)
 	if err != nil {
-		return fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
+		return scerr.Wrap(err, "failed to join workers to Docker Swarm")
 	}
 	joinCmd, err := c.getSwarmJoinCommand(task, master, true)
 	if err != nil {
@@ -2836,12 +2836,12 @@ func (c *cluster) joinNodesFromList(task concurrency.Task, hosts []resources.Hos
 	for _, host := range hosts {
 		retcode, _, stderr, err := host.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.SafeGetName(), stderr)
+			return scerr.NewError("failed to join host '%s' to swarm as worker: %s", host.SafeGetName(), stderr)
 		}
 		nodeLabel := "docker node update " + host.SafeGetName() + " --label-add safescale.host.role=node"
 		retcode, _, stderr, err = master.Run(task, nodeLabel, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to add label to docker Swarm worker '%s': %s", host.SafeGetName(), stderr)
+			return scerr.NewError("failed to add label to docker Swarm worker '%s': %s", host.SafeGetName(), stderr)
 		}
 
 		if c.makers.JoinMasterToCluster != nil {
@@ -2950,7 +2950,7 @@ func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to make node '%s' leave swarm: %s", host.SafeGetName(), stderr)
+		return scerr.NewError("failed to make node '%s' leave swarm: %s", host.SafeGetName(), stderr)
 	}
 
 	// 2nd: wait the Swarm worker to appear as down from Swarm master
@@ -2962,7 +2962,7 @@ func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster
 				return err
 			}
 			if retcode != 0 {
-				return fmt.Errorf("'%s' not in Down state", host.SafeGetName())
+				return scerr.NotAvailableError("'%s' not in Down state", host.SafeGetName())
 			}
 			return nil
 		},
@@ -2971,9 +2971,9 @@ func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			return fmt.Errorf("SWARM worker '%s' didn't reach 'Down' state after %v", host.SafeGetName(), temporal.GetHostTimeout())
+			return scerr.NewError("SWARM worker '%s' didn't reach 'Down' state after %v", host.SafeGetName(), temporal.GetHostTimeout())
 		default:
-			return fmt.Errorf("SWARM worker '%s' didn't reach 'Down' state: %v", host.SafeGetName(), retryErr)
+			return scerr.NewError("SWARM worker '%s' didn't reach 'Down' state: %v", host.SafeGetName(), retryErr)
 		}
 	}
 
@@ -2984,7 +2984,7 @@ func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", host.SafeGetName(), selectedMaster.SafeGetName(), stderr)
+		return scerr.NewError("failed to remove worker '%s' from Swarm on master '%s': %s", host.SafeGetName(), selectedMaster.SafeGetName(), stderr)
 	}
 	return nil
 }

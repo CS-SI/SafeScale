@@ -98,27 +98,27 @@ func WithField(err error, key string, content interface{}) error {
 	return err
 }
 
-// DecorateError changes the error to something more comprehensible when
-// timeout occurred
-func DecorateError(err error, action string, timeout time.Duration) error {
-	if IsGRPCTimeout(err) {
-		if timeout > 0 {
-			return fmt.Errorf("%s took too long (> %v) to respond", action, timeout)
-		}
-		return fmt.Errorf("%s took too long to respond", action)
-	}
-	msg := err.Error()
-	if strings.Contains(msg, "desc = ") {
-		pos := strings.Index(msg, "desc = ") + 7
-		msg = msg[pos:]
+// // DecorateError changes the error to something more comprehensible when
+// // timeout occurred
+// func DecorateError(err error, action string, timeout time.Duration) error {
+// 	if IsGRPCTimeout(err) {
+// 		if timeout > 0 {
+// 			return fmt.Errorf("%s took too long (> %v) to respond", action, timeout)
+// 		}
+// 		return fmt.Errorf("%s took too long to respond", action)
+// 	}
+// 	msg := err.Error()
+// 	if strings.Contains(msg, "desc = ") {
+// 		pos := strings.Index(msg, "desc = ") + 7
+// 		msg = msg[pos:]
 
-		if strings.Index(msg, " :") == 0 {
-			msg = msg[2:]
-		}
-		return fmt.Errorf(msg)
-	}
-	return err
-}
+// 		if strings.Index(msg, " :") == 0 {
+// 			msg = msg[2:]
+// 		}
+// 		return fmt.Errorf(msg)
+// 	}
+// 	return err
+// }
 
 // IsGRPCTimeout tells if the err is a timeout kind
 func IsGRPCTimeout(err error) bool {
@@ -276,8 +276,23 @@ func Wrap(cause error, msg ...interface{}) Error {
 	return newErr
 }
 
-// NewError creates a new error with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
-func NewError(cause error, consequences []error, msg ...interface{}) Error {
+// NewError creates a new error
+func NewError(msg ...interface{}) Error {
+	return newError(nil, nil, msg...)
+}
+
+// NewErrorWithCause creates a new error with a cause
+func NewErrorWithCause(cause error, msg ...interface{}) Error {
+	return newError(cause, nil, msg...)
+}
+
+// NewErrorWithCauseAndConsequences creates a new error with a cause and a list of teardown problems 'consequences'
+func NewErrorWithCauseAndConsequences(cause error, consequences []error, msg ...interface{}) Error {
+	return newError(cause, consequences, msg...)
+}
+
+// newError creates a new error with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
+func newError(cause error, consequences []error, msg ...interface{}) Error {
 	if consequences == nil {
 		consequences = []error{}
 	}
@@ -698,17 +713,18 @@ type ErrOverflow struct {
 }
 
 // OverflowError creates a ErrOverflow error
-func OverflowError(msg string, limit uint, err error) ErrOverflow {
+func OverflowError(limit uint, err error, msg ...interface{}) ErrOverflow {
+	message := strprocess.FormatStrings(msg...)
 	if limit > 0 {
-		limitMsg := fmt.Sprintf("(limit reached: %d)", limit)
-		if msg != "" {
-			msg += " "
+		limitMsg := fmt.Sprintf("(limit: %d)", limit)
+		if message != "" {
+			message += " "
 		}
-		msg += limitMsg
+		message += limitMsg
 	}
 	return ErrOverflow{
 		errCore: errCore{
-			message:      msg,
+			message:      message,
 			causer:       err,
 			consequences: []error{},
 			fields:       make(fields),

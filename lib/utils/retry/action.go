@@ -357,7 +357,7 @@ func (a action) loop() error {
 				errLast = a.Last()
 			}
 			if errLast != nil {
-				return fmt.Errorf("%s + %s", err.Error(), errLast.Error())
+				return scerr.NewError("%s + %s", err.Error(), errLast.Error())
 			}
 			return err
 		case verdict.Abort:
@@ -367,7 +367,7 @@ func (a action) loop() error {
 				errLast = a.Last()
 			}
 			if errLast != nil {
-				return fmt.Errorf("%s + %s", retryErr.Error(), errLast.Error())
+				return scerr.NewError("%s + %s", retryErr.Error(), errLast.Error())
 			}
 			return retryErr
 		default:
@@ -437,7 +437,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 				errLast = a.Last()
 			}
 			if errLast != nil {
-				return fmt.Errorf("%s + %s", err.Error(), errLast.Error())
+				return scerr.NewError("%s + %s", err.Error(), errLast.Error())
 			}
 			return err
 		case verdict.Abort:
@@ -447,7 +447,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 				errLast = a.Last()
 			}
 			if errLast != nil {
-				return fmt.Errorf("%s + %s", retryErr.Error(), errLast.Error())
+				return scerr.NewError("%s + %s", retryErr.Error(), errLast.Error())
 			}
 			return retryErr
 		default:

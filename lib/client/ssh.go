@@ -97,11 +97,11 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 					return innerErr
 				}
 				retcode = -1
-				return retry.StopRetryError("", innerErr)
+				return retry.StopRetryError(innerErr)
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 {
-				return fmt.Errorf("failed to connect")
+				return scerr.NewError("failed to connect")
 			}
 			return nil
 		},

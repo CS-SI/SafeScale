@@ -70,13 +70,13 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (err error) {
 					// File may exist on target, try to remote it
 					_, _, _, err = host.Run(task, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
 					if err == nil {
-						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
+						return scerr.NewError("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
 					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
-					return retry.StopRetryError("an unrecoverable network error has occurred", err)
+					return retry.StopRetryError(err, "an unrecoverable network error has occurred")
 				}
 				if system.IsSCPRetryable(retcode) {
-					err = fmt.Errorf("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.SafeGetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
+					err = scerr.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.SafeGetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
 					return err
 				}
 				return nil
@@ -112,7 +112,7 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (err error) {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to update owner and/or access rights of the remote file")
+		return scerr.NewError("failed to update owner and/or access rights of the remote file")
 	}
 
 	return nil
@@ -130,7 +130,7 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
 
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %s", err.Error())
+		return scerr.NewError("failed to create temporary file: %s", err.Error())
 	}
 	rfc.Local = f.Name()
 	return rfc.Upload(task, host)
@@ -141,7 +141,7 @@ func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) error {
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to remove file '%s:%s'", host.SafeGetName(), rfc.Remote)
+		return scerr.NewError("failed to remove file '%s:%s'", host.SafeGetName(), rfc.Remote)
 	}
 	return nil
 }

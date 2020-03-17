@@ -153,7 +153,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "1":
 			hostT = "1"
 		default:
-			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", hostT, targetHosts)
+			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", hostT, targetHosts)
 		}
 	}
 
@@ -180,7 +180,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			masterT = "*"
 		default:
-			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", masterT, targetMasters)
+			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", masterT, targetMasters)
 		}
 	}
 
@@ -205,7 +205,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			nodeT = "*"
 		default:
-			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", nodeT, targetNodes)
+			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", nodeT, targetNodes)
 		}
 	}
 
@@ -232,12 +232,12 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			gwT = "*"
 		default:
-			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", gwT, targetGateways)
+			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", gwT, targetGateways)
 		}
 	}
 
 	if hostT == "0" && masterT == "0" && nodeT == "0" && gwT == "0" {
-		return "", "", "", "", fmt.Errorf("no targets identified")
+		return "", "", "", "", scerr.SyntaxError("no targets identified")
 	}
 	return hostT, masterT, nodeT, gwT, nil
 }
@@ -413,7 +413,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
-		return stepResult{err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())}, nil
+		return stepResult{err: scerr.Wrap(err, "failed to finalize installer script for step '%s'", is.Name)}, nil
 	}
 
 	// If options file is defined, upload it to the remote host
@@ -495,14 +495,14 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 // 		if err != nil {
 // 			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
 // 		}
-// 		return fmt.Errorf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
+// 		return scerr.NewError("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
 // 	}
 
 // 	if err != nil {
 // 		return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
 // 	}
 // 	if retcode != 0 {
-// 		return fmt.Errorf("%s: failed with error code %s", msg, richErrc)
+// 		return scerr.NewError("%s: failed with error code %s", msg, richErrc)
 // 	}
 
 // 	return nil
@@ -516,7 +516,7 @@ func realizeVariables(variables data.Map) (data.Map, error) {
 		if variable, ok := v.(string); ok {
 			varTemplate, err := template.New("realize_var").Parse(variable)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing variable '%s': %s", k, err.Error())
+				return nil, scerr.SyntaxError("error parsing variable '%s': %s", k, err.Error())
 			}
 			buffer := bytes.NewBufferString("")
 			err = varTemplate.Execute(buffer, variables)
@@ -533,12 +533,12 @@ func realizeVariables(variables data.Map) (data.Map, error) {
 func replaceVariablesInString(text string, v data.Map) (string, error) {
 	tmpl, err := template.New("text").Parse(text)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse: %s", err.Error())
+		return "", scerr.SyntaxError("failed to parse: %s", err.Error())
 	}
 	dataBuffer := bytes.NewBufferString("")
 	err = tmpl.Execute(dataBuffer, v)
 	if err != nil {
-		return "", fmt.Errorf("failed to replace variables: %s", err.Error())
+		return "", scerr.Wrap(err, "failed to replace variables")
 	}
 	return dataBuffer.String(), nil
 }

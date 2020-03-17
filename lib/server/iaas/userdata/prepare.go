@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Content is the structure to apply to userdata.sh template
@@ -132,7 +133,7 @@ func (ud *Content) Prepare(
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return fmt.Errorf("failed to generate password: %s", err.Error())
+			return scerr.Wrap(err, "failed to generate password")
 		}
 		request.Password = password
 	}
@@ -238,11 +239,11 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 			}
 			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", provider))
 			if err != nil {
-				return nil, fmt.Errorf("error loading script template for phase1 : %s", err.Error())
+				return nil, scerr.Wrap(err, "error loading script template for phase1")
 			}
 			tmpl, err := template.New("userdata.phase1").Parse(tmplString)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing script template for phase 1 : %s", err.Error())
+				return nil, scerr.Wrap(err, "error parsing script template for phase1")
 			}
 			userdataPhase1Template.Store(tmpl)
 			anon = userdataPhase1Template.Load()
@@ -265,11 +266,11 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 
 			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase2.sh", provider))
 			if err != nil {
-				return nil, fmt.Errorf("error loading script template: %s", err.Error())
+				return nil, scerr.Wrap(err, "error loading script template for phase2")
 			}
 			tmpl, err := template.New("userdata.phase2").Parse(tmplString)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+				return nil, scerr.Wrap(err, "error parsing script template for phase2")
 			}
 			userdataPhase2Template.Store(tmpl)
 			anon = userdataPhase2Template.Load()
@@ -288,7 +289,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 		}
 
 	default:
-		return nil, fmt.Errorf("phase '%s' not managed", phase)
+		return nil, scerr.NotImplementedError("phase '%s' not managed", phase)
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {

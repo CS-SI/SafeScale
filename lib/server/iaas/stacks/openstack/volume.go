@@ -127,7 +127,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 			break
 		}
 		if vol == nil {
-			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
+			err = scerr.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
 			break
 		}
 		v = abstract.Volume{
@@ -149,7 +149,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 			break
 		}
 		if vol == nil {
-			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
+			err = scerr.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
 			break
 		}
 		v = abstract.Volume{
@@ -160,7 +160,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 			State: toVolumeState(vol.Status),
 		}
 	default:
-		err = fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
+		err = scerr.NotImplementedError("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if err != nil {
 		return nil, scerr.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
@@ -257,7 +257,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 			if err != nil {
 				switch err.(type) {
 				case gophercloud.ErrDefault400:
-					return fmt.Errorf("volume not in state 'available'")
+					return scerr.NotAvailableError("volume not in state 'available'")
 				default:
 					return err
 				}

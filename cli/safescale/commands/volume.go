@@ -63,7 +63,7 @@ var volumeList = &cli.Command{
 		volumes, err := client.New().Volume.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "list of volumes", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of volumes", false).Error())))
 		}
 		return clitools.SuccessResponse(volumes.Volumes)
 	},
@@ -84,7 +84,7 @@ var volumeInspect = &cli.Command{
 		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "inspection of volume", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of volume", false).Error())))
 		}
 		return clitools.SuccessResponse(toDisplayableVolumeInfo(volumeInfo))
 	},
@@ -109,7 +109,7 @@ var volumeDelete = &cli.Command{
 		err := client.New().Volume.Delete(volumeList, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "deletion of volume", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of volume", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -157,7 +157,7 @@ var volumeCreate = &cli.Command{
 		volume, err := client.New().Volume.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "creation of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(toDisplayableVolume(volume))
 	},
@@ -199,7 +199,7 @@ var volumeAttach = &cli.Command{
 		err := client.New().Volume.Attach(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "attach of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "attach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -219,7 +219,7 @@ var volumeDetach = &cli.Command{
 		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "unattach of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unattach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

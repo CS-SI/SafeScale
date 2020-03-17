@@ -52,7 +52,7 @@ func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v d
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
@@ -80,7 +80,7 @@ func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v dat
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, g.method, installaction.Add, g.addCommand)
@@ -110,7 +110,7 @@ func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v 
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)

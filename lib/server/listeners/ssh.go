@@ -187,7 +187,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		return nil, err
 	}
 	if retcode != 0 {
-		return nil, scerr.NewError(nil, nil, fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
+		return nil, scerr.NewError(fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
 	}
 
 	return &protocol.SshResponse{

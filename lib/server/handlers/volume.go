@@ -534,7 +534,7 @@ func (handler *volumeHandler) listAttachedDevices(host resources.Host) (set maps
 				if retcode == 255 {
 					return scerr.NotAvailableError("failed to reach SSH service of host '%s', retrying", host.SafeGetName())
 				}
-				return scerr.NewError(nil, nil, stderr)
+				return scerr.NewError(stderr)
 			}
 			return nil
 		},

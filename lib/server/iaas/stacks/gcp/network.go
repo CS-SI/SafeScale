@@ -279,7 +279,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 		if err != nil {
-			return networks, fmt.Errorf("cannot list networks ...: %s", err)
+			return networks, scerr.Wrap(err, "cannot list networks")
 		}
 
 		for _, nett := range resp.Items {
@@ -298,7 +298,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).PageToken(token).Do()
 		if err != nil {
-			return networks, fmt.Errorf("cannot list subnetworks ...: %s", err)
+			return networks, scerr.Wrap(err, "cannot list subnetworks")
 		}
 
 		for _, nett := range resp.Items {
@@ -334,7 +334,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	if theNetwork == nil {
-		return fmt.Errorf("delete network failed: unexpected nil network when looking for [%s]", ref)
+		return scerr.NewError("delete network failed: unexpected nil network when looking for '%s'", ref)
 	}
 
 	if !theNetwork.OK() {
@@ -459,7 +459,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull
 		case scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
+			return nil, userData, scerr.Wrap(err, "error creating gateway")
 		}
 	}
 

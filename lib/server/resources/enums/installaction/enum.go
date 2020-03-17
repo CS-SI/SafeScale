@@ -19,6 +19,8 @@ package installaction
 import (
 	"fmt"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Enum is the type of an action
@@ -62,7 +64,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Action.Enum corresponding to '%s'", v)
+		return e, scerr.NotFoundError("failed to find a Action.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 

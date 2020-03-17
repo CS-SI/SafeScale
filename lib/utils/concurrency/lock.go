@@ -17,7 +17,6 @@
 package concurrency
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -181,7 +180,7 @@ func (tm *taskedLock) Lock(task Task) error {
 	if _, ok := tm.readLocks[tid]; ok {
 		tracer.Trace("Cannot Lock, already RLocked")
 		taskID, _ := task.GetID()
-		return fmt.Errorf("cannot Lock task '%s': already RLocked", taskID)
+		return scerr.InconsistentError("cannot Lock task '%s': already RLocked", taskID)
 	}
 	// registers lock for read for the task and actively lock the RWMutex
 	tm.writeLocks[tid] = 1

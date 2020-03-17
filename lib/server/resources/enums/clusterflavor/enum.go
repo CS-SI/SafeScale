@@ -19,6 +19,8 @@ package clusterflavor
 import (
 	"fmt"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Enum represents the flavor of a cluster, in other words what technology is used behind the scene
@@ -70,7 +72,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Flavor matching with '%s'", v)
+		return e, scerr.NotFoundError("failed to find a Flavor matching with '%s'", v)
 	}
 	return e, nil
 

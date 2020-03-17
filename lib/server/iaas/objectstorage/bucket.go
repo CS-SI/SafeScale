@@ -74,7 +74,7 @@ func (b *bucket) InspectObject(objectName string) (Object, error) {
 		return nil, err
 	}
 	if o.item == nil {
-		return nil, fmt.Errorf("not found")
+		return nil, scerr.NotFoundError("not found")
 	}
 	return o, nil
 }

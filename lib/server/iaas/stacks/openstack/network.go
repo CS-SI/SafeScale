@@ -79,7 +79,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 	// Checks if CIDR is valid...
 	_, _, err = net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error())
+		return nil, scerr.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
 	}
 
 	// We specify a name and that it should forward packets
@@ -92,7 +92,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 	// Execute the operation and get back a networks.NetworkClient struct
 	network, err := networks.Create(s.NetworkClient, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, ProviderErrorToString(err))
+		return nil, scerr.NewError("error creating network '%s': %s", req.Name, ProviderErrorToString(err))
 	}
 
 	// Starting from here, delete network if exit with error
@@ -108,7 +108,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 
 	subnet, err := s.createSubnet(req.Name, network.ID, req.CIDR, req.IPVersion, req.DNSServers)
 	if err != nil {
-		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, ProviderErrorToString(err))
+		return nil, scerr.NewError("error creating network '%s': %s", req.Name, ProviderErrorToString(err))
 	}
 
 	// Starting from here, delete subnet if exit with error
@@ -150,7 +150,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
 			return nil, abstract.ResourceForbiddenError("network", name)
 		}
-		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
+		return nil, scerr.NewError("query for network '%s' failed: %v", name, r.Err)
 	}
 	nets, found := r.Body.(map[string]interface{})["networks"].([]interface{})
 	if found && len(nets) > 0 {
@@ -192,12 +192,12 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 			return nil, scerr.Wrap(err, fmt.Sprintf("error getting network: %s", ProviderErrorToString(err)))
 		}
 		if len(sns) != 1 {
-			return nil, fmt.Errorf("bad configuration, each network should have exactly one subnet")
+			return nil, scerr.InconsistentError("bad configuration, each network should have exactly one subnet")
 		}
 		sn := sns[0]
 		// gwID, _ := client.getGateway(id)
 		// if err != nil {
-		// 	return nil, fmt.Errorf("bad configuration, no gateway associated to this network")
+		// 	return nil, scerr.InconsistentError("bad configuration, no gateway associated to this network")
 		// }
 		newNet := abstract.NewNetwork()
 		newNet.ID = network.ID
@@ -235,7 +235,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 			for _, n := range networkList {
 				sns, err := s.listSubnets(n.ID)
 				if err != nil {
-					return false, fmt.Errorf("error getting network: %s", ProviderErrorToString(err))
+					return false, scerr.NewError("error getting network: %s", ProviderErrorToString(err))
 				}
 				if len(sns) != 1 {
 					continue
@@ -286,9 +286,9 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	sns, err := s.listSubnets(id)
 	if err != nil {
-		msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-		logrus.Debugf(strprocess.Capitalize(msg))
-		return fmt.Errorf(msg)
+		err = scerr.NewError("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+		logrus.Debugf(strprocess.Capitalize(err.Error()))
+		return err
 	}
 	for _, sn := range sns {
 		err := s.deleteSubnet(sn.ID)
@@ -297,9 +297,9 @@ func (s *Stack) DeleteNetwork(id string) error {
 			case scerr.ErrNotAvailable:
 				return err
 			default:
-				msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-				logrus.Debugf(strprocess.Capitalize(msg))
-				return fmt.Errorf(msg)
+				err = scerr.NewError("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+				logrus.Debugf(strprocess.Capitalize(err.Error()))
+				return err
 			}
 		}
 	}
@@ -309,9 +309,9 @@ func (s *Stack) DeleteNetwork(id string) error {
 		case scerr.ErrNotAvailable:
 			return err
 		default:
-			msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-			logrus.Debugf(strprocess.Capitalize(msg))
-			return fmt.Errorf(msg)
+			err = scerr.NewError("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+			logrus.Debugf(strprocess.Capitalize(err.Error()))
+			return err
 		}
 	}
 
@@ -483,7 +483,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		case gophercloud.ErrDefault400:
 			neutronError := ParseNeutronError(r.Err.Error())
 			if neutronError != nil {
-				return nil, scerr.NewError(nil, nil, "error creating subnet: bad request: %s", neutronError["message"])
+				return nil, scerr.NewError("error creating subnet: bad request: %s", neutronError["message"])
 			}
 		}
 		return nil, scerr.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
@@ -540,7 +540,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 // func calcDhcpAllocationPool(cidr string) (string, string, error) {
 // 	_, _, err := net.ParseCIDR(cidr)
 // 	if err != nil {
-// 		return "", "", fmt.Errorf("invalid cidr '%s'", cidr)
+// 		return "", "", scerr.InvalidParameterError("invalid cidr '%s'", cidr)
 // 	}
 
 // 	start, end, err := utils.CIDRToLongRange(cidr)
@@ -549,11 +549,11 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 // 	}
 // 	start += 11
 // 	if start >= end {
-// 		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+// 		return "", "", scerr.OverflowError(start, nil, "not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr)
 // 	}
 // 	end -= 3
 // 	if end <= start {
-// 		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+// 		return "", "", scerr.OverflowError(end, nil, "not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr)
 // 	}
 // 	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
 // }
@@ -584,7 +584,7 @@ func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
 	paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
-			return false, scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "error listing subnets")
+			return false, scerr.NewError("error listing subnets: %s", ProviderErrorToString(err))
 		}
 
 		for _, subnet := range list {
@@ -624,10 +624,10 @@ func (s *Stack) deleteSubnet(id string) (err error) {
 	}
 	if router != nil {
 		if err = s.removeSubnetFromRouter(router.ID, id); err != nil {
-			return scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "failed to delete subnet '%s'", id)
+			return scerr.NewError("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
 		}
 		if err = s.deleteRouter(router.ID); err != nil {
-			return scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "failed to delete subnet '%s'", id)
+			return scerr.NewError("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
 		}
 	}
 
@@ -648,7 +648,7 @@ func (s *Stack) deleteSubnet(id string) (err error) {
 				}
 			}
 			if err != nil {
-				return scerr.Wrap(fmt.Errorf(ProviderErrorToString(err)), "failed to delete subnet '%s'", id)
+				return scerr.NewError("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
 			}
 
 			return nil

@@ -134,7 +134,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return scerr.Wrap(err, "failed to get bucket size")
 	}
 	if size < 0 {
-		return scerr.NewError(nil, nil, "unknown size of object")
+		return scerr.NewError("unknown size of object")
 	}
 
 	length = size
@@ -250,7 +250,7 @@ func writeChunk(
 	if err == io.EOF {
 		msg := fmt.Sprintf("failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 		logrus.Errorf(msg)
-		return scerr.NewError(fmt.Errorf(msg), nil, "")
+		return scerr.NewError(msg)
 	}
 	r := bytes.NewReader(buf)
 	objectNamePart := objectName + strconv.Itoa(chunkIndex)

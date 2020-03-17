@@ -88,7 +88,7 @@ var sshRun = &cli.Command{
 		retcode, _, _, err := client.New().SSH.Run(task, c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
 			return cli.NewExitError("", retcode)
@@ -136,7 +136,7 @@ var sshCopy = &cli.Command{
 		retcode, _, _, err := client.New().SSH.Copy(task, normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
 		}
 		if retcode != 0 {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode))))
@@ -181,7 +181,7 @@ var sshConnect = &cli.Command{
 		err := client.New().SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "ssh connect", false).Error()))
+			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))
 		}
 		return nil
 	},
@@ -232,7 +232,7 @@ var sshTunnel = &cli.Command{
 		err := client.New().SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "ssh tunnel", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh tunnel", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -286,7 +286,7 @@ var sshClose = &cli.Command{
 		err := client.New().SSH.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "ssh close", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh close", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

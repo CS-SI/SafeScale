@@ -380,8 +380,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		if path == "" {
 			path, err = exec.LookPath("safescale")
 			if err != nil {
-				msg := "failed to find local binary 'safescale', make sure its path is in environment variable PATH"
-				return fmt.Errorf(strprocess.Capitalize(msg))
+				return scerr.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
 			}
 		}
 
@@ -396,7 +395,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			} else if stderr != "" {
 				output = stderr
 			}
-			return scerr.NewError(nil, nil, "failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
+			return scerr.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
 		}
 
 		// Uploads safescaled binary
@@ -407,8 +406,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		if path == "" {
 			path, err = exec.LookPath("safescaled")
 			if err != nil {
-				msg := "failed to find local binary 'safescaled', make sure its path is in environment variable PATH"
-				return fmt.Errorf(strprocess.Capitalize(msg))
+				return scerr.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
 			}
 		}
 		retcode, stdout, stderr, err = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout())
@@ -422,7 +420,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			} else if stderr != "" {
 				output = stderr
 			}
-			return scerr.NewError(nil, nil, "failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
+			return scerr.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
 		}
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 		suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX")
@@ -441,7 +439,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 					output = stderr
 				}
 				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", host.SafeGetName(), output)
-				return scerr.NewError(nil, nil, strprocess.Capitalize(msg))
+				return scerr.NewError(strprocess.Capitalize(msg))
 			}
 		}
 	}
@@ -518,7 +516,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.SafeGetName(), msg)
+			return scerr.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.SafeGetName(), msg)
 		}
 		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.SafeGetName())
 	}
@@ -569,7 +567,7 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fmt.Errorf("[cluster %s] failed to add 'remotedesktop' failed: %s", clusterName, msg)
+			return scerr.NewError("[cluster %s] failed to add 'remotedesktop' failed: %s", clusterName, msg)
 		}
 		logrus.Debugf("[cluster %s] feature 'remotedesktop' added successfully", clusterName)
 	}
@@ -612,7 +610,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fmt.Errorf("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
+			return scerr.NewError("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
 		}
 	}
 	return nil
@@ -657,7 +655,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return scerr.NewError(nil, nil, "[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
+			return scerr.NewError("[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
 		}
 	}
 	return nil
@@ -688,7 +686,7 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
 		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
-		return fmt.Errorf("failed to add feature 'docker' on host '%s': %s", host.SafeGetName(), msg)
+		return scerr.NewError("failed to add feature 'docker' on host '%s': %s", host.SafeGetName(), msg)
 	}
 	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil

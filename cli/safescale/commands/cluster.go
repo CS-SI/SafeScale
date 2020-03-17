@@ -110,7 +110,7 @@ var clusterListCommand = &cli.Command{
 		list, err := client.New().Cluster.List(temporal.DefaultExecutionTimeout)
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "failed to get cluster list", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
 		}
 
 		var formatted []interface{}
@@ -599,7 +599,7 @@ var clusterStartCommand = &cli.Command{
 		err = client.New().Cluster.Start(clusterRef, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = scerr.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateError(err, "start of cluster", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of cluster", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

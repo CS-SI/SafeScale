@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"reflect"
@@ -273,7 +272,7 @@ func (handler *scannerHandler) analyze() (err error) {
 				return nil
 			}
 
-			logrus.Printf("Checking template %s", template.Name)
+			logrus.Infof("Checking template %s", template.Name)
 
 			var an *abstract.Network
 			err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
@@ -302,10 +301,9 @@ func (handler *scannerHandler) analyze() (err error) {
 			def := abstract.HostSizingRequirements{
 				Image: "Ubuntu 18.04",
 			}
-			err = host.Create(task, req, def) // hostName, network.Name, "Ubuntu 18.04", true, template.Name, false)
+			err = host.Create(task, req, def)
 			if err != nil {
-				logrus.Warnf("template [%s] host '%s': error creation: %v", template.Name, hostName, err.Error())
-				return err
+				return scerr.Wrap(err, "template [%s] host '%s': error creation", template.Name, hostName)
 			}
 
 			defer func() {
@@ -340,13 +338,11 @@ func (handler *scannerHandler) analyze() (err error) {
 			// }
 			_, cout, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
 			if err != nil {
-				logrus.Warnf("template [%s] host '%s': failed to run collection script: %v", template.Name, hostName, err.Error())
-				return err
+				return scerr.Wrap(err, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 			}
 			daCPU, err := createCPUInfo(cout)
 			if err != nil {
-				logrus.Warnf("template [%s]: Problem building cpu info: %v", template.Name, err)
-				return err
+				return scerr.Wrap(err, "template [%s]: Problem building cpu info", template.Name)
 			}
 
 			daCPU.TemplateName = template.Name
@@ -466,31 +462,30 @@ func (handler *scannerHandler) dumpImages() (err error) {
 	return nil
 }
 
-func createCPUInfo(output string) (*CPUInfo, error) {
+func createCPUInfo(output string) (_ *CPUInfo, err error) {
 	str := strings.TrimSpace(output)
 
 	tokens := strings.Split(str, "î")
 	if len(tokens) < 9 {
-		return nil, fmt.Errorf("parsing error: '%s'", str)
+		return nil, scerr.SyntaxError("parsing error: '%s'", str)
 	}
 	info := CPUInfo{}
-	var err error
 	info.NumberOfCPU, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return nil, fmt.Errorf("parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
+		return nil, scerr.SyntaxError("parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
 	}
 	info.NumberOfCore, err = strconv.Atoi(tokens[1])
 	if err != nil {
-		return nil, fmt.Errorf("parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
+		return nil, scerr.SyntaxError("parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
 	}
 	info.NumberOfSocket, err = strconv.Atoi(tokens[2])
 	if err != nil {
-		return nil, fmt.Errorf("parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
+		return nil, scerr.SyntaxError("parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
 	}
 	info.NumberOfCore *= info.NumberOfSocket
 	info.CPUFrequency, err = strconv.ParseFloat(tokens[3], 64)
 	if err != nil {
-		return nil, fmt.Errorf("parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
+		return nil, scerr.SyntaxError("parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
 	}
 	info.CPUFrequency = math.Floor(info.CPUFrequency*100) / 100000
 
@@ -499,7 +494,7 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	info.CPUModel = tokens[6]
 	info.RAMSize, err = strconv.ParseFloat(tokens[7], 64)
 	if err != nil {
-		return nil, fmt.Errorf("parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
+		return nil, scerr.SyntaxError("parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
 	}
 
 	memInGb := info.RAMSize / 1024 / 1024
@@ -555,7 +550,7 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	return &info, nil
 }
 
-func (handler *scannerHandler) collect() error {
+func (handler *scannerHandler) collect() (err error) {
 	svc := handler.job.SafeGetService()
 
 	authOpts, err := svc.GetAuthenticationOptions()
@@ -564,53 +559,53 @@ func (handler *scannerHandler) collect() error {
 	}
 	region, ok := authOpts.Get("Region")
 	if !ok {
-		return fmt.Errorf("region value unset")
+		return scerr.InvalidRequestError("'Region' not set in tenant 'compute' section")
 	}
 
 	folder := fmt.Sprintf("images/%s/%s", svc.SafeGetName(), region)
 
 	err = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	files, err := ioutil.ReadDir(utils.AbsPathify("$HOME/.safescale/scanner"))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	for _, file := range files {
 		acpu := StoredCPUInfo{}
 		theFile := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name()))
 		if strings.Contains(file.Name(), svc.SafeGetName()+"#") {
-			log.Printf("Storing: %s", file.Name())
+			logrus.Infof("Storing: %s", file.Name())
 
 			byteValue, err := ioutil.ReadFile(theFile)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
 			err = json.Unmarshal(byteValue, &acpu)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
 			acpu.ID = acpu.ImageID
 
 			err = db.Write(folder, acpu.TemplateName, acpu)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 		}
 		if !file.IsDir() {
 			err := os.Remove(theFile)
 			if err != nil {
-				fmt.Printf("Error Supressing %s : %s", file.Name(), err.Error())
+				logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
 			}
 		}
 	}

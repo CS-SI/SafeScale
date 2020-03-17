@@ -502,7 +502,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return err
 	}
 	if retcode != 0 {
-		return scerr.NewError(nil, nil, "failed to finalize host '%s' installation: %s", rh.SafeGetName(), stderr)
+		return scerr.NewError("failed to finalize host '%s' installation: %s", rh.SafeGetName(), stderr)
 	}
 
 	// Reboot host
@@ -520,7 +520,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 		if abstract.IsProvisioningError(err) {
 			logrus.Errorf("%+v", err)
-			return scerr.NewError(nil, nil, "error creating the host [%s], error provisioning the new host, please check safescaled logs", rh.SafeGetName())
+			return scerr.NewError("error creating the host [%s], error provisioning the new host, please check safescaled logs", rh.SafeGetName())
 		}
 
 		return err
@@ -840,7 +840,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 					if state, stateErr := svc.GetHostState(rh.SafeGetID()); stateErr == nil {
 						logrus.Warnf("While deleting the status was [%s]", state)
 						if state == hoststate.ERROR {
-							return fmt.Errorf("host is in state ERROR")
+							return scerr.NotAvailableError("host is in state ERROR")
 						}
 					} else {
 						return stateErr
@@ -892,20 +892,20 @@ func (rh *host) Delete(task concurrency.Task) error {
 	// 			}
 	// 			hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, "ubuntu 18.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, &sizing, true)
 	// 			if err3 != nil {
-	// 				return fmt.Errorf("failed to stop host deletion : %s", err3.Error()
+	// 				return scerr.Wrap(err3, "failed to stop host deletion")
 	// 			}
 	// 			return nil
 	// 		})
 	// 	})
 	// 	if err2 != nil {
-	// 		return fmt.Errorf("failed to cancel host deletion : %s", err2.Error()
+	// 		return scerr.Wrap(err2, "failed to cancel host deletion")
 	// 	}
 
 	// 	buf, err2 := hostBis.Serialize()
 	// 	if err2 != nil {
-	// 		return fmt.Errorf("deleted Host recreated by safescale")
+	// 		return scerr.Wrap(err2, "deleted host recreated by safescale")
 	// 	}
-	// 	return fmt.Errorf("deleted Host recreated by safescale : %s", buf)
+	// 	return scerr.NewError("deleted Host recreated by safescale: %s", buf)
 
 	// default:
 	// }
@@ -1074,7 +1074,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 	}
 	// If retcode == 255, ssh connection failed
 	if retcode == 255 {
-		return -1, "", "", fmt.Errorf("failed to connect")
+		return -1, "", "", scerr.NewError("failed to connect")
 	}
 	return retcode, stdout, stderr, err
 }
@@ -1473,7 +1473,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 		if !outcomes.Successful() {
 			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, rh.SafeGetName())
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
-			return scerr.NewError(nil, nil, msg)
+			return scerr.NewError(msg)
 		}
 
 		// updates HostFeatures property for host
@@ -1875,7 +1875,7 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 	hostName := rh.SafeGetName()
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %s", err.Error())
+		return scerr.Wrap(err, "failed to create temporary file")
 	}
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	deleted := false
@@ -1897,10 +1897,10 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 					if inErr == nil {
 						deleted = true
 					}
-					return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
+					return scerr.NewError("file may exist on remote with inappropriate access rights, deleted it and retrying")
 				}
 				if system.IsSCPRetryable(retcode) {
-					err = fmt.Errorf("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
+					err = scerr.NewError("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
 				}
 				return nil
 			}
@@ -1932,7 +1932,7 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 				return err
 			}
 			if retcode != 0 {
-				err = fmt.Errorf("failed to change rights of file '%s' (retcode=%d)", to, retcode)
+				err = scerr.NewError("failed to change rights of file '%s' (retcode=%d)", to, retcode)
 				return nil
 			}
 			return nil

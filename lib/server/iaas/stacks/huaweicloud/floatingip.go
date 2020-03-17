@@ -17,14 +17,13 @@
 package huaweicloud
 
 import (
-	"fmt"
-
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ListOpts to define parameter of list
@@ -148,7 +147,7 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, error) {
 	r.Err = err
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get information for Floating IP id '%s': %s", id, openstack.ProviderErrorToString(err))
+		return nil, scerr.NewError("failed to get information for Floating IP id '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	return fip, nil
 }
@@ -173,7 +172,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.NewError("failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err))
 	}
 	if found {
 		return &fip, nil
@@ -188,7 +187,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bi, err := ipOpts.toFloatingIPCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.NewError("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
 	}
 	bandwidthOpts := bandwidthCreateOpts{
 		Name:      "bandwidth-" + s.vpc.Name,
@@ -197,7 +196,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bb, err := bandwidthOpts.toBandwidthCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.NewError("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
 	}
 	// Merger bi in bb
 	for k, v := range bi {
@@ -213,11 +212,11 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to request Floating IP creation: %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.NewError("failed to request Floating IP creation: %s", openstack.ProviderErrorToString(err))
 	}
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Floating IP: %s", err)
+		return nil, scerr.Wrap(err, "failed to create Floating IP")
 	}
 	return fip, nil
 }
@@ -239,7 +238,7 @@ func (s *Stack) DeleteFloatingIP(id string) error {
 func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
-		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
+		return scerr.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
 	}
 
 	b := map[string]interface{}{
@@ -252,7 +251,7 @@ func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) error {
 	_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
+		return scerr.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -261,7 +260,7 @@ func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) error {
 func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
-		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
+		return scerr.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
 	}
 
 	b := map[string]interface{}{
@@ -274,7 +273,7 @@ func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) error {
 	_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
+		return scerr.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }

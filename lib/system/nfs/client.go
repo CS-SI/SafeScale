@@ -17,8 +17,6 @@
 package nfs
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -33,7 +31,7 @@ type Client struct {
 // NewNFSClient creates a new NFS client instance
 func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 	if sshconfig == nil {
-		return nil, fmt.Errorf("invalid parameter: 'sshconfig' cannot be nil")
+		return nil, scerr.InvalidParameterError("sshconfig", "cannot be nil")
 	}
 
 	client := &Client{

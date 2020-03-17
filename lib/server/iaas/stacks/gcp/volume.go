@@ -136,7 +136,7 @@ func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, error) {
 	case "RESTORING":
 		return volumestate.CREATING, nil
 	default:
-		return -1, fmt.Errorf("unexpected volume status: [%s]", gcpDriveStatus)
+		return -1, scerr.NewError("unexpected volume status '%s'", gcpDriveStatus)
 	}
 }
 
@@ -154,7 +154,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 		if err != nil {
-			return volumes, fmt.Errorf("cannot list volumes: %v", err)
+			return volumes, scerr.Wrap(err, "cannot list volumes")
 		}
 		for _, instance := range resp.Items {
 			nvolume := abstract.NewVolume()
