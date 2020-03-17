@@ -104,6 +104,9 @@ build/exported
 build/marker
 build/markerCi
 build/Dockerfile.cibranch
+/exported/
+/build/newMarkerCi
+/marker
 
 # secrets
 build/tenants.toml
