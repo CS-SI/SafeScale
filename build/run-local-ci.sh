@@ -29,7 +29,15 @@ else
   export CLUTYPE=$2
 fi
 
-if [ ! -z "$3" ]
+if [ -z "$3" ]
+then
+  echo "Third parameter is os..."
+  exit 1
+else
+  export OSTESTED=$3
+fi
+
+if [ ! -z "$4" ]
 then
   if [[ $3 == "-f" ]]; then
     date > markerCi
@@ -45,7 +53,7 @@ else
   diff ./markerCi ./newMarkerCi 1>/dev/null && rm ./newMarkerCi && echo "Nothing to do !, if you want to force a ci test lauch with -f flag" && exit 0
 fi
 
-THISBRANCH=local-$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') TENANT=$1 CLUTYPE=$2 envsubst <Dockerfile.ci > Dockerfile.cibranch-$1-$2
+THISBRANCH=local-$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') TENANT=$1 CLUTYPE=$2 OSTESTED="$3" envsubst <Dockerfile.ci > Dockerfile.cibranch-$1-$2
 docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.cibranch-$1-$2 -t safescale-ci:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g')-$1-$2 $WRKDIR
 RC=$?
 if [ $RC -ne 0 ]; then

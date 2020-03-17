@@ -1,4 +1,5 @@
 #!/bin/bash
+
 WRKDIR=$(readlink -f $(dirname "$0"))
 
 if [ ! -z "$1" ]

@@ -76,7 +76,7 @@ do
   for i in $(seq $ROUNDS); do
     stamp=`date +"%s"`
     ./safescale-cover cluster delete clu-$TENANT-$stamp-ubu-$fla-r$i -y
-    ./safescale-cover cluster create -k -F $fla --os "ubuntu 18.04" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-ubu-$fla-r$i
+    ./safescale-cover cluster create -k -F $fla --os "$OSTESTED" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-ubu-$fla-r$i
     RUN=$?
     if [[ $RUN -ne 0 ]]; then
       CODE=$((CODE + 1))
