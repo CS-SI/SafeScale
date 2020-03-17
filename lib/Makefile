@@ -25,7 +25,7 @@ vet:
 	@$(GO) vet ./...
 
 gensrc:
-	@(cd server/iaas/resources/userdata && $(MAKE) $(@))
+	@(cd server/iaas/userdata && $(MAKE) $(@))
 	@(cd system && $(MAKE) $(@))
 
 generate: gensrc sdk
