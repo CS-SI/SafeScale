@@ -102,6 +102,35 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	return &googleprotobuf.Empty{}, nil
 }
 
+// Destroy a bucket
+func (s *BucketListener) Destroy(ctx context.Context, in *pb.Bucket) (empty *googleprotobuf.Empty, err error) {
+	bucketName := in.GetName()
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Destroy : "+bucketName); err != nil {
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+	}
+
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		logrus.Info("Cannot destroy buckets: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot delete bucket: no tenant set")
+	}
+
+	handler := BucketHandler(tenant.Service)
+	err = handler.Destroy(ctx, bucketName)
+	if err != nil {
+		tbr := scerr.Wrap(err, "cannot destroy bucket")
+		return nil, status.Errorf(codes.Internal, tbr.Error())
+	}
+
+	return &googleprotobuf.Empty{}, nil
+}
+
 // Delete a bucket
 func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *googleprotobuf.Empty, err error) {
 	bucketName := in.GetName()

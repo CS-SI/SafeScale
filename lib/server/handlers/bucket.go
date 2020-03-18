@@ -35,6 +35,7 @@ type BucketAPI interface {
 	List(context.Context) ([]string, error)
 	Create(context.Context, string) error
 	Delete(context.Context, string) error
+	Destroy(context.Context, string) error
 	Inspect(context.Context, string) (*resources.Bucket, error)
 	Mount(context.Context, string, string, string) error
 	Unmount(context.Context, string, string) error
@@ -87,6 +88,24 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 		return resources.ResourceDuplicateError("bucket", name)
 	}
 	_, err = handler.service.CreateBucket(name)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Destroy a bucket, clear then delete
+func (handler *BucketHandler) Destroy(ctx context.Context, name string) (err error) {
+	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	err = handler.service.ClearBucket(name, "/", "")
+	if err != nil {
+		return err
+	}
+
+	err = handler.service.DeleteBucket(name)
 	if err != nil {
 		return err
 	}
