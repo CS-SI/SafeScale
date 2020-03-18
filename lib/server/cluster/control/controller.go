@@ -532,6 +532,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 		sshCfg, err := clientHost.SSHConfig(hostID)
 		if err != nil {
 			log.Errorf("failed to get ssh config of node '%s': %s", hostID, err.Error())
+			lastError = err
 			continue
 		}
 		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
