@@ -61,6 +61,46 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 	return err
 }
 
+// Destroy ...
+func (c *bucket) Destroy(names []string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewBucketServiceClient(c.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	var (
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
+	)
+
+	bucketDeleter := func(aname string) {
+		defer wg.Done()
+		_, err := service.Destroy(ctx, &pb.Bucket{Name: aname})
+		if err != nil {
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
+		}
+	}
+
+	// FIXME Unused timeout, use waitTimeout
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go bucketDeleter(target)
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+	}
+	return nil
+}
+
 // Delete ...
 func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
@@ -86,6 +126,8 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 			mutex.Unlock()
 		}
 	}
+
+	// FIXME Unused timeout, use waitTimeout
 
 	wg.Add(len(names))
 	for _, target := range names {

@@ -319,6 +319,12 @@ func (l *location) ClearBucket(bucketName string, path, prefix string) error {
 	if err != nil {
 		return err
 	}
+
+	b.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		return err
+	}
+
 	return b.Clear(path, prefix)
 }
 

@@ -82,6 +82,12 @@ var bucketDelete = cli.Command{
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Delete a bucket",
 	ArgsUsage: "<Bucket_name> [<Bucket_name>...]",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If used, deletes the bucket and its contents",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", bucketCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -93,10 +99,20 @@ var bucketDelete = cli.Command{
 		bucketList = append(bucketList, c.Args().First())
 		bucketList = append(bucketList, c.Args().Tail()...)
 
-		err := client.New().Bucket.Delete(bucketList, temporal.GetExecutionTimeout())
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
+		destroy := c.Bool("force") // FIXME Use this flag
+
+		if destroy {
+			err := client.New().Bucket.Destroy(bucketList, temporal.GetExecutionTimeout())
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "destruction of bucket", true).Error())))
+			}
+		} else {
+			err := client.New().Bucket.Delete(bucketList, temporal.GetExecutionTimeout())
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
+			}
 		}
+
 		return clitools.SuccessResponse(nil)
 	},
 }

@@ -129,26 +129,30 @@ func (b *bucket) Clear(path, prefix string) error {
 		return scerr.InvalidInstanceError()
 	}
 
+	if b.container == nil {
+		return scerr.InvalidInstanceContentError("b.container", "cannot be nil")
+	}
+
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	fullPath := buildFullPath(path, prefix)
 
-	return stow.Walk(b.container, path, 100,
+	walkErr := stow.Walk(b.container, fullPath, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
-			if strings.Index(item.Name(), fullPath) == 0 {
-				err = b.container.RemoveItem(item.Name())
-				if err != nil {
-					// log.Println("erreur RemoveItem => : ", err)
-					return err
-				}
-				// l.NbItem = 0
+
+			err = b.container.RemoveItem(item.ID())
+			if err != nil {
+				return err
 			}
+
 			return nil
 		},
 	)
+
+	return walkErr
 }
 
 // DeleteObject deletes an object from a bucket
