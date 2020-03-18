@@ -107,7 +107,7 @@ type Task interface {
 
 // task is the implementation of Task
 type task struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	id     string
 	sig    string
 	status TaskStatus
@@ -223,13 +223,7 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 		context: taskContext,
 		cancel:  taskCancel,
 		status:  READY,
-		// abortCh:  make(chan bool, 1),
-		// doneCh:   make(chan bool, 1),
-		// finishCh: make(chan struct{}, 1),
 	}
-	// close(t.abortCh)
-	// close(t.doneCh)
-	// close(t.finishCh)
 
 	u, err := uuid.NewV4()
 	if err != nil {
@@ -272,8 +266,8 @@ func (t *task) GetID() (string, error) {
 		return "", scerr.InvalidInstanceError()
 	}
 
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
 	return t.id, nil
 }
@@ -290,6 +284,8 @@ func (t *task) GetSignature() (string, error) {
 	if t == nil {
 		return "", scerr.InvalidInstanceError()
 	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
 	return t.sig, nil
 }
@@ -306,8 +302,8 @@ func (t *task) GetStatus() (TaskStatus, error) {
 		return 0, scerr.InvalidInstanceError()
 	}
 
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return t.status, nil
 }
 
@@ -316,6 +312,9 @@ func (t *task) GetContext() (context.Context, context.CancelFunc, error) {
 	if t == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	return t.context, t.cancel, nil
 }
 
@@ -404,14 +403,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 	if timeout > 0 {
 		for !finish {
 			select {
-			// VPL: cancel signal is captured by its own go routine
-			// case <-t.context.Done():
-			// 	// Context cancel signal received, propagating using abort signal
-			// 	// tracer.Trace("receiving signal from context, aborting task...")
-			// 	logrus.Debugf("%s received cancel signal from context", sig)
-			// 	t.abortCh <- true
 			case <-t.doneCh:
-				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 				// tracer.Trace("receiving done signal from go routine")
 				t.mu.Lock()
 				t.status = DONE
@@ -429,8 +421,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
 				}
 				t.mu.Unlock()
-				// VPL: don't force stop on abort to let the task the chance to clean up and end properly
-				// finish = true
+				// don't force stop on abort to let the task the chance to clean up and end properly
 			case <-time.After(timeout):
 				t.mu.Lock()
 				if t.status == RUNNING {
@@ -445,13 +436,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 	} else {
 		for !finish {
 			select {
-			// case <-t.ctx.Done():
-			// 	// Context cancel signal received, propagating using abort signal
-			// 	// tracer.Trace("receiving signal from context, aborting task...")
-			// 	logrus.Debugf("%s received cancel signal from context", sig)
-			// 	t.abortCh <- true
 			case <-t.doneCh:
-				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
 				// tracer.Trace("receiving done signal from go routine")
 				t.mu.Lock()
 				t.status = DONE
@@ -469,8 +454,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
 				}
 				t.mu.Unlock()
-				// VPL: don't force stop on abort to let the goroutine the chance to clean up and end properly
-				// finish = true
+				// don't force stop on abort to let the goroutine the chance to clean up and end properly
 			}
 		}
 	}
@@ -709,15 +693,6 @@ func (t *task) Abort() (err error) {
 	if status == RUNNING {
 		// Tell controller to abort go routine
 		t.abortCh <- true
-
-		// VPL: sending a signal to abortCh should be sufficient
-		// // Tell context to cancel
-		// if t.cancel != nil {
-		// 	logrus.Debugf("%s: cancelling from Abort()...", sig)
-		// 	t.cancel()
-		// 	t.cancel = nil
-		// }
-
 		t.status = ABORTED
 	} else if t.status != DONE {
 		t.status = ABORTED
@@ -736,8 +711,8 @@ func (t *task) Aborted() bool {
 
 // Abortable tells if task can be aborted
 func (t *task) Abortable() bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return !t.abortDisengaged
 }
 
@@ -753,7 +728,7 @@ func (t *task) IgnoreAbortSignal(ignore bool) error {
 	return nil
 }
 
-// Close cleans up the context
+// Close cleans up the task
 // Must be called to prevent memory leaks
 func (t *task) Close() {
 	_ = t.Abort()
@@ -761,6 +736,7 @@ func (t *task) Close() {
 		_ = k.Abort()
 		_, _ = k.Wait()
 	}
+	t.subtasks = nil
 	_, _ = t.Wait()
 	if t.context != nil && t.cancel != nil {
 		t.closeCh <- struct{}{}

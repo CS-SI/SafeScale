@@ -79,7 +79,7 @@ func New() Client {
 	}
 
 	s.Bucket = &bucket{session: s}
-	// s.Data = &data{session: s}
+	s.Cluster = &cluster{session: s}
 	s.Host = &host{session: s}
 	s.Image = &image{session: s}
 	s.Network = &network{session: s}
@@ -137,10 +137,3 @@ func DecorateTimeoutError(err error, action string, maySucceed bool) error {
 func IsTimeoutError(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }
-
-// VPL: moved in abstract package
-// // IsProvisioningError detects provisioning errors
-// func IsProvisioningError(err error) bool {
-// 	errText := err.Error()
-// 	return strings.Contains(errText, "PROVISIONING_ERROR:")
-// }
