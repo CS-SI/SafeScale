@@ -139,12 +139,12 @@ func (rh *host) Browse(task concurrency.Task, callback func(*abstract.HostCore) 
 	}
 
 	return rh.Core.BrowseFolder(task, func(buf []byte) error {
-		host := abstract.NewHostCore()
-		err = host.Deserialize(buf)
+		ahc := abstract.NewHostCore()
+		err = ahc.Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		return callback(host)
+		return callback(ahc)
 	})
 }
 

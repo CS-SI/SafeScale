@@ -92,15 +92,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		gwName    string
 	)
 	if in.Gateway == nil || in.Gateway.Sizing == nil {
-		sizing = &abstract.HostSizingRequirements{
-			MinCores:    int(in.Gateway.Sizing.MinCpuCount),
-			MaxCores:    int(in.Gateway.Sizing.MaxCpuCount),
-			MinRAMSize:  in.Gateway.Sizing.MinRamSize,
-			MaxRAMSize:  in.Gateway.Sizing.MaxRamSize,
-			MinDiskSize: int(in.Gateway.Sizing.MinDiskSize),
-			MinGPU:      int(in.Gateway.Sizing.GpuCount),
-			MinCPUFreq:  in.Gateway.Sizing.MinCpuFreq,
-		}
+		sizing = &abstract.HostSizingRequirements{}
 	} else {
 		s := converters.HostSizingRequirementsFromProtocolToAbstract(*in.Gateway.Sizing)
 		sizing = &s

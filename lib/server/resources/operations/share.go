@@ -168,8 +168,8 @@ func (objs *share) Browse(task concurrency.Task, callback func(string, string) e
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 	return objs.Core.BrowseFolder(task, func(buf []byte) error {
-		si := ShareIdentity{}
-		err := (&si).Deserialize(buf)
+		si := &ShareIdentity{}
+		err := si.Deserialize(buf)
 		if err != nil {
 			return err
 		}

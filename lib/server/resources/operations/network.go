@@ -591,8 +591,13 @@ func (objn *network) Browse(task concurrency.Task, callback func(*abstract.Netwo
 		return scerr.InvalidParameterError("callback", "can't be nil")
 	}
 
-	return objn.Browse(task, func(entry *abstract.Network) error {
-		return callback(entry)
+	return objn.Core.BrowseFolder(task, func(buf []byte) error {
+		an := abstract.NewNetwork()
+		err := an.Deserialize(buf)
+		if err != nil {
+			return err
+		}
+		return callback(an)
 	})
 }
 

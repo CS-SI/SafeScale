@@ -20,6 +20,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sirupsen/logrus"
 )
 
@@ -121,14 +123,25 @@ func (n *Network) OK() bool {
 	return result
 }
 
+// Serialize serializes Host instance into bytes (output json code)
+func (n *Network) Serialize() ([]byte, error) {
+	return serialize.ToJSON(n)
+}
+
+// Deserialize reads json code and reinstantiates an Host
+func (n *Network) Deserialize(buf []byte) (err error) {
+	defer scerr.OnPanic(&err)()
+	return serialize.FromJSON(buf, n)
+}
+
 // VirtualIP is a structure containing information needed to manage VIP (virtual IP)
 type VirtualIP struct {
-	ID        string
-	Name      string
-	NetworkID string
-	PrivateIP string
-	PublicIP  string
-	Hosts     []*HostCore
+	ID        string      `json:"id,omitempty"`
+	Name      string      `json:"name,omitempty"`
+	NetworkID string      `json:"network_id,omitempty"`
+	PrivateIP string      `json:"private_ip,omitempty"`
+	PublicIP  string      `json:"public_ip,omitempty"`
+	Hosts     []*HostCore `json:"hosts,omitempty"`
 }
 
 func NewVirtualIP() *VirtualIP {
