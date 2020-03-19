@@ -227,6 +227,7 @@ func newTask(ctx context.Context, cancel context.CancelFunc, parentTask Task) (*
 		context: taskContext,
 		cancel:  taskCancel,
 		status:  READY,
+		subtasks: map[Task]struct{}{},
 	}
 
 	u, err := uuid.NewV4()
@@ -402,6 +403,9 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, e
 	if err != nil {
 		return nil, err
 	}
+	t.mu.Lock()
+	t.subtasks[st] = struct{}{}
+	t.mu.Unlock()
 
 	return st.Start(action, params)
 }
@@ -546,26 +550,27 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	// tid, err := t.GetID()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	tid, err := t.GetID()
+	if err != nil {
+		return nil, err
+	}
 
-	// status, err := t.GetStatus()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	status, err := t.GetStatus()
+	if err != nil {
+		return nil, err
+	}
 
-	// if status == DONE {
-	// 	return t.result, t.err
-	// }
-	// if status == ABORTED || status == TIMEOUT {
-	// 	return nil, t.err
-	// }
-	// if status != RUNNING {
-	// 	return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
-	// }
+	if status == DONE {
+		return t.result, t.err
+	}
+	if status == ABORTED || status == TIMEOUT {
+		return nil, t.err
+	}
+	if status != RUNNING {
+		return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
+	}
 
+	// Task status is coherent, waiting the end of the goroutine
 	<-t.finishCh
 
 	t.mu.Lock()
@@ -577,10 +582,6 @@ func (t *task) Wait() (TaskResult, error) {
 	if t.status == ABORTED || t.status == TIMEOUT {
 		return nil, t.err
 	}
-	if t.status != RUNNING {
-		return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", t.id, t.status)
-	}
-
 	return t.result, t.err
 }
 
@@ -617,7 +618,7 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 	t.mu.RUnlock()
 	if finished {
 		_, err := t.Wait()
-		return err == nil, t.result, err
+		return true, t.result, err
 	}
 	return false, nil, nil
 }

@@ -340,9 +340,9 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
-	funk := func(timeout uint, sleep uint, trigger uint, witherror bool) {
+	funk := func(timeout uint, sleep uint, trigger uint, errorExpected bool) {
 		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout*10)*time.Millisecond))
-		single, err := NewTaskWithContext(ctx, nil)
+		single, err := NewTaskWithContext(ctx, cafu)
 		require.NotNil(t, single)
 		require.Nil(t, err)
 
@@ -362,18 +362,18 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 		_, err = single.Wait()
 		end := time.Since(begin)
 		if err != nil {
-			if !strings.Contains(err.Error(), "cancel") {
+			if !strings.Contains(err.Error(), "abort") {
 				t.Errorf("Why so serious ? it's just a failure cancelling a goroutine: %s", err.Error())
 			}
 		}
 
-		if !((err != nil) == witherror) {
-			t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+		if !((err != nil) == errorExpected) {
+			t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, errorExpected)
 		}
-		require.True(t, (err != nil) == witherror)
+		require.True(t, (err != nil) == errorExpected)
 
 		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
-			t.Errorf("We waited too much !")
+			t.Errorf("Failure in test: %v, %v, %v, %t: We waited too much! %v > %v", timeout, sleep, trigger, errorExpected, end, time.Duration(trigger+2)*10*time.Millisecond)
 		}
 	}
 	funk(3, 5, 1, true)
@@ -389,9 +389,9 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
-	funk := func(sleep uint, trigger uint, witherror bool) {
+	funk := func(sleep uint, trigger uint, errorExpected bool) {
 		ctx, cafu := context.WithCancel(context.TODO())
-		single, err := NewTaskWithContext(ctx, nil)
+		single, err := NewTaskWithContext(ctx, cafu)
 		require.NotNil(t, single)
 		require.Nil(t, err)
 
@@ -411,15 +411,15 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 		_, err = single.Wait()
 		end := time.Since(begin)
 		if err != nil {
-			if !strings.Contains(err.Error(), "cancel") {
+			if !strings.Contains(err.Error(), "abort") {
 				t.Errorf("Why so serious ? it's just a failure cancelling a goroutine: %s", err.Error())
 			}
 		}
 
-		require.True(t, (err != nil) == witherror)
+		require.True(t, (err != nil) == errorExpected)
 
 		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
-			t.Errorf("We waited too much !")
+			t.Errorf("Failure in test: %v, %v, %t: We waited too much! %v > %v", sleep, trigger, errorExpected, end, time.Duration(trigger+2)*time.Millisecond)
 		}
 	}
 	funk(5, 1, true)
