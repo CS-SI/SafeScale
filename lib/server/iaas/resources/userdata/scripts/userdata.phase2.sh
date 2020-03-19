@@ -403,6 +403,14 @@ EOF
         fi
     done
 
+    if [ "{{.ProviderName}}" == "aws" ]; then
+      echo "It actually IS AWS"
+      AWS=1
+    else
+      echo "It is NOT AWS"
+      AWS=0
+    fi
+
     if [[ $AWS -eq 1 ]]; then
       if [[ $ISGW -eq 0 ]]; then
         rm -f /etc/netplan/*
@@ -452,11 +460,43 @@ EOF
       fi
     fi
 
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 0"
+            fail 196
+        }
+    fi
+
     netplan generate && netplan apply || fail 198
+
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 1"
+            fail 196
+        }
+    fi
 
     configure_dhclient
 
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 2"
+            fail 196
+        }
+    fi
+
     systemctl restart systemd-networkd
+
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 3"
+            fail 196
+        }
+    fi
 
     reset_fw || fail 199
 
