@@ -66,8 +66,8 @@ do
   RUN=0
 
   for i in $(seq $ROUNDS); do
-    ./safescale-cover cluster delete clu-$TENANT-ubu-$fla-r$i -y
-    ./safescale-cover cluster create -k -F $fla --os "ubuntu 18.04" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.4.$i.0/24 clu-$TENANT-ubu-$fla-r$i
+    ./safescale-cover cluster delete clu-$TENANT-$fla-r$i -y
+    ./safescale-cover cluster create -k -F $fla --os "ubuntu 18.04" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.4.$i.0/24 clu-$TENANT-$fla-r$i
     RUN=$?
     if [[ $RUN -ne 0 ]]; then
       CODE=$((CODE + 1))
@@ -89,7 +89,7 @@ do
       CLEAN=$((CLEAN + 1))
     fi
 
-    ./safescale-cover cluster delete clu-$TENANT-ubu-$fla-r$i -y
+    ./safescale-cover cluster delete clu-$TENANT-$fla-r$i -y
     if [[ $? -ne 0 ]]; then
       CLEAN=$((CLEAN + 1))
     fi
@@ -105,8 +105,8 @@ do
   fi
   
   for i in $(seq $ROUNDS); do
-    ./safescale-cover cluster delete clu-$TENANT-cent7-$fla-r$i -y
-    ./safescale-cover cluster create -k -F $fla --os "centos 7" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.7.$i.0/24 clu-$TENANT-cent7-$fla-r$i
+    ./safescale-cover cluster delete clu-$TENANT-$fla-r$i -y
+    ./safescale-cover cluster create -k -F $fla --os "centos 7" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.7.$i.0/24 clu-$TENANT-$fla-r$i
     RUN=$?
     if [[ $RUN -ne 0 ]]; then
       CODE=$((CODE + 1))
@@ -128,7 +128,7 @@ do
       CLEAN=$((CLEAN + 1))
     fi
 
-    ./safescale-cover cluster delete clu-$TENANT-cent7-$fla-r$i -y
+    ./safescale-cover cluster delete clu-$TENANT-$fla-r$i -y
     if [[ $? -ne 0 ]]; then
       CLEAN=$((CLEAN + 1))
     fi
