@@ -10,6 +10,7 @@ generate:
 	@(cd ovh && $(MAKE) $(@))
 	@(cd local && $(MAKE) $(@))
 	@(cd gcp && $(MAKE) $(@))
+	@(cd aws && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...
@@ -22,4 +23,5 @@ clean:
 	@(cd ovh && $(MAKE) $(@))
 	@(cd local && $(MAKE) $(@))
 	@(cd gcp && $(MAKE) $(@))
+	@(cd aws && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true

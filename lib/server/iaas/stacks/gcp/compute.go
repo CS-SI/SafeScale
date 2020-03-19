@@ -219,7 +219,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet")
+	return nil
 }
 
 // CreateHost creates an host satisfying request

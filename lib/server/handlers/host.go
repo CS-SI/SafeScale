@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"os"
 	"os/user"
 	"strings"
@@ -337,7 +338,22 @@ func (handler *HostHandler) Create(
 			return nil, err
 		}
 	} else {
-		return nil, resources.ResourceDuplicateError("host", name)
+		hostThere, err := handler.service.GetHostState(name)
+		if err == nil {
+			logrus.Warnf("we have a host %s with status: %s", name, hostThere.String())
+			if hostThere != hoststate.TERMINATED {
+				return nil, resources.ResourceDuplicateError("host", name)
+			}
+		} else {
+			switch err.(type) {
+			case scerr.ErrNotFound:
+			case scerr.ErrTimeout:
+				logrus.Warnf("timeout problem retrieving status of host %s: %v", name, err)
+				return nil, resources.ResourceDuplicateError("host", name)
+			default:
+				return nil, resources.ResourceDuplicateError("host", name)
+			}
+		}
 	}
 
 	var (
@@ -632,6 +648,9 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
+	logrus.Warnf("Showtime host: %s", spew.Sdump(host)) // FIXME Remove logs
+	logrus.Warnf("Showtime sshCfg: %s", spew.Sdump(sshCfg))
+
 	_, err = sshCfg.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
 	if err != nil {
 		derr := err
@@ -722,6 +741,9 @@ func (handler *HostHandler) Create(
 		}
 
 		return nil, err
+	} else {
+		// FIXME AWS Retrieve data anyway
+		retrieveForensicsData(ctx, sshHandler, host)
 	}
 
 	// Reboot host
@@ -793,6 +815,16 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
+		etcDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/etcdata.tar.gz", host.Name))
+		textDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/textdata.tar.gz", host.Name))
+
+		_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
+		_, _, _, _ = sshHandler.Run(ctx, host.Name, "systemd-resolve --status > /tmp/systemd-resolve.txt", outputs.COLLECT)
+		_, _, _, _ = sshHandler.Run(ctx, host.Name, "netplan ip leases eth0 > /tmp/netplan.txt", outputs.COLLECT)
+		_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf textdumps.tar.gz /tmp/*.txt", outputs.COLLECT)
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/etcdir.tar.gz", etcDumpName)
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/textdumps.tar.gz", textDumpName)
+
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase2.sh", dumpName+"sh")
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase2.log", dumpName+"log")
 	}

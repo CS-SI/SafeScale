@@ -545,6 +545,27 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 		return nil, err
 	}
 
+	log.Warnf("We are looking for an image for %s", svc.GetName())
+
+	if svc.GetName() == "aws" {
+		// FIXME AWS Mappings
+
+		if strings.EqualFold(osname, "CentOS 7.3") {
+			osname = "ami-0ec8d2a455affc7e4"
+		}
+
+		if strings.EqualFold(osname, "Ubuntu 18.04") {
+			osname = "ami-0cc0a36f626a4fdf5"
+		}
+	}
+
+	// If is an exact match for an Image return that image
+	for _, img := range imgs {
+		if img.ID == osname {
+			return &img, nil
+		}
+	}
+
 	maxscore := 0.0
 	maxi := -1
 	//fields := strings.Split(strings.ToUpper(osname), " ")

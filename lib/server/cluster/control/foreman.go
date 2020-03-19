@@ -373,6 +373,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return err
 	}
 
+	defer func() {
+		if err != nil && !req.KeepOnFailure {
+			derr := svc.DeleteKeyPair(kpName)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	// Saving Cluster metadata, with status 'Creating'
 	b.cluster.Identity.Name = req.Name
 	b.cluster.Identity.Flavor = req.Flavor
@@ -504,7 +513,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Step 2: awaits gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		_ = mastersTask.Abort()
+		_ = mastersTask.Abort() // FIXME Handle aborts
 		_ = privateNodesTask.Abort()
 		return primaryGatewayStatus
 	}
@@ -750,7 +759,19 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		cleaningErrors = append(cleaningErrors, err)
 		return scerr.ErrListError(cleaningErrors)
 	}
-	cluster.service = nil
+
+	// Delete cluster key
+	err = b.cluster.service.DeleteKeyPair("cluster_" + b.cluster.Name + "_cladm_key")
+	if err != nil {
+		cleaningErrors = append(cleaningErrors, err)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	defer func() {
+		if err == nil {
+			cluster.service = nil
+		}
+	}()
 
 	return scerr.ErrListError(cleaningErrors)
 }

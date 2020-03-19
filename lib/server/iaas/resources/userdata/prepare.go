@@ -89,6 +89,8 @@ type Content struct {
 	// PrivateVIP contains the private IP of the VIP instance if it exists
 	PrivateVIP string // VPL: change to DefaultRouteIP
 
+	ProviderName     string
+	BuildSubnetworks bool
 	// Dashboard bool // Add kubernetes dashboard
 }
 
@@ -102,6 +104,13 @@ func NewContent() *Content {
 	return &Content{
 		Tags: map[string]map[string][]string{},
 	}
+}
+
+func (ud Content) OK() bool { // FIXME Complete function
+	result := true
+	result = result && ud.BashLibrary != ""
+	result = result && ud.HostName != ""
+	return result
 }
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
@@ -137,9 +146,6 @@ func (ud *Content) Prepare(
 	useNATService = options.UseNATService
 	operatorUsername = options.OperatorUsername
 	dnsList = options.DNSList
-	if len(dnsList) == 0 {
-		dnsList = []string{"1.1.1.1"}
-	}
 
 	bashLibrary, err := system.GetBashLibrary()
 	if err != nil {
@@ -170,6 +176,8 @@ func (ud *Content) Prepare(
 	ud.DefaultRouteIP = ip
 	ud.Password = request.Password
 	ud.EmulatedPublicNet = defaultNetworkCIDR
+	ud.ProviderName = options.ProviderName
+	ud.BuildSubnetworks = options.BuildSubnetworks
 
 	if request.HostName != "" {
 		ud.HostName = request.HostName

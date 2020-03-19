@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Script customized for {{.ProviderName}} driver
+
 {{.Header}}
 
 print_error() {
@@ -46,21 +48,21 @@ set -x
 reset_fw() {
     case $LINUX_KIND in
         debian|ubuntu)
-            sfApt update &>/dev/null
-            sfApt install -qy firewalld || return 1
+            sfApt update &>/dev/null || return 1
+            sfApt install -q -y firewalld || return 1
 
             systemctl stop ufw
             # systemctl start firewalld || return 1
             systemctl disable ufw
             # systemctl enable firewalld
-            sfApt purge -qy ufw &>/dev/null || return 1
+            sfApt purge -q -y ufw &>/dev/null || return 1
             ;;
 
         rhel|centos)
             # firewalld may not be installed
             if ! systemctl is-active firewalld &>/dev/null; then
                 if ! systemctl status firewalld &>/dev/null; then
-                    yum install -qy firewalld || return 1
+                    yum install -q -y firewalld || return 1
                 fi
                 # systemctl enable firewalld &>/dev/null
                 # systemctl start firewalld &>/dev/null
@@ -116,6 +118,7 @@ PU_IP=
 PU_IF=
 i_PR_IF=
 o_PR_IF=
+AWS=
 
 # Don't request dns name servers from DHCP server
 # Don't update default route
@@ -187,6 +190,25 @@ identify_nics() {
     echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
     echo "$PU_IF" >${SF_VARDIR}/state/public_nics
 
+    if [ ! -z $PU_IP ]; then
+      if [ -z $PU_IF ]; then
+        if [ -z $NO404 ]; then
+          echo "It seems AWS"
+          AWS=1
+        else
+          AWS=0
+        fi
+      fi
+    fi
+
+    if [ "{{.ProviderName}}" == "aws" ]; then
+      echo "It actually IS AWS"
+      AWS=1
+    else
+      echo "It is NOT AWS"
+      AWS=0
+    fi
+
     echo "NICS identified: $NICS"
     echo "    private NIC(s): $PR_IFs"
     echo "    public NIC: $PU_IF"
@@ -201,20 +223,31 @@ substring_diff() {
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
+    op=-1
+    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
+    [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
+
     {{- if .AddGateway }}
         route del -net default &>/dev/null
         route add -net default gw {{ .DefaultRouteIP }}
     {{- else }}
     :
     {{- end}}
+
+    op=-1
+    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
+    [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
 }
 
 configure_dns() {
     if systemctl status systemd-resolved &>/dev/null; then
+        echo "Configuring dns with resolved"
         configure_dns_systemd_resolved
     elif systemctl status resolvconf &>/dev/null; then
+        echo "Configuring dns with resolvconf"
         configure_dns_resolvconf
     else
+        echo "Configuring dns legacy"
         configure_dns_legacy
     fi
 }
@@ -278,16 +311,35 @@ EOF
 auto ${IF}
 iface ${IF} inet dhcp
 {{- if .AddGateway }}
-  up route add -net default gw {{ .DefaultRouteIP }} || true
+  up route add -net default gw {{ .DefaultRouteIP }}
 {{- end}}
 EOF
         fi
     done
 
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 0"
+        fail 196
+    }
+
     configure_dhclient
 
     /sbin/dhclient || true
+
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 1"
+        fail 196
+    }
+
     systemctl restart networking
+
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 2"
+        fail 196
+    }
 
     reset_fw || fail 197
 
@@ -297,6 +349,12 @@ EOF
 # Configure network using systemd-networkd
 configure_network_systemd_networkd() {
     echo "Configuring network (using netplan and systemd-networkd)..."
+
+    {{- if .IsGateway }}
+    ISGW=1
+    {{- else}}
+    ISGW=0
+    {{- end}}
 
     mkdir -p /etc/netplan
     rm -f /etc/netplan/*
@@ -344,6 +402,56 @@ network:
 EOF
         fi
     done
+
+    if [[ $AWS -eq 1 ]]; then
+      if [[ $ISGW -eq 0 ]]; then
+        rm -f /etc/netplan/*
+        # Recreate netplan configuration with last netplan version and more settings
+        for IF in $NICS; do
+            if [ "$IF" = "$PU_IF" ]; then
+                cat <<-EOF >/etc/netplan/10-$IF-public.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    $IF:
+      dhcp4: true
+      dhcp6: false
+      critical: true
+      dhcp4-overrides:
+          use-dns: true
+          use-routes: true
+EOF
+            else
+                cat <<-EOF >/etc/netplan/11-$IF-private.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    $IF:
+      dhcp4: true
+      dhcp6: false
+      critical: true
+      dhcp4-overrides:
+        use-dns: true
+{{- if .AddGateway }}
+        use-routes: true
+      routes:
+      - to: 0.0.0.0/0
+        via: {{ .DefaultRouteIP }}
+        scope: global
+        on-link: true
+{{- else }}
+        use-routes: true
+{{- end}}
+EOF
+            fi
+        done
+      fi
+    fi
+
     netplan generate && netplan apply || fail 198
 
     configure_dhclient
@@ -357,7 +465,7 @@ EOF
 
 # Configure network for redhat7-like distributions (rhel, centos, ...)
 configure_network_redhat() {
-    echo "Configuring network (redhat-like)..."
+    echo "Configuring network (redhat7-like)..."
 
     if [ -z $VERSION_ID -o $VERSION_ID -lt 7 ]; then
         disable_svc() {
@@ -408,7 +516,12 @@ EOF
             i=$((i+1))
             {{- end }}
             {{- else }}
-            echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
+            if [ -z $EXISTING_DNS ]; then
+                echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            else
+                echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            fi
             {{- end }}
         fi
     done
@@ -439,11 +552,19 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
+    NETROUNDS=24
+    REACHED=0
+
+    for i in $(seq $NETROUNDS); do
     if which wget; then
-      wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
+        wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
     else
-      ping -n -c1 -w30 -i5 www.google.com || return 1
+        ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
     fi
+		done
+
+		[ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
+
     [ ! -z "$PU_IF" ] && {
         check_for_ip $PU_IF || return 1
     }
@@ -589,6 +710,8 @@ EOF
 
 configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
+    cp /etc/resolv.conf /etc/resolv.conf.bak
+
     rm -f /etc/resolv.conf
     {{- if .DNSServers }}
     if [[ -e /etc/dhcp/dhclient.conf ]]; then
@@ -616,11 +739,18 @@ nameserver {{ . }}
 nameserver 1.1.1.1
 {{- end }}
 EOF
+
+    op=-1
+    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
+    [ $op -ne 0 ] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
+
     echo done
 }
 
 configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
+
+    EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
 
     cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
 {{- if .DNSServers }}
@@ -663,7 +793,7 @@ install_drivers_nvidia() {
         ubuntu)
             sfFinishPreviousInstall
             add-apt-repository -y ppa:graphics-drivers &>/dev/null
-            sfApt update
+            sfApt update || fail 201
             sfApt -y install nvidia-410 &>/dev/null || {
                 sfApt -y install nvidia-driver-410 &>/dev/null || fail 201
             }
@@ -724,7 +854,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils
-            sfApt install -qy systemd pciutils || fail 210
+            sfApt install -q -y systemd pciutils || fail 210
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
             ;;
@@ -754,7 +884,7 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -qy systemd pciutils yum-utils || fail 213
+            yum install -q -y systemd pciutils yum-utils || fail 213
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
