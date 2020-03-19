@@ -181,7 +181,7 @@ func Timeout(limit time.Duration) Arbiter {
 			}
 
 			if time.Since(t.Start) >= limit {
-				return verdict.Abort, TimeoutError(limit, t.Err)
+				return verdict.Abort, TimeoutError(t.Err, limit)
 			}
 			return verdict.Retry, nil
 		}
@@ -210,7 +210,7 @@ func Max(limit uint) Arbiter {
 			}
 
 			if t.Count >= limit {
-				return verdict.Abort, LimitError(limit, t.Err)
+				return verdict.Abort, LimitError(t.Err, limit)
 			}
 			return verdict.Retry, nil
 		}

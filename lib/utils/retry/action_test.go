@@ -381,11 +381,11 @@ func genErr() error {
 }
 
 func genTimeout() error {
-	return TimeoutError(10*time.Millisecond, fmt.Errorf("too late ... "))
+	return TimeoutError(fmt.Errorf("too late ... "), 10*time.Millisecond)
 }
 
 func genLimit() error {
-	return LimitError(7, fmt.Errorf("7 times is one too many"))
+	return LimitError(fmt.Errorf("7 times is one too many"), 7)
 }
 
 func genAbort() error {

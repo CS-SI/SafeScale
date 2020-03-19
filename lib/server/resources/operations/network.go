@@ -75,7 +75,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, error) {
 
 // LoadNetwork loads the metadata of a network
 func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, error) {
-	if task != nil {
+	if task == nil {
 		return nullNetwork(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
@@ -128,12 +128,12 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	if objn.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
-	if task != nil {
+	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(
-		nil,
+		task,
 		true,
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()

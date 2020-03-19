@@ -76,7 +76,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, err error) {
 
 // LoadVolume loads the metadata of a network
 func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, error) {
-	if task != nil {
+	if task == nil {
 		return nullVolume(), scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {

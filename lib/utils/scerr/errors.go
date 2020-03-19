@@ -365,10 +365,10 @@ type ErrTimeout struct {
 }
 
 // TimeoutError returns an ErrTimeout instance
-func TimeoutError(msg string, timeout time.Duration, cause error) ErrTimeout {
+func TimeoutError(cause error, timeout time.Duration, msg ...interface{}) ErrTimeout {
 	return ErrTimeout{
 		errCore: errCore{
-			message:      msg,
+			message:      strprocess.FormatStrings(msg),
 			causer:       cause,
 			consequences: []error{},
 			fields:       make(fields),
@@ -713,7 +713,7 @@ type ErrOverflow struct {
 }
 
 // OverflowError creates a ErrOverflow error
-func OverflowError(limit uint, err error, msg ...interface{}) ErrOverflow {
+func OverflowError(err error, limit uint, msg ...interface{}) ErrOverflow {
 	message := strprocess.FormatStrings(msg...)
 	if limit > 0 {
 		limitMsg := fmt.Sprintf("(limit: %d)", limit)
