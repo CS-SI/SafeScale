@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,9 +54,9 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, err)
 	require.Nil(t, what)
 
-	// err = got.Reset()
+	// what, err = got.Reset()
 	// require.Nil(t, err)
-	// require.NotNil(t, got)
+	// require.NotNil(t, what)
 }
 
 func TestWaitingGame(t *testing.T) {
@@ -145,14 +145,12 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	if end >= (time.Millisecond * 15) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
-	single.Close()
 
-	// VPL: Task.Reset() removed, don't understand the goal of this test to update it...
-	// _, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-	// 	time.Sleep(time.Duration(30) * time.Millisecond)
-	// 	return "Ahhhh", nil
-	// }, nil)
-	// require.NotNil(t, err)
+	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
+		time.Sleep(time.Duration(30) * time.Millisecond)
+		return "Ahhhh", nil
+	}, nil)
+	require.NotNil(t, err)
 
 	err = nil
 	for {
@@ -173,19 +171,11 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	}, nil)
 	require.Nil(t, err)
 
-	// err = single.Reset()
-	// require.NotNil(t, single)
-	// require.Nil(t, err)
-
-	single, err = NewTask()
-	require.NotNil(t, single)
-	require.Nil(t, err)
 	_, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
 		time.Sleep(time.Duration(30) * time.Millisecond)
 		return "Ahhhh", nil
 	}, nil)
 	require.NotNil(t, err)
-	single.Close()
 }
 
 func TestSingleTaskTryWaitUsingSubtasks(t *testing.T) {
@@ -207,7 +197,6 @@ func TestSingleTaskTryWaitUsingSubtasks(t *testing.T) {
 
 	require.Nil(t, res)
 	require.NotNil(t, err)
-	single.Close()
 }
 
 func TestSingleTaskTryWaitOK(t *testing.T) {
@@ -235,8 +224,6 @@ func TestSingleTaskTryWaitOK(t *testing.T) {
 	if end >= (time.Millisecond * 100) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
-
-	single.Close()
 }
 
 func TestSingleTaskTryWaitKO(t *testing.T) {
@@ -264,7 +251,6 @@ func TestSingleTaskTryWaitKO(t *testing.T) {
 	if end >= (time.Millisecond * 150) {
 		t.Errorf("It should have finished fast but it didn't !!")
 	}
-	single.Close()
 }
 
 func TestSingleTaskWait(t *testing.T) {
@@ -288,71 +274,69 @@ func TestSingleTaskWait(t *testing.T) {
 	if end >= (time.Millisecond*50) || end < (time.Millisecond*20) {
 		t.Errorf("It should have finished near 30 ms but it didn't !!")
 	}
-	single.Close()
 }
 
 func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
-	funk := func(timeout uint, sleep uint, trigger uint, witherror bool) {
-		ctx, cafu := context.WithTimeout(context.TODO(), time.Duration(timeout*10)*time.Millisecond)
+	funk := func(timeout time.Duration, sleep time.Duration, trigger time.Duration, errorExpected bool) {
+		ctx, cafu := context.WithTimeout(context.TODO(), timeout)
 		defer cafu()
 
-		single, err := NewTaskWithContext(ctx, nil)
+		single, err := NewTaskWithContext(ctx, cafu)
 		require.NotNil(t, single)
 		require.Nil(t, err)
 
 		begin := time.Now()
 
 		single, err = single.Start(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-			time.Sleep(time.Duration(sleep*10) * time.Millisecond)
+			time.Sleep(sleep)
 			return "Ahhhh", nil
 		}, nil)
 		require.Nil(t, err)
 
 		go func() {
-			time.Sleep(time.Duration(trigger*10) * time.Millisecond)
+			time.Sleep(trigger)
 			cafu()
 		}()
 
 		_, err = single.Wait()
 		end := time.Since(begin)
 		if err != nil {
-			if !strings.Contains(err.Error(), "cancel") {
-				t.Errorf("Why so serious ? it's just a failure cancelling a goroutine: %s", err.Error())
+			if !strings.Contains(err.Error(), "abort") {
+				t.Errorf("Why so serious? it's just a failure cancelling a goroutine: %s", err.Error())
 			}
 		}
 
-		if witherror {
-			st, err := single.GetStatus()
-			require.Nil(t, err)
+		if errorExpected {
+			st := single.SafeGetStatus()
 			if st != ABORTED {
-				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 			}
 			require.True(t, st == ABORTED)
 		} else {
-			st, err := single.GetStatus()
-			require.Nil(t, err)
+			st := single.SafeGetStatus()
 			if st == ABORTED {
-				t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 			}
 			require.True(t, st != ABORTED)
 		}
 
-		if !((err != nil) == witherror) {
-			t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, witherror)
+		if !((err != nil) == errorExpected) {
+			t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 		}
-		require.True(t, (err != nil) == witherror)
+		require.True(t, (err != nil) == errorExpected)
 
-		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
-			t.Errorf("We waited too much !")
+		// if end > time.Millisecond*time.Duration(10*(trigger+2)) {
+		if end > trigger+20*time.Millisecond {
+			t.Errorf("Failure in test: %v, %v, %v, %t: We waited too much! %v > %v", timeout, sleep, trigger, errorExpected, end, trigger+20*time.Millisecond)
 		}
 	}
-	funk(3, 5, 1, true)
-	funk(3, 5, 8, true)
-	funk(6, 3, 1, true)
-	funk(4, 2, 1, true)
-	funk(4, 2, 3, false)
-	funk(14, 2, 4, false)
-	funk(14, 5, 1, true)
+	funk(30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)
+	funk(30*time.Millisecond, 50*time.Millisecond, 80*time.Millisecond, true)
+	funk(60*time.Millisecond, 30*time.Millisecond, 10*time.Millisecond, true)
+	funk(40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)
+	funk(40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)
+	funk(140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false)
+	funk(140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
@@ -469,7 +453,6 @@ func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 	begin := time.Now()
 	for _, war := range tasks {
 		_, err = war.Wait()
-		war.Close()
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}

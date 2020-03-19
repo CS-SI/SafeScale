@@ -33,17 +33,12 @@ import (
 type TaskStatus int
 
 const (
-	_ TaskStatus = iota
-	// READY the task is ready to start
-	READY
-	// RUNNING the task is running
-	RUNNING
-	// DONE the task has run and is done
-	DONE
-	// ABORTED the task has been aborted
-	ABORTED
-	// TIMEOUT the task ran out of time
-	TIMEOUT
+	UNKNOWN TaskStatus = iota // status is unknown
+	READY                     // the task is ready to start
+	RUNNING                   // the task is running
+	DONE                      // the task has run and is done
+	ABORTED                   // the task has been aborted
+	TIMEOUT                   // the task ran out of time
 )
 
 // TaskParameters ...
@@ -53,11 +48,13 @@ type TaskParameters interface{}
 type TaskResult interface{}
 
 // TaskAction defines the type of the function that can be started by a Task.
-// NOTE: you have to check if task is aborted inside this function using method Aborted(),
-//       to be able to stop the corresponding process when task is aborted (no matter what
-//       the abort reason is), and permit to end properly. Otherwise this may lead to goroutine leak.
+// NOTE: you have to check if task is aborted inside this function using method t.Aborted(),
+//       to be able to stop the process when task is aborted (no matter what
+//       the abort reason is), and permit to end properly. Otherwise this may lead to goroutine leak
+//       (there is no good way to stop forcibly a goroutine).
 // Example:
 // task.Start(func(t concurrency.Task, p TaskParameters) (concurrency.TaskResult, error) {
+// ...
 //    for {
 //        if t.Aborted() {
 //            break // or return
@@ -65,7 +62,7 @@ type TaskResult interface{}
 //        ...
 //    }
 //    return nil
-//})
+//}, nil)
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
 // TaskGuard ...
@@ -95,7 +92,7 @@ type TaskCore interface {
 
 	SafeGetID() string
 	SafeGetSignature() string
-
+	SafeGetStatus() TaskStatus
 	Close()
 }
 
@@ -178,6 +175,13 @@ func NewTaskWithParent(parentTask Task) (Task, error) {
 
 // NewTaskWithContext creates a task with a context and cancel function
 func NewTaskWithContext(ctx context.Context, cancel context.CancelFunc) (Task, error) {
+	if ctx == nil && cancel != nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil if cancel is not nil")
+	}
+	if ctx != nil && cancel == nil {
+		return nil, scerr.InvalidParameterError("cancel", "cannot be nil if ctx is not nil")
+	}
+
 	return newTask(ctx, cancel, nil)
 }
 
@@ -255,7 +259,7 @@ func (t *task) taskCancelReceiver() {
 			_ = t.Abort()
 			finish = true
 		default:
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(1 * time.Millisecond)
 		}
 	}
 }
@@ -307,6 +311,12 @@ func (t *task) GetStatus() (TaskStatus, error) {
 	return t.status, nil
 }
 
+// SafeGetStatus ...
+func (t *task) SafeGetStatus() TaskStatus {
+	st, _ := t.GetStatus()
+	return st
+}
+
 // GetContext returns the context associated to the task
 func (t *task) GetContext() (context.Context, context.CancelFunc, error) {
 	if t == nil {
@@ -350,6 +360,10 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, error) {
 // If timeout happens, error returned will be ErrTimeout
 // This function is useful when you know at the time you use it there will be a timeout to apply.
 func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	tid, err := t.GetID()
 	if err != nil {
 		return nil, err
@@ -360,7 +374,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 		return t, err
 	}
 	if status != READY {
-		return t, scerr.InvalidRequestError("cannot start task '%s': not ready", tid)
+		return nil, scerr.InvalidRequestError("cannot start task '%s': not ready", tid)
 	}
 
 	t.mu.Lock()
@@ -406,7 +420,9 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			case <-t.doneCh:
 				// tracer.Trace("receiving done signal from go routine")
 				t.mu.Lock()
-				t.status = DONE
+				if t.status == RUNNING {
+					t.status = DONE
+				}
 				t.mu.Unlock()
 				finish = true
 			case <-t.abortCh:
@@ -427,7 +443,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				if t.status == RUNNING {
 					t.abortCh <- true
 					close(t.abortCh)
-					t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+					t.err = scerr.TimeoutError(nil, timeout, "task is out of time")
 				}
 				t.mu.Unlock()
 				finish = true
@@ -439,7 +455,9 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			case <-t.doneCh:
 				// tracer.Trace("receiving done signal from go routine")
 				t.mu.Lock()
-				t.status = DONE
+				if t.status == RUNNING {
+					t.status = DONE
+				}
 				t.mu.Unlock()
 				finish = true
 			case <-t.abortCh:
@@ -484,8 +502,10 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.err = err
-	t.result = result
+	if t.status == RUNNING {
+		t.err = err
+		t.result = result
+	}
 	t.doneCh <- true
 	close(t.doneCh)
 }
@@ -526,34 +546,41 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
-	if err != nil {
-		return nil, err
-	}
+	// tid, err := t.GetID()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	status, err := t.GetStatus()
-	if err != nil {
-		return nil, err
-	}
+	// status, err := t.GetStatus()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	if status == DONE {
-		return t.result, t.err
-	}
-	if status == ABORTED {
-		return nil, t.err
-	}
-	if status != RUNNING {
-		return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
-	}
+	// if status == DONE {
+	// 	return t.result, t.err
+	// }
+	// if status == ABORTED || status == TIMEOUT {
+	// 	return nil, t.err
+	// }
+	// if status != RUNNING {
+	// 	return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
+	// }
 
 	<-t.finishCh
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	close(t.finishCh)
-	close(t.abortCh)
-	close(t.doneCh)
+	if t.status == DONE {
+		return t.result, t.err
+	}
+	if t.status == ABORTED || t.status == TIMEOUT {
+		return nil, t.err
+	}
+	if t.status != RUNNING {
+		return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", t.id, t.status)
+	}
+
 	return t.result, t.err
 }
 
@@ -566,28 +593,32 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
-	if err != nil {
-		return false, nil, err
-	}
+	// tid, err := t.GetID()
+	// if err != nil {
+	// 	return false, nil, err
+	// }
 
-	status, err := t.GetStatus()
-	if err != nil {
-		return false, nil, err
-	}
+	// status, err := t.GetStatus()
+	// if err != nil {
+	// 	return false, nil, err
+	// }
 
-	if status == DONE {
-		return true, t.result, t.err
-	}
-	if status == ABORTED {
-		return true, nil, t.err
-	}
-	if status != RUNNING {
-		return false, nil, scerr.InconsistentError("cannot wait task '%s': not running", tid)
-	}
-	if len(t.finishCh) == 1 {
+	// if status == DONE {
+	// 	return true, t.result, t.err
+	// }
+	// if status == ABORTED || status == TIMEOUT {
+	// 	return true, nil, t.err
+	// }
+	// if status != RUNNING {
+	// 	return false, nil, scerr.InconsistentError("cannot wait task '%s': not running", tid)
+	// }
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	finished := len(t.finishCh) == 1
+	if finished {
 		_, err := t.Wait()
-		return false, t.result, err
+		return err == nil, t.result, err
 	}
 	return false, nil, nil
 }
@@ -602,30 +633,23 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
-	if err != nil {
-		return false, nil, err
-	}
+	tid := t.SafeGetID()
 
-	status, err := t.GetStatus()
-	if err != nil {
-		return false, nil, err
-	}
-
-	if status == DONE {
-		return true, t.result, t.err
-	}
-	if status == ABORTED {
-		return true, nil, t.err
-	}
-	if status != RUNNING {
-		return false, nil, scerr.InconsistentError("cannot wait task '%s': not running", tid)
-	}
+	// status := t.SafeGetStatus()
+	// if status == DONE {
+	// 	return true, t.result, t.err
+	// }
+	// if status == ABORTED {
+	// 	return true, nil, t.err
+	// }
+	// if status != RUNNING {
+	// 	return false, nil, scerr.InconsistentError("cannot wait task '%s': not running", tid)
+	// }
 
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
+			return false, nil, scerr.TimeoutError(nil, duration, "timeout waiting for task '%s'", tid)
 		default:
 			ok, result, err := t.TryWait()
 			if ok {
@@ -674,23 +698,14 @@ func (t *task) Abort() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	status, err := t.GetStatus()
-	if err != nil {
-		return err
-	}
-	id, err := t.GetID()
-	if err != nil {
-		return err
-	}
-
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	if t.abortDisengaged {
-		return scerr.NotAvailableError("abort signal is disengaged on task %s", id)
+		return scerr.NotAvailableError("abort signal is disengaged on task %s", t.id)
 	}
 
-	if status == RUNNING {
+	if t.status == RUNNING {
 		// Tell controller to abort go routine
 		t.abortCh <- true
 		t.status = ABORTED
