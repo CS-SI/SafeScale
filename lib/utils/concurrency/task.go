@@ -426,6 +426,8 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.mu.Lock()
 				if t.status == RUNNING {
 					t.status = DONE
+					t.finishCh <- struct{}{}
+					close(t.finishCh)
 				}
 				t.mu.Unlock()
 				finish = true
@@ -434,9 +436,16 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// tracer.Trace("receiving abort signal")
 				logrus.Debugf("%s received abort signal", sig)
 				t.mu.Lock()
-				if !t.abortDisengaged && t.status != TIMEOUT {
-					t.status = ABORTED
+				if !t.abortDisengaged {
+					if t.status != TIMEOUT {
+						t.status = ABORTED
+					}
 					t.err = scerr.AbortedError("aborted", nil)
+					// We must signal Wait() the task is finished to be able to succeed the Wait() before the real end of the goroutine
+					t.finishCh <- struct{}{}
+					close(t.finishCh)
+					// disengages abort signal handling to not redo this part
+					t.abortDisengaged = true
 				} else {
 					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
 				}
@@ -461,6 +470,8 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.mu.Lock()
 				if t.status == RUNNING {
 					t.status = DONE
+					t.finishCh <- struct{}{}
+					close(t.finishCh)
 				}
 				t.mu.Unlock()
 				finish = true
@@ -469,9 +480,16 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				logrus.Debugf("%s received abort signal", sig)
 				// tracer.Trace("receiving abort signal")
 				t.mu.Lock()
-				if !t.abortDisengaged && t.status != TIMEOUT {
-					t.status = ABORTED
+				if !t.abortDisengaged {
+					if t.status != TIMEOUT {
+						t.status = ABORTED
+					}
 					t.err = scerr.AbortedError("aborted", nil)
+					// We must signal Wait() the task is finished to be able to succeed the Wait() before the real end of the goroutine
+					t.finishCh <- struct{}{}
+					close(t.finishCh)
+					// disengages abort signal handling to not redo this part
+					t.abortDisengaged = true
 				} else {
 					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
 				}
@@ -482,8 +500,6 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 	}
 
 	logrus.Debugf("%s controller ended properly", sig)
-	t.finishCh <- struct{}{}
-	close(t.finishCh)
 }
 
 // run executes the function 'action'
@@ -570,15 +586,11 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, scerr.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
 	}
 
-	// Task status is coherent, waiting the end of the goroutine
-	<-t.finishCh
+ 	<-t.finishCh
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.status == DONE {
-		return t.result, t.err
-	}
 	if t.status == ABORTED || t.status == TIMEOUT {
 		return nil, t.err
 	}
