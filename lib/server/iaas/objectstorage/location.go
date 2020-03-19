@@ -244,6 +244,12 @@ func (l *location) GetObject(bucketName string, objectName string) (Object, erro
 	if err != nil {
 		return nil, err
 	}
+
+	bucket.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		return nil, err
+	}
+
 	return newObject(bucket, objectName)
 }
 
@@ -265,6 +271,12 @@ func (l *location) DeleteObject(bucketName, objectName string) error {
 	if err != nil {
 		return err
 	}
+
+	bucket.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		return err
+	}
+
 	return bucket.DeleteObject(objectName)
 }
 
@@ -283,6 +295,12 @@ func (l *location) ListObjects(bucketName string, path, prefix string) ([]string
 	if err != nil {
 		return nil, err
 	}
+
+	b.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		return nil, err
+	}
+
 	return b.List(path, prefix)
 }
 
@@ -301,6 +319,12 @@ func (l *location) BrowseBucket(bucketName string, path, prefix string, callback
 	if err != nil {
 		return err
 	}
+
+	b.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		return err
+	}
+
 	return b.Browse(path, prefix, callback)
 }
 
@@ -346,6 +370,10 @@ func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, f
 	if err != nil {
 		return err
 	}
+	b.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		return err
+	}
 	o, err := newObject(b, objectName)
 	if err != nil {
 		return err
@@ -383,6 +411,10 @@ func (l *location) WriteObject(
 	if err != nil {
 		return nil, err
 	}
+	b.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		return nil, err
+	}
 	return b.WriteObject(objectName, source, size, metadata)
 }
 
@@ -408,6 +440,10 @@ func (l *location) WriteMultiPartObject(
 	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize), false /*Trace.Location*/).GoingIn().OnExitTrace()()
 
 	bucket, err := newBucket(l.stowLocation, bucketName)
+	if err != nil {
+		return nil, err
+	}
+	bucket.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
 		return nil, err
 	}
