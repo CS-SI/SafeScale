@@ -169,11 +169,13 @@ enum HostState {
 	STARTED = 2;
 	/*STOPPING host is stopping*/
 	STOPPING = 3;
-    /*TERMINATED host is terminated (in AWS, it's like DELETED)*/
-    TERMINATED = 4;
 	/*ERROR host is in error state*/
-	ERROR = 5;
-  }
+    ERROR = 4;
+    /*TERMINATED host is terminated (in AWS, it's like DELETED)*/
+    TERMINATED = 5;
+    /*UNKNOWN is unknown*/
+    UNKNOWN = 255;
+}
 
 message Host{
     string id = 1;
