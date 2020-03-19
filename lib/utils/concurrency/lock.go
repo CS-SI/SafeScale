@@ -42,7 +42,7 @@ type TaskedLock interface {
 
 // taskedLock ...
 type taskedLock struct {
-	lock       *sync.Mutex
+	mu         *sync.Mutex
 	rwmutex    *sync.RWMutex
 	readLocks  map[string]uint64
 	writeLocks map[string]uint64
@@ -51,7 +51,7 @@ type taskedLock struct {
 // NewTaskedLock ...
 func NewTaskedLock() TaskedLock {
 	return &taskedLock{
-		lock:       &sync.Mutex{},
+		mu:         &sync.Mutex{},
 		rwmutex:    &sync.RWMutex{},
 		readLocks:  map[string]uint64{},
 		writeLocks: map[string]uint64{},
@@ -77,23 +77,23 @@ func (tm *taskedLock) RLock(task Task) error {
 		return err
 	}
 
-	tm.lock.Lock()
+	tm.mu.Lock()
 
 	if _, ok := tm.readLocks[tid]; ok {
 		tm.readLocks[tid]++
-		tm.lock.Unlock()
+		tm.mu.Unlock()
 		return nil
 	}
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
 		tracer.Trace("really RLocking...")
-		tm.lock.Unlock()
+		tm.mu.Unlock()
 		tm.rwmutex.RLock()
 		return nil
 	}
 	tracer.Trace("using running write lock...")
 
-	tm.lock.Unlock()
+	tm.mu.Unlock()
 	return nil
 }
 
@@ -124,11 +124,11 @@ func (tm *taskedLock) RUnlock(task Task) (err error) {
 		return err
 	}
 
-	tm.lock.Lock()
-	defer tm.lock.Unlock()
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
 
 	if _, ok := tm.readLocks[tid]; !ok {
-		return scerr.InconsistentError("cannot RUnlock task %s: not RLocked", tid)
+		return scerr.ForbiddenError("cannot RUnlock task %s: not RLocked", tid)
 	}
 	tm.readLocks[tid]--
 	if tm.readLocks[tid] == 0 {
@@ -168,23 +168,23 @@ func (tm *taskedLock) Lock(task Task) error {
 	}
 
 	// logrus.Warnf("Calling lock from %d, with tid %s", goid(), tid)
-	tm.lock.Lock()
+	tm.mu.Lock()
 
 	// If already locked for write, increments counter for the task
 	if _, ok := tm.writeLocks[tid]; ok {
 		tm.writeLocks[tid]++
-		tm.lock.Unlock()
+		tm.mu.Unlock()
 		return nil
 	}
 	// If already lock for read, returns an error
 	if _, ok := tm.readLocks[tid]; ok {
 		tracer.Trace("Cannot Lock, already RLocked")
 		taskID, _ := task.GetID()
-		return scerr.InconsistentError("cannot Lock task '%s': already RLocked", taskID)
+		return scerr.ForbiddenError("cannot Lock task '%s': already RLocked", taskID)
 	}
 	// registers lock for read for the task and actively lock the RWMutex
 	tm.writeLocks[tid] = 1
-	tm.lock.Unlock()
+	tm.mu.Unlock()
 	tm.rwmutex.Lock()
 	return nil
 }
@@ -210,16 +210,16 @@ func (tm *taskedLock) Unlock(task Task) error {
 		return err
 	}
 
-	tm.lock.Lock()
-	defer tm.lock.Unlock()
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
 
 	// a TaskedLock can be Locked then RLocked without problem,
 	// but RUnlocks must have been done before Unlock.
 	if _, ok := tm.readLocks[tid]; ok {
-		return scerr.InconsistentError("cannot Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid])
+		return scerr.ForbiddenError("cannot Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid])
 	}
 	if _, ok := tm.writeLocks[tid]; !ok {
-		return scerr.InconsistentError("cannot Unlock task '%s': not Locked", tid)
+		return scerr.ForbiddenError("cannot Unlock task '%s': not Locked", tid)
 	}
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {

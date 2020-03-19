@@ -306,7 +306,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult
 
 	select {
 	case <-time.After(duration):
-		return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil)
+		return false, nil, scerr.TimeoutError(nil, duration, "timeout waiting for task group '%s'", tid)
 	case <-c:
 		return true, results, err
 	}

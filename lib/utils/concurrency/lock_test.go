@@ -329,8 +329,9 @@ func TestWriteThenReadThenWrite(t *testing.T) {
 				if unlockErr == nil {
 					break
 				} else {
-					fmt.Println("Unlock error! :", unlockErr)
+					fmt.Println("recall() Unlock error:", unlockErr)
 				}
+				time.Sleep(time.Millisecond)
 			}
 		}()
 		return "World"
@@ -357,7 +358,7 @@ func TestWriteThenReadThenWrite(t *testing.T) {
 				if unlockErr == nil {
 					break
 				} else {
-					fmt.Println(unlockErr)
+					fmt.Println("kall() Unlock error:", unlockErr)
 				}
 			}
 		}()
