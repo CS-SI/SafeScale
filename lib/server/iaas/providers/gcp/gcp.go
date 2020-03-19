@@ -116,7 +116,9 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		FloatingIPPool:   "public",
 	}
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName("gcp", region, "", projectID)
+	providerName := "gcp"
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +135,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		DefaultImage:     defaultImage,
 		OperatorUsername: operatorUsername,
 		UseNATService:    true,
+		ProviderName:     providerName,
 	}
 
 	stack, err := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -143,8 +146,6 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		Stack:            stack,
 		tenantParameters: params,
 	}
-
-	providerName := "gcp"
 
 	// evalid := apiprovider.NewValidatedProvider(p, providerName)
 	etrace := apiprovider.NewErrorTraceProvider(newP, providerName)
@@ -176,6 +177,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
+	cfg.Set("ProviderName", p.GetName())
 	return cfg, nil
 }
 

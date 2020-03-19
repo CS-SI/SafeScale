@@ -75,9 +75,11 @@ type StoredCPUInfo struct {
 
 // Image represents an OS image
 type Image struct {
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
-	URL  string
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	URL         string `json:"url,omitempty"`
+	Description string `json:"description,omitempty"`
+	StorageType string `json:"storagetype,omitempty"`
 }
 
 // HostRequest represents requirements to create host
@@ -104,6 +106,8 @@ type HostRequest struct {
 	Password string
 	// DiskSize allows to ask for a specific size for system disk (in GB)
 	DiskSize int
+	// Use spot instance
+	Spot bool
 }
 
 // HostDefinition ...
@@ -164,6 +168,21 @@ func (h *Host) OK() bool {
 	return h.IsConsistent()
 }
 
+func (i Image) OK() bool {
+	result := true
+	result = result && i.ID != ""
+	result = result && i.Name != ""
+	result = result && i.URL != ""
+	return result
+}
+
+func (ht HostTemplate) OK() bool {
+	result := true
+	result = result && ht.ID != ""
+	result = result && ht.Name != ""
+	return result
+}
+
 // GetAccessIP returns the IP to reach the host
 func (h *Host) GetAccessIP() string {
 	ip := h.GetPublicIP()
@@ -199,6 +218,14 @@ func (h *Host) GetPrivateIP() string {
 			ip = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
 			if ip == "" {
 				ip = hostNetworkV1.IPv6Addresses[hostNetworkV1.DefaultNetworkID]
+			}
+			if ip == "" { // FIXME AWS Fix for subnetworks
+				for _, value := range hostNetworkV1.IPv4Addresses {
+					if value != "" {
+						ip = value
+						break
+					}
+				}
 			}
 		}
 		return nil

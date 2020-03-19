@@ -93,3 +93,15 @@ type VolumeAttachment struct {
 	MountPoint string `json:"mountpoint,omitempty"`
 	Format     string `json:"format,omitempty"`
 }
+
+func (va VolumeAttachment) OK() bool {
+	result := true
+	result = result && va.ID != ""
+	result = result && va.Name != ""
+	result = result && va.VolumeID != ""
+	result = result && va.ServerID != ""
+	result = result && va.Device != ""
+	result = result && va.MountPoint != ""
+	result = result && va.Format != ""
+	return result
+}

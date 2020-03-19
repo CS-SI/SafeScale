@@ -19,6 +19,7 @@ package tests
 // TODO NOTICE Side-effects imports here
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"testing"
 	"time"
 
@@ -44,6 +45,7 @@ import (
 	libvirt "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/aws"            // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialize tenant gcp
@@ -65,6 +67,7 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	stack = &huaweicloud.Stack{} // nolint
 	stack = &openstack.Stack{}   // nolint
 	stack = &gcp.Stack{}         // nolint
+	stack = &aws.Stack{}         // nolint
 
 	_ = stack
 }

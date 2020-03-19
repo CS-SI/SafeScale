@@ -156,6 +156,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	config.Set("MetadataBucketName", p.Config.MetadataBucket)
 	config.Set("ProviderNetwork", p.Config.ProviderNetwork)
 	config.Set("OperatorUsername", p.Config.OperatorUsername)
+	config.Set("ProviderName", p.GetName())
 
 	return config, nil
 }

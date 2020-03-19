@@ -144,7 +144,9 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		return nil, err
 	}
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName("openstack", region, applicationKey, projectName)
+	providerName := "openstack"
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, applicationKey, projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +163,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		},
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,
+		ProviderName:     providerName,
 	}
 
 	serviceVersions := map[string]string{"volume": "v1"}
@@ -251,6 +254,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
+	cfg.Set("ProviderName", p.GetName())
 	return cfg, nil
 }
 

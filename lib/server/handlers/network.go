@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"strings"
 
 	// "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
@@ -680,6 +681,9 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 		warnings, errs := getPhaseWarningsAndErrors(task.GetContext(), sshHandler, gw)
 
 		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gw.Name, returnCode, warnings, errs)
+	} else {
+		// FIXME AWS Retrieve data anyway
+		retrieveForensicsData(task.GetContext(), sshHandler, gw)
 	}
 	logrus.Infof("Gateway '%s' successfully configured.", gw.Name)
 
@@ -835,11 +839,12 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 		if hostsLen > 0 {
 			list := make([]string, 0, hostsLen)
 			for k := range networkHostsV1.ByName {
-				_, err = handler.service.GetHostByName(k)
+				rechost, err := handler.service.GetHostByName(k)
 				if err == nil {
-					list = append(list, k)
+					if rechost.LastState != hoststate.TERMINATED {
+						list = append(list, k)
+					}
 				}
-
 			}
 			if len(list) == 0 {
 				return nil

@@ -92,7 +92,9 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		FloatingIPPool:   floatingIPPool,
 	}
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName("openstack", region, tenantName, "0")
+	providerName := "openstack"
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, tenantName, "0")
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +112,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		DefaultImage:     defaultImage,
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,
+		ProviderName:     providerName,
 	}
 
 	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -197,6 +200,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("ProviderNetwork", opts.ProviderNetwork)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
+	cfg.Set("ProviderName", p.GetName())
 
 	return cfg, nil
 }

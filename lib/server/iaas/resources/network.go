@@ -51,7 +51,12 @@ type NetworkRequest struct {
 	HA bool
 }
 
-// Network representes a virtual network
+type SubNetwork struct {
+	CIDR string `json:"subnetmask,omitempty"`
+	ID   string `json:"subnetid,omitempty"`
+}
+
+// Network represents a virtual network
 type Network struct {
 	ID                 string                    `json:"id,omitempty"`                   // ID for the network (from provider)
 	Name               string                    `json:"name,omitempty"`                 // Name of the network
@@ -61,6 +66,11 @@ type Network struct {
 	VIP                *VirtualIP                `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
 	IPVersion          ipversion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
 	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
+
+	Subnetworks []SubNetwork `json:"subnetworks,omitempty"`
+
+	Subnet bool
+	Parent string
 }
 
 // NewNetwork ...
