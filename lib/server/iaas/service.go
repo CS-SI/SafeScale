@@ -209,7 +209,7 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 		}
 		select {
 		case <-timer:
-			return scerr.TimeoutError("Wait volume state timeout", timeout, nil)
+			return scerr.TimeoutError(nil, timeout, "Wait volume state timeout")
 		default:
 			time.Sleep(1 * time.Second)
 		}
@@ -245,7 +245,7 @@ func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, scerr.TimeoutError("Wait host state timeout", timeout, nil)
+			return nil, scerr.TimeoutError(nil, timeout, "Wait host state timeout")
 		}
 	}
 }

@@ -37,12 +37,12 @@ func ResourceNotFoundError(resource, name string) scerr.ErrNotFound {
 // ResourceTimeoutError creates a ErrTimeout error
 func ResourceTimeoutError(resource, name string, dur time.Duration) scerr.ErrTimeout {
 	msgFinal := fmt.Sprintf("timeout of '%s' waiting for '%s' '%s'", dur, resource, name)
-	return scerr.TimeoutError(msgFinal, dur, nil)
+	return scerr.TimeoutError(nil, dur, msgFinal)
 }
 
 // // TimeoutError creates a ErrTimeout error
 // func TimeoutError(message string, dur time.Duration) scerr.ErrTimeout {
-// 	return scerr.TimeoutError(message, dur, nil)
+// 	return scerr.TimeoutError(nil, dur, message)
 // }
 
 // ResourceNotAvailableError creates a ResourceNotAvailable error

@@ -410,9 +410,9 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 			err = response
 		case <-time.After(timeout):
 			// call timed out
-			err = scerr.TimeoutError("operation timeout", timeout, nil)
+			err = scerr.TimeoutError(nil, timeout, "operation timeout")
 		case <-desist:
-			err = scerr.TimeoutError("desist timeout", timeout, nil)
+			err = scerr.TimeoutError(nil, timeout, "desist timeout")
 		}
 
 		// Collects the result of the try
@@ -462,7 +462,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 					err = response
 					_ = err
 				case <-desist:
-					err = scerr.TimeoutError("desist timeout", timeout, nil)
+					err = scerr.TimeoutError(nil, timeout, "desist timeout")
 					_ = err
 				}
 			}

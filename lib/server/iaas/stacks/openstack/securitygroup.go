@@ -47,7 +47,7 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
 		return nil, err
 	}
 	if len(sgList) > 1 {
-		return nil, scerr.OverflowError(1, nil, "several security groups named '%s' found", name)
+		return nil, scerr.OverflowError(nil, 1, "several security groups named '%s' found", name)
 	}
 
 	return &sgList[0], nil

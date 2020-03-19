@@ -1015,7 +1015,7 @@ func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connec
 	if rh.IsNull() {
 		return 0, "", "", scerr.InvalidInstanceError()
 	}
-	if task != nil {
+	if task == nil {
 		return 0, "", "", scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if cmd == "" {
@@ -1278,7 +1278,7 @@ func (rh *host) Start(task concurrency.Task) (err error) {
 	if rh.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
-	if task != nil {
+	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	scerr.OnPanic(&err)()
@@ -1309,7 +1309,7 @@ func (rh *host) Stop(task concurrency.Task) (err error) {
 	if rh.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
-	if task != nil {
+	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
