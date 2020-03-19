@@ -613,9 +613,8 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 	// 	return false, nil, scerr.InconsistentError("cannot wait task '%s': not running", tid)
 	// }
 	t.mu.RLock()
-	defer t.mu.RUnlock()
-
 	finished := len(t.finishCh) == 1
+	t.mu.RUnlock()
 	if finished {
 		_, err := t.Wait()
 		return err == nil, t.result, err
