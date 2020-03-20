@@ -16,7 +16,7 @@ RUN mkdir -p /root/.safescale/forensics
 
 COPY tenants.toml /etc/safescale/tenants.toml
 
-COPY markerCi-$TENANT-$CLUTYPE-*-$CLUSIZE /tmp
+COPY markerCi-$TENANT-$CLUTYPE-*-$CLUSIZE /tmp/
 
 COPY small.sh /exported
 COPY medium.sh /exported

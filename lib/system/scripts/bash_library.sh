@@ -262,7 +262,7 @@ sfInstall() {
     case $LINUX_KIND in
         debian|ubuntu)
             export DEBIAN_FRONTEND=noninteractive
-            sfRetry 5m 3 "sfApt update"
+            sfRetry 5m 5 "sfApt update"
             sfApt install $1 -y || exit 194
             which $1 || exit 194
             ;;

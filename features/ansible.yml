@@ -57,20 +57,20 @@ feature:
                             case $LINUX_KIND in
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 5 "sfApt update"
                                     apt-cache showpkg software-properties-common && apt-get install -y software-properties-common
                                     apt-cache showpkg python-software-properties && apt-get install -y python-software-properties
                                     apt-add-repository --yes --update ppa:ansible/ansible
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ansible"
+                                    sfRetry 5m 5 "sfApt update"
+                                    sfRetry 5m 5 "sfApt install -y ansible"
                                     ;;
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry 5m 5 "sfApt update"
                                     echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
                                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ansible"
+                                    sfRetry 5m 5 "sfApt update"
+                                    sfRetry 5m 5 "sfApt install -y ansible"
                                     ;;
                                 centos|rhel)
                                     yum install -y ansible || sfFail 192

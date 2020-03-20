@@ -23,7 +23,7 @@ type Enum int
 
 const (
 	// STOPPED when host is stopped
-	STOPPED Enum = iota + 1
+	STOPPED Enum = iota
 	// STARTING when host is starting
 	STARTING
 	// STARTED when host is started
