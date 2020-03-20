@@ -606,7 +606,7 @@ feature:
                             {{ end }}
                             EOF
 
-                            sfRetry 5m 5 kubeadm config images pull || sfFail 202
+                            sfRetry 15m 5 kubeadm config images pull || sfFail 202
                             sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 203
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 204
                             cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 205
@@ -972,10 +972,10 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 254 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfRetry 5m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 254 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 255 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfRetry 5m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 255 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi

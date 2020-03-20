@@ -58,7 +58,7 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update && sfApt install -y ntp" || sfFail 192
+                                    sfRetry 5m 5 "sfApt update && sfApt install -y ntp" || sfFail 192
                                     ;;
                                 centos|rhel)
                                     yum install -y ntp || sfFail 192

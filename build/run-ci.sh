@@ -37,7 +37,7 @@ then
   exit 1
 else
   export OSTESTED=$3
-  OSHASH=$(echo "$3" | base64)
+  OSHASH=$(echo "$3" | base64 | sed 's/=//' | sed 's/=//' | sed 's/=//' | sed 's/=//')
 fi
 
 if [ -z "$4" ]
