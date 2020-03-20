@@ -57,7 +57,7 @@ fi
 
 sleep 3
 
-ROUNDS=10
+ROUNDS=3
 
 RETCODE=0
 
@@ -76,7 +76,7 @@ do
   for i in $(seq $ROUNDS); do
     stamp=`date +"%s"`
     ./safescale-cover cluster delete clu-$TENANT-$stamp-$fla-r$i -y
-    ./safescale-cover cluster create -k -F $fla --os "$OSTESTED" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-$fla-r$i
+    ./safescale-cover cluster create -k -C $CLUSIZE -F $fla --os "$OSTESTED" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-$fla-r$i
     RUN=$?
     if [[ $RUN -ne 0 ]]; then
       CODE=$((CODE + 1))
@@ -92,10 +92,6 @@ do
       whydied $machine $stamp
     fi
     done
-
-    if [[ $nmach -ne 3 ]]; then
-      CLEAN=$((CLEAN + 1))
-    fi
 
     for j in $(seq $ROUNDS); do
       ./safescale-cover cluster delete clu-$TENANT-$stamp-$fla-r$i -y

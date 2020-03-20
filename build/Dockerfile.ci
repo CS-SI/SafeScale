@@ -9,13 +9,14 @@ ENV BUILD_ENV docker
 ENV TENANT $TENANT
 ENV CLUTYPE $CLUTYPE
 ENV OSTESTED $OSTESTED
+ENV CLUSIZE $CLUSIZE
 
 RUN mkdir -p /etc/safescale
 RUN mkdir -p /root/.safescale/forensics
 
 COPY tenants.toml /etc/safescale/tenants.toml
 
-COPY markerCi-$TENANT-$CLUTYPE /tmp
+COPY markerCi-$TENANT-$CLUTYPE-*-$CLUSIZE /tmp
 
 COPY small.sh /exported
 COPY medium.sh /exported
