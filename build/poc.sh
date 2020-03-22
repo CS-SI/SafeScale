@@ -75,6 +75,8 @@ do
 
   for i in $(seq $ROUNDS); do
     stamp=`date +"%s"`
+    nfrag=$(( $frag + $i ));
+    
     ./safescale-cover cluster delete clu-$TENANT-$stamp-$fla-r$i -y
     ./safescale-cover cluster create -k -C $CLUSIZE -F $fla --os "$OSTESTED" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-$fla-r$i
     RUN=$?

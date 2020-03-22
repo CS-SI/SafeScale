@@ -94,12 +94,12 @@ docker rmi safescale-ci:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g')-$1-$
 if [ ! -f ./ci-logs/$stamp/.safescale/success ]; then
   echo "CI FAILED"
   rm -f ./ci-logs/success-$1-$2-$OSHASH-$4
-  touch ./ci-logs/failure-$1-$2-$OSHASH-$4
+  echo $stamp > ./ci-logs/failure-$1-$2-$OSHASH-$4
   exit 1
 else
   echo "CI OK"
   rm -f ./ci-logs/failure-$1-$2-$OSHASH-$4
-  touch ./ci-logs/success-$1-$2-$OSHASH-$4
+  echo $stamp > ./ci-logs/success-$1-$2-$OSHASH-$4
 fi
 
 exit 0
