@@ -190,7 +190,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            if [ "{{.Harden}}" == "true" ]; then
+                            if [ "{{.Hardening}}" == "true" ]; then
 
                                 case $(sfGetFact "linux_kind") in
                                     debian|ubuntu)
@@ -417,7 +417,7 @@ feature:
                             touch /etc/kubernetes/.joined
                             echo "cp1 init done"
 
-                            if [ "{{.Harden}}" == "true" ]; then
+                            if [ "{{.Hardening}}" == "true" ]; then
                                 cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
                             ---
                             apiVersion: extensions/v1beta1
