@@ -43,6 +43,14 @@ fi
 
 settos 24m
 
+if [[ $(echo $CLUSIZE | grep ormal) ]]; then
+  settos 35m
+fi
+
+if [[ $(echo $CLUSIZE | grep arge) ]]; then
+  settos 45m
+fi
+
 ./safescaled-cover&
 if [[ $? -ne 0 ]]; then
   echo "Failure starting safescale demon..." && exit 1
