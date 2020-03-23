@@ -28,8 +28,11 @@ trap print_error ERR
 fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
+
     # For compatibility with previous user_data implementation (until v19.03.x)...
-    ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
+    mkdir -p /var/tmp || true
+    ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
+
     exit $1
 }
 
@@ -1012,8 +1015,10 @@ lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 update_kernel_settings || fail 217
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
+
 # For compatibility with previous user_data implementation (until v19.03.x)...
-ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
+mkdir -p /var/tmp || true
+ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
 
 # !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
 #                      but after the template has been realized (cf. libvirt Stack)
