@@ -19,6 +19,7 @@ package concurrency
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -260,6 +261,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 
 	// tracer := NewTracer(t, "", true)
 	finish := false
+	begin := time.Now()
 
 	if timeout > 0 {
 		for !finish {
@@ -293,7 +295,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Lock()
 				st := t.status
 				t.status = TIMEOUT
-				t.err = scerr.TimeoutError("task is out of time", timeout, nil)
+				t.err = scerr.TimeoutError(fmt.Sprintf("task is out of time ( %s > %s)", temporal.FormatDuration(time.Since(begin)), temporal.FormatDuration(timeout)), timeout, nil)
 				if st == RUNNING {
 					t.abortCh <- struct{}{}
 					close(t.abortCh)

@@ -91,3 +91,13 @@ func TestStartStopDurationWithPause(t *testing.T) {
 		t.Errorf("This should be 30 ms and it isn't: %s", res)
 	}
 }
+
+// Sometimes there are tests or timeouts that take hours...
+func TestFormatDurationBuild(t *testing.T) {
+	dur := time.Duration(90 * time.Minute)
+	biggerThan60min := FormatDuration(dur)
+
+	if biggerThan60min != "01h30m00.000s" {
+		t.Errorf("failure formatting duration string")
+	}
+}

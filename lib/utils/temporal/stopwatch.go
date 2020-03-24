@@ -141,6 +141,7 @@ func FormatDuration(dur time.Duration) string {
 	}
 
 	sec := int64(dur.Truncate(time.Second).Seconds()) % 60
-	min := int64(dur.Truncate(time.Minute).Minutes())
-	return fmt.Sprintf("00h%02dm%02d.%03ds", min, sec, ms)
+	min := int64(dur.Truncate(time.Minute).Minutes()) % 60
+	hours := int64(dur.Truncate(time.Hour).Hours())
+	return fmt.Sprintf("%02dh%02dm%02d.%03ds", hours, min, sec, ms)
 }
