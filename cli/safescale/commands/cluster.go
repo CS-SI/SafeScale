@@ -523,11 +523,11 @@ var clusterCreateCommand = cli.Command{
 					logrus.Warnf("Error deleting cluster instance: %s", cluDel)
 				}
 			}
-			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
+			msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		if clusterInstance == nil {
-			msg := fmt.Sprintf("failed to create cluster: unknown reason")
+			msg := "failed to create cluster: unknown reason"
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 
