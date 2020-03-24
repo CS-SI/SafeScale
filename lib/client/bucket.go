@@ -61,6 +61,22 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 	return err
 }
 
+// WaitGroup with timeout, returns true when it's a timeout
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+
+	select {
+	case <-c: // OK
+		return false
+	case <-time.After(timeout): // timeout
+		return true
+	}
+}
+
 // Destroy ...
 func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 	c.session.Connect()
@@ -87,17 +103,21 @@ func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 		}
 	}
 
-	// FIXME Unused timeout, use waitTimeout
-
 	wg.Add(len(names))
 	for _, target := range names {
 		go bucketDeleter(target)
 	}
-	wg.Wait()
+
+	isTimeout := waitTimeout(&wg, timeout)
 
 	if len(errs) > 0 {
 		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
+
+	if isTimeout {
+		return clitools.ExitOnRPC("timeout destroying buckets")
+	}
+
 	return nil
 }
 
@@ -127,17 +147,21 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 		}
 	}
 
-	// FIXME Unused timeout, use waitTimeout
-
 	wg.Add(len(names))
 	for _, target := range names {
 		go bucketDeleter(target)
 	}
-	wg.Wait()
+
+	isTimeout := waitTimeout(&wg, timeout)
 
 	if len(errs) > 0 {
 		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
+
+	if isTimeout {
+		return clitools.ExitOnRPC("timeout deleting buckets")
+	}
+
 	return nil
 }
 
@@ -150,6 +174,8 @@ func (c *bucket) Inspect(name string, timeout time.Duration) (*pb.BucketMounting
 	if err != nil {
 		return nil, err
 	}
+
+	// FIXME Use waitTimeout with other functions
 
 	return service.Inspect(ctx, &pb.Bucket{Name: name})
 }
