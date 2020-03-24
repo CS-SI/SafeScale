@@ -302,7 +302,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
 					// step failures must be traced as errors
-					tracer.TraceErr("%s(%s):step(%s)@%s failed in %s: %s",
+					tracer.TraceAsError("%s(%s):step(%s)@%s failed in %s: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
@@ -356,7 +356,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				} else { // other steps are expected to succeed
 					// step failures must be traced as errors
-					tracer.TraceErr(": %s(%s):step(%s)@%s failed in %s: %s",
+					tracer.TraceAsError(": %s(%s):step(%s)@%s failed in %s: %s",
 						is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), results.ErrorMessages())
 				}
