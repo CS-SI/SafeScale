@@ -1034,11 +1034,14 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 		func() error {
 			server, err = servers.Get(s.ComputeClient, host.ID).Extract()
 			if err != nil {
-				switch err.(type) {
+				switch err.(type) { // FIXME Is a mistake, all 40x errors should be considered
 				case gc.ErrDefault404:
 					// If error is "resource not found", we want to return GopherCloud error as-is to be able
 					// to behave differently in this special case. To do so, stop the retry
 					return scerr.AbortedError("", resources.ResourceNotFoundError("host", host.ID))
+				case gc.ErrDefault409:
+					// specific handling for error 409
+					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", host.ID, ProviderErrorToString(err)))
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
 					return err
@@ -1210,7 +1213,7 @@ func (s *Stack) DeleteHost(id string) error {
 			// 1st, send delete host order
 			err := servers.Delete(s.ComputeClient, id).ExtractErr()
 			if err != nil {
-				switch err.(type) {
+				switch err.(type) { // FIXME Is a mistake, all 40x errors should be considered
 				case gc.ErrDefault404:
 					// Resource not found, consider deletion successful
 					logrus.Debugf("Host '%s' not found, deletion considered successful", id)
@@ -1231,9 +1234,9 @@ func (s *Stack) DeleteHost(id string) error {
 						}
 						return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
 					}
-					// FIXME: captures more error types
+
 					switch err.(type) { // nolint
-					case gc.ErrDefault404:
+					case gc.ErrDefault404: // FIXME Is a mistake, all 40x errors should be considered
 						resourcePresent = false
 						return nil
 					}
