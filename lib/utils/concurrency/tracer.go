@@ -185,8 +185,8 @@ func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
 	return t
 }
 
-// TraceErr traces a message with error level
-func (t *Tracer) TraceErr(format string, a ...interface{}) *Tracer {
+// TraceAsError traces a message with error level
+func (t *Tracer) TraceAsError(format string, a ...interface{}) *Tracer {
 	if !t.IsNull() && t.enabled {
 		msg := t.TraceMessage(format, a...)
 		if msg != "" {
