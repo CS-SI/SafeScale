@@ -185,6 +185,17 @@ func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
 	return t
 }
 
+// TraceErr traces a message with error level
+func (t *Tracer) TraceErr(format string, a ...interface{}) *Tracer {
+	if !t.IsNull() && t.enabled {
+		msg := t.TraceMessage(format, a...)
+		if msg != "" {
+			logrus.Errorf(msg)
+		}
+	}
+	return t
+}
+
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
 func (t *Tracer) Stopwatch() temporal.Stopwatch {
 	return t.sw
