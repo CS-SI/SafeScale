@@ -33,28 +33,34 @@ import (
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	// Autoload embedded provider drivers
 	_ "github.com/CS-SI/SafeScale/lib/server"
 )
 
-func cleanup() {
-	fmt.Println("\nBe careful stopping safescale will not stop the execution on safescaled, but will try to go back to the previous state as much as possible!")
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
-	text, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("failed to read the input : ", err.Error())
-		text = "y"
-	}
-	if strings.TrimRight(text, "\n") == "y" {
-		err = client.New().JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+var profileCloseFunc = func() {}
+
+func cleanup(onAbort bool) {
+	if onAbort {
+		fmt.Println("\nBe careful stopping safescale will not stop the execution on safescaled, but will try to go back to the previous state as much as possible!")
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
+		text, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Printf("failed to stop the process %v\n", err)
+			fmt.Println("failed to read the input : ", err.Error())
+			text = "y"
 		}
-		os.Exit(0)
+		if strings.TrimRight(text, "\n") == "y" {
+			err = client.New().JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+			if err != nil {
+				fmt.Printf("failed to stop the process %v\n", err)
+			}
+		}
 	}
+	profileCloseFunc()
+	os.Exit(0)
 }
 
 func main() {
@@ -64,7 +70,7 @@ func main() {
 	go func() {
 		for {
 			<-c
-			cleanup()
+			cleanup(true)
 		}
 	}()
 
@@ -96,6 +102,11 @@ func main() {
 			Name:  "debug, d",
 			Usage: "Show debug information",
 		},
+		cli.StringFlag{
+			Name:  "profile",
+			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
+			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
+		},
 		// cli.IntFlag{
 		// 	Name:  "port, p",
 		// 	Usage: "Bind to specified port `PORT`",
@@ -104,6 +115,20 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
+		// Define trace settings of the application (what to trace if trace is wanted)
+		// NOTE: is it the good behavior ? Shouldn't we fail ?
+		// If trace settings cannot be registered, report it but do not fail
+		// err := debug.RegisterTraceSettings(appTrace)
+		// if err != nil {
+		// 	logrus.Errorf(err.Error())
+		// }
+
+		// Sets profiling
+		if c.IsSet("profile") {
+			what := c.String("profile")
+			profileCloseFunc = debug.Profile(what)
+		}
+
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
 			utils.Verbose = true
@@ -111,18 +136,24 @@ func main() {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
 
-		if c.GlobalBool("verbose") {
+		// Defines trace level wanted by user
+		if utils.Verbose = c.Bool("verbose"); utils.Verbose {
 			logrus.SetLevel(logrus.InfoLevel)
 			utils.Verbose = true
 		}
-		if c.GlobalBool("debug") {
-			if c.GlobalBool("verbose") {
+		if utils.Debug = c.Bool("debug"); utils.Debug {
+			if utils.Verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			} else {
 				logrus.SetLevel(logrus.DebugLevel)
 			}
-			utils.Debug = true
 		}
+
+		return nil
+	}
+
+	app.After = func(c *cli.Context) error {
+		cleanup(false)
 		return nil
 	}
 
@@ -144,10 +175,6 @@ func main() {
 	app.Commands = append(app.Commands, commands.BucketCmd)
 	sort.Sort(cli.CommandsByName(commands.BucketCmd.Subcommands))
 
-	//VPL: data disabled, not ready
-	// app.Commands = append(app.Commands, commands.DataCmd)
-	// sort.Sort(cli.CommandsByName(commands.DataCmd.Subcommands))
-
 	app.Commands = append(app.Commands, commands.ShareCmd)
 	sort.Sort(cli.CommandsByName(commands.ShareCmd.Subcommands))
 
@@ -160,13 +187,13 @@ func main() {
 	app.Commands = append(app.Commands, commands.ClusterCommand)
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
-	// app.Commands = append(app.Commands, commands.PerformCommand)
-	// sort.Sort(cli.CommandsByName(commands.PerformCommand.Subcommands))
-
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	err := app.Run(os.Args)
-	if err != nil {
-		fmt.Println("Error Running App : " + err.Error())
-	}
+	// err := app.Run(os.Args)
+	// if err != nil {
+	// 	fmt.Println("Error Running App: " + err.Error())
+	// }
+	_ = app.Run(os.Args)
+
+	cleanup(false)
 }
