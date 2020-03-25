@@ -99,7 +99,7 @@ var bucketDelete = cli.Command{
 		bucketList = append(bucketList, c.Args().First())
 		bucketList = append(bucketList, c.Args().Tail()...)
 
-		destroy := c.Bool("force") // FIXME Use this flag
+		destroy := c.Bool("force")
 
 		if destroy {
 			err := client.New().Bucket.Destroy(bucketList, temporal.GetExecutionTimeout())
