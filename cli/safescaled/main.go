@@ -27,7 +27,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dlespiau/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -37,12 +36,17 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/listeners"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	_ "github.com/CS-SI/SafeScale/lib/server"
 )
 
-func cleanup() {
+var profileCloseFunc = func() {}
+
+func cleanup(onAbort bool) {
 	fmt.Println("cleanup")
+	profileCloseFunc()
+	os.Exit(0)
 }
 
 // *** MAIN ***
@@ -51,8 +55,7 @@ func work() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		cleanup()
-		exit.Exit(1)
+		cleanup(true)
 	}()
 
 	logrus.Infoln("Checking configuration")
@@ -146,6 +149,11 @@ func main() {
 			Name:  "debug, d",
 			Usage: "Show debug information",
 		},
+		cli.StringFlag{
+			Name:  "profile",
+			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
+			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
+		},
 		// cli.IntFlag{
 		// 	Name:  "port, p",
 		// 	Usage: "Bind to specified port `PORT`",
@@ -154,6 +162,12 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
+		// Sets profiling
+		if c.IsSet("profile") {
+			what := c.String("profile")
+			profileCloseFunc = debug.Profile(what)
+		}
+
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
 			utils.Verbose = true
@@ -183,6 +197,8 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
 	}
+
+	cleanup(false)
 }

@@ -17,10 +17,6 @@
 package gcp
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"strconv"
 	"time"
@@ -28,7 +24,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
@@ -40,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -176,7 +172,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
 
-// CreateKeyPair creates and import a key pair
+// CreateKeyPair creates a key pair (no import)
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -185,26 +181,27 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	publicKey := privateKey.PublicKey
-	pub, _ := ssh.NewPublicKey(&publicKey)
-	pubBytes := ssh.MarshalAuthorizedKey(pub)
-	pubKey := string(pubBytes)
+	// privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	// publicKey := privateKey.PublicKey
+	// pub, _ := ssh.NewPublicKey(&publicKey)
+	// pubBytes := ssh.MarshalAuthorizedKey(pub)
+	// pubKey := string(pubBytes)
 
-	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	priKeyPem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: priBytes,
-		},
-	)
-	priKey := string(priKeyPem)
-	return &resources.KeyPair{
-		ID:         name,
-		Name:       name,
-		PublicKey:  pubKey,
-		PrivateKey: priKey,
-	}, nil
+	// priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	// priKeyPem := pem.EncodeToMemory(
+	// 	&pem.Block{
+	// 		Type:  "RSA PRIVATE KEY",
+	// 		Bytes: priBytes,
+	// 	},
+	// )
+	// priKey := string(priKeyPem)
+	// return &resources.KeyPair{
+	// 	ID:         name,
+	// 	Name:       name,
+	// 	PublicKey:  pubKey,
+	// 	PrivateKey: priKey,
+	// }, nil
+	return crypt.GenerateRSAKeyPair(name)
 }
 
 // GetKeyPair returns the key pair identified by id

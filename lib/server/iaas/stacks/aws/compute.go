@@ -17,37 +17,34 @@
 package aws
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"strings"
+	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
-	"github.com/davecgh/go-spew/spew"
-	// converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
-	// "strconv"
-	"strings"
-	"time"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	uuid "github.com/satori/go.uuid"
 )
 
 type portDef struct {
@@ -56,45 +53,58 @@ type portDef struct {
 	toPort   int64
 }
 
-// createKeyPair creates a key pair
-func createKeyPair() (publicKeyBytes []byte, privateKeyBytes []byte, err error) {
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	publicKey := privateKey.PublicKey
-	pub, err := ssh.NewPublicKey(&publicKey)
-	if err != nil {
-		return nil, nil, err
-	}
+// // createKeyPair creates a key pair
+// func createKeyPair() (publicKeyBytes []byte, privateKeyBytes []byte, err error) {
+// 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+// 	publicKey := privateKey.PublicKey
+// 	pub, err := ssh.NewPublicKey(&publicKey)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
 
-	publicKeyBytes = ssh.MarshalAuthorizedKey(pub)
+// 	publicKeyBytes = ssh.MarshalAuthorizedKey(pub)
 
-	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	privateKeyBytes = pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: priBytes,
-		},
-	)
-	return publicKeyBytes, privateKeyBytes, nil
-}
+// 	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+// 	privateKeyBytes = pem.EncodeToMemory(
+// 		&pem.Block{
+// 			Type:  "RSA PRIVATE KEY",
+// 			Bytes: priBytes,
+// 		},
+// 	)
+// 	return publicKeyBytes, privateKeyBytes, nil
+// }
 
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	publicKey, privateKey, err := createKeyPair()
+	// publicKey, privateKey, err := createKeyPair()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// _, err = s.EC2Service.ImportKeyPair(&ec2.ImportKeyPairInput{
+	// 	KeyName:           aws.String(name),
+	// 	PublicKeyMaterial: publicKey,
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return &resources.KeyPair{
+	// 	ID:         name,
+	// 	Name:       name,
+	// 	PrivateKey: string(privateKey),
+	// 	PublicKey:  string(publicKey),
+	// }, nil
+
+	kp, err := crypt.GenerateRSAKeyPair(name)
 	if err != nil {
 		return nil, err
 	}
 	_, err = s.EC2Service.ImportKeyPair(&ec2.ImportKeyPairInput{
 		KeyName:           aws.String(name),
-		PublicKeyMaterial: publicKey,
+		PublicKeyMaterial: []byte(kp.PublicKey),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &resources.KeyPair{
-		ID:         name,
-		Name:       name,
-		PrivateKey: string(privateKey),
-		PublicKey:  string(publicKey),
-	}, nil
+	return kp, nil
 }
 
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
@@ -401,12 +411,12 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	var (
 		host *resources.Host
 	)
-	switch hostParam.(type) {
+	switch hostParam := hostParam.(type) {
 	case string:
 		host = resources.NewHost()
-		host.ID = hostParam.(string)
+		host.ID = hostParam
 	case *resources.Host:
-		host = hostParam.(*resources.Host)
+		host = hostParam
 	}
 	if host == nil {
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
@@ -712,7 +722,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		temporal.GetLongOperationTimeout(),
 	)
 	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
+		return nil, userData, scerr.Wrap(err, "Error creating host: timeout")
 	}
 	if desistError != nil {
 		return nil, userData, scerr.ForbiddenError(fmt.Sprintf("Error creating host: %s", desistError.Error()))
@@ -1131,7 +1141,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	}
 
 	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(v data.Clonable) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		hostNetworkV1 := v.(*propertiesv1.HostNetwork)
 		hostNetworkV1.IPv4Addresses = ip4bynetid
 		hostNetworkV1.IPv6Addresses = make(map[string]string)
 		hostNetworkV1.NetworksByID = netnamebyid
@@ -1148,7 +1158,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	allocated := fromMachineTypeToAllocatedSize(s, instanceType)
 
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(v data.Clonable) error {
-		hostSizingV1 := v.(*propsv1.HostSizing)
+		hostSizingV1 := v.(*propertiesv1.HostSizing)
 		hostSizingV1.AllocatedSize.Cores = allocated.Cores
 		hostSizingV1.AllocatedSize.RAMSize = allocated.RAMSize
 		hostSizingV1.AllocatedSize.DiskSize = allocated.DiskSize
@@ -1165,8 +1175,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	return host, nil
 }
 
-func fromMachineTypeToAllocatedSize(stack *Stack, machineType string) propsv1.HostSize {
-	hz := propsv1.HostSize{}
+func fromMachineTypeToAllocatedSize(stack *Stack, machineType string) propertiesv1.HostSize {
+	hz := propertiesv1.HostSize{}
 
 	templates, err := stack.ListTemplates()
 	if err != nil {

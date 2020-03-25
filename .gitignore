@@ -8,6 +8,7 @@
 # Test binary, build with `go test -c`
 *.test
 debug
+!lib/utils/debug
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
@@ -111,3 +112,5 @@ build/Dockerfile.cibranch
 # secrets
 build/tenants.toml
 lib/security/gateway/client/safe-security
+
+*.pprof
