@@ -1051,8 +1051,23 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 				}
 
 				errorCode, failed := GetUnexpectedGophercloudErrorCode(err)
-				if failed != nil {
-					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err))
+				if failed == nil {
+					switch errorCode {
+					case 408:
+						return err
+					case 429:
+						return err
+					case 500:
+						return err
+					case 503:
+						return err
+					default:
+						return scerr.AbortedError("", fmt.Errorf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err))
+					}
+				}
+
+				if IsServiceUnavailableError(err) {
+					return err
 				}
 
 				// Any other error stops the retry
