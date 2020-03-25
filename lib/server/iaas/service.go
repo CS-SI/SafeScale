@@ -545,7 +545,7 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 		return nil, err
 	}
 
-	log.Warnf("We are looking for an image for %s", svc.GetName())
+	log.Debugf("We are looking for an image for %s", svc.GetName())
 
 	if svc.GetName() == "aws" {
 		// FIXME AWS Mappings

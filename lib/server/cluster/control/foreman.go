@@ -50,6 +50,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -368,7 +369,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
-	kp, err = svc.CreateKeyPair(kpName)
+	kp, err = crypt.GenerateRSAKeyPair(kpName)
 	if err != nil {
 		return err
 	}
@@ -760,18 +761,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		return scerr.ErrListError(cleaningErrors)
 	}
 
-	// Delete cluster key
-	err = b.cluster.service.DeleteKeyPair("cluster_" + b.cluster.Name + "_cladm_key")
-	if err != nil {
-		cleaningErrors = append(cleaningErrors, err)
-		return scerr.ErrListError(cleaningErrors)
-	}
-
-	defer func() {
-		if err == nil {
-			cluster.service = nil
-		}
-	}()
+	cluster.service = nil
 
 	return scerr.ErrListError(cleaningErrors)
 }
