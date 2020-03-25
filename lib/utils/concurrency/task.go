@@ -19,10 +19,11 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
@@ -270,9 +271,8 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// Context cancel signal received, propagating using abort signal
 				// tracer.Trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
-				if t.status == RUNNING {
+				if t.status == RUNNING && t.abortCh != nil {
 					t.abortCh <- struct{}{}
-					close(t.abortCh)
 				}
 				t.lock.Unlock()
 			case <-t.doneCh:
@@ -285,6 +285,8 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			case <-t.abortCh:
 				// Abort signal received
 				t.lock.Lock()
+				close(t.abortCh)
+				t.abortCh = nil
 				if t.status != TIMEOUT {
 					t.status = ABORTED
 					t.err = scerr.AbortedError("", nil)
@@ -296,9 +298,8 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				st := t.status
 				t.status = TIMEOUT
 				t.err = scerr.TimeoutError(fmt.Sprintf("task is out of time ( %s > %s)", temporal.FormatDuration(time.Since(begin)), temporal.FormatDuration(timeout)), timeout, nil)
-				if st == RUNNING {
+				if st == RUNNING && t.abortCh != nil {
 					t.abortCh <- struct{}{}
-					close(t.abortCh)
 				}
 				t.lock.Unlock()
 			}
@@ -310,9 +311,8 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// Context cancel signal received, propagating using abort signal
 				// tracer.Trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
-				if t.status == RUNNING {
+				if t.status == RUNNING && t.abortCh != nil {
 					t.abortCh <- struct{}{}
-					close(t.abortCh)
 				}
 				t.lock.Unlock()
 			case <-t.doneCh:
@@ -324,6 +324,8 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				// Abort signal received
 				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
+				close(t.abortCh)
+				t.abortCh = nil
 				if t.status != TIMEOUT {
 					t.status = ABORTED
 					t.err = scerr.AbortedError("", nil)
@@ -485,12 +487,7 @@ func (t *task) Abort() error {
 		t.lock.Lock()
 		defer t.lock.Unlock()
 
-		// // Tell controller to stop go routine
-		// t.abortCh <- true
-		// close(t.abortCh)
-
 		// Tell context to cancel
-		// VPL: normally this should trigger abort in controller...
 		t.cancel()
 
 		t.status = ABORTED
