@@ -19,7 +19,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"os"
 	"os/user"
 	"strings"
@@ -648,9 +647,6 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
-	logrus.Warnf("Showtime host: %s", spew.Sdump(host)) // FIXME Remove logs
-	logrus.Warnf("Showtime sshCfg: %s", spew.Sdump(sshCfg))
-
 	_, err = sshCfg.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
 	if err != nil {
 		derr := err
@@ -764,8 +760,6 @@ func (handler *HostHandler) Create(
 		}
 
 		if client.IsProvisioningError(err) {
-			logrus.Errorf("%+v", err)
-			// FIXME Check error type
 			return nil, fmt.Errorf("error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
@@ -1075,7 +1069,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	// Conditions are met, delete host
 	var deleteMetadataOnly bool
 	var moreTimeNeeded bool
-	err = handler.service.DeleteHost(host.ID) // FIXME DeleteHost, check retry.ErrTimeout
+	err = handler.service.DeleteHost(host.ID)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound:
