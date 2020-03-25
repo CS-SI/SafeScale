@@ -1121,17 +1121,28 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 		func() error {
 			server, err = servers.Get(s.ComputeClient, host.ID).Extract()
 			if err != nil {
-				switch err.(type) { // FIXME Is a mistake, all 40x errors should be considered
+				switch err.(type) {
 				case gc.ErrDefault404:
 					// If error is "resource not found", we want to return GopherCloud error as-is to be able
 					// to behave differently in this special case. To do so, stop the retry
 					return scerr.AbortedError("", resources.ResourceNotFoundError("host", host.ID))
+				case gc.ErrDefault408:
+					// Server timeout
+					return err
 				case gc.ErrDefault409:
 					// specific handling for error 409
 					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", host.ID, err))
+				case gc.ErrDefault503:
+					// service unavailable, retry
+					return err
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
 					return err
+				}
+
+				errorCode, failed := openstack.GetUnexpectedGophercloudErrorCode(err)
+				if failed != nil {
+					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err))
 				}
 
 				// Any other error stops the retry
