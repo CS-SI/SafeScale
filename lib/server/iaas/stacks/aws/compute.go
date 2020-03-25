@@ -40,7 +40,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	// converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/satori/go.uuid"
@@ -536,17 +535,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	if defaultGateway == nil && !hostMustHavePublicIP {
 		return nil, userData, fmt.Errorf("the host %s must have a gateway or be public", resourceName)
-	}
-
-	var nets []servers.Network
-
-	// FIXME add provider network to host networks ?
-
-	// Add private networks
-	for _, n := range request.Networks {
-		nets = append(nets, servers.Network{
-			UUID: n.ID,
-		})
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -1095,9 +1083,15 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 				return nil, err
 			}
 
-			instanceType = aws.StringValue(i.InstanceType)
-			break
+			if aws.StringValue(i.InstanceType) != "" {
+				instanceType = aws.StringValue(i.InstanceType)
+				break
+			}
 		}
+	}
+
+	if instanceType == "" {
+		return nil, fmt.Errorf("error recovering instance type of %s", hostRef)
 	}
 
 	var subnets []IPInSubnet
