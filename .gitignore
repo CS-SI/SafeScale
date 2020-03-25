@@ -112,3 +112,5 @@ build/Dockerfile.cibranch
 # secrets
 build/tenants.toml
 lib/security/gateway/client/safe-security
+
+*.pprof
