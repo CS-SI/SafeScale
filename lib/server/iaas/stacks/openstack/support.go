@@ -3,7 +3,21 @@ package openstack
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
+
+func caseInsensitiveContains(haystack, needle string) bool {
+	lowerHaystack := strings.ToLower(haystack)
+	lowerNeedle := strings.ToLower(needle)
+
+	return strings.Contains(lowerHaystack, lowerNeedle)
+}
+
+func IsServiceUnavailableError(err error) bool {
+	text := err.Error()
+
+	return caseInsensitiveContains(text, "Service Unavailable")
+}
 
 func GetUnexpectedGophercloudErrorCode(err error) (int64, error) {
 	xType := reflect.TypeOf(err)
@@ -17,7 +31,10 @@ func GetUnexpectedGophercloudErrorCode(err error) (int64, error) {
 	if there {
 		_, there := xType.FieldByName("Actual")
 		if there {
-			return xValue.FieldByName("Actual").Int(), nil
+			recoveredValue := xValue.FieldByName("Actual").Int()
+			if recoveredValue != 0 {
+				return recoveredValue, nil
+			}
 		}
 	}
 

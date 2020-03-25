@@ -1132,6 +1132,9 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 				case gc.ErrDefault409:
 					// specific handling for error 409
 					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", host.ID, err))
+				case gc.ErrDefault429:
+					// rate limiting defined by provider, retry
+					return err
 				case gc.ErrDefault503:
 					// service unavailable, retry
 					return err
@@ -1141,8 +1144,23 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 				}
 
 				errorCode, failed := openstack.GetUnexpectedGophercloudErrorCode(err)
-				if failed != nil {
-					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err))
+				if failed == nil {
+					switch errorCode {
+					case 408:
+						return err
+					case 429:
+						return err
+					case 500:
+						return err
+					case 503:
+						return err
+					default:
+						return scerr.AbortedError("", fmt.Errorf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err))
+					}
+				}
+
+				if openstack.IsServiceUnavailableError(err) {
+					return err
 				}
 
 				// Any other error stops the retry
