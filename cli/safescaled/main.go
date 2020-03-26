@@ -42,8 +42,12 @@ import (
 	_ "github.com/CS-SI/SafeScale/lib/server"
 )
 
-func cleanup() {
+var profileCloseFunc = func() {}
+
+func cleanup(onAbort bool) {
 	fmt.Println("cleanup")
+	profileCloseFunc()
+	exit.Exit(1)
 }
 
 // *** MAIN ***
@@ -52,8 +56,7 @@ func work() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		cleanup()
-		exit.Exit(1)
+		cleanup(true)
 	}()
 
 	// NOTE: is it the good behavior ? Shouldn't we fail ?
@@ -93,7 +96,6 @@ func work() {
 	}
 
 	logrus.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", safescaledPort, suffix)
-
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(safescaledPort))
 	if err != nil {
 		logrus.Fatalf("failed to listen: %v", err)
@@ -157,6 +159,11 @@ func main() {
 			Aliases: []string{"d"},
 			Usage:   "Show debug information",
 		},
+		&cli.StringFlag{
+			Name:  "profile",
+			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
+			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
+		},
 		// &cli.IntFlag{
 		// 	Name:  "port",
 		// 	Aliases: []string{"p"},
@@ -166,6 +173,12 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
+		// Sets profiling
+		if c.IsSet("profile") {
+			what := c.String("profile")
+			profileCloseFunc = debug.Profile(what)
+		}
+
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
 			utils.Verbose = true
@@ -195,6 +208,8 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
 	}
+
+	cleanup(false)
 }
