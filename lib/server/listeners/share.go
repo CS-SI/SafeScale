@@ -333,12 +333,11 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -368,7 +368,7 @@ type ErrTimeout struct {
 func TimeoutError(cause error, timeout time.Duration, msg ...interface{}) ErrTimeout {
 	return ErrTimeout{
 		errCore: errCore{
-			message:      strprocess.FormatStrings(msg),
+			message:      strprocess.FormatStrings(msg...),
 			causer:       cause,
 			consequences: []error{},
 			fields:       make(fields),
@@ -894,7 +894,7 @@ type ErrRuntimePanic struct {
 func RuntimePanicError(msg ...interface{}) ErrRuntimePanic {
 	return ErrRuntimePanic{
 		errCore: errCore{
-			message:      strprocess.FormatStrings(msg...),
+			message:      decorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""),
 			causer:       nil,
 			consequences: []error{},
 			fields:       make(fields),

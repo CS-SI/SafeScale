@@ -57,27 +57,27 @@ type taskGroup struct {
 
 // NewTaskGroup ...
 func NewTaskGroup(parentTask Task) (TaskGroup, error) {
-	return newTaskGroup(nil, nil, parentTask) // nolint
+	return newTaskGroup(nil, parentTask) // nolint
 }
 
 // NewTaskGroupWithParent ...
 func NewTaskGroupWithParent(parentTask Task) (TaskGroup, error) {
-	return newTaskGroup(nil, nil, parentTask) // nolint
+	return newTaskGroup(nil, parentTask) // nolint
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context, cancel context.CancelFunc) (TaskGroup, error) {
-	return newTaskGroup(ctx, cancel, nil)
+func NewTaskGroupWithContext(ctx context.Context) (TaskGroup, error) {
+	return newTaskGroup(ctx, nil)
 }
 
-func newTaskGroup(ctx context.Context, cancel context.CancelFunc, parentTask Task) (tg *taskGroup, err error) {
+func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err error) {
 	var t Task
 
 	if parentTask != nil {
 		t, err = NewTaskWithParent(parentTask)
 	} else {
 		if ctx != nil {
-			t, err = NewTaskWithContext(ctx, cancel)
+			t, err = NewTaskWithContext(ctx)
 		} else {
 			t, err = NewUnbreakableTask()
 		}
@@ -116,9 +116,9 @@ func (tg *taskGroup) GetStatus() (TaskStatus, error) {
 }
 
 // GetContext returns the current task status
-func (tg *taskGroup) GetContext() (context.Context, context.CancelFunc, error) {
+func (tg *taskGroup) GetContext() (context.Context, error) {
 	if tg == nil {
-		return nil, nil, scerr.InvalidInstanceError()
+		return nil, scerr.InvalidInstanceError()
 	}
 
 	tg.task.mu.Lock()

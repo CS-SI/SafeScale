@@ -106,3 +106,5 @@ lib/system/version.go
 cli/safescaled/__debug_bin
 lib/security/gateway/client/safe-security
 go.sum
+
+lib/server/iaas/.DS_Store

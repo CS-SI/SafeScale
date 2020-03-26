@@ -155,10 +155,10 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	err = nil
 	for {
 		time.Sleep(time.Duration(80) * time.Millisecond)
-		ctx, cancel, err := single.GetContext()
+		ctx, err := single.GetContext()
 		require.Nil(t, err)
 
-		if singleReplacement, err := NewTaskWithContext(ctx, cancel); err == nil {
+		if singleReplacement, err := NewTaskWithContext(ctx); err == nil {
 			single = singleReplacement
 			break
 		}
@@ -281,7 +281,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		ctx, cafu := context.WithTimeout(context.TODO(), timeout)
 		defer cafu()
 
-		single, err := NewTaskWithContext(ctx, cafu)
+		single, err := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
 		require.Nil(t, err)
 
@@ -342,7 +342,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	funk := func(timeout uint, sleep uint, trigger uint, errorExpected bool) {
 		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout*10)*time.Millisecond))
-		single, err := NewTaskWithContext(ctx, cafu)
+		single, err := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
 		require.Nil(t, err)
 
@@ -391,7 +391,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk := func(sleep uint, trigger uint, errorExpected bool) {
 		ctx, cafu := context.WithCancel(context.TODO())
-		single, err := NewTaskWithContext(ctx, cafu)
+		single, err := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
 		require.Nil(t, err)
 
