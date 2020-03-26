@@ -368,18 +368,6 @@ var clusterCreateCommand = &cli.Command{
 			Name:  "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
-		&cli.UintFlag{
-			Name:  "cpu",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the number of cpu of masters and nodes in the cluster",
-		},
-		&cli.Float64Flag{
-			Name:  "ram",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of RAM of masters and nodes in the cluster (in GB)",
-		},
-		&cli.UintFlag{
-			Name:  "disk",
-			Usage: "DEPRECATED! uses --sizing and friends! Defines the size of system disk of masters and nodes (in GB)",
-		},
 	},
 
 	Action: func(c *cli.Context) (err error) {
@@ -500,8 +488,7 @@ var clusterCreateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
 		if res == nil {
-			msg := fmt.Sprintf("failed to create cluster: unknown reason")
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, "failed to create cluster: unknown reason"))
 		}
 
 		toFormat, err := convertToMap(res)
@@ -655,26 +642,6 @@ var clusterExpandCommand = &cli.Command{
 	<component> can be cpu, cpufreq, gpu, ram, disk, os
 	<operator> can be =,<,> (except for disk where valid operators are only = or >)
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
-		},
-		&cli.UintFlag{
-			Name:  "cpu",
-			Usage: "DEPRECATED! Define the number of cpu for new node(s); default: number used at cluster creation",
-			Value: 0,
-		},
-		&cli.Float64Flag{
-			Name:  "ram",
-			Usage: "DEPRECATED! Define the size of RAM for new node(s) (in GB); default: size used at cluster creation",
-			Value: 0.0,
-		},
-		&cli.UintFlag{
-			Name:  "disk",
-			Usage: "DEPRECATED! Define the size of system disk for new node(s) (in GB); default: size used at cluster creation",
-			Value: 0,
-		},
-		&cli.BoolFlag{
-			Name:   "gpu",
-			Usage:  "DEPRECATED! Ask for gpu capable host; default: no",
-			Hidden: true,
 		},
 	},
 	Action: func(c *cli.Context) error {

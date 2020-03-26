@@ -240,28 +240,6 @@ var hostCreate = &cli.Command{
 				--sizing "cpu <= 8, ram ~ 16"
 `,
 		},
-		&cli.UintFlag{
-			Name:  "cpu",
-			Usage: "DEPRECATED! use --sizing! Defines the number of cpu of masters and nodes in the cluster",
-		},
-		&cli.Float64Flag{
-			Name:  "cpu-freq, cpufreq",
-			Value: 0,
-			Usage: "DEPRECATED! use --sizing! Minimum cpu frequency required for the host (GHz)",
-		},
-		&cli.IntFlag{
-			Name:  "gpu",
-			Value: -1,
-			Usage: "DEPRECATED! use --sizing! Number of GPU for the host (by default NO GPUs)",
-		},
-		&cli.Float64Flag{
-			Name:  "ram",
-			Usage: "DEPRECATED! use --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
-		},
-		&cli.UintFlag{
-			Name:  "disk",
-			Usage: "DEPRECATED! use --sizing! Defines the size of system disk of masters and nodes (in GB)",
-		},
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
