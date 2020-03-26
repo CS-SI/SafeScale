@@ -102,7 +102,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 	}
 	vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
 	if err != nil {
-		return nil, scerr.NewError("error creating volume : %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.NewError("error creating volume: %s", openstack.ProviderErrorToString(err))
 	}
 	v := abstract.Volume{
 		ID:    vol.ID,

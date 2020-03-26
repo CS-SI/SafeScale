@@ -3,7 +3,6 @@ package gcp
 import (
 	"fmt"
 	"net/url"
-	"reflect"
 	"strings"
 	"time"
 
@@ -34,15 +33,28 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 
 	if oco.Operation != nil {
 		if oco.Operation.Zone != "" { // nolint
-			zoneURL, _ := url.Parse(oco.Operation.Zone)
+			zoneURL, ierr := url.Parse(oco.Operation.Zone)
+			if ierr != nil {
+				return res, ierr
+			}
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 		} else if oco.Operation.Region != "" {
-			regionURL, _ := url.Parse(oco.Operation.Region)
+			regionURL, ierr := url.Parse(oco.Operation.Region)
+			if ierr != nil {
+				return res, ierr
+			}
 			region := getResourceNameFromSelfLink(*regionURL)
 			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
 		} else {
 			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
+		}
+
+		if oco.Operation == nil {
+			if err == nil {
+				return res, fmt.Errorf("no operation")
+			}
+			return res, err
 		}
 
 		res.State = oco.Operation.Status
@@ -115,13 +127,14 @@ func getRegionFromSelfLink(link SelfLink) (string, error) {
 				return parts[regionPos+1], nil
 			}
 		}
+		return "", fmt.Errorf("not a region link")
 	}
 	return "", scerr.InvalidRequestError("not a region link")
 }
 
-func assertEq(exp, got interface{}) error { // nolint
-	if !reflect.DeepEqual(exp, got) {
-		return scerr.InconsistentError("wanted %v; Got %v", exp, got)
-	}
-	return nil
-}
+// func assertEq(exp, got interface{}) error {
+// 	if !reflect.DeepEqual(exp, got) {
+// 		return fmt.Errorf("wanted %v; Got %v", exp, got)
+// 	}
+// 	return nil
+// }
