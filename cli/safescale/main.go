@@ -40,22 +40,27 @@ import (
 	_ "github.com/CS-SI/SafeScale/lib/server"
 )
 
-func cleanup() {
-	fmt.Println("\nBe careful stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible!")
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
-	text, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("failed to read the input : ", err.Error())
-		text = "y"
-	}
-	if strings.TrimRight(text, "\n") == "y" {
-		err = client.New().JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+var profileCloseFunc = func() {}
+
+func cleanup(onAbort bool) {
+	if onAbort {
+		fmt.Println("\nBe careful stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible!")
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
+		text, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Printf("failed to stop the process %v\n", err)
+			fmt.Println("failed to read the input : ", err.Error())
+			text = "y"
 		}
-		os.Exit(0)
+		if strings.TrimRight(text, "\n") == "y" {
+			err = client.New().JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+			if err != nil {
+				fmt.Printf("failed to stop the process %v\n", err)
+			}
+		}
 	}
+	profileCloseFunc()
+	os.Exit(0)
 }
 
 func main() {
@@ -65,7 +70,7 @@ func main() {
 	go func() {
 		for {
 			<-c
-			cleanup()
+			cleanup(true)
 		}
 	}()
 
@@ -113,11 +118,9 @@ func main() {
 		// },
 	}
 
-	var profileCloseFunc func()
-
 	app.Before = func(c *cli.Context) error {
 		// Define trace settings of the application (what to trace if trace is wanted)
-		// NOTE: is it the good behavior ? Shouldn't we fail ?
+		// TODO: is it the good behavior ? Shouldn't we fail ?
 		// If trace settings cannot be registered, report it but do not fail
 		err := debug.RegisterTraceSettings(appTrace)
 		if err != nil {
@@ -128,8 +131,6 @@ func main() {
 		if c.IsSet("profile") {
 			what := c.String("profile")
 			profileCloseFunc = debug.Profile(what)
-		} else {
-			profileCloseFunc = func() {}
 		}
 
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
@@ -152,11 +153,6 @@ func main() {
 			}
 		}
 
-		return nil
-	}
-
-	app.After = func(c *cli.Context) error {
-		profileCloseFunc()
 		return nil
 	}
 
@@ -192,10 +188,10 @@ func main() {
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	// TODO: enables performance profiling
-
 	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println("Error Running App : " + err.Error())
 	}
+
+	cleanup(false)
 }
