@@ -91,16 +91,20 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		gwImageID string
 		gwName    string
 	)
-	if in.Gateway == nil || in.Gateway.Sizing == nil {
-		sizing = &abstract.HostSizingRequirements{}
-	} else {
-		s := converters.HostSizingRequirementsFromProtocolToAbstract(*in.Gateway.Sizing)
-		sizing = &s
-	}
 	if in.Gateway != nil {
-		gwImageID = in.GetGateway().GetImageId()
-		gwName = in.GetGateway().GetName()
+		if in.Gateway.SizingAsString != "" {
+			sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.Gateway.SizingAsString)
+			if err != nil {
+				return nil, err
+			}
+		} else if in.Gateway.Sizing != nil {
+			sizing = converters.HostSizingRequirementsFromProtocolToAbstract(*in.Gateway.Sizing)
+		}
 	}
+	if sizing == nil {
+		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
+	}
+	sizing.Image = in.Gateway.GetImageId()
 
 	handler := handlers.NewNetworkHandler(job)
 	r, err := task.Run(
