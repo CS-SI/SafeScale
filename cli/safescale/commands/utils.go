@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/denisbrodbeck/machineid"
 	cli "github.com/urfave/cli/v2"
@@ -41,6 +42,20 @@ func constructHostDefinitionStringFromCLI(c *cli.Context, key string) (string, e
 			return "", clitools.FailureResponse(clitools.ExitOnInvalidArgument(fmt.Sprintf("cannot use simultaneously --%s and --cpu|--cpufreq|--gpu|--ram|--disk", key)))
 		}
 		sizing = c.String(key)
+		splitted := strings.Split(key, ",")
+		found := false
+		for _, v := range splitted {
+			if strings.HasPrefix(v, "gpu") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			if sizing != "" {
+				sizing += ","
+			}
+			sizing += "gpu = -1"
+		}
 	} else {
 		if c.IsSet("cpu") {
 			sizing = fmt.Sprintf("cpu ~ %d,", c.Int("cpu"))
@@ -50,6 +65,8 @@ func constructHostDefinitionStringFromCLI(c *cli.Context, key string) (string, e
 		}
 		if c.IsSet("gpu") {
 			sizing += fmt.Sprintf("gpu = %d,", c.Int("gpu"))
+		} else {
+			sizing += "gpu = -1"
 		}
 		if c.IsSet("ram") {
 			sizing += fmt.Sprintf("ram ~ %.01f,", c.Float64("ram"))
