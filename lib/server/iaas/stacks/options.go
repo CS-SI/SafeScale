@@ -105,6 +105,9 @@ type ConfigurationOptions struct {
 
 	UseNATService bool
 
+	ProviderName     string
+	BuildSubnetworks bool
+
 	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool
 

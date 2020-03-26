@@ -304,31 +304,31 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	publicKey := privateKey.PublicKey
-	pub, _ := ssh.NewPublicKey(&publicKey)
-	pubBytes := ssh.MarshalAuthorizedKey(pub)
-	pubKey := string(pubBytes)
+	// privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	// publicKey := privateKey.PublicKey
+	// pub, _ := ssh.NewPublicKey(&publicKey)
+	// pubBytes := ssh.MarshalAuthorizedKey(pub)
+	// pubKey := string(pubBytes)
 
-	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	priKeyPem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: priBytes,
-		},
-	)
+	// priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	// priKeyPem := pem.EncodeToMemory(
+	// 	&pem.Block{
+	// 		Type:  "RSA PRIVATE KEY",
+	// 		Bytes: priBytes,
+	// 	},
+	// )
 
-	priKey := string(priKeyPem)
-	newUuid, err := uuid.NewV4()
+	// priKey := string(priKeyPem)
+
+	kp, err := crypt.GenerateRSAKeyPair(name)
 	if err != nil {
 		return nil, scerr.Wrap(err, "failed to generate uuid key")
 	}
-	return &abstract.KeyPair{
-		ID:         newUuid.String(),
-		Name:       name,
-		PublicKey:  pubKey,
-		PrivateKey: priKey,
-	}, nil
+	kp.ID, err = uuid.NewV4()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate uuid key : %s", err.Error())
+	}
+	return kp, nil
 }
 
 // GetKeyPair returns the key pair identified by id
@@ -667,6 +667,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, err
 	host.PrivateKey = "Impossible to fetch them from the domain, the private key is unknown by the domain"
 	host.LastState = stateConvert(state)
 
+	// FIXME: this code should have been moved to operations, check this
 	err = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
 		innerErr := props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
 			hostDescriptionV1, err := getDescriptionV1FromDomain(domain, s.LibvirtService)
@@ -750,6 +751,7 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err
 	}
 	host.LastState = newHost.LastState
 
+	// FIXME: this code should have been moved to operations, check this
 	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
 		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			newHostNetworkV1 := propertiesv1.NewHostNetwork()

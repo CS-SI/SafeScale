@@ -97,7 +97,7 @@ func Test_CreateKeyPair(t *testing.T) {
 // func Test_GetKeyPair(t *testing.T) {
 // 	tt, err := getTester()
 // 	require.Nil(t, err)
-// 	tt.KeyPair(t)
+// 	tt.GetKeyPair(t)
 // }
 
 // Not implemented

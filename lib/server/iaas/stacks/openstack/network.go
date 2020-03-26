@@ -485,8 +485,9 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 			if neutronError != nil {
 				return nil, scerr.NewError("error creating subnet: bad request: %s", neutronError["message"])
 			}
+		default:
+			return nil, scerr.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
 		}
-		return nil, scerr.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
 	}
 
 	// Starting from here, delete subnet if exit with error

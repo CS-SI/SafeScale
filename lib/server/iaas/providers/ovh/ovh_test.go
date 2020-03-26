@@ -64,6 +64,23 @@ func getService() (iaas.Service, error) {
 	return service, nil
 }
 
+// Test that we have templates, and each template has 1 or more cores
+func Test_GetTemplates(t *testing.T) {
+	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
+	require.Nil(t, err)
+	tpls, err := cli.Service.ListTemplates(false)
+	assert.NoError(t, err)
+	assert.True(t, len(tpls) > 0)
+
+	for _, tpl := range tpls {
+		fmt.Println(tpl.Cores)
+		assert.True(t, tpl.Cores > 0)
+	}
+}
+
 // Test that we have templates with GPUs
 func Test_GetGpuTemplates(t *testing.T) {
 	cli, err := getTester()
@@ -165,15 +182,6 @@ func Test_Networks(t *testing.T) {
 	cli.Networks(t)
 }
 
-// func Test_NetworkCreation(t *testing.T) {
-// 	cli, err := getTester()
-// 	if err != nil {
-// 		t.Skip(err)
-// 	}
-// 	require.Nil(t, err)
-// 	cli.CreateNetworkTest(t)
-// }
-
 func Test_Hosts(t *testing.T) {
 	cli, err := getTester()
 	if err != nil {
@@ -199,15 +207,6 @@ func Test_Volumes(t *testing.T) {
 	}
 	require.Nil(t, err)
 	cli.Volumes(t)
-}
-
-func Test_VolumeAttachments(t *testing.T) {
-	cli, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	cli.VolumeAttachments(t)
 }
 
 func Test_Containers(t *testing.T) {

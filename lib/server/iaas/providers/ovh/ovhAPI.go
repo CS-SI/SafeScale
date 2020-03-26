@@ -66,7 +66,7 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 	case "DELETE":
 		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
 	default:
-		return nil, scerr.NewError("unexpected HTTP code : %s", httpCode)
+		return nil, scerr.NewError("unexpected HTTP code: %s", httpCode)
 	}
 
 	return result, nil

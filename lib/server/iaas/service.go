@@ -338,7 +338,6 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	allTpls, err := svc.ListTemplates(false)
 	scannerTpls := map[string]bool{}
@@ -346,7 +345,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 		return nil, err
 	}
 
-	// FIXME Prevent GPUs when user sends a 0
+	// FIXME: Prevent GPUs when user sends a 0
 	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinCPUFreq != 0
 	if askedForSpecificScannerInfo {
 		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
@@ -357,9 +356,9 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 			} else {
 				var noHostError string
 				if sizing.MinCPUFreq <= 0 {
-					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
+					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
 				} else {
-					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
+					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 				}
 				return nil, scerr.NewError(noHostError)
 			}

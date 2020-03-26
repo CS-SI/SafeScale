@@ -172,7 +172,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, scerr.NewError("failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.NewError("failed to browse Floating IPs: %s", openstack.ProviderErrorToString(err))
 	}
 	if found {
 		return &fip, nil

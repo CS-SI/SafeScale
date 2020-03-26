@@ -94,9 +94,9 @@ func Test_Template(t *testing.T) {
 	err := userData.Prepare(client, dataBuffer, data)
 	assert.Nil(t, err)
 	output := userData.Generate("phase1")
-	fmt.Println(output.String()
+	fmt.Println(output.String())
 	output = userData.Generate("phase2")
-	fmt.Println(output.String()
+	fmt.Println(output.String())
 }*/
 
 func Test_Images(t *testing.T) {
@@ -162,13 +162,13 @@ func Test_Volumes(t *testing.T) {
 	tt.Volumes(t)
 }
 
-func Test_VolumeAttachments(t *testing.T) {
+func Test_Containers(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tt.VolumeAttachments(t)
+	tt.Containers(t)
 }
 
 // func Test_Objects(t *testing.T) {

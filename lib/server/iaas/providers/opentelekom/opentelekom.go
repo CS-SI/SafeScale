@@ -102,7 +102,8 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		return nil, err
 	}
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName("huaweicloud", region, domainName, projectID)
+	providerName := "huaweicloud"
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +119,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		},
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,
+		ProviderName:     providerName,
 	}
 	stack, err := huaweicloud.New(authOptions, cfgOptions)
 	if err != nil {
@@ -221,6 +223,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
+	cfg.Set("ProviderName", p.GetName())
 
 	return cfg, nil
 }

@@ -125,15 +125,6 @@ func Test_Volumes(t *testing.T) {
 	tt.Volumes(t)
 }
 
-func Test_VolumeAttachments(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.VolumeAttachments(t)
-}
-
 func Test_Containers(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
