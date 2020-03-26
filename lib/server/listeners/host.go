@@ -296,21 +296,18 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var sizing *abstract.HostSizingRequirements
-	if in.Sizing == nil {
-		sizing = &abstract.HostSizingRequirements{
-			MinCores:    int(in.GetCpuCount()),
-			MaxCores:    int(in.GetCpuCount()),
-			MinRAMSize:  in.GetRam(),
-			MaxRAMSize:  in.GetRam(),
-			MinDiskSize: int(in.GetDisk()),
-			MinGPU:      int(in.GetGpuCount()),
-			MinCPUFreq:  in.GetCpuFreq(),
-			Image:       in.GetImageId(),
+	if in.SizingAsString != "" {
+		sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.SizingAsString)
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		s := converters.HostSizingRequirementsFromProtocolToAbstract(*in.Sizing)
-		sizing = &s
+	} else if in.Sizing != nil {
+		sizing = converters.HostSizingRequirementsFromProtocolToAbstract(*in.Sizing)
 	}
+	if sizing == nil {
+		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
+	}
+	sizing.Image = in.GetImageId()
 
 	network, err := networkfactory.Load(task, job.SafeGetService(), in.GetNetwork())
 	if err != nil {
