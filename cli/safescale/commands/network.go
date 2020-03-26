@@ -206,22 +206,10 @@ var networkCreate = &cli.Command{
 				--sizing "cpu <= 8, ram ~ 16"
 `,
 		},
-		&cli.UintFlag{
-			Name:  "cpu",
-			Usage: "DEPRECATED! use --sizing! Defines the number of cpu of masters and nodes in the cluster",
-		},
-		&cli.Float64Flag{
-			Name:  "ram",
-			Usage: "DEPRECATED! use --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
-		},
-		&cli.UintFlag{
-			Name:  "disk",
-			Usage: "DEPRECATED! use --sizing! Defines the size of system disk of masters and nodes (in GB)",
-		},
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
+		if c.Args().Get(0) == "" {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
