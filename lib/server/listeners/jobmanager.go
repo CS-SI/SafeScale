@@ -93,7 +93,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 		}
 	}
 
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}

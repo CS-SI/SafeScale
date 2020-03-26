@@ -93,7 +93,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		}
 	}
 
-	task, err := concurrency.NewTaskWithContext(ctx, cancel)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -164,13 +164,13 @@ func (j *job) Aborted() bool {
 
 // Close tells the job to wait for end of operation; this ensure everything is cleaned up correctly
 func (j *job) Close() {
-	if j.task != nil {
-		j.task.Close()
-	}
 	_ = deregister(j)
 	if j.cancel != nil {
 		logrus.Debugf("{job:%s} cancelling from job.Close()...", j.SafeGetID())
 		j.cancel()
+	}
+	if j.task != nil {
+		j.task.Close()
 	}
 }
 

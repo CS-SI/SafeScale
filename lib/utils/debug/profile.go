@@ -17,7 +17,6 @@
 package debug
 
 import (
-	"log"
 	"net/http"
 	_ "net/http/pprof" // nolint
 	"os"
@@ -30,8 +29,8 @@ import (
 )
 
 const (
-	defaultCPUProfileFilename = "safescale_profile_cpu.pprof"
-	defaultMemProfileFilename = "safescale_profile_mem.pprof"
+	defaultCPUProfileFilenameSuffix = "_profile_cpu.pprof"
+	defaultMemProfileFilenameSuffix = "_profile_mem.pprof"
 )
 
 // Profile starts profiling based on the content of 'what'
@@ -51,19 +50,31 @@ func Profile(what string) func() {
 		content := strings.Split(v, ":")
 		switch content[0] {
 		case "cpu":
-			filename := constructProfileFilename(content[1], defaultCPUProfileFilename)
+			var filename string
+			if len(content) > 1 {
+				filename = constructProfileFilename(content[1], defaultCPUProfileFilenameSuffix)
+			} else {
+				filename = constructProfileFilename("", defaultCPUProfileFilenameSuffix)
+			}
 			cpufile, err = os.Create(filename)
 			if err != nil {
 				logrus.Fatalf("Failed to create profile file '%s'", filename)
 			}
 			_ = pprof.StartCPUProfile(cpufile)
+			logrus.Infof("CPU profiling enabled")
 			profileCPU = true
 		case "mem", "memory", "ram":
-			filename := constructProfileFilename(content[1], defaultMemProfileFilename)
+			var filename string
+			if len(content) > 1 {
+				filename = constructProfileFilename(content[1], defaultMemProfileFilenameSuffix)
+			} else {
+				filename = constructProfileFilename("", defaultMemProfileFilenameSuffix)
+			}
 			memfile, err = os.Create(filename)
 			if err != nil {
 				logrus.Fatalf("could not create memory profile: %v", err)
 			}
+			logrus.Infof("RAM profiling enabled")
 			profileMemory = true
 		case "web", "www":
 			listen := "localhost"
@@ -83,7 +94,12 @@ func Profile(what string) func() {
 			runtime.SetBlockProfileRate(1)
 			server := listen + ":" + port
 			go func() {
-				log.Println(http.ListenAndServe(server, nil))
+				err := http.ListenAndServe(server, nil)
+				if err != nil {
+					logrus.Errorf("ailed to start profiling web ui: %s", err.Error())
+				} else {
+					logrus.Infof("WEBUI profiling started on %s", server)
+				}
 			}()
 		default:
 			logrus.Infof("Unsupported profiling option '%s'", v)
@@ -91,6 +107,7 @@ func Profile(what string) func() {
 	}
 
 	return func() {
+		logrus.Debug("calling debug.Profile() closing func...")
 		if profileMemory {
 			defer func() {
 				_ = memfile.Close()
@@ -109,15 +126,16 @@ func Profile(what string) func() {
 
 func constructProfileFilename(path, complement string) string {
 	if path == "" {
-		path = "./" + defaultCPUProfileFilename
+		path = "./" + os.Args[0] + complement
 	}
 	path = strings.TrimSpace(path)
 	st, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		logrus.Fatalf("Failed to create profile file '%s'", path)
-	}
-	if st.IsDir() {
-		path += "/" + complement
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logrus.Fatalf("failed to check if profile file '%s' exists: %s", path, err.Error())
+		}
+	} else if st.IsDir() {
+		path += "/" + os.Args[0] + complement
 	}
 	return path
 }

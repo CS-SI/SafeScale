@@ -89,7 +89,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
+	task, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}

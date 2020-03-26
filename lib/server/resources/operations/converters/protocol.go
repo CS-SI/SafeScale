@@ -66,8 +66,8 @@ func FeatureSettingsFromProtocolToResource(in protocol.FeatureSettings) resource
 	}
 }
 
-func HostSizingRequirementsFromProtocolToAbstract(in protocol.HostSizing) abstract.HostSizingRequirements {
-	return abstract.HostSizingRequirements{
+func HostSizingRequirementsFromProtocolToAbstract(in protocol.HostSizing) *abstract.HostSizingRequirements {
+	return &abstract.HostSizingRequirements{
 		MinCores:    int(in.MinCpuCount),
 		MaxCores:    int(in.MaxCpuCount),
 		MinRAMSize:  in.MinRamSize,
