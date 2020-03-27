@@ -113,4 +113,8 @@ build/Dockerfile.cibranch
 build/tenants.toml
 lib/security/gateway/client/safe-security
 
+# profiling files
 *.pprof
+
+# macOS files
+.DS_Store
