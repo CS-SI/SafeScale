@@ -234,3 +234,41 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	log.Infof("Network '%s' successfully deleted.", ref)
 	return &googleprotobuf.Empty{}, nil
 }
+
+// Destroy a network
+func (s *NetworkListener) Destroy(ctx context.Context, in *pb.Reference) (buf *googleprotobuf.Empty, err error) {
+	if s == nil {
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+	}
+	if in == nil {
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+	}
+	ref := srvutils.GetReference(in)
+	if ref == "" {
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
+	}
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err == nil {
+		defer srvutils.JobDeregister(ctx)
+	}
+
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		// log.Info("Can't delete network: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot delete network: no tenant set")
+	}
+
+	handler := NetworkHandler(currentTenant.Service)
+	err = handler.Destroy(ctx, ref)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+
+	log.Infof("Network '%s' successfully deleted.", ref)
+	return &googleprotobuf.Empty{}, nil
+}

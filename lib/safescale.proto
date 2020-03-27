@@ -128,6 +128,7 @@ service NetworkService{
     rpc List(NetworkListRequest) returns (NetworkList){}
     rpc Inspect(Reference) returns (Network) {}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
+    rpc Destroy(Reference) returns (google.protobuf.Empty){}
 }
 
 // safescale host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
