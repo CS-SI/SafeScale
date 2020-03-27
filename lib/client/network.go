@@ -85,6 +85,46 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
+}
+
+// TODO concurent access if deleting multiple networks
+// Delete deletes several networks at the same time in goroutines
+func (n *network) Destroy(names []string, timeout time.Duration) error {
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewNetworkServiceClient(n.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	var (
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
+	)
+
+	networkDeleter := func(aname string) {
+		defer wg.Done()
+		_, err := service.Destroy(ctx, &pb.Reference{Name: aname})
+
+		if err != nil {
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
+		}
+	}
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go networkDeleter(target)
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+	}
+	return nil
 
 }
 

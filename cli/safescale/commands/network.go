@@ -68,6 +68,12 @@ var networkDelete = cli.Command{
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "delete Network",
 	ArgsUsage: "<Network_name> [<Network_name>...]",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If used, deletes the network ignoring metadata discrepancies",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -75,13 +81,22 @@ var networkDelete = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>."))
 		}
 
+		destroy := c.Bool("force")
+
 		var networkList []string
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		err := client.New().Network.Delete(networkList, temporal.GetExecutionTimeout())
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
+		if destroy {
+			err := client.New().Network.Destroy(networkList, temporal.GetExecutionTimeout())
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
+			}
+		} else {
+			err := client.New().Network.Delete(networkList, temporal.GetExecutionTimeout())
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
+			}
 		}
 		return clitools.SuccessResponse(nil)
 	},
