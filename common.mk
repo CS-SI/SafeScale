@@ -14,6 +14,12 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
+ifeq (, $(GOOS))
+RACE_CHECK=-race
+else
+RACE_CHECK=
+endif
+
 BRANCH_NAME?="develop"
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)

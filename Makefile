@@ -203,7 +203,7 @@ generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
-	@$(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log
+	@if [ -z "$(GOOS)" ]; then $(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log;fi;
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
 
 test: begin # Run unit tests
