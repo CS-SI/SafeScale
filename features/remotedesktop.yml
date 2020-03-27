@@ -289,7 +289,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                        timeout: 10
+                        timeout: 20
                         run: |
                             cat >${SF_ETCDIR}/remotedesktop/build/supervisord.conf <<-'EOF'
                             [supervisord]

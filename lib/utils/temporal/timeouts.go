@@ -28,22 +28,22 @@ const (
 	DefaultContextTimeout = 1 * time.Minute
 
 	// HostTimeout timeout for grpc command relative to host creation
-	HostTimeout = 5 * time.Minute
+	HostTimeout = 10 * time.Minute
 
 	// LongHostOperationTimeout is a Long timeout
-	LongHostOperationTimeout = 10 * time.Minute
+	LongHostOperationTimeout = 90 * time.Minute
 
 	// DefaultSSHConnectionTimeout is the default ssh timeout connection
-	DefaultSSHConnectionTimeout = 2 * time.Minute
+	DefaultSSHConnectionTimeout = 10 * time.Minute
 
 	// HostCleanupTimeout is the default timeout of host teardown operations
-	HostCleanupTimeout = 3 * time.Minute
+	HostCleanupTimeout = 10 * time.Minute
 
 	// DefaultConnectionTimeout is the default connection timeout
 	DefaultConnectionTimeout = 30 * time.Second
 
 	// DefaultExecutionTimeout is the default linux command operation timeout
-	DefaultExecutionTimeout = 5 * time.Minute
+	DefaultExecutionTimeout = 10 * time.Minute
 
 	// SmallDelay is the predefined small delay
 	SmallDelay = 1 * time.Second
