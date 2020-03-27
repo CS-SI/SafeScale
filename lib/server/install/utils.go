@@ -246,7 +246,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 			return nil
 		},
 		temporal.GetMinDelay(),
-		temporal.GetContextTimeout(),
+		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
