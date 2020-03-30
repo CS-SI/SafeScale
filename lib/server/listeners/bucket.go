@@ -27,7 +27,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -71,7 +70,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
 
-	return conv.ToPBBucketList(buckets), nil
+	return srvutils.ToPBBucketList(buckets), nil
 }
 
 // Create a new bucket
@@ -187,7 +186,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	if resp == nil {
 		return nil, status.Errorf(codes.NotFound, "cannot inspect bucket '%s': not found", in.GetName())
 	}
-	return conv.ToPBBucketMountPoint(resp), nil
+	return srvutils.ToPBBucketMountPoint(resp), nil
 }
 
 // Mount a bucket on the filesystem of the host

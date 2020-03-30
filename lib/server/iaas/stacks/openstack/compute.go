@@ -255,7 +255,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 			return nil, err
 		default:
 			spew.Dump(pager.Err)
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing templates"))
+			return nil, scerr.Wrap(err, "error listing templates")
 		}
 	}
 	if len(flvList) == 0 {
@@ -313,7 +313,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting keypair"))
+		return nil, scerr.Wrap(err, "error getting keypair")
 	}
 	return &resources.KeyPair{
 		ID:         kp.Name,
@@ -356,7 +356,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 	})
 	if (len(kpList) == 0) || (err != nil) {
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing keypairs"))
+			return nil, scerr.Wrap(err, "error listing keypairs")
 		}
 	}
 	return kpList, nil
@@ -878,7 +878,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, userData, scerr.Wrap(retryErr, fmt.Sprintf("error creating host"))
+		return nil, userData, scerr.Wrap(retryErr, "error creating host")
 	}
 	logrus.Debugf("host resource created.")
 
@@ -1284,7 +1284,7 @@ func (s *Stack) DeleteHost(id string) error {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		return scerr.Wrap(outerRetryErr, fmt.Sprintf("error deleting host: retry error"))
+		return scerr.Wrap(outerRetryErr, "error deleting host: retry error")
 	}
 	return nil
 }

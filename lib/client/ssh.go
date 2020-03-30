@@ -28,7 +28,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -270,7 +269,7 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 	if err != nil {
 		return nil, err
 	}
-	return conv.ToSystemSSHConfig(sshConfig), nil
+	return utils.ToSystemSSHConfig(sshConfig), nil
 }
 
 // Connect ...

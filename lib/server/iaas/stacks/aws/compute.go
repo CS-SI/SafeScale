@@ -834,7 +834,7 @@ func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
 				return fmt.Errorf("Security group %q already exists.", name)
 			}
 		}
-		return fmt.Errorf("Unable to create security group %q, %v", name, err)
+		return fmt.Errorf("unable to create security group %q, %v", name, err)
 	}
 	fmt.Printf("Created security group %s with VPC %s.\n",
 		aws.StringValue(createRes.GroupId), vpcID)
