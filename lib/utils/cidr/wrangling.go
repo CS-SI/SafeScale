@@ -14,7 +14,7 @@ func ipToInt(ip net.IP) (*big.Int, int) {
 	} else if len(ip) == net.IPv6len {
 		return val, 128
 	} else {
-		panic(fmt.Errorf("Unsupported address length %d", len(ip)))
+		panic(fmt.Errorf("unsupported address length %d", len(ip)))
 	}
 }
 

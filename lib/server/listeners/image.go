@@ -25,7 +25,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -69,7 +68,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 	// Map resources.Image to pb.Image
 	var pbImages []*pb.Image
 	for _, image := range images {
-		pbImages = append(pbImages, conv.ToPBImage(&image))
+		pbImages = append(pbImages, srvutils.ToPBImage(&image))
 	}
 	rv := &pb.ImageList{Images: pbImages}
 	return rv, nil

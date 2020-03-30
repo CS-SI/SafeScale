@@ -9,10 +9,10 @@ import (
 	"os/exec"
 	"strings"
 
+	scribble "github.com/nanobox-io/golang-scribble"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	_ "github.com/nanobox-io/golang-scribble"
-	scribble "github.com/nanobox-io/golang-scribble"
 )
 
 // StoredCPUInfo ...
