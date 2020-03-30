@@ -28,7 +28,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -85,7 +84,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	// Map resources.Volume to pb.Volume
 	var pbvolumes []*pb.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, conv.ToPBVolume(&volume))
+		pbvolumes = append(pbvolumes, srvutils.ToPBVolume(&volume))
 	}
 	rv := &pb.VolumeList{Volumes: pbvolumes}
 	return rv, nil
@@ -127,7 +126,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	}
 
 	log.Infof("Volume '%s' created", name)
-	return conv.ToPBVolume(vol), nil
+	return srvutils.ToPBVolume(vol), nil
 }
 
 // Attach a volume to an host and create a mount point
@@ -306,5 +305,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect volume '%s': volume not found", ref))
 	}
 
-	return conv.ToPBVolumeInfo(volume, mounts), nil
+	return srvutils.ToPBVolumeInfo(volume, mounts), nil
 }

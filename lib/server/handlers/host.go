@@ -737,10 +737,10 @@ func (handler *HostHandler) Create(
 		}
 
 		return nil, err
-	} else {
-		// FIXME AWS Retrieve data anyway
-		retrieveForensicsData(ctx, sshHandler, host)
 	}
+
+	// FIXME: AWS Retrieve data anyway
+	retrieveForensicsData(ctx, sshHandler, host)
 
 	// Reboot host
 	command = "sudo systemctl reboot"

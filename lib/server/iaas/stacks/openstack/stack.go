@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -102,7 +101,7 @@ func ParseNeutronError(neutronError string) map[string]string {
 	unjsoned := map[string]map[string]interface{}{}
 	err := json.Unmarshal([]byte(jsonError), &unjsoned)
 	if err != nil {
-		log.Debugf(err.Error())
+		logrus.Debugf(err.Error())
 		return nil
 	}
 	if content, ok := unjsoned["NeutronError"]; ok {

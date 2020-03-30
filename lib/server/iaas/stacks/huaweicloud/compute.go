@@ -28,7 +28,6 @@ import (
 	"github.com/pengux/check"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -203,7 +202,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 		} else {
 			userData = string(opts.UserData)
 		}
-		// log.Debugf("Base64 encoded userdata size = %d bytes", len(userData))
+		// logrus.Debugf("Base64 encoded userdata size = %d bytes", len(userData))
 		b["user_data"] = &userData
 	}
 
@@ -317,7 +316,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			log.Debugf(utils.Capitalize(msg))
+			logrus.Debugf(utils.Capitalize(msg))
 		}
 	}
 	if request.Password == "" {
@@ -334,7 +333,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		log.Debugf(utils.Capitalize(msg))
+		logrus.Debugf(utils.Capitalize(msg))
 		return nil, userData, fmt.Errorf(msg)
 	}
 
@@ -460,7 +459,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				logrus.Tracef("Host successfully created in requested AZ '%s'", creationZone)
 				if creationZone != srvOpts.AvailabilityZone {
 					if srvOpts.AvailabilityZone != "" {
-						log.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
+						logrus.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
 					}
 				}
 			}
@@ -504,11 +503,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			if derr != nil {
 				switch derr.(type) {
 				case scerr.ErrNotFound:
-					log.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
 				case scerr.ErrTimeout:
-					log.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
 				default:
-					log.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			}
@@ -531,7 +530,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			if err != nil {
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
-					log.Errorf("Error deleting Floating IP: %v", derr)
+					logrus.Errorf("Error deleting Floating IP: %v", derr)
 					err = scerr.AddConsequence(err, derr)
 				}
 			}
@@ -560,7 +559,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}
 
-	log.Infoln(msgSuccess)
+	logrus.Infoln(msgSuccess)
 	return host, userData, nil
 }
 
@@ -618,7 +617,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	}
 
 	if !host.OK() {
-		log.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
 	return host, err
@@ -730,7 +729,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 			if netname == "" {
 				network, err := s.GetNetwork(netid)
 				if err != nil {
-					log.Errorf("failed to get network '%s'", netid)
+					logrus.Errorf("failed to get network '%s'", netid)
 					continue
 				}
 				hostNetworkV1.NetworksByID[netid] = network.Name
@@ -907,7 +906,7 @@ func (s *Stack) DeleteHost(id string) error {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		log.Errorf("failed to remove host '%s': %s", id, outerRetryErr.Error())
+		logrus.Errorf("failed to remove host '%s': %s", id, outerRetryErr.Error())
 		return err
 	}
 	return nil
@@ -955,7 +954,7 @@ func (s *Stack) attachFloatingIP(host *resources.Host) (*FloatingIP, error) {
 	if err != nil {
 		derr := s.DeleteFloatingIP(fip.ID)
 		if derr != nil {
-			log.Warnf("Error deleting floating ip: %v", derr)
+			logrus.Warnf("Error deleting floating ip: %v", derr)
 		}
 		return nil, fmt.Errorf("failed to attach Floating IP to host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}

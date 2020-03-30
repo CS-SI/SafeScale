@@ -21,12 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-
 	pb "github.com/CS-SI/SafeScale/lib"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
-
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
@@ -43,7 +40,7 @@ func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +53,7 @@ func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +67,7 @@ func (h *host) Status(name string, timeout time.Duration) (*pb.HostStatus, error
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +80,7 @@ func (h *host) Reboot(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return err
 	}
@@ -97,7 +94,7 @@ func (h *host) Start(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return err
 	}
@@ -110,7 +107,7 @@ func (h *host) Stop(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return err
 	}
@@ -124,7 +121,7 @@ func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, e
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +134,7 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return err
 	}
@@ -179,7 +176,7 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +185,7 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	sshCfg := conv.ToSystemSSHConfig(pbSSHCfg)
+	sshCfg := srvutils.ToSystemSSHConfig(pbSSHCfg)
 	// if err == nil {
 	// 	nerr := sshCfgCache.Set(name, sshCfg)
 	// 	if nerr != nil {
@@ -202,7 +199,7 @@ func (h *host) Resize(def pb.HostDefinition, duration time.Duration) (*pb.Host, 
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := srvutils.GetContext(true)
 	if err != nil {
 		return nil, err
 	}

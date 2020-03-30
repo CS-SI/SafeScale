@@ -25,7 +25,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -70,7 +69,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	// Map resources.Host to pb.Host
 	var pbTemplates []*pb.HostTemplate
 	for _, template := range templates {
-		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))
+		pbTemplates = append(pbTemplates, srvutils.ToPBHostTemplate(&template))
 	}
 	rv := &pb.TemplateList{Templates: pbTemplates}
 	return rv, nil

@@ -20,19 +20,16 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/grpc/status"
-
 	log "github.com/sirupsen/logrus"
 
-	"google.golang.org/grpc/codes"
-
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -113,7 +110,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	}
 
 	log.Infof("Network '%s' successfuly created.", networkName)
-	return conv.ToPBNetwork(network), nil
+	return srvutils.ToPBNetwork(network), nil
 }
 
 // List existing networks
@@ -151,7 +148,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	// Map resources.Network to pb.Network
 	var pbnetworks []*pb.Network
 	for _, network := range networks {
-		pbnetworks = append(pbnetworks, conv.ToPBNetwork(network))
+		pbnetworks = append(pbnetworks, srvutils.ToPBNetwork(network))
 	}
 	rv = &pb.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -194,7 +191,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect network '%s': not found", ref))
 	}
 
-	return conv.ToPBNetwork(network), nil
+	return srvutils.ToPBNetwork(network), nil
 }
 
 // Delete a network

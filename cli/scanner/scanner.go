@@ -214,7 +214,7 @@ func RunScanner(targetedTenant string) {
 		if isScannable {
 			tenantName, found := tenant.(map[string]interface{})["name"].(string)
 			if !found {
-				panic(fmt.Sprintf("There is a scannable tenant without name"))
+				panic("There is a scannable tenant without name")
 			}
 			targetedProviders = append(targetedProviders, tenantName)
 		}
