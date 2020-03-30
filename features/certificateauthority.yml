@@ -47,6 +47,18 @@ feature:
                             hosts: yes
                             masters: one
                         run: |
+                            case $LINUX_KIND in
+                                centos|redhat)
+                                    yum install -y openssl || sfFail 192 "Unable to install openssl"
+                                    ;;
+                                debian|ubuntu)
+                                    sfApt install -y openssl || sfFail 192 "Unable to install openssl"
+                                    ;;
+                                *)
+                                    sfFail 1 "unmanaged Linux distribution '$LINUX_KIND'"
+                                    ;;
+                            esac
+
                             [ -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfExit
 
                             mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,newcerts,private}
