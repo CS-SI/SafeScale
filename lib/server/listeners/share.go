@@ -27,7 +27,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	convert "github.com/CS-SI/SafeScale/lib/server/utils"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -82,7 +81,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 		tbr := scerr.Wrap(err, fmt.Sprintf("cannot create share '%s'", shareName))
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
-	return convert.ToPBShare(in.GetName(), share), err
+	return srvutils.ToPBShare(in.GetName(), share), err
 }
 
 // Delete call share service deletion
@@ -161,7 +160,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (sl 
 	var pbshares []*pb.ShareDefinition
 	for k, item := range shares {
 		for _, share := range item {
-			pbshares = append(pbshares, convert.ToPBShare(k, share))
+			pbshares = append(pbshares, srvutils.ToPBShare(k, share))
 		}
 	}
 	list := &pb.ShareList{ShareList: pbshares}
@@ -203,7 +202,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 		tbr := scerr.Wrap(err, fmt.Sprintf("cannot mount share '%s'", shareRef))
 		return nil, status.Errorf(codes.Internal, tbr.Error())
 	}
-	return convert.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
+	return srvutils.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
 }
 
 // Unmount unmounts share from the given host
@@ -282,5 +281,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 		return nil, resources.ResourceNotFoundError("share", shareRef)
 	}
 
-	return convert.ToPBShareMountList(host.Name, share, mounts), nil
+	return srvutils.ToPBShareMountList(host.Name, share, mounts), nil
 }

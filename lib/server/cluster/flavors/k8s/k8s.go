@@ -347,7 +347,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	clientSSH := client.New().SSH
 
 	// Check worker belongs to k8s
-	cmd := fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
+	cmd := "sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2"
 	retcode, retout, _, err := clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
@@ -378,7 +378,7 @@ func leaveNodeFromCluster(task concurrency.Task, b control.Foreman, pbHost *pb.H
 	}
 
 	// check node no longer belongs to k8s
-	cmd = fmt.Sprintf("sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2")
+	cmd = "sudo -u cladm -i kubectl get node --selector='!node-role.kubernetes.io/master' | tail -n +2"
 	retcode, retout, _, err = clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err

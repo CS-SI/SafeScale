@@ -19,8 +19,9 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 
 	// "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
 
@@ -682,10 +683,11 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 		warnings, errs := getPhaseWarningsAndErrors(task.GetContext(), sshHandler, gw)
 
 		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gw.Name, returnCode, warnings, errs)
-	} else {
-		// FIXME AWS Retrieve data anyway
-		retrieveForensicsData(task.GetContext(), sshHandler, gw)
 	}
+
+	// FIXME: AWS Retrieve data anyway
+	retrieveForensicsData(task.GetContext(), sshHandler, gw)
+
 	logrus.Infof("Gateway '%s' successfully configured.", gw.Name)
 
 	// Reboot gateway

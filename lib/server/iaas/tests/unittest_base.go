@@ -19,9 +19,10 @@ package tests
 // TODO NOTICE Side-effects imports here
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -286,7 +287,7 @@ func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
 	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_6", true, "1.1.1.0/24")
 	require.NotNil(t, network1)
 	require.NotNil(t, kp1)
-	fmt.Println(fmt.Sprintf("Created a Network with name %v and id %v", network1.Name, kp1.ID))
+	fmt.Printf("Created a Network with name %v and id %v\n", network1.Name, kp1.ID)
 
 	networkFound := false
 
