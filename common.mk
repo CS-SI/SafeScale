@@ -14,6 +14,26 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
+ifneq (, $(GOOS))
+ifneq (, $(GOARCH))
+ifneq (, $(GOBIN))
+$(error "Cross compilation cannot work with GOBIN defined. Stopping build.")
+endif
+endif
+endif
+
+ifneq (, $(GOOS))
+ifeq (, $(GOARCH))
+$(error "Cross compilation requires both GOOS and GOARCH to be specified. Stopping build.")
+endif
+endif
+
+ifeq (, $(GOOS))
+ifneq (, $(GOARCH))
+$(error "Cross compilation requires both GOOS and GOARCH to be specified. Stopping build.")
+endif
+endif
+
 ifeq (, $(GOOS))
 RACE_CHECK=-race
 else
