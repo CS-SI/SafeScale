@@ -829,9 +829,9 @@ func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case "InvalidVpcID.NotFound":
-				return fmt.Errorf("Unable to find VPC with ID %q.", vpcID)
+				return fmt.Errorf("unable to find VPC with ID %q.", vpcID)
 			case "InvalidGroup.Duplicate":
-				return fmt.Errorf("Security group %q already exists.", name)
+				return fmt.Errorf("security group %q already exists.", name)
 			}
 		}
 		return fmt.Errorf("unable to create security group %q, %v", name, err)
