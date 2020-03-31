@@ -64,8 +64,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 
 	var theVpc *ec2.Vpc
 
-	// FIXME Check if network already there...
-
+	// Check if network already there
 	out, err := s.EC2Service.DescribeVpcs(&ec2.DescribeVpcsInput{})
 	if err != nil {
 		return nil, err
@@ -88,6 +87,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		}
 	}
 
+	// if not, create the network
 	if theVpc == nil {
 		vpcOut, err := s.EC2Service.CreateVpc(&ec2.CreateVpcInput{
 			CidrBlock: aws.String(req.CIDR),
@@ -99,6 +99,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		theVpc = vpcOut.Vpc
 	}
 
+	// wait until available status
 	if IsOperation(theVpc, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
@@ -124,6 +125,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		}
 	}
 
+	// resource tagging
 	_, err = s.EC2Service.CreateTags(&ec2.CreateTagsInput{
 		Resources: []*string{theVpc.VpcId},
 		Tags: []*ec2.Tag{
