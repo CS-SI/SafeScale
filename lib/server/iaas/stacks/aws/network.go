@@ -201,6 +201,10 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		}()
 	}
 
+	if len(subnetsResult) == 0 {
+		return nil, fmt.Errorf("unable to create any subnet")
+	}
+
 	var subnetIds []*string
 	for _, snid := range subnetsResult {
 		subnetIds = append(subnetIds, snid.Subnet.SubnetId)
