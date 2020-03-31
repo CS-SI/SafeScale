@@ -1049,14 +1049,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 				Name:   aws.String("instance-id"),
 				Values: []*string{aws.String(hostRef)},
 			},
-			/*
-				{
-					Name: aws.String("tag:Name"),
-					Values: []*string{
-						aws.String(hostRef),
-					},
-				},
-			*/
 		},
 	})
 	if err != nil {
@@ -1083,6 +1075,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, scerr.NotFoundError(fmt.Sprintf("host %s not found", hostRef))
 	}
 
+	instanceName := ""
 	instanceType := ""
 
 	for _, r := range awsHost.Reservations {
@@ -1090,6 +1083,16 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			host.LastState, err = getAwsInstanceState(i.State)
 			if err != nil {
 				return nil, err
+			}
+
+			for _, tag := range i.Tags {
+				if tag != nil {
+					if aws.StringValue(tag.Key) == "Name" || aws.StringValue(tag.Key) == "tag:Name" {
+						if aws.StringValue(tag.Value) != "" {
+							instanceName = aws.StringValue(tag.Value)
+						}
+					}
+				}
 			}
 
 			if aws.StringValue(i.InstanceType) != "" {
@@ -1166,6 +1169,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	if err != nil {
 		return nil, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
 	}
+
+	host.Name = instanceName
 
 	if !host.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
@@ -1319,11 +1324,28 @@ func (s *Stack) DeleteHost(id string) error {
 	var keyPairName string
 	var secGroupId string
 
+	var attachedVolumes []string
+
 	if dio != nil {
 		if len(dio.Reservations) > 0 {
 			res := dio.Reservations[0]
 			if len(res.Instances) > 0 {
 				inst := res.Instances[0]
+
+				// register attached volumes
+				for _, attVol := range inst.BlockDeviceMappings {
+					if attVol != nil {
+						if attVol.Ebs != nil {
+							if attVol.Ebs.VolumeId != nil {
+								volume := aws.StringValue(attVol.Ebs.VolumeId)
+								if volume != "" {
+									attachedVolumes = append(attachedVolumes, volume)
+								}
+							}
+						}
+					}
+				}
+
 				if inst != nil {
 					keyPairName = aws.StringValue(inst.KeyName)
 					if len(inst.SecurityGroups) > 0 {
@@ -1363,6 +1385,16 @@ func (s *Stack) DeleteHost(id string) error {
 			return fmt.Errorf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout())
 		}
 		return retryErr
+	}
+
+	// Delete volumes if there, mark errors as warnings
+	for _, volume := range attachedVolumes {
+		_, err = s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{
+			VolumeId: aws.String(volume),
+		})
+		if err != nil {
+			logrus.Warnf("problem cleaning up, deleting volume %s", volume)
+		}
 	}
 
 	// Delete security group
