@@ -30,6 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -39,6 +41,9 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+
+	tracer := concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()()
 
 	// disable subnetwork auto-creation
 	ne := compute.Network{
@@ -90,6 +95,13 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	net := abstract.NewNetwork()
 	net.ID = strconv.FormatUint(necreated.Id, 10)
 	net.Name = necreated.Name
+
+	// Checks if CIDR is valid...
+	if req.CIDR == "" {
+		tracer.Trace("CIDR is empty, choosing one...")
+		req.CIDR = "192.168.1.0/24"
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
+	}
 
 	// Create subnetwork
 

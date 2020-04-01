@@ -74,12 +74,25 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()()
+	tracer := concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()()
 
 	// Checks if CIDR is valid...
 	_, _, err = net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return nil, scerr.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
+	}
+
+	// Checks if CIDR is valid...
+	if req.CIDR != "" {
+		_, _, err = net.ParseCIDR(req.CIDR)
+		if err != nil {
+			return nil, scerr.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
+		}
+	} else { // CIDR is empty, choose the first Class C one possible
+		tracer.Trace("CIDR is empty, choosing one...")
+		req.CIDR = "192.168.1.0/24"
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
 	// We specify a name and that it should forward packets
@@ -636,14 +649,18 @@ func (s *Stack) deleteSubnet(id string) (err error) {
 		func() error {
 			r := subnets.Delete(s.NetworkClient, id)
 			err = r.ExtractErr()
-
-			if _, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
+			switch err.(type) {
+			case gophercloud.ErrDefault409:
+				msg := fmt.Sprintf("hosts or services are still attached")
+				logrus.Warnf(strprocess.Capitalize(msg))
+				return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
+			case gophercloud.ErrUnexpectedResponseCode:
 				neutronError := ParseNeutronError(err.Error())
 				switch neutronError["type"] {
 				case "SubnetInUse":
 					msg := fmt.Sprintf("hosts or services are still attached")
 					logrus.Warnf(strprocess.Capitalize(msg))
-					return abstract.ResourceNotAvailableError("subnet", id)
+					return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
 				default:
 					logrus.Debugf("NeutronError: type = %s", neutronError["type"])
 				}
