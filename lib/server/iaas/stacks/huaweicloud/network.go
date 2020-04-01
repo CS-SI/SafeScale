@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -206,13 +207,34 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 
 	// Checks if CIDR is valid...
 	_, vpcnetDesc, _ := net.ParseCIDR(s.vpc.CIDR)
-	_, networkDesc, err := net.ParseCIDR(req.CIDR)
-	if err != nil {
-		return nil, scerr.Wrap(err, "failed to create subnet '%s (%s)'", req.Name, req.CIDR)
-	}
-	// .. and if CIDR is inside VPC's one
-	if !cidrIntersects(vpcnetDesc, networkDesc) {
-		return nil, scerr.InvalidRequestError("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR)
+	if req.CIDR != "" {
+		_, networkDesc, err := net.ParseCIDR(req.CIDR)
+		if err != nil {
+			return nil, scerr.Wrap(err, "failed to create subnet '%s (%s)'", req.Name, req.CIDR)
+		}
+		// ... and if CIDR is inside VPC's one
+		if !utils.CIDROverlap(*vpcnetDesc, *networkDesc) {
+			return nil, scerr.InvalidRequestError("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR)
+		}
+		if vpcnetDesc.IP.Equal(networkDesc.IP) {
+			return nil, scerr.InvalidRequestError("cannot create subnet with CIDR '%s': network part of CIDR is equal to VPC one (%s)", req.CIDR, networkDesc.IP.String())
+		}
+	} else { // CIDR is empty, choose the first Class C one possible
+		tracer.Trace("CIDR is empty, choosing one...")
+
+		mask, _ := vpcnetDesc.Mask.Size()
+		var bitShift uint8
+		if mask >= 24 {
+			bitShift = 1
+		} else {
+			bitShift = 24 - uint8(mask)
+		}
+		ipNet, err := utils.FirstIncludedSubnet(*vpcnetDesc, bitShift)
+		if err != nil {
+			return nil, scerr.Wrap(err, "failed to choose a CIDR for the subnet")
+		}
+		req.CIDR = ipNet.String()
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
 	// Creates the subnet
@@ -383,30 +405,6 @@ type subnetDeleteResult struct {
 	gophercloud.ErrResult
 }
 
-// convertIPv4ToNumber converts a net.IP to a uint32 representation
-func convertIPv4ToNumber(ip net.IP) (uint32, error) {
-	if ip.To4() == nil {
-		return 0, scerr.InvalidParameterError("ip", "not an IPv4")
-	}
-	n := uint32(ip[0])*0x1000000 + uint32(ip[1])*0x10000 + uint32(ip[2])*0x100 + uint32(ip[3])
-	return n, nil
-}
-
-// convertNumberToIPv4 converts a uint32 representation of an IPv4 Address to net.IP
-func convertNumberToIPv4(n uint32) net.IP {
-	a := byte(n >> 24)
-	b := byte((n & 0xff0000) >> 16)
-	c := byte((n & 0xff00) >> 8)
-	d := byte(n & 0xff)
-	IP := net.IPv4(a, b, c, d)
-	return IP
-}
-
-// cidrIntersects tells if the 2 CIDR passed as parameter intersect
-func cidrIntersects(n1, n2 *net.IPNet) bool {
-	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
-}
-
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
 	const CANNOT = "cannot create subnet"
@@ -420,17 +418,14 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	for _, s := range *subnetworks {
 		_, sDesc, _ := net.ParseCIDR(s.CIDR)
-		if cidrIntersects(networkDesc, sDesc) {
+		if utils.CIDROverlap(*networkDesc, *sDesc) {
 			return nil, scerr.Wrap(err, "would intersect with '%s (%s)'", s.Name, s.CIDR)
 		}
 	}
 
 	// Calculate IP address for gateway
-	n, err := convertIPv4ToNumber(network.To4())
-	if err != nil {
-		return nil, scerr.NewError("failed to choose gateway IP address for the subnet: %s", openstack.ProviderErrorToString(err))
-	}
-	gw := convertNumberToIPv4(n + 1)
+	n := utils.IPv4ToUInt32(network)
+	gw := utils.UInt32ToIPv4(n + 1)
 
 	dnsList := s.cfgOpts.DNSList
 	if len(dnsList) == 0 {

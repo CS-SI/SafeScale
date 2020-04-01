@@ -165,7 +165,7 @@ var networkCreate = &cli.Command{
 		&cli.StringFlag{
 			Name:    "cidr",
 			Aliases: []string{"N"},
-			Value:   "192.168.0.0/24",
+			Value:   "",
 			Usage:   "cidr of the network",
 		},
 		&cli.StringFlag{

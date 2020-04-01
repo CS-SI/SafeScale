@@ -47,6 +47,10 @@ func ProviderErrorToString(err error) string {
 		return fmt.Sprintf("code: 404, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault404:
 		return fmt.Sprintf("code: 404, reason: %s", string(e.Body))
+	case gophercloud.ErrDefault409:
+		return fmt.Sprintf("code: 409, reason: %s", string(e.Body))
+	case *gophercloud.ErrDefault409:
+		return fmt.Sprintf("code: 409, reason: %s", string(e.Body))
 	case gophercloud.ErrDefault500:
 		return fmt.Sprintf("code: 500, reason: %s", string(e.Body))
 	case *gophercloud.ErrDefault500:

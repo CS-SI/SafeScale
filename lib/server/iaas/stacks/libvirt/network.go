@@ -130,6 +130,11 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	name := req.Name
 	ipVersion := req.IPVersion
 	cidr := req.CIDR
+	if cidr == "" {
+		tracer.Trace("CIDR is empty, choosing one...")
+		req.CIDR = "192.168.1.0/24"
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
+	}
 	dns := req.DNSServers
 
 	if ipVersion != ipversion.IPv4 {
