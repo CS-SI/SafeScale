@@ -38,7 +38,7 @@ WORKDIR /tmp
 # ----------------------
 RUN wget https://dl.google.com/go/go$GOVERSION.linux-amd64.tar.gz \
 && tar -C /usr/local -xzf go$GOVERSION.linux-amd64.tar.gz
-ENV PATH $PATH:/usr/local/go/bin:/go/bin
+ENV PATH $PATH:/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 RUN rm /tmp/go$GOVERSION.linux-amd64.tar.gz
 
 # ----------------------
