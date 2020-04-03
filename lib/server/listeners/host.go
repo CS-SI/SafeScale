@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"github.com/asaskevich/govalidator"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -114,14 +113,14 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 }
 
 // Stop shutdowns a host.
-func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot stop host").ToGRPCStatus()
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}
@@ -164,14 +163,14 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 }
 
 // Reboot reboots a host.
-func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot reboot host").ToGRPCStatus()
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}
@@ -490,14 +489,14 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 }
 
 // Delete an host
-func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empty *google_protobuf.Empty, err error) {
+func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot delete host").ToGRPCStatus()
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}

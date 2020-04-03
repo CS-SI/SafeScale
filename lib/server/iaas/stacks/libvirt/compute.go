@@ -20,11 +20,7 @@ package local
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -41,20 +37,23 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
+	"google.golang.org/appengine/log"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"golang.org/x/crypto/ssh"
 )
 
 // The createds hosts could be connected to the network with a bridge or a nat
@@ -1066,27 +1065,18 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	host = abstract.NewHostFull()
-	switch hostParam := hostParam.(type) {
-	case string:
-		if hostParam == "" {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
-		}
-		host.Core.ID = hostParam
-	case *abstract.HostCore:
-		if hostParam == nil {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
-		}
-		host.Core = hostParam
-	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *abstract.HostCore")
+	ahc, hostRef, err := stacks.ValidateHostParam(hostParam)
+	if err != nil {
+		return err
 	}
 
-	newHost, _, err := s.getHostAndDomainFromRef(host.Core.ID)
+	newHost, _, err := s.getHostAndDomainFromRef(ahc.ID)
 	if err != nil {
 		return nil, err
 	}
 
+	host := abstract.NewHostFulle()
+	host.Core = ahc
 	if err = s.complementHost(host, newHost); err != nil {
 		return nil, scerr.Wrap(err, "failed to complement the host")
 	}

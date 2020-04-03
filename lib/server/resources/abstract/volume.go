@@ -87,6 +87,24 @@ func (v *Volume) Deserialize(buf []byte) error {
 	return serialize.FromJSON(buf, v)
 }
 
+// SafeGetName returns the name of the volume
+// Satisfies interface data.Identifyable
+func (v *Volume) SafeGetName() string {
+	if v == nil {
+		return ""
+	}
+	return v.Name
+}
+
+// SafeGetID returns the ID of the volume
+// Satisfies interface data.Identifyable
+func (v *Volume) SafeGetID() string {
+	if v == nil {
+		return ""
+	}
+	return v.ID
+}
+
 // VolumeAttachmentRequest represents a volume attachment request
 type VolumeAttachmentRequest struct {
 	Name     string `json:"name,omitempty"`

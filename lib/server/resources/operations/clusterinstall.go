@@ -138,7 +138,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	}
 	var controlPlaneV1 *propertiesv1.ClusterControlPlane
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.ControlPlaneV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.ControlPlaneV1, func(clonable data.Clonable) error {
 			var ok bool
 			controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlPlane)
 			if !ok {
@@ -492,7 +492,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -539,7 +539,7 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -590,7 +590,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -632,7 +632,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())

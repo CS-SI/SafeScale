@@ -17,7 +17,6 @@
 package utils
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -29,25 +28,21 @@ var networks = map[string]*net.IPNet{}
 
 // CIDRToIPv4Range converts CIDR to IPv4 range
 func CIDRToIPv4Range(cidr string) (string, string, error) {
-	start, end, err := CIDRToLongRange(cidr)
+	start, end, err := CIDRToUInt32Range(cidr)
 	if err != nil {
 		return "", "", err
 	}
 
-	ipStart := LongToIPv4(start)
-	ipEnd := LongToIPv4(end)
+	ipStart := UInt32ToIPv4String(start)
+	ipEnd := UInt32ToIPv4String(end)
 
 	return ipStart, ipEnd, nil
 }
 
-// CIDRToLongRange converts CIDR to range of long values (representing IPv4 addresses)
-func CIDRToLongRange(cidr string) (uint32, uint32, error) {
+// CIDRToUInt32Range converts CIDR to IPv4 range
+func CIDRToUInt32Range(cidr string) (uint32, uint32, error) {
 	if cidr == "" {
 		return 0, 0, scerr.InvalidParameterError("cidr", "cannot be empty string")
-	}
-	_, _, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return 0, 0, scerr.InvalidParameterError("cidr", "Not a valid CIDR")
 	}
 
 	var (
@@ -57,7 +52,7 @@ func CIDRToLongRange(cidr string) (uint32, uint32, error) {
 	)
 
 	splitted := strings.Split(cidr, "/")
-	ip = IPv4ToLong(splitted[0])
+	ip = IPv4StringToUInt32(splitted[0])
 	bits, _ := strconv.ParseUint(splitted[1], 10, 32)
 
 	if start == 0 || start > ip {
@@ -72,21 +67,37 @@ func CIDRToLongRange(cidr string) (uint32, uint32, error) {
 	return start, end, nil
 }
 
-// IPv4ToLong converts IPv4 to uint32
-func IPv4ToLong(ip string) uint32 {
+// IPv4ToUInt32 converts net.IP to uint32
+func IPv4ToUInt32(ip net.IP) uint32 {
+	ipv4 := ip.To4() // make sure we have the version with 4 first significant bytes
+	result := (uint32(ipv4[0]) << 24) | (uint32(ipv4[1]) << 16) | (uint32(ipv4[2]) << 8) | uint32(ipv4[3])
+	return uint32(result)
+}
+
+// IPv4StringToUInt32 converts IPv4 to uint32
+func IPv4StringToUInt32(ip string) uint32 {
 	parts := [4]uint64{}
 
 	for i, v := range strings.SplitN(ip, ".", 4) {
 		parts[i], _ = strconv.ParseUint(v, 10, 32)
 	}
-
 	result := (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]
 	return uint32(result)
 }
 
-// LongToIPv4 converts uint32 to IP
-func LongToIPv4(value uint32) string {
-	return fmt.Sprintf("%d.%d.%d.%d", value>>24, (value&0x00FFFFFF)>>16, (value&0x0000FFFF)>>8, value&0x000000FF)
+// UInt32ToIPv4 converts uint32 to net.IP
+func UInt32ToIPv4(value uint32) net.IP {
+	return net.IP{
+		byte(value >> 24),
+		byte((value & 0x00FFFFFF) >> 16),
+		byte((value & 0x0000FFFF) >> 8),
+		byte(value & 0x000000FF),
+	}
+}
+
+// UInt32ToIPv4String converts uint32 to IP
+func UInt32ToIPv4String(value uint32) string {
+	return UInt32ToIPv4(value).String()
 }
 
 // IsCIDRRoutable tells if the network is routable
@@ -104,6 +115,40 @@ func IsCIDRRoutable(cidr string) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// CIDROverlap tells if the 2 CIDR passed as parameter intersect
+func CIDROverlap(n1, n2 net.IPNet) bool {
+	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
+}
+
+// FirstIncludedSubnet takes a parent CIDR range and creates the first subnet within it
+// with the given number of additional prefix bits 'maskAddition'.
+//
+// For example, 192.168.0.0/16, extended by 8 bits becomes 192.168.1.0/24.
+func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, error) {
+	ip := base.IP
+	mask := base.Mask
+
+	parentLen, addrLen := mask.Size()
+	newPrefixLen := parentLen + int(maskAddition)
+
+	if newPrefixLen > addrLen {
+		return net.IPNet{}, scerr.OverflowError(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
+	}
+
+	maxNetNum := uint64(1<<uint64(maskAddition)) - 1
+	if uint64(1) > maxNetNum {
+		return net.IPNet{}, scerr.OverflowError(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
+	}
+
+	ipAsNumber := IPv4ToUInt32(ip)
+	bitShift := uint32(32 - newPrefixLen)
+	ipAsNumber |= 1 << bitShift
+	return net.IPNet{
+		IP:   UInt32ToIPv4(ipAsNumber),
+		Mask: net.CIDRMask(newPrefixLen, addrLen),
+	}, nil
 }
 
 func init() {

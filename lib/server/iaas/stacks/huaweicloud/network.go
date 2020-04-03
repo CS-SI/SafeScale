@@ -578,12 +578,19 @@ func (s *Stack) deleteSubnet(id string) error {
 			if r == nil {
 				return scerr.NewError("failed to acknowledge DELETE command submission")
 			}
-			if r.StatusCode == 204 || r.StatusCode == 404 {
+			switch r.StatusCode {
+			case 404:
+				logrus.Infof("subnet '%s' not found, considered as success", id)
+				fallthrough
+			case 200, 204:
 				return nil
+			case 409:
+				return fmt.Errorf("409")
+			default:
+				return fmt.Errorf("DELETE command failed with status %d", r.StatusCode)
 			}
-			return fmt.Errorf("DELETE command failed with status %d", r.StatusCode)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostCleanupTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil,
 		func(t retry.Try, verdict verdict.Enum) {
@@ -598,12 +605,12 @@ func (s *Stack) deleteSubnet(id string) error {
 		},
 	)
 	if err != nil {
-		return scerr.Wrap(err, "failed to submit deletion of subnet id '%s'")
+		return scerr.Wrap(err, "failed to submit deletion of subnet '%s'", id)
 	}
 	// Deletion submit has been executed, checking returned error code
 	err = resp.ExtractErr()
 	if err != nil {
-		return scerr.NewError("error deleting subnet id '%s': %s", id, openstack.ProviderErrorToString(err))
+		return scerr.NewError("error deleting subnet '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -630,13 +637,10 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 }
 
 func fromIntIPVersion(v int) ipversion.Enum {
-	if v == 4 {
-		return ipversion.IPv4
-	}
 	if v == 6 {
 		return ipversion.IPv6
 	}
-	return -1
+	return ipversion.IPv4
 }
 
 // CreateGateway creates a gateway for a network.

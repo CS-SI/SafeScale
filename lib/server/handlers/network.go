@@ -29,8 +29,6 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers NetworkHandler
 
-// TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
-
 // NetworkHandler defines API to manage networks
 type NetworkHandler interface {
 	Create(string, string, ipversion.Enum, abstract.HostSizingRequirements, string, string, bool) (resources.Network, error)
@@ -39,8 +37,7 @@ type NetworkHandler interface {
 	Delete(string) error
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
-// FIXME Technical debt Input verification
+// FIXME: Technical debt Input verification
 
 // networkHandler an implementation of NetworkAPI
 type networkHandler struct {
@@ -80,7 +77,8 @@ func (handler *networkHandler) Create(
 		"('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	objn, err := networkfactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -110,7 +108,8 @@ func (handler *networkHandler) List(all bool) (netList []*abstract.Network, err 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	objn, err := networkfactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -139,7 +138,8 @@ func (handler *networkHandler) Inspect(ref string) (network resources.Network, e
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	return networkfactory.Load(task, handler.job.SafeGetService(), ref)
 }
@@ -159,12 +159,12 @@ func (handler *networkHandler) Delete(ref string) (err error) {
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	objn, err := networkfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err == nil {
-		err = objn.Delete(task)
+	if err != nil {
+		return err
 	}
-	return err
+	return objn.Delete(task)
 }

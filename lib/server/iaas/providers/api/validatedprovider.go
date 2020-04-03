@@ -294,15 +294,7 @@ func (w ValidatedProvider) InspectHost(something interface{}) (res *abstract.Hos
 }
 
 // WaitHostReady ...
-func (w ValidatedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.HostCore, err error) {
-	res, err = w.InnerProvider.WaitHostReady(hostParam, timeout)
-	if err != nil {
-		if res != nil {
-			if !res.OK() {
-				logrus.Warnf("Invalid host: %v", *res)
-			}
-		}
-	}
+func (w ValidatedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) error {
 	return w.InnerProvider.WaitHostReady(hostParam, timeout)
 }
 

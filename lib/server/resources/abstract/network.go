@@ -134,6 +134,24 @@ func (n *Network) Deserialize(buf []byte) (err error) {
 	return serialize.FromJSON(buf, n)
 }
 
+// SafeGetName ...
+// satisfies interface data.Identifyable
+func (n *Network) SafeGetName() string {
+	if n == nil {
+		return ""
+	}
+	return n.Name
+}
+
+// SafeGetID ...
+// satisfies interface data.Identifyable
+func (n *Network) SafeGetID() string {
+	if n == nil {
+		return ""
+	}
+	return n.ID
+}
+
 // VirtualIP is a structure containing information needed to manage VIP (virtual IP)
 type VirtualIP struct {
 	ID        string      `json:"id,omitempty"`

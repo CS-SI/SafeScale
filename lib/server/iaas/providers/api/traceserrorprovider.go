@@ -32,7 +32,7 @@ import (
 type ErrorTraceProvider WrappedProvider
 
 // WaitHostReady ...
-func (w ErrorTraceProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (host *abstract.HostCore, err error) {
+func (w ErrorTraceProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)

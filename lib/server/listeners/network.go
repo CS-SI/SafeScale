@@ -27,7 +27,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
@@ -107,24 +106,18 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	sizing.Image = in.Gateway.GetImageId()
 
 	handler := handlers.NewNetworkHandler(job)
-	r, err := task.Run(
-		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
-			return handler.Create(
-				networkName,
-				in.GetCidr(),
-				ipversion.IPv4,
-				*sizing,
-				gwImageID,
-				gwName,
-				in.FailOver,
-			)
-		},
-		nil,
+	network, err := handler.Create(
+		networkName,
+		in.GetCidr(),
+		ipversion.IPv4,
+		*sizing,
+		gwImageID,
+		gwName,
+		in.FailOver,
 	)
 	if err != nil {
 		return nil, err
 	}
-	network := r.(resources.Network)
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)
 	return network.ToProtocol(task)

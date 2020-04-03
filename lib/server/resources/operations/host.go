@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -72,7 +73,7 @@ func NewHost(svc iaas.Service) (resources.Host, error) {
 		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	core, err := NewCore(svc, "host", hostsFolderName)
+	core, err := NewCore(svc, "host", hostsFolderName, &abstract.HostCore{})
 	if err != nil {
 		return nil, err
 	}
@@ -320,14 +321,20 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// }
 
 	// If hostReq.ImageID is not explicitely defined, find an image ID corresponding to the content of hostDef.Image
-	if hostReq.ImageID == "" && hostDef.Image != "" {
-		var img *abstract.Image
+	if hostReq.ImageID == "" {
+		if hostDef.Image == "" {
+			cfg, err := svc.GetConfigurationOptions()
+			if err != nil {
+				return err
+			}
+			hostDef.Image = cfg.GetString("DefaultImage")
+		}
 
-		hostDef.Image = hostReq.ImageID
+		var img *abstract.Image
 		err = retry.WhileUnsuccessfulDelay1Second(
 			func() error {
 				var inErr error
-				img, inErr = svc.SearchImage(hostReq.ImageID)
+				img, inErr = svc.SearchImage(hostDef.Image)
 				return inErr
 			},
 			10*time.Second,
@@ -364,7 +371,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// Updates properties in metadata
 	err = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) error {
+		innerErr := props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
 			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -388,7 +395,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}()
 
 		// Sets host extension DescriptionV1
-		innerErr = props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
+		innerErr = props.Alter(task, hostproperty.DescriptionV1, func(clonable data.Clonable) error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -419,7 +426,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		// 	defaultNetworkID string
 		// 	gatewayID string
 		// )
-		return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -461,7 +468,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// -- update host property propertiesv1.System --
 	err = rh.Alter(task, func(clonable data.Clonable, properties *serialize.JSONProperties) error {
-		return properties.Alter(hostproperty.SystemV1, func(clonable data.Clonable) error {
+		return properties.Alter(task, hostproperty.SystemV1, func(clonable data.Clonable) error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -552,7 +559,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase string) (string, e
 		}
 		if abstract.IsProvisioningError(err) {
 			logrus.Errorf("%+v", err)
-			return status, scerr.Wrap(err, "error creating the host [%s], error provisioning the new host, please check safescaled logs", rh.SafeGetName())
+			return status, scerr.Wrap(err, "error creating host '%s': error provisioning the new host, please check safescaled logs", rh.SafeGetName())
 		}
 		return status, err
 	}
@@ -565,7 +572,7 @@ func (rh *host) updateNetwork(task concurrency.Task, networkID string) error {
 		return err
 	}
 	return objn.Alter(task, func(clonable data.Clonable, properties *serialize.JSONProperties) error {
-		return properties.Alter(networkproperty.HostsV1, func(clonable data.Clonable) error {
+		return properties.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -655,7 +662,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 	err := rh.Alter(task, func(_ data.Clonable, properties *serialize.JSONProperties) error {
 		// Don't remove a host having shares that are currently remotely mounted
 		var shares map[string]*propertiesv1.HostShare
-		inErr := properties.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		inErr := properties.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -681,7 +688,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 		}
 
 		// Don't remove a host with volumes attached
-		inErr = properties.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+		inErr = properties.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -697,7 +704,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 		}
 
 		// Don't remove a host that is a gateway
-		inErr = properties.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		inErr = properties.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -713,7 +720,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 
 		// If host mounted shares, unmounts them before anything else
 		var mounts []*propertiesv1.HostShare
-		inErr = properties.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) error {
+		inErr = properties.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -774,7 +781,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 		}
 
 		// Update networks property prosv1.NetworkHosts to remove the reference to the host
-		inErr = properties.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		inErr = properties.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -790,7 +797,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 					continue
 				}
 				loopErr = objn.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) error {
-					return netprops.Alter(networkproperty.HostsV1, func(clonable data.Clonable) error {
+					return netprops.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
 						networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 						if !ok {
 							return scerr.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -818,6 +825,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 				// FIXME: need to remove retry from svc.DeleteHost!
 				err := svc.DeleteHost(hostID)
 				if err != nil {
+					spew.Dump(err)
 					if _, ok := err.(scerr.ErrNotFound); !ok {
 						return scerr.Wrap(err, "cannot delete host")
 					}
@@ -940,12 +948,12 @@ func (rh *host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, err er
 				User:       abstract.DefaultUser,
 			}
 
-			inErr := properties.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			inErr := properties.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 				hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				if hostNetworkV1.DefaultNetworkID != "" {
+				if !hostNetworkV1.IsGateway {
 					svc := rh.SafeGetService()
 					objn, err := LoadNetwork(task, svc, hostNetworkV1.DefaultNetworkID)
 					if err != nil {
@@ -1169,7 +1177,7 @@ func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.
 		// if inErr != nil {
 		// 	return inErr
 		// }
-		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1202,7 +1210,7 @@ func (rh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, er
 
 	var hvV1 *propertiesv1.HostVolumes
 	err := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
@@ -1380,7 +1388,7 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 		}
 
 		// updates HostFeatures property for host
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) error {
 			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
 				return scerr.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
@@ -1477,7 +1485,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 		}
 
 		// updates HostFeatures property for host
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) error {
 			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
 				return scerr.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
@@ -1511,7 +1519,7 @@ func (rh *host) GetPublicIP(task concurrency.Task) (ip string, err error) {
 	defer scerr.OnPanic(&err)()
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1552,7 +1560,7 @@ func (rh *host) GetPrivateIP(task concurrency.Task) (ip string, err error) {
 	defer scerr.OnPanic(&err)()
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1592,7 +1600,7 @@ func (rh *host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (
 	defer scerr.OnPanic(&err)()
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1664,7 +1672,7 @@ func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installme
 
 			// Ignore error in this special case; will fallback to use bash method if cannot determine operating system type and flavor
 			var index uint8
-			_ = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) error {
+			_ = props.Inspect(task, hostproperty.SystemV1, func(clonable data.Clonable) error {
 				systemV1, ok := clonable.(*propertiesv1.HostSystem)
 				if !ok {
 					logrus.Error(scerr.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String()))
@@ -1707,7 +1715,7 @@ func (rh *host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShare
 	}
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1737,7 +1745,7 @@ func (rh *host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMount
 	}
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1789,7 +1797,7 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) e
 	// FIXME: gateway stuff has to be refactored (2 gateways possible)
 	var rn resources.Network
 	err := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			var innerErr error
 			networkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
@@ -1845,7 +1853,7 @@ func (rh *host) IsClusterMember(task concurrency.Task) (yes bool, err error) {
 	}
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.ClusterMembershipV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.ClusterMembershipV1, func(clonable data.Clonable) error {
 			hostClusterMembershipV1, ok := clonable.(*propertiesv1.HostClusterMembership)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostClusterMembership' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1961,7 +1969,7 @@ func (rh *host) GetDefaultNetwork(task concurrency.Task) (objn resources.Network
 	}
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			networkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2008,12 +2016,22 @@ func (rh *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, err error)
 		if !ok {
 			return scerr.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			hostNetworkV1 = clonable.(*propertiesv1.HostNetwork)
-			return props.Inspect(hostproperty.SizingV1, func(clonable data.Clonable) error {
-				hostSizingV1 = clonable.(*propertiesv1.HostSizing)
-				return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
-					hostVolumesV1 = clonable.(*propertiesv1.HostVolumes)
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			hostNetworkV1, ok = clonable.(*propertiesv1.HostNetwork)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String)
+			}
+			return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) error {
+				hostSizingV1, ok = clonable.(*propertiesv1.HostSizing)
+				if !ok {
+					return scerr.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String)
+				}
+				return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
+					hostVolumesV1, ok = clonable.(*propertiesv1.HostVolumes)
+					if !ok {
+						return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String)
+					}
+
 					volumes = make([]string, len(hostVolumesV1.VolumesByName))
 					for _, v := range hostVolumesV1.VolumesByName {
 						volumes = append(volumes, v)

@@ -103,7 +103,7 @@ func (x *JSONProperties) Clone() *JSONProperties {
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) error) error {
+func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector func(clonable data.Clonable) error) error {
 	if x == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -112,6 +112,9 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 	}
 	if x.module == "" {
 		return scerr.InvalidInstanceContentError("x.module", "can't be empty string")
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if key == "" {
 		return scerr.InvalidParameterError("key", "cannot be empty string")
@@ -137,14 +140,16 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 	clone := item.Clone()
 	x.RUnlock()
 
-	return inspector(clone)
+	err := clone.(*jsonProperty).Shielded.Inspect(task, inspector)
+	return err
+	// return inspector(clone)
 }
 
 // Alter is used to lock an extension for write
 // Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
 // If no extension exists corresponding to the key, an empty one is created (in other words, this call
 // can't fail because a key doesn't exist).
-func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) error) error {
+func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(data.Clonable) error) error {
 	if x == nil {
 		return scerr.InvalidInstanceError()
 	}
@@ -153,6 +158,9 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) error) er
 	}
 	if x.module == "" {
 		return scerr.InvalidInstanceContentError("x.module", "cannot be empty string")
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 	if key == "" {
 		return scerr.InvalidParameterError("key", "cannot be empty string")
@@ -179,7 +187,8 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) error) er
 	}
 	clone := item.Clone()
 
-	err := alterer(clone)
+	err := clone.(*jsonProperty).Alter(task, alterer)
+	// err := alterer(clone)
 	if err != nil {
 		return err
 	}

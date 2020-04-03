@@ -35,8 +35,8 @@ type Stack struct {
 }
 
 // WaitHostReady ...
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.HostCore, error) {
-	return nil, gError
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) error {
+	return gError
 }
 
 // ListAvailabilityZones stub

@@ -213,6 +213,24 @@ func (hc *HostCore) Deserialize(buf []byte) (err error) {
 	return serialize.FromJSON(buf, hc)
 }
 
+// SafeGetName returns the name of the host
+// Satisfies interface data.Identifyable
+func (hc *HostCore) SafeGetName() string {
+	if hc == nil {
+		return ""
+	}
+	return hc.Name
+}
+
+// SafeGetID returns the ID of the host
+// Satisfies interface data.Identifyable
+func (hc *HostCore) SafeGetID() string {
+	if hc == nil {
+		return ""
+	}
+	return hc.ID
+}
+
 // HostNetwork contains network information related to Host
 type HostNetwork struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
@@ -225,6 +243,16 @@ type HostNetwork struct {
 	PublicIPv6              string            `json:"public_ip_v6,omitempty"`
 	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
 	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
+}
+
+// NewHostNetwork creates a new instance of HostNetwork
+func NewHostNetwork() *HostNetwork {
+	return &HostNetwork{
+		NetworksByID:   map[string]string{},
+		NetworksByName: map[string]string{},
+		IPv4Addresses:  map[string]string{},
+		IPv6Addresses:  map[string]string{},
+	}
 }
 
 // HostDescription contains description information for the host
@@ -249,7 +277,7 @@ func NewHostFull() *HostFull {
 	return &HostFull{
 		Core:        NewHostCore(),
 		Sizing:      NewHostEffectiveSizing(),
-		Network:     &HostNetwork{},
+		Network:     NewHostNetwork(),
 		Description: &HostDescription{},
 	}
 }

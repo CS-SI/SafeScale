@@ -8,7 +8,6 @@ import (
 	"github.com/libvirt/libvirt-go"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -19,8 +18,8 @@ type Stack struct {
 	AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.Host, error) {
-	return nil, scerr.NotImplementedError("WaitHostReady not implemented yet!") // FIXME Technical debt
+func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) error {
+	return nil, scerr.NotImplementedError("WaitHostReady not implemented yet!") // FIXME: Technical debt
 }
 
 // Build Create and initialize a ClientAPI
