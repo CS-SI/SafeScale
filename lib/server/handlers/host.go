@@ -157,7 +157,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 
 	reduce := false
 	err = objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.SizingV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) error {
 			nhs, ok := clonable.(*propertiesv1.HostSizing)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())

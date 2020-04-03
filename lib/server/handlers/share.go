@@ -174,7 +174,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		}
 
 		err = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-			return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+			return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -244,7 +244,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// Check if there is already volume mounted in the path (or in subpath)
 	var targetNetwork *propertiesv1.HostNetwork
 	err = target.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		inErr := props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) error {
+		inErr := props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostsMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -270,7 +270,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 			return inErr
 		}
 
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			var ok bool
 			targetNetwork, ok = clonable.(*propertiesv1.HostNetwork)
 			if !ok {
@@ -284,7 +284,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	shareID := objs.SafeGetID()
 	err = server.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		var ip string
-		inErr := props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		inErr := props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			serverNetwork, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -312,7 +312,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 			return inErr
 		}
 
-		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -334,7 +334,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 
 	// Mount the share on host
 	err = server.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostShare' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -396,7 +396,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 			}
 
 			derr = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) error {
+				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -414,7 +414,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	}()
 
 	err = target.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -473,7 +473,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 
 	var shareID, sharePath string
 	err = server.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -507,7 +507,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 	}
 
 	err = target.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -549,7 +549,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 
 	// Remove host from client lists of the share
 	err = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())

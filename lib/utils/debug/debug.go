@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-var settings map[string]map[string]struct{} = nil
+var settings map[string]map[string]bool = nil
 
 // RegisterTraceSettings keeps track of what has to be traced
 func RegisterTraceSettings(jsonSettings string) error {
@@ -32,7 +32,7 @@ func RegisterTraceSettings(jsonSettings string) error {
 		return scerr.DuplicateError("trace settings are already defined")
 	}
 
-	newSettings := map[string]map[string]struct{}{}
+	newSettings := map[string]map[string]bool{}
 	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
 	if err != nil {
 		return scerr.Wrap(scerr.SyntaxError(err.Error()), "no trace are enabled, an error occured loading trace settings")
@@ -47,12 +47,21 @@ func RegisterTraceSettings(jsonSettings string) error {
 			}
 			keys := strings.Split(strings.TrimSpace(part), ".")
 			key := strings.TrimSpace(keys[0])
-			if _, ok := newSettings[keys[0]]; !ok {
-				newSettings[key] = map[string]struct{}{}
+			reverse := false
+			if key[0] == '!' {
+				key = key[1:]
+				reverse = true
 			}
-			if len(keys) > 1 {
+
+			keysLength := len(keys)
+			if _, ok := newSettings[key]; !ok || (keysLength == 1 && !reverse) {
+				newSettings[key] = map[string]bool{}
+			} else if ok && keysLength == 1 && reverse {
+				delete(newSettings, key)
+			}
+			if keysLength > 1 {
 				subkey := strings.TrimSpace(keys[1])
-				newSettings[key][subkey] = struct{}{}
+				newSettings[key][subkey] = true
 			}
 		}
 	}
@@ -69,9 +78,9 @@ func IfTrace(key string) bool {
 	parts := strings.Split(key, ".")
 	// If key.subkey is defined, return true
 	if len(parts) >= 2 {
-		_, ok := settings[parts[0]][parts[1]]
+		setting, ok := settings[parts[0]][parts[1]]
 		if ok {
-			return true
+			return setting
 		}
 	}
 	// If key is defined and there is no subkey, return true (key enabled as a whole)

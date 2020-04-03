@@ -137,7 +137,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 		}
 		sshConfig.PrivateKey = hc.PrivateKey
 
-		return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())

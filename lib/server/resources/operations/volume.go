@@ -67,7 +67,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, err error) {
 		return nullVolume(), scerr.InvalidParameterError("svc", "can't be nil")
 	}
 
-	core, err := NewCore(svc, "volume", volumesFolderName)
+	core, err := NewCore(svc, "volume", volumesFolderName, &abstract.Volume{})
 	if err != nil {
 		return nullVolume(), err
 	}
@@ -185,7 +185,7 @@ func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeA
 
 	var vaV1 *propertiesv1.VolumeAttachments
 	err := objv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
@@ -232,7 +232,7 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 	}
 
 	err = objv.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
+		innerErr := props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' received", reflect.TypeOf(clonable).String())
@@ -361,7 +361,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 
 	// -- proceed some checks on volume --
 	err = objv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -390,12 +390,12 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 
 	// -- proceed some checks on target server --
 	err = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) error {
+			return props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -485,7 +485,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 
 	// -- updates target properties --
 	err = host.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+		innerErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -532,7 +532,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 			return innerErr
 		}
 
-		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -559,7 +559,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 				logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volumeName, targetName, derr)
 			}
 			derr = host.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-				innerErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+				innerErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -573,7 +573,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 				if innerErr != nil {
 					logrus.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
 				}
-				return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
+				return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 					hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -590,7 +590,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 	}()
 
 	err = objv.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
+		return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -692,7 +692,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 
 	// -- Update target attachments --
 	err = host.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) error {
+		return props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -705,7 +705,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 			}
 
 			// Obtain mounts information
-			return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) error {
+			return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -735,7 +735,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 				}
 
 				// Check if volume (or a subdir in volume) is shared
-				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) error {
+				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -788,7 +788,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 
 	// -- updates volume property propertiesv1.VolumeAttachments --
 	return objv.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
+		return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())

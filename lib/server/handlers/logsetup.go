@@ -42,9 +42,9 @@ func init() {
 	_, err := os.Stat(dirname)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("Unable to create directory %s", dirname)
+			fmt.Printf("Unable to create directory %s\n", dirname)
 		} else {
-			fmt.Printf("Directory %s stat error: %v", dirname, err)
+			fmt.Printf("Directory %s stat error: %v\n", dirname, err)
 		}
 		os.Exit(1)
 	}
@@ -52,7 +52,7 @@ func init() {
 	logFileName := utils.AbsPathify("$HOME/.safescale/safescaled-session.log")
 	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Unable to access file %s, make sure the file is writable", logFileName))
+		fmt.Printf("Unable to access file %s, make sure the file is writable\n", logFileName)
 		os.Exit(1)
 	}
 

@@ -64,13 +64,13 @@ const (
 // Cluster is the implementation of resources.Cluster interface
 type cluster struct {
 	*Core
+	concurrency.TaskedLock `json:"-"`
 	abstract.ClusterIdentity
 
-	installMethods         map[uint8]installmethod.Enum
-	lastStateCollection    time.Time
-	service                iaas.Service
-	makers                 flavors.Makers
-	concurrency.TaskedLock `json:"-"`
+	installMethods      map[uint8]installmethod.Enum
+	lastStateCollection time.Time
+	service             iaas.Service
+	makers              flavors.Makers
 }
 
 func nullCluster() *cluster {
@@ -87,7 +87,7 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, e
 	}
 	defer scerr.OnPanic(&err)()
 
-	core, err := NewCore(svc, "cluster", clustersFolderName)
+	core, err := NewCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
 	if err != nil {
 		return nullCluster(), err
 	}
@@ -133,12 +133,12 @@ func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) error {
 	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		if !props.Lookup(clusterproperty.NodesV2) {
 			// Replace NodesV1 by NodesV2 properties
-			return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+			return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 				nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				return props.Alter(clusterproperty.NodesV1, func(clonable data.Clonable) error {
+				return props.Alter(task, clusterproperty.NodesV1, func(clonable data.Clonable) error {
 					nodesV1, ok := clonable.(*propertiesv1.ClusterNodes)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv1.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -183,16 +183,15 @@ func (c *cluster) IsNull() bool {
 	return c == nil || c.Core.IsNull()
 }
 
-// // VPL: ambiguous candidate on GetName(), didn't find where yet...
-// // GetName returns the name if the cluster
-// func (c *cluster) GetName() string {
-// 	return c.Core.Name()
-// }
-//
-// // GetID returns the name of the cluster (there is no ID, but data.Identityable wants ID()
-// func (c *cluster) GetID() string {
-// 	return c.Core.Name()
-// }
+// SafeGetName returns the name if the cluster
+func (c *cluster) SafeGetName() string {
+	return c.Core.SafeGetName()
+}
+
+// SafeGetID returns the name of the cluster (there is no ID, but data.Identityable wants ID()
+func (c *cluster) SafeGetID() string {
+	return c.Core.SafeGetName()
+}
 
 // Create creates the necessary infrastructure of the Cluster
 func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (err error) {
@@ -328,7 +327,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 
 	err := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		// VPL: For now, always disable addition of feature proxycache-client
-		innerErr := props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
+		innerErr := props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -342,7 +341,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		// ENDVPL
 
 		// Sets initial state of the new cluster and create metadata
-		innerErr = props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		innerErr = props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -355,7 +354,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		}
 
 		// sets default sizing from req
-		innerErr = props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+		innerErr = props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -371,7 +370,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		}
 
 		// FUTURE: sets the cluster composition (when we will be able to manage cluster spread on several tenants...)
-		innerErr = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) error {
+		innerErr = props.Alter(task, clusterproperty.CompositeV1, func(clonable data.Clonable) error {
 			compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterComposite' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -488,7 +487,7 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
 	nodesDef.Image = imageID
 
 	err := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -554,7 +553,7 @@ func (c *cluster) createNetwork(
 
 	// Updates cluster metadata, propertiesv2.ClusterNetwork
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 			networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1082,7 +1081,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		if props.Lookup(clusterproperty.NetworkV2) {
-			return props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
+			return props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv2.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1091,7 +1090,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 				return nil
 			})
 		}
-		err = props.Inspect(clusterproperty.NetworkV1, func(clonable data.Clonable) error {
+		err = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) error {
 			networkV1 := clonable.(*propertiesv1.ClusterNetwork)
 			config = &propertiesv2.ClusterNetwork{
 				NetworkID:      networkV1.NetworkID,
@@ -1107,7 +1106,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 			return err
 		}
 
-		return props.Alter(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 			networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1183,7 +1182,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 
 	// First mark cluster to be in state Starting
 	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1204,7 +1203,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 
 	// Then start it and mark it as STARTED on success
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		innerErr := props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1217,7 +1216,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 			return scerr.Wrap(err, "failed to get list of hosts")
 		}
 		if props.Lookup(clusterproperty.NetworkV2) {
-			innerErr = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
+			innerErr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1227,7 +1226,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 				return nil
 			})
 		} else {
-			err = props.Inspect(clusterproperty.NetworkV1, func(clonable data.Clonable) error {
+			err = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) error {
 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1241,7 +1240,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 		}
 
 		// Mark cluster as state Starting
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1290,7 +1289,7 @@ func (c *cluster) Start(task concurrency.Task) (err error) {
 	}
 
 	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1355,7 +1354,7 @@ func (c *cluster) Stop(task concurrency.Task) (err error) {
 
 	// First mark cluster to be in state Stopping
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1375,7 +1374,7 @@ func (c *cluster) Stop(task concurrency.Task) (err error) {
 			masters                       []*propertiesv2.ClusterNode
 			gatewayID, secondaryGatewayID string
 		)
-		inErr := props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		inErr := props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1389,7 +1388,7 @@ func (c *cluster) Stop(task concurrency.Task) (err error) {
 		}
 
 		if props.Lookup(clusterproperty.NetworkV2) {
-			inErr = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
+			inErr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1399,7 +1398,7 @@ func (c *cluster) Stop(task concurrency.Task) (err error) {
 				return nil
 			})
 		} else {
-			inErr = props.Inspect(clusterproperty.NetworkV1, func(clonable data.Clonable) error {
+			inErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) error {
 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1448,7 +1447,7 @@ func (c *cluster) Stop(task concurrency.Task) (err error) {
 			return inErr
 		}
 
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1485,7 +1484,7 @@ func (c *cluster) State(task concurrency.Task) (state clusterstate.Enum, err err
 		return clusterstate.Unknown, err
 	}
 	return state, c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1543,12 +1542,12 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		if !props.Lookup(clusterproperty.DefaultsV2) {
 			// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
-			return props.Inspect(clusterproperty.DefaultsV1, func(clonable data.Clonable) error {
+			return props.Inspect(task, clusterproperty.DefaultsV1, func(clonable data.Clonable) error {
 				defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				return props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+				return props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
 					defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1566,7 +1565,7 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
 
 	var nodeDef *propertiesv2.HostSizingRequirements
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1747,7 +1746,7 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv2.Clus
 
 	// Removed reference of the node from cluster
 	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		inErr := props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		inErr := props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1793,7 +1792,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 	// Identifies the node to delete and remove it preventively from metadata
 	var node *propertiesv2.ClusterNode
 	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1821,7 +1820,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 	defer func() {
 		if err != nil {
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-				return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+				return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 					nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1882,7 +1881,7 @@ func (c *cluster) ListMasters(task concurrency.Task) (list resources.IndexedList
 
 	list = resources.IndexedListOfClusterNodes{}
 	err = c.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1916,7 +1915,7 @@ func (c *cluster) ListMasterNames(task concurrency.Task) (list data.IndexedListO
 
 	list = data.IndexedListOfStrings{}
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1946,7 +1945,7 @@ func (c *cluster) ListMasterIDs(task concurrency.Task) (list data.IndexedListOfS
 
 	list = data.IndexedListOfStrings{}
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1975,7 +1974,7 @@ func (c *cluster) ListMasterIPs(task concurrency.Task) (list data.IndexedListOfS
 
 	list = data.IndexedListOfStrings{}
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2053,7 +2052,7 @@ func (c *cluster) ListNodes(task concurrency.Task) (list resources.IndexedListOf
 
 	list = resources.IndexedListOfClusterNodes{}
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2086,7 +2085,7 @@ func (c *cluster) ListNodeNames(task concurrency.Task) (list data.IndexedListOfS
 
 	list = data.IndexedListOfStrings{}
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2116,7 +2115,7 @@ func (c *cluster) ListNodeIDs(task concurrency.Task) (list data.IndexedListOfStr
 
 	list = data.IndexedListOfStrings{}
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2147,7 +2146,7 @@ func (c *cluster) ListNodeIPs(task concurrency.Task) (list data.IndexedListOfStr
 
 	list = data.IndexedListOfStrings{}
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2226,7 +2225,7 @@ func (c *cluster) LookupNode(task concurrency.Task, ref string) (found bool, err
 
 	found = false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2251,7 +2250,7 @@ func (c *cluster) CountNodes(task concurrency.Task) (count uint, err error) {
 	defer scerr.OnExitLogError(concurrency.NewTracer(task, debug.IfTrace("cluster"), "").TraceMessage(""), &err)()
 
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2286,7 +2285,7 @@ func (c *cluster) Node(task concurrency.Task, hostID string) (host resources.Hos
 
 	found := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2316,7 +2315,7 @@ func (c *cluster) deleteMaster(task concurrency.Task, hostID string) error {
 	var master *propertiesv2.ClusterNode
 	// Removes master from cluster properties
 	err := c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2342,7 +2341,7 @@ func (c *cluster) deleteMaster(task concurrency.Task, hostID string) error {
 	defer func() {
 		if err != nil {
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-				return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+				return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 					nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 					if !ok {
 						return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2373,7 +2372,7 @@ func (c *cluster) Delete(task concurrency.Task) error {
 
 	err := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		// Updates cluster state to mark cluster as Removing
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2452,7 +2451,7 @@ func (c *cluster) Delete(task concurrency.Task) error {
 		// Deletes the network and gateway
 		networkID := ""
 		if props.Lookup(clusterproperty.NetworkV2) {
-			err = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) error {
+			err = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2461,7 +2460,7 @@ func (c *cluster) Delete(task concurrency.Task) error {
 				return nil
 			})
 		} else {
-			err = props.Inspect(clusterproperty.NetworkV1, func(clonable data.Clonable) error {
+			err = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) error {
 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -3006,7 +3005,7 @@ func (c *cluster) buildHostname(task concurrency.Task, core string, nodeType clu
 	// Locks for write the manager extension...
 
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())

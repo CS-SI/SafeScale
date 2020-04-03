@@ -48,6 +48,8 @@ type Core struct {
 	shielded   *concurrency.Shielded
 	properties *serialize.JSONProperties
 	folder     *folder
+	loaded     bool
+	committed  bool
 	name       atomic.Value
 	id         atomic.Value
 }
@@ -57,7 +59,7 @@ func nullCore() *Core {
 }
 
 // NewCore creates an instance of core
-func NewCore(svc iaas.Service, kind string, path string) (*Core, error) {
+func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*Core, error) {
 	if svc == nil {
 		return nullCore(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -80,6 +82,8 @@ func NewCore(svc iaas.Service, kind string, path string) (*Core, error) {
 		kind:       kind,
 		folder:     folder,
 		properties: props,
+		TaskedLock: concurrency.NewTaskedLock(),
+		shielded:   concurrency.NewShielded(instance),
 	}
 	return &c, nil
 }
@@ -168,8 +172,13 @@ func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err er
 	if callback == nil {
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
+
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
+
+	if c.shielded == nil {
+		return scerr.InvalidInstanceContentError("c.shielded", "cannot be nil")
+	}
 
 	// Make sure c.properties is populated
 	if c.properties == nil {
@@ -191,6 +200,7 @@ func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err er
 	if err != nil {
 		return err
 	}
+	c.committed = false
 	return c.write(task)
 }
 
@@ -211,15 +221,20 @@ func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
 	if clonable == nil {
 		return scerr.InvalidParameterError("clonable", "cannot be nil")
 	}
-	if c.shielded != nil {
-		return scerr.NotAvailableError("already carrying a shielded value")
-	}
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
+	if c.loaded {
+		return scerr.NotAvailableError("already carrying a shielded value")
+	}
+	if c.shielded == nil {
+		return scerr.InvalidInstanceContentError("c.shielded", "cannot be nil")
+	}
+
 	var err error
 	c.shielded = concurrency.NewShielded(clonable)
+	c.loaded = true
 	err = c.updateIdentity(task)
 	if err != nil {
 		return err
@@ -228,7 +243,7 @@ func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
 }
 
 func (c *Core) updateIdentity(task concurrency.Task) error {
-	if c.shielded != nil {
+	if c.loaded {
 		return c.shielded.Inspect(task, func(clonable data.Clonable) error {
 			ident, ok := clonable.(data.Identifyable)
 			if !ok {
@@ -259,7 +274,7 @@ func (c *Core) Read(task concurrency.Task, ref string) error {
 	if ref == "" {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
-	if c.shielded != nil {
+	if c.loaded {
 		return scerr.NotAvailableError("metadata is already carrying a value")
 	}
 
@@ -292,6 +307,7 @@ func (c *Core) Read(task concurrency.Task, ref string) error {
 		}
 	}
 
+	c.loaded = true
 	return c.updateIdentity(task)
 }
 
@@ -309,49 +325,58 @@ func (c *Core) readByReference(task concurrency.Task, ref string) error {
 // readByID reads a metadata identified by ID from Object Storage
 func (c *Core) readByID(task concurrency.Task, id string) error {
 	return c.shielded.Alter(task, func(clonable data.Clonable) error {
-		data, ok := clonable.(data.Serializable)
+		d, ok := clonable.(data.Serializable)
 		if !ok {
 			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		return c.folder.Read(byIDFolderName, id, data.Deserialize)
+		return c.folder.Read(byIDFolderName, id, d.Deserialize)
 	})
 }
 
 // readByName reads a metadata identified by name
 func (c *Core) readByName(task concurrency.Task, name string) error {
 	return c.shielded.Alter(task, func(clonable data.Clonable) error {
-		data, ok := clonable.(data.Serializable)
+		d, ok := clonable.(data.Serializable)
 		if !ok {
 			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		return c.folder.Read(byNameFolderName, name, data.Deserialize)
+		return c.folder.Read(byNameFolderName, name, d.Deserialize)
 	})
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
 func (c *Core) write(task concurrency.Task) error {
-	return c.shielded.Inspect(task, func(clonable data.Clonable) error {
-		ser, ok := clonable.(data.Serializable)
-		if !ok {
-			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		buf, err := ser.Serialize()
-		if err != nil {
-			return err
-		}
-		ident, ok := clonable.(data.Identifyable)
-		if !ok {
-			return scerr.InconsistentError("'data.Identifyable' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		err = c.folder.Write(byNameFolderName, ident.SafeGetName(), buf)
-		if err != nil {
-			return err
-		}
-		return c.folder.Write(byIDFolderName, ident.SafeGetID(), buf)
-	})
+	if !c.committed {
+		return c.shielded.Inspect(task, func(clonable data.Clonable) error {
+			ser, ok := clonable.(data.Serializable)
+			if !ok {
+				return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			buf, err := ser.Serialize()
+			if err != nil {
+				return err
+			}
+			ident, ok := clonable.(data.Identifyable)
+			if !ok {
+				return scerr.InconsistentError("'data.Identifyable' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			err = c.folder.Write(byNameFolderName, ident.SafeGetName(), buf)
+			if err != nil {
+				return err
+			}
+			err = c.folder.Write(byIDFolderName, ident.SafeGetID(), buf)
+			if err != nil {
+				return err
+			}
+			c.loaded = true
+			c.committed = true
+			return nil
+		})
+	}
+	return nil
 }
 
-// Reload reloads the content of the Object Storage, overriding what is in the metadata instance
+// Reload reloads the content of the Object Storage, overriding what is in the metadata instance (being written or not...)
 func (c *Core) Reload(task concurrency.Task) error {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
@@ -438,16 +463,17 @@ func (c *Core) Delete(task concurrency.Task) error {
 		}
 	}
 
-	c.shielded = nil
+	c.loaded = false
+	c.committed = false
 	return nil
 }
 
-// Serialize serializes Host instance into bytes (output json code)
+// Serialize serializes instance into bytes (output json code)
 func (c *Core) Serialize() ([]byte, error) {
 	return serialize.ToJSON(c)
 }
 
-// Deserialize reads json code and reinstantiates an Host
+// Deserialize reads json code and reinstantiates
 func (c *Core) Deserialize(buf []byte) error {
 	var err error
 	if c.properties == nil {

@@ -27,6 +27,7 @@ import (
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -417,7 +418,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			hostCore.Name = server.Name
 
 			// Wait that Host is ready, not just that the build is started
-			_, err = s.WaitHostReady(host, temporal.GetLongOperationTimeout())
+			err = s.WaitHostReady(host, temporal.GetLongOperationTimeout())
 			if err != nil {
 				killErr := s.DeleteHost(hostCore.ID)
 				if killErr != nil {
@@ -479,48 +480,23 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.HostCore, err error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return scerr.InvalidInstanceError()
 	}
 
-	var (
-		hostCore *abstract.HostCore
-		hostRef  string
-	)
-	switch hostParam := hostParam.(type) {
-	case string:
-		hostCore = abstract.NewHostCore()
-		hostCore.ID = hostParam
-		hostRef = hostCore.ID
-		if hostRef == "" {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be empty string")
-		}
-	case *abstract.HostCore:
-		hostCore = hostParam
-		if hostCore == nil {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
-		}
-		hostRef = hostCore.ID
-		if hostRef == "" {
-			hostRef = hostCore.Name
-		}
-		if hostRef == "" {
-			return nil, scerr.InvalidParameterError("hostParam", "'*abstract.HostCore' does not contain values for neither Name nor ID")
-		}
-	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a non-empty string or a '*abstract.HostCore'")
+	ahc, hostRef, err := stacks.ValidateHostParam(hostParam)
+	if err != nil {
+		return err
 	}
 
-	tracer := concurrency.NewTracer(nil, true, "(%s)", hostCore.ID).Entering()
+	tracer := concurrency.NewTracer(nil, true, "(%s)", hostRef).Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	var hostComplete *abstract.HostFull
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			var innerErr error
-			hostComplete, innerErr = s.InspectHost(hostCore)
+			hostComplete, innerErr := s.InspectHost(ahc)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -535,11 +511,11 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return nil, abstract.ResourceTimeoutError("host", hostCore.Name, timeout)
+			return abstract.ResourceTimeoutError("host", ahc.Name, timeout)
 		}
-		return nil, retryErr
+		return retryErr
 	}
-	return hostComplete.Core, nil
+	return nil
 }
 
 func publicAccess(isPublic bool) []*compute.AccessConfig {

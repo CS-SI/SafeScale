@@ -18,6 +18,8 @@ package operations
 
 import (
 	"fmt"
+	"os"
+	"os/user"
 	"reflect"
 
 	"github.com/sirupsen/logrus"
@@ -27,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -48,22 +51,21 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
 
-	// name := inputs["name"].(string)
 	request, ok := inputs["request"].(abstract.GatewayRequest)
 	if !ok {
-		return nil, scerr.InvalidParameterError("params[request]", "must be a resources.GatewayRequest")
+		return nil, scerr.InvalidParameterError("params['request']", "must be a abstract.GatewayRequest")
 	}
-	sizing, ok := inputs["sizing"].(abstract.HostSizingRequirements)
-	if !ok {
-		return nil, scerr.InvalidParameterError("params[sizing]", "must be a resources.SizingRequirements")
+	if request.TemplateID == "" {
+		return nil, scerr.InvalidRequestError("params['request'].TemplateID", "cannot be empty string")
 	}
 	primary, ok := inputs["primary"].(bool)
 	if !ok {
-		return nil, scerr.InvalidParameterError("params[primary]", "must be a bool")
+		return nil, scerr.InvalidParameterError("params['primary']", "must be a bool")
 	}
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
-	pgw, userData, err := objn.SafeGetService().CreateGateway(request)
+	svc := objn.SafeGetService()
+	gwahf, userData, err := svc.CreateGateway(request)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound, scerr.ErrTimeout:
@@ -76,8 +78,8 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	// Starting from here, deletes the primary gateway if exiting with error
 	defer func() {
 		if err != nil {
-			logrus.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
-			derr := objn.SafeGetService().DeleteHost(pgw.Core.ID)
+			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
+			derr := svc.DeleteHost(gwahf.Core.ID)
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
@@ -96,29 +98,18 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		}
 	}()
 
-	// Reloads the host to be sure all the properties are updated
-	pgw, err = objn.SafeGetService().InspectHost(pgw)
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
-			return nil, err
-		default:
-			return nil, err
-		}
-	}
-
-	objgw, err := NewHost(objn.SafeGetService())
+	objgw, err := NewHost(svc)
 	if err != nil {
 		return nil, err
 	}
-	err = objgw.Carry(task, pgw.Core)
+	err = objgw.Carry(task, gwahf.Core)
 	if err != nil {
 		return nil, err
 	}
 
 	// Binds gateway to VIP
 	if request.Network.VIP != nil {
-		err := objn.SafeGetService().BindHostToVIP(request.Network.VIP, pgw.Core.ID)
+		err := svc.BindHostToVIP(request.Network.VIP, gwahf.Core.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -129,14 +120,70 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	}
 	userData.IsPrimaryGateway = primary
 
+	// Updates properties in metadata
 	err = objgw.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		// Updates requested sizing in gateway property propertiesv1.HostSizing
-		return props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) error {
-			gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+		innerErr := props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
+			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(sizing)
+			hostSizingV2.AllocatedSize = converters.HostEffectiveSizingFromAbstractToPropertyV2(gwahf.Sizing)
+			return nil
+		})
+		if innerErr != nil {
+			return innerErr
+		}
+
+		// Starting from here, delete host metadata if exiting with error
+		defer func() {
+			if innerErr != nil {
+				derr := objgw.(*host).Core.Delete(task)
+				if derr != nil {
+					logrus.Errorf("After failure, failed to cleanup by removing host metadata")
+				}
+			}
+		}()
+
+		// Sets host extension DescriptionV1
+		innerErr = props.Alter(task, hostproperty.DescriptionV1, func(clonable data.Clonable) error {
+			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*gwahf.Description))
+			creator := ""
+			hostname, _ := os.Hostname()
+			if curUser, err := user.Current(); err == nil {
+				creator = curUser.Username
+				if hostname != "" {
+					creator += "@" + hostname
+				}
+				if curUser.Name != "" {
+					creator += " (" + curUser.Name + ")"
+				}
+			} else {
+				creator = "unknown@" + hostname
+			}
+			hostDescriptionV1.Creator = creator
+			return nil
+		})
+		if innerErr != nil {
+			return innerErr
+		}
+
+		// Updates host property propertiesv1.HostNetwork
+		// var (
+		// 	defaultNetworkID string
+		// 	gatewayID string
+		// )
+		return props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
+			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
+			if !ok {
+				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*gwahf.Network))
+			hostNetworkV1.DefaultNetworkID = objn.SafeGetID()
+			hostNetworkV1.IsGateway = true
 			return nil
 		})
 	})
@@ -145,15 +192,13 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	}
 
 	res := data.Map{
-		"host":     pgw,
+		"host":     objgw,
 		"userdata": userData,
-		"object":   objgw,
 	}
 	return res, nil
 }
 
 func (objn *network) taskWaitForInstallPhase1OnGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-
 	objgw, ok := params.(resources.Host)
 	if !ok {
 		return nil, scerr.InconsistentError("'resources.Host' expected, '%s' provided", reflect.TypeOf(params).String())

@@ -100,7 +100,7 @@ type Stack interface {
 	ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, error)
 
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
-	WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.HostCore, error)
+	WaitHostReady(hostParam interface{}, timeout time.Duration) error
 
 	// CreateVolume creates a block volume
 	CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error)

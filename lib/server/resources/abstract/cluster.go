@@ -64,13 +64,13 @@ func NewClusterIdentity() *ClusterIdentity {
 	return &ClusterIdentity{}
 }
 
-// Clone ...
+// Clone makes a copy of the instance
 // satisfies interface data.Clonable
 func (i *ClusterIdentity) Clone() data.Clonable {
 	return NewClusterIdentity().Replace(i)
 }
 
-// Replace ...
+// Replace replaces the content of the instance with the content of the parameter
 // satisfies interface data.Clonable
 func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 	src := p.(*ClusterIdentity)
@@ -78,6 +78,21 @@ func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 	i.Keypair = &KeyPair{}
 	*i.Keypair = *src.Keypair
 	return i
+}
+
+// SafeGetName returns the name of the cluster
+// Satisfies interface data.Identifyable
+func (i *ClusterIdentity) SafeGetName() string {
+	if i == nil {
+		return ""
+	}
+	return i.Name
+}
+
+// SafeGetID returns the ID of the cluster (== Name)
+// Satisfies interface data.Identifyable
+func (i *ClusterIdentity) SafeGetID() string {
+	return i.SafeGetName()
 }
 
 // OK ...

@@ -32,7 +32,7 @@ import (
 type LoggedProvider WrappedProvider
 
 // WaitHostReady ...
-func (w LoggedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.HostCore, error) {
+func (w LoggedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) error {
 	defer w.prepare(w.trace("WaitHostReady"))
 	return w.InnerProvider.WaitHostReady(hostParam, timeout)
 }

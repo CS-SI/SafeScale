@@ -29,10 +29,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -65,7 +67,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, error) {
 		return nullNetwork(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	core, err := NewCore(svc, "network", networksFolderName)
+	core, err := NewCore(svc, "network", networksFolderName, &abstract.Network{})
 	if err != nil {
 		return nullNetwork(), err
 	}
@@ -99,7 +101,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := err.(retry.ErrTimeout); ok {
 			logrus.Debugf("timeout reading metadata of network '%s'", ref)
-			err = scerr.NotFoundError("failed to read metadata of network '%s': timeout", ref)
+			err = scerr.NotFoundError("network '%s' not found", ref)
 		}
 		return nullNetwork(), err
 	}
@@ -138,7 +140,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	svc := objn.SafeGetService()
@@ -158,12 +160,14 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	// Verify the CIDR is not routable
-	routable, err := utils.IsCIDRRoutable(req.CIDR)
-	if err != nil {
-		return scerr.Wrap(err, "failed to determine if CIDR is not routable")
-	}
-	if routable {
-		return scerr.InvalidRequestError("cannot create such a network, CIDR must be not routable; please choose an appropriate CIDR (RFC1918)")
+	if req.CIDR != "" {
+		routable, err := utils.IsCIDRRoutable(req.CIDR)
+		if err != nil {
+			return scerr.Wrap(err, "failed to determine if CIDR is not routable")
+		}
+		if routable {
+			return scerr.InvalidRequestError("cannot create such a network, CIDR must not be routable; please choose an appropriate CIDR (RFC1918)")
+		}
 	}
 
 	// Create the network
@@ -198,11 +202,13 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	caps := svc.GetCapabilities()
 	failover := req.HA
-	if failover && caps.PrivateVirtualIP {
-		logrus.Infof("Provider support private Virtual IP, honoring the failover setup for gateways.")
-	} else {
-		logrus.Warningf("Provider doesn't support private Virtual IP, cannot set up high availability of network default route.")
-		failover = false
+	if failover {
+		if caps.PrivateVirtualIP {
+			logrus.Info("Provider support private Virtual IP, honoring the failover setup for gateways.")
+		} else {
+			logrus.Warning("Provider doesn't support private Virtual IP, cannot set up high availability of network default route.")
+			failover = false
+		}
 	}
 
 	// Creates VIP for gateways if asked for
@@ -272,14 +278,22 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	} else {
 		return scerr.NotFoundError("error creating network: no host template matching requirements for gateway")
 	}
-	img, err := svc.SearchImage(req.Image)
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
-			return err
-		default:
+	if req.Image == "" {
+		// if gwSizing.Image != "" {
+		req.Image = gwSizing.Image
+		// }
+	}
+	if req.Image == "" {
+		cfg, err := svc.GetConfigurationOptions()
+		if err != nil {
 			return err
 		}
+		req.Image = cfg.GetString("DefaultImage")
+		gwSizing.Image = req.Image
+	}
+	img, err := svc.SearchImage(req.Image)
+	if err != nil {
+		return scerr.Wrap(err, "unable to create network gateway")
 	}
 
 	networkName := objn.SafeGetName()
@@ -320,7 +334,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	primaryRequest.Name = primaryGatewayName
 	primaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 		"request": primaryRequest,
-		"sizing":  gwSizing,
+		"sizing":  *gwSizing,
 		"primary": true,
 	})
 	if err != nil {
@@ -333,7 +347,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		secondaryRequest.Name = secondaryGatewayName
 		secondaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 			"request": secondaryRequest,
-			"sizing":  gwSizing,
+			"sizing":  *gwSizing,
 			"primary": false,
 		})
 		if err != nil {
@@ -368,6 +382,21 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 				}
 			}
 		}()
+
+		err = primaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+			// Updates requested sizing in gateway property propertiesv1.HostSizing
+			return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
+				gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+				if !ok {
+					return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
 	}
 	if failover && secondaryTask != nil {
 		secondaryResult, secondaryErr = secondaryTask.Wait()
@@ -396,6 +425,21 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 					err = scerr.AddConsequence(err, failErr)
 				}
 			}()
+
+			err = secondaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+				// Updates requested sizing in gateway property propertiesv1.HostSizing
+				return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
+					gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+					if !ok {
+						return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if primaryErr != nil {
@@ -615,14 +659,14 @@ func (objn *network) AttachHost(task concurrency.Task, host resources.Host) (err
 
 	tracer := concurrency.NewTracer(nil, true, "("+host.SafeGetName()+")").Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	hostID := host.SafeGetID()
 	hostName := host.SafeGetName()
 
 	return objn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) error {
+		return props.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -648,11 +692,11 @@ func (objn *network) DetachHost(task concurrency.Task, hostID string) (err error
 
 	tracer := concurrency.NewTracer(nil, true, "('"+hostID+"')").Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	return objn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) error {
+		return props.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -678,12 +722,12 @@ func (objn *network) ListHosts(task concurrency.Task) (_ []resources.Host, err e
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	var list []resources.Host
 	err = objn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(networkproperty.HostsV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -718,7 +762,7 @@ func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resource
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
 	var gatewayID string
@@ -757,7 +801,8 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 
 	tracer := concurrency.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnPanic(&err)()
 
 	objn.SafeLock(task)
 	defer objn.SafeUnlock(task)
@@ -773,7 +818,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 
 		// Check if hosts are still attached to network according to metadata
 		var errorMsg string
-		innerErr := props.Inspect(networkproperty.HostsV1, func(clonable data.Clonable) error {
+		innerErr := props.Inspect(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1060,9 +1105,12 @@ func (objn *network) ToProtocol(task concurrency.Task) (_ *protocol.Network, err
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
+	tracer := concurrency.NewTracer(task, true, "").Entering()
+	defer tracer.OnExitTrace()()
+
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot convert network to protocol")
+			err = scerr.Wrap(err, "failed to convert resources.Network to *protocol.Network")
 		}
 	}()
 

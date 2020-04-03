@@ -45,8 +45,8 @@ type AuthOptions struct {
 type CfgOptions struct {
 }
 
-func (provider *provider) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.HostCore, error) {
-	return nil, gError
+func (provider *provider) WaitHostReady(hostParam interface{}, timeout time.Duration) error {
+	return gError
 }
 
 func (provider *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {

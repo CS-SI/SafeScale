@@ -247,25 +247,25 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		nokeep bool
 	)
 	if anon, ok = p["index"]; !ok {
-		return nil, scerr.InvalidParameterError("params[index]", "is missing or is not an unsigned integer")
+		return nil, scerr.InvalidParameterError("params['index']", "is missing or is not an unsigned integer")
 	}
 	if index, ok = anon.(uint); !ok || index < 1 {
-		return nil, scerr.InvalidParameterError("params[index]", "must be an interger greater than 0")
+		return nil, scerr.InvalidParameterError("params['index']", "must be an interger greater than 0")
 	}
 	if anon, ok = p["masterDef"]; !ok {
-		return nil, scerr.InvalidParameterError("params[masterDef]", "is missing")
+		return nil, scerr.InvalidParameterError("params['masterDef']", "is missing")
 	}
 	if def, ok = anon.(*abstract.HostSizingRequirements); !ok {
-		return nil, scerr.InvalidParameterError("params[masterDef]", "is not a *abstract.HostSizingRequirements")
+		return nil, scerr.InvalidParameterError("params['masterDef']", "is not a *abstract.HostSizingRequirements")
 	}
 	if def == nil {
-		return nil, scerr.InvalidParameterError("params[masterDef]", "cannot be nil")
+		return nil, scerr.InvalidParameterError("params['masterDef']", "cannot be nil")
 	}
 	if anon, ok = p["image"]; !ok {
-		return nil, scerr.InvalidParameterError("params[image]", "is missing")
+		return nil, scerr.InvalidParameterError("params['image']", "is missing")
 	}
 	if image, ok = anon.(string); !ok {
-		return nil, scerr.InvalidParameterError("params[image]", "cannot be an empty string")
+		return nil, scerr.InvalidParameterError("params['image']", "cannot be an empty string")
 	}
 	// if anon, ok = p["timeout"]; !ok {
 	// 	timeout = 0
@@ -323,7 +323,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	// Updates cluster metadata to keep track of created host, before testing if an error occurred during the creation
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		// References new node in cluster
-		return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2 := clonable.(*propertiesv2.ClusterNodes)
 			nodesV2.GlobalLastIndex++
 			pubIP, innerErr := host.GetPublicIP(task)
@@ -678,7 +678,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 	var node *propertiesv2.ClusterNode
 	err = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) error {
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())

@@ -97,7 +97,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	if err != nil {
 		return nil, err
 	}
-	err = task.SetID("job-subtask:" + id)
+	err = task.SetID("job-task:" + id)
 	if err != nil {
 		return nil, err
 	}
