@@ -109,7 +109,7 @@ pathprepend $HOME/.local/bin
 pathappend /opt/safescale/bin
 EOF
 
-	chown -R safescale:safescale /opt/safescale
+	chown -R {{.User}}:{{.User}} /opt/safescale
 	chmod -R 0640 /opt/safescale
 	find /opt/safescale -type d -exec chmod a+rx {} \;
 	chmod 1777 /opt/safescale/var/tmp
