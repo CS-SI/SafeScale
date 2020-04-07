@@ -19,8 +19,9 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 
 	// "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
 
@@ -615,6 +616,7 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	logrus.Infof("Waiting until gateway '%s' is available by SSH ...", gw.Name)
 	sshHandler := NewSSHHandler(handler.service)
 	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
+	logrus.Infof("%v", ssh)
 	if err != nil {
 		return nil, err
 	}
