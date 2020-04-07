@@ -94,6 +94,10 @@ const (
 	RAMDRFWeight float32 = 1.0 / 8.0
 	// DiskDRFWeight is the Dominant Resource Fairness weight of 1 GB of Disk
 	DiskDRFWeight float32 = 1.0 / 16.0
+	// CPUFreqDRFWeight is the Dominant Resource Fairness weight of 1 GHz of cpu
+	CPUFreqDRFWeight float32 = 1.0 / 2.0
+	// GPUDRFWeight is the Dominant Resource Fairness weight of 1 GPU
+	GPUDRFWeight float32 = 16.0
 )
 
 // RankDRF computes the Dominant Resource Fairness Rank of an host template
@@ -101,7 +105,9 @@ func RankDRF(t *resources.HostTemplate) float32 {
 	fc := float32(t.Cores)
 	fr := t.RAMSize
 	fd := float32(t.DiskSize)
-	return fc*CoreDRFWeight + fr*RAMDRFWeight + fd*DiskDRFWeight
+	ff := float32(t.CPUFreq)
+	fg := float32(t.GPUNumber)
+	return fc*CoreDRFWeight + fr*RAMDRFWeight + fd*DiskDRFWeight + ff*CPUFreqDRFWeight + fg*GPUDRFWeight
 }
 
 // ByRankDRF implements sort.Interface for []HostTemplate based on
@@ -291,7 +297,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	}
 
 	// FIXME Prevent GPUs when user sends a 0
-	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinFreq != 0
+	askedForSpecificScannerInfo := sizing.MinGPU > 0 || sizing.MinFreq != 0
 	if askedForSpecificScannerInfo {
 		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
