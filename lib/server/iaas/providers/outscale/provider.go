@@ -161,11 +161,17 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	//MetadataBucketName
-	m := providers.ConfigMap{}
+	cfg := providers.ConfigMap{}
 	//
-	m["MetadataBucketName"] = p.Options.Metadata.Bucket
-	m["OperatorUsername"] = p.Options.Compute.OperatorUsername
-	return m, nil
+	cfg.Set("DNSList", p.Options.Compute.DNSList)
+	cfg.Set("AutoHostNetworkInterfaces", true)
+	cfg.Set("UseLayer3Networking", false)
+	cfg.Set("DefaultImage", p.Options.Compute.DefaultImage)
+	cfg.Set("MetadataBucketName", p.Options.Metadata.Bucket)
+	cfg.Set("OperatorUsername", p.Options.Compute.OperatorUsername)
+	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("BuildSubnetworks", false)
+	return cfg, nil
 }
 
 // GetName returns the provider name
@@ -182,9 +188,9 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
-		PublicVirtualIP:  true,
-		PrivateVirtualIP: false,
-		Layer3Networking: true,
+		PublicVirtualIP:  false,
+		PrivateVirtualIP: true,
+		Layer3Networking: false,
 	}
 }
 

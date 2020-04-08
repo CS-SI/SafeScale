@@ -59,7 +59,6 @@ func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
 	}
 	res, err := s.client.POST_ReadImages(oapi.ReadImagesRequest{})
 	if err != nil {
-		logrus.Errorf("%v", err)
 		return nil, err
 	}
 	var images []resources.Image
@@ -476,7 +475,6 @@ func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 		}
 		return nil
 	}, temporal.GetHostCreationTimeout())
-	logrus.Error(err)
 	return err
 }
 
@@ -568,18 +566,16 @@ func (s *Stack) getNICS(vmID string) ([]oapi.Nic, error) {
 	return res.OK.Nics, nil
 }
 
-func (s *Stack) addPublicIP(request *resources.HostRequest, userData *userdata.Content, nic *oapi.Nic) error {
-	if !request.PublicIP {
-		return nil
-	}
+func (s *Stack) addPublicIP(nic *oapi.Nic) (*oapi.PublicIp, error) {
+
 	resIP, err := s.client.POST_CreatePublicIp(oapi.CreatePublicIpRequest{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resIP.OK == nil {
-		return scerr.InconsistentError("Provider inconstent response")
+		return nil, scerr.InconsistentError("Provider inconstent response")
 	}
-	userData.PublicIP = resIP.OK.PublicIp.PublicIp
+
 	_, err = s.client.POST_LinkPublicIp(oapi.LinkPublicIpRequest{
 		NicId:      nic.NicId,
 		PublicIpId: resIP.OK.PublicIp.PublicIpId,
@@ -590,10 +586,10 @@ func (s *Stack) addPublicIP(request *resources.HostRequest, userData *userdata.C
 		})
 		if err != nil {
 			logrus.Warnf("Cannot delete public ip %s: %v", resIP.OK.PublicIp.PublicIpId, err)
-			return err
+			return nil, err
 		}
 	}
-	return err
+	return &resIP.OK.PublicIp, nil
 }
 
 func (s *Stack) setHostProperties(host *resources.Host, networks []*resources.Network, vm *oapi.Vm, nics []oapi.Nic) error {
@@ -741,7 +737,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	defer func() {
 		_ = s.DeleteKeyPair(keyPair.ID)
 	}()
-	logrus.Infof("%v", keyPair)
 	request.KeyPair = keyPair
 	password, err := s.getOrCreatePassword(request)
 	request.Password = password
@@ -773,7 +768,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	if err != nil {
 		return nil, userData, err
 	}
-	logrus.Infof(string(userDataPhase1))
 	vmType, err := outscaleTemplateID(request.TemplateID)
 	if err != nil {
 		return nil, userData, err
@@ -819,15 +813,26 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	if err != nil {
 		return nil, userData, s.deleteHostOnError(err, &vm)
 	}
+	if request.PublicIP {
+		ip, err := s.addPublicIP(&defaultNic)
+		if err != nil {
+			return nil, userData, s.deleteHostOnError(err, &vm)
+		}
+		if ip != nil {
+			userData.PublicIP = ip.PublicIp
+			vm.PublicIp = userData.PublicIP
+		}
 
-	err = s.addPublicIP(&request, userData, &defaultNic)
-	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		for _, nic := range nics {
+			_, err = s.addPublicIP(&nic)
+			if err != nil {
+				return nil, userData, s.deleteHostOnError(err, &vm)
+			}
+		}
 	}
-	vm.PublicIp = userData.PublicIP
+
 	err = s.addVolume(&request, vm.VmId)
 	if err != nil {
-		logrus.Error(err)
 		return nil, userData, s.deleteHostOnError(err, &vm)
 	}
 

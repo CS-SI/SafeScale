@@ -111,8 +111,8 @@ func New(options *ConfigurationOptions) (*Stack, error) {
 			ProviderNetwork:           "",
 			DNSList:                   options.Compute.DNSList,
 			UseFloatingIP:             true,
-			UseLayer3Networking:       true,
-			UseNATService:             true,
+			UseLayer3Networking:       false,
+			UseNATService:             false,
 			ProviderName:              "outscale",
 			BuildSubnetworks:          false,
 			AutoHostNetworkInterfaces: false,
@@ -143,7 +143,6 @@ func (s *Stack) initDefaultNetwork() error {
 	if err != nil || onet == nil { //Try to create the network
 		onet, err = s.createVpc(s.Options.Network.VPCName, s.Options.Network.VPCCIDR)
 		if err != nil {
-			logrus.Errorf("%v", err)
 			return err
 		}
 	}
