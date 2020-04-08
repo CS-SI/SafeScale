@@ -73,7 +73,7 @@ func (handler *networkHandler) Create(
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(
 		task,
-		debug.IfTrace("handlers.network"),
+		debug.ShouldTrace("handlers.network"),
 		"('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
@@ -106,7 +106,7 @@ func (handler *networkHandler) List(all bool) (netList []*abstract.Network, err 
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -136,7 +136,7 @@ func (handler *networkHandler) Inspect(ref string) (network resources.Network, e
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -157,7 +157,7 @@ func (handler *networkHandler) Delete(ref string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()

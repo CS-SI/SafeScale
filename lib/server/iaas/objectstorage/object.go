@@ -89,7 +89,7 @@ func (o *object) Reload() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	item, err := o.bucket.container.Item(o.Name)
 	if err != nil {
@@ -118,7 +118,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return scerr.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%d, %d)", from, to).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().OnExitTrace()()
 
 	var seekTo int64
 	var length int64
@@ -194,7 +194,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 		return scerr.InvalidParameterError("o.bucket", "cannot be nil")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%d)", sourceSize).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().OnExitTrace()()
 
 	item, err := o.bucket.container.Put(o.Name, source, sourceSize, o.SafeGetMetadata())
 	if err != nil {
@@ -213,7 +213,7 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 		return nil
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().OnExitTrace()()
 
 	metadataCopy := o.SafeGetMetadata().Clone()
 
@@ -269,7 +269,7 @@ func (o *object) Delete() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	err := o.bucket.container.RemoveItem(o.Name)
 	if err != nil {
@@ -285,7 +285,7 @@ func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	for k, v := range newMetadata {
 		o.Metadata[k] = v
@@ -299,7 +299,7 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	for k, v := range newMetadata {
 		_, found := o.Metadata[k]
@@ -315,7 +315,7 @@ func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
 	if o == nil {
 		return scerr.InvalidInstanceError()
 	}
-	defer concurrency.NewTracer(nil, debug.IfTrace("objectstorage"), "").Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()()
 
 	o.Metadata = newMetadata
 	return nil

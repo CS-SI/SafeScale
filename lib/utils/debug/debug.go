@@ -70,8 +70,8 @@ func RegisterTraceSettings(jsonSettings string) error {
 	return nil
 }
 
-// IfTrace tells if a specific trace is asked for
-func IfTrace(key string) bool {
+// ShouldTrace tells if a specific trace is asked for
+func ShouldTrace(key string) bool {
 	if key == "" {
 		return false
 	}
