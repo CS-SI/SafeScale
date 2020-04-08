@@ -23,18 +23,16 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/outscale/osc-sdk-go/oapi"
+	"github.com/sirupsen/logrus"
 )
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(netID string, name string) (*resources.VirtualIP, error) {
-	subnet, err := s.getSubnet(netID)
+func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, error) {
+	subnet, err := s.getSubnet(subnetID)
 	if err != nil {
 		return nil, err
 	}
-	if subnet == nil {
-		return nil, resources.ResourceInvalidRequestError("host creation", "invalid network, no subnet found")
-	}
-	subnetID := subnet.SubnetId
+	netID := subnet.NetId
 	group, err := s.getNetworkSecurityGroup(netID)
 	if err != nil {
 		return nil, err
@@ -52,12 +50,17 @@ func (s *Stack) CreateVIP(netID string, name string) (*resources.VirtualIP, erro
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
 	nic := res.OK.Nic
+	ip, err := s.addPublicIP(&nic)
+	if res == nil || res.OK == nil || len(res.OK.Nic.PrivateIps) < 1 {
+		return nil, scerr.InconsistentError("Inconsistent provider response")
+	}
 	//primary := deviceNumber == 0
 	return &resources.VirtualIP{
 		ID:        nic.NicId,
 		PrivateIP: nic.PrivateIps[0].PrivateIp,
 		NetworkID: netID,
 		Hosts:     nil,
+		PublicIP:  ip.PublicIp,
 	}, nil
 }
 
@@ -89,7 +92,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 	}
 	sort.Sort(numbers)
 	for i := 1; i <= 7; i++ {
-		if sort.SearchInts(numbers, i) < 0 {
+		if idx := sort.SearchInts(numbers, i); idx < 0 || idx >= numbers.Len() {
 			return int64(i), nil
 		}
 	}
@@ -131,6 +134,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 		DeviceNumber: deviceNumber,
 	})
 	if err != nil {
+		logrus.Errorf("BindHostToVIP %v", err)
 		return err
 	}
 	return nil
@@ -138,6 +142,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
+//TODO improve
 func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()

@@ -173,6 +173,25 @@ func Test_Test(t *testing.T) {
 	}
 }
 
+func Test_Delete(t *testing.T) {
+	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
+	require.Nil(t, err)
+	hosts, err := tt.Service.ListHosts()
+	for _, h := range hosts {
+		err = tt.Service.DeleteHost(h.ID)
+		require.Nil(t, err)
+	}
+	nets, err := tt.Service.ListNetworks()
+	require.Nil(t, err)
+	for _, n := range nets {
+		err = tt.Service.DeleteNetwork(n.ID)
+		require.Nil(t, err)
+	}
+}
+
 // func Test_Objects(t *testing.T) {
 // 	tt, err := getTester()
 // 	require.Nil(t, err)
