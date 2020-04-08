@@ -17,11 +17,11 @@
 package abstract
 
 import (
+	"encoding/json"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sirupsen/logrus"
 )
 
@@ -63,7 +63,7 @@ type Network struct {
 	SecondaryGatewayID string         `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
 	VIP                *VirtualIP     `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
 	IPVersion          ipversion.Enum `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
-	// Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
+	// properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
 	NetworkState networkstate.Enum `json:"status,omitempty"`
 }
 
@@ -76,7 +76,7 @@ func NewNetwork() *Network {
 	// }
 
 	return &Network{
-		// Properties:   props,
+		// properties:   props,
 		NetworkState: networkstate.UNKNOWNSTATE,
 	}
 }
@@ -98,10 +98,7 @@ func (n *Network) Replace(p data.Clonable) data.Clonable {
 
 // OK ...
 func (n *Network) OK() bool {
-	result := true
-	if n == nil {
-		return false
-	}
+	result := n != nil
 
 	result = result && (n.ID != "")
 	if n.ID == "" {
@@ -125,13 +122,19 @@ func (n *Network) OK() bool {
 
 // Serialize serializes Host instance into bytes (output json code)
 func (n *Network) Serialize() ([]byte, error) {
-	return serialize.ToJSON(n)
+	if n == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	return json.Marshal(n)
 }
 
 // Deserialize reads json code and reinstantiates an Host
 func (n *Network) Deserialize(buf []byte) (err error) {
-	defer scerr.OnPanic(&err)()
-	return serialize.FromJSON(buf, n)
+	if n == nil {
+		return scerr.InvalidInstanceError()
+	}
+	defer scerr.OnPanic(&err)()	// json.Unmarshal may panic
+	return json.Unmarshal(buf, n)
 }
 
 // SafeGetName ...
