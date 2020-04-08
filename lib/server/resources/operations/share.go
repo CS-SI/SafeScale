@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
 	"reflect"
@@ -68,13 +69,16 @@ func (si *ShareIdentity) SafeGetName() string {
 }
 
 // Serialize ...
+// satisfies interface data.Serializable
 func (si *ShareIdentity) Serialize() ([]byte, error) {
-	return serialize.ToJSON(si)
+	return json.Marshal(si)
 }
 
 // Deserialize ...
-func (si *ShareIdentity) Deserialize(buf []byte) error {
-	return serialize.FromJSON(buf, si)
+// satisfies interface data.Serializable
+func (si *ShareIdentity) Deserialize(buf []byte) (err error) {
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	return json.Unmarshal(buf, si)
 }
 
 // Clone ...
@@ -94,11 +98,11 @@ func (si *ShareIdentity) Replace(src data.Clonable) data.Clonable {
 
 // share contains information to maintain in Object Storage a list of shared folders
 type share struct {
-	*Core
+	*core
 }
 
 func nullShare() *share {
-	return &share{Core: nullCore()}
+	return &share{core: nullCore()}
 }
 
 // NewShare creates an instance of Share
@@ -111,7 +115,7 @@ func NewShare(svc iaas.Service) (resources.Share, error) {
 	if err != nil {
 		return nullShare(), err
 	}
-	return &share{Core: core}, nil
+	return &share{core: core}, nil
 }
 
 // LoadShare returns the name of the host owing the share 'ref', read from Object Storage
@@ -153,7 +157,7 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.S
 }
 
 func (objs *share) IsNull() bool {
-	return objs == nil || objs.Core.IsNull()
+	return objs == nil || objs.core.IsNull()
 }
 
 // Browse walks through shares folder and executes a callback for each entry
@@ -167,7 +171,7 @@ func (objs *share) Browse(task concurrency.Task, callback func(string, string) e
 	if callback == nil {
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
-	return objs.Core.BrowseFolder(task, func(buf []byte) error {
+	return objs.core.BrowseFolder(task, func(buf []byte) error {
 		si := &ShareIdentity{}
 		err := si.Deserialize(buf)
 		if err != nil {
@@ -892,7 +896,7 @@ func (objs *share) Delete(task concurrency.Task) error {
 	}
 
 	// Remove share metadata
-	return objs.Core.Delete(task)
+	return objs.core.Delete(task)
 }
 
 func sanitize(in string) (string, error) {
