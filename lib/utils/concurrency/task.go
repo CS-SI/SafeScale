@@ -90,9 +90,6 @@ type TaskCore interface {
 	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, error)
 	StartInSubtask(TaskAction, TaskParameters) (Task, error)
 
-	SafeGetID() string
-	SafeGetSignature() string
-	SafeGetStatus() TaskStatus
 	Close()
 }
 

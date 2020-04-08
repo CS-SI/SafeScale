@@ -307,13 +307,13 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		}
 
 		if errorExpected {
-			st := single.SafeGetStatus()
+			st, _ := single.GetStatus()
 			if st != ABORTED {
 				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 			}
 			require.True(t, st == ABORTED)
 		} else {
-			st := single.SafeGetStatus()
+			st, _ := single.GetStatus()
 			if st == ABORTED {
 				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 			}
