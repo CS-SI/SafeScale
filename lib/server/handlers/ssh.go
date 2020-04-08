@@ -103,7 +103,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a resources.Host*abstract.Host")
 	}
 
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -223,7 +223,7 @@ func (handler *sshHandler) WaitServerReady(hostParam interface{}, timeout time.D
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.ssh"), "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -251,7 +251,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
@@ -345,7 +345,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

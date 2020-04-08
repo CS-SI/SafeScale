@@ -42,7 +42,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, debug.IfTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 
 	// disable subnetwork auto-creation
@@ -477,7 +477,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull
 
 	// VPL: Moved in objects.Host
 	// // Updates Host Property propertiesv1.HostSizing
-	// err = host.Properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
+	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
 	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
 	// 	hostSizingV1.Template = req.TemplateID
 	// 	return nil

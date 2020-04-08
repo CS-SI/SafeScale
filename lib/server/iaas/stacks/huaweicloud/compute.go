@@ -1069,10 +1069,10 @@ func toHostState(status string) hoststate.Enum {
 // 	// 		if innerErr != nil {
 // 	// 			return innerErr
 // 	// 		}
-// 	// 		if hostTmp.Core.LastState == hoststate.ERROR {
+// 	// 		if hostTmp.core.LastState == hoststate.ERROR {
 // 	// 			return retry.StopRetryError(nil, "host '%s' in error state", hostRef)
 // 	// 		}
-// 	// 		ahc = hostTmp.Core
+// 	// 		ahc = hostTmp.core
 // 	// 		if ahc.LastState != hoststate.STARTED {
 // 	// 			return scerr.NotAvailableError("not in ready state (current state: %s)", ahc.LastState.String())
 // 	// 		}

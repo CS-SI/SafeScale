@@ -96,7 +96,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 		return nil, scerr.InvalidParameterError("request.Name", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().OnExitTrace()()
 
 	volume, err = s.GetVolume(request.Name)
 	if err != nil {
@@ -178,7 +178,7 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
 
 	r := volumesv2.Get(s.VolumeClient, id)
 	volume, err := r.Extract()
@@ -205,7 +205,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().OnExitTrace()()
 
 	var vs []abstract.Volume
 	err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -244,7 +244,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().OnExitTrace()()
 
 	var (
 		timeout = temporal.GetBigDelay()
@@ -287,7 +287,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 		return "", scerr.InvalidParameterError("request.Name", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().OnExitTrace()()
 
 	// Creates the attachment
 	r := volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
@@ -319,7 +319,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().OnExitTrace()()
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 	if err != nil {
@@ -342,7 +342,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
 		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().OnExitTrace()()
 
 	var vs []abstract.VolumeAttachment
 	err := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
@@ -379,7 +379,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 		return scerr.InvalidParameterError("vaID", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.IfTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().OnExitTrace()()
 
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
 	err := r.ExtractErr()

@@ -53,7 +53,7 @@ func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, e
 		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

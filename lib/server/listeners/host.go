@@ -98,7 +98,7 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -148,7 +148,7 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -195,7 +195,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -238,7 +238,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	defer job.Close()
 
 	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
@@ -290,7 +290,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 
 	name := in.GetName()
 	task := job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -368,7 +368,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 
 	name := in.GetName()
 	task := job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -427,7 +427,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	defer job.Close()
 
 	task := job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -476,7 +476,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	defer job.Close()
 
 	task := job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -525,7 +525,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -574,7 +574,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.IfTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
