@@ -52,13 +52,13 @@ const (
 
 // network links Object Storage folder and Network
 type network struct {
-	*Core
+	*core
 
 	hasVIP bool
 }
 
 func nullNetwork() *network {
-	return &network{Core: nullCore()}
+	return &network{core: nullCore()}
 }
 
 // NewNetwork creates an instance of Network
@@ -72,7 +72,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, error) {
 		return nullNetwork(), err
 	}
 
-	return &network{Core: core}, nil
+	return &network{core: core}, nil
 }
 
 // LoadNetwork loads the metadata of a network
@@ -101,7 +101,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := err.(retry.ErrTimeout); ok {
 			logrus.Debugf("timeout reading metadata of network '%s'", ref)
-			err = scerr.NotFoundError("network '%s' not found", ref)
+			err = scerr.NotFoundError("network '%s' not found: %s", ref, err.Error())
 		}
 		return nullNetwork(), err
 	}
@@ -122,7 +122,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 
 // IsNull tells if the instance corresponds to network Null Value
 func (objn *network) IsNull() bool {
-	return objn == nil || objn.Core.IsNull()
+	return objn == nil || objn.core.IsNull()
 }
 
 // Create creates a network
@@ -143,9 +143,14 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
+	// Check if network already exists and is managed by SafeScale
 	svc := objn.SafeGetService()
+	_, err = LoadNetwork(task, svc, req.Name)
+	if err == nil {
+		return scerr.DuplicateError("network '%s' anready exists", req.Name)
+	}
 
-	// Verify that the network doesn't exist first
+	// Verify if the network already exist and in this case is not managed by SafeScale
 	_, err = svc.GetNetworkByName(req.Name)
 	if err != nil {
 		switch err.(type) {
@@ -156,7 +161,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 			return err
 		}
 	} else {
-		return scerr.DuplicateError("network '%s' already exists", req.Name)
+		return scerr.DuplicateError("network '%s' already exists (not managed by SafeScale)", req.Name)
 	}
 
 	// Verify the CIDR is not routable
@@ -247,7 +252,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	// Starting from here, delete network metadata if exits with error
 	defer func() {
 		if err != nil {
-			derr := objn.Core.Delete(task)
+			derr := objn.core.Delete(task)
 			if derr != nil {
 				logrus.Errorf("failed to delete network metadata: %+v", derr)
 				err = scerr.AddConsequence(err, derr)
@@ -445,6 +450,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	if primaryErr != nil {
 		return primaryErr
 	}
+
 	if secondaryErr != nil {
 		return secondaryErr
 	}
@@ -589,10 +595,14 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 }
 
 // deleteGateway eases a gateway deletion
+// Note: doesn't use gw.Delete() because by rule a Delete on a gateway is not permitted
 func (objn *network) deleteGateway(task concurrency.Task, gw resources.Host) (err error) {
 	name := gw.SafeGetName()
 	logrus.Warnf("Cleaning up on failure, deleting gateway '%s'...", name)
-	err = gw.Delete(task)
+	err = objn.SafeGetService().DeleteHost(gw.SafeGetID())
+	if err == nil {
+		err = gw.(*host).core.Delete(task)
+	}
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound:
@@ -602,8 +612,9 @@ func (objn *network) deleteGateway(task concurrency.Task, gw resources.Host) (er
 		default:
 			logrus.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", name, err)
 		}
+	} else {
+		logrus.Infof("Cleaning up on failure, gateway '%s' deleted", name)
 	}
-	logrus.Infof("Cleaning up on failure, gateway '%s' deleted", name)
 	return err
 }
 
@@ -635,7 +646,7 @@ func (objn *network) Browse(task concurrency.Task, callback func(*abstract.Netwo
 		return scerr.InvalidParameterError("callback", "can't be nil")
 	}
 
-	return objn.Core.BrowseFolder(task, func(buf []byte) error {
+	return objn.core.BrowseFolder(task, func(buf []byte) error {
 		an := abstract.NewNetwork()
 		err := an.Deserialize(buf)
 		if err != nil {
@@ -852,9 +863,6 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 		if an.GatewayID != "" {
 			stop := false
 			rh, innerErr := LoadHost(task, svc, an.GatewayID)
-			if err != nil {
-				return err
-			}
 			if innerErr != nil {
 				if _, ok := innerErr.(scerr.ErrNotFound); !ok {
 					return innerErr
@@ -862,6 +870,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				stop = true
 			}
 			if !stop {
+				logrus.Debugf("Deleting resources.Host...")
 				innerErr = rh.Delete(task)
 				if innerErr != nil { // allow no gateway, but log it
 					if _, ok := err.(scerr.ErrNotFound); ok {
@@ -871,7 +880,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 					}
 				}
 			} else {
-				logrus.Infof("Gateway of network '%s' appears to be already deleted", an.Name)
+				logrus.Infof("Primary Gateway of network '%s' appears to be already deleted", an.Name)
 			}
 		}
 
@@ -886,6 +895,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				stop = true
 			}
 			if !stop {
+				logrus.Debugf("Deleting resources.Host...")
 				innerErr = rh.Delete(task)
 				if innerErr != nil { // allow no gateway, but log it
 					if _, ok := innerErr.(scerr.ErrNotFound); ok { // nolint
@@ -895,7 +905,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 					}
 				}
 			} else {
-				logrus.Infof("Gateway of network '%s' appears to be already deleted", an.Name)
+				logrus.Infof("Secondary Gateway of network '%s' appears to be already deleted", an.Name)
 			}
 		}
 
@@ -949,7 +959,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 	}
 
 	// Delete metadata
-	return objn.Core.Delete(task)
+	return objn.core.Delete(task)
 }
 
 // GetDefaultRouteIP returns the IP of the LAN default route

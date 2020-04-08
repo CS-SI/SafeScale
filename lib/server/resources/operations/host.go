@@ -61,7 +61,7 @@ const (
 // host ...
 // follows interface resources.Host
 type host struct {
-	*Core
+	*core
 
 	installMethods map[uint8]installmethod.Enum
 	sshProfile     *system.SSHConfig
@@ -78,12 +78,12 @@ func NewHost(svc iaas.Service) (resources.Host, error) {
 		return nil, err
 	}
 
-	return &host{Core: core}, nil
+	return &host{core: core}, nil
 }
 
 // nullHost returns a *host corresponding to NullValue
 func nullHost() *host {
-	return &host{Core: nullCore()}
+	return &host{core: nullCore()}
 }
 
 // LoadHost ...
@@ -124,7 +124,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (resources.Ho
 }
 
 func (rh *host) IsNull() bool {
-	return rh == nil || rh.Core.IsNull()
+	return rh == nil || rh.core.IsNull()
 }
 
 // Browse walks through host folder and executes a callback for each entries
@@ -139,7 +139,7 @@ func (rh *host) Browse(task concurrency.Task, callback func(*abstract.HostCore) 
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	return rh.Core.BrowseFolder(task, func(buf []byte) error {
+	return rh.core.BrowseFolder(task, func(buf []byte) error {
 		ahc := abstract.NewHostCore()
 		err = ahc.Deserialize(buf)
 		if err != nil {
@@ -345,6 +345,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		hostReq.ImageID = img.ID
 	}
 
+	hostReq.Password = "safescale" // VPL:for debugging purpose, remove if you see this!
 	ahf, userDataContent, err := svc.CreateHost(hostReq)
 	if err != nil {
 		if _, ok := err.(scerr.ErrInvalidRequest); ok {
@@ -387,7 +388,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		// Starting from here, delete host metadata if exiting with error
 		defer func() {
 			if innerErr != nil {
-				derr := rh.Core.Delete(task)
+				derr := rh.core.Delete(task)
 				if derr != nil {
 					logrus.Errorf("After failure, failed to cleanup by removing host metadata")
 				}
@@ -567,7 +568,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase string) (string, e
 }
 
 func (rh *host) updateNetwork(task concurrency.Task, networkID string) error {
-	objn, err := LoadNetwork(task, rh.Core.SafeGetService(), networkID)
+	objn, err := LoadNetwork(task, rh.core.SafeGetService(), networkID)
 	if err != nil {
 		return err
 	}
@@ -754,8 +755,8 @@ func (rh *host) Delete(task concurrency.Task) error {
 			return inErr
 		}
 
-		// Unmounts tier shares mounted on host (done outside the previous host.Properties.Reading() section, because
-		// Unmount() have to lock for write, and won't succeed while host.Properties.Reading() is running,
+		// Unmounts tier shares mounted on host (done outside the previous host.properties.Reading() section, because
+		// Unmount() have to lock for write, and won't succeed while host.properties.Reading() is running,
 		// leading to a deadlock)
 		for _, item := range mounts {
 			objs, loopErr := LoadShare(task, svc, item.ID)
@@ -869,7 +870,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 	}
 
 	// Deletes metadata from Object Storage
-	err = rh.Core.Delete(task)
+	err = rh.core.Delete(task)
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); ok {
 			// If entry not found, consider a success
@@ -883,9 +884,9 @@ func (rh *host) Delete(task concurrency.Task) error {
 	// case <-ctx.Done():
 	// 	logrus.Warnf("Host delete cancelled by safescale")
 	// 	var hostBis *abstract.Host
-	// 	err2 := host.Properties.Inspect(hostproperty.SizingV1, func(v interface{}) error {
+	// 	err2 := host.properties.Inspect(hostproperty.SizingV1, func(v interface{}) error {
 	// 		hostSizingV1 := v.(*propertiesv1.HostSizing)
-	// 		return host.Properties.Inspect(hostproperty.NetworkV1, func(v interface{}) error {
+	// 		return host.properties.Inspect(hostproperty.NetworkV1, func(v interface{}) error {
 	// 			hostNetworkV1 := v.(*propertiesv1.HostNetwork)
 	// 			//FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
 	// 			var err3 error
@@ -1173,7 +1174,7 @@ func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.
 		// if !ok {
 		// 	return scerr.InconsistentError("'*abstract.Host' expected, '%s' provided", reflect.TypeOf(clonable).String()
 		// }
-		// props, inErr := rh.Properties(task)
+		// props, inErr := rh.properties(task)
 		// if inErr != nil {
 		// 	return inErr
 		// }
@@ -1665,7 +1666,7 @@ func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installme
 		rh.installMethods = map[uint8]installmethod.Enum{}
 
 		_ = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-			// props, inErr := rh.Properties(task)
+			// props, inErr := rh.properties(task)
 			// if inErr != nil {
 			// 	return inErr
 			// }
@@ -1932,28 +1933,30 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 	if mode != "" {
 		cmd += `sudo chmod ` + mode + ` '` + filename + `'`
 	}
-	retryErr = retry.WhileUnsuccessful(
-		func() error {
-			var retcode int
-			retcode, _, _, err = rh.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-			if err != nil {
-				return err
-			}
-			if retcode != 0 {
-				err = scerr.NewError("failed to change rights of file '%s' (retcode=%d)", to, retcode)
+	if cmd != "" {
+		retryErr = retry.WhileUnsuccessful(
+			func() error {
+				var retcode int
+				retcode, _, _, err = rh.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+				if err != nil {
+					return err
+				}
+				if retcode != 0 {
+					err = scerr.NewError("failed to change rights of file '%s' (retcode=%d)", to, retcode)
+					return nil
+				}
 				return nil
+			},
+			2*time.Second,
+			1*time.Minute,
+		)
+		if retryErr != nil {
+			switch retryErr.(type) {
+			case retry.ErrTimeout:
+				return scerr.Wrap(err, "timeout trying to change rights of file '%s' on host '%s'", filename, hostName)
+			default:
+				return scerr.Wrap(retryErr, "failed to change rights of file '%s' on host '%s'", filename, hostName)
 			}
-			return nil
-		},
-		2*time.Second,
-		1*time.Minute,
-	)
-	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
-			return scerr.Wrap(err, "timeout trying to change rights of file '%s' on host '%s'", filename, hostName)
-		default:
-			return scerr.Wrap(retryErr, "failed to change rights of file '%s' on host '%s'", filename, hostName)
 		}
 	}
 	return nil

@@ -123,7 +123,7 @@ func (c *cluster) taskConfigureGateway(task concurrency.Task, params concurrency
 		return result, scerr.InvalidParameterError("params", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(task, debug.IfTrace("cluster"), "(%v)", params).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

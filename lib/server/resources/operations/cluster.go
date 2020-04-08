@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -63,7 +64,7 @@ const (
 
 // Cluster is the implementation of resources.Cluster interface
 type cluster struct {
-	*Core
+	*core
 	concurrency.TaskedLock `json:"-"`
 	abstract.ClusterIdentity
 
@@ -74,7 +75,7 @@ type cluster struct {
 }
 
 func nullCluster() *cluster {
-	return &cluster{Core: nullCore()}
+	return &cluster{core: nullCore()}
 }
 
 // NewCluster ...
@@ -92,7 +93,7 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, e
 		return nullCluster(), err
 	}
 
-	return &cluster{Core: core}, nil
+	return &cluster{core: core}, nil
 }
 
 // LoadCluster ...
@@ -180,17 +181,17 @@ func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) error {
 
 // IsNull tells if the instance represents a null value of cluster
 func (c *cluster) IsNull() bool {
-	return c == nil || c.Core.IsNull()
+	return c == nil || c.core.IsNull()
 }
 
 // SafeGetName returns the name if the cluster
 func (c *cluster) SafeGetName() string {
-	return c.Core.SafeGetName()
+	return c.core.SafeGetName()
 }
 
 // SafeGetID returns the name of the cluster (there is no ID, but data.Identityable wants ID()
 func (c *cluster) SafeGetID() string {
-	return c.Core.SafeGetName()
+	return c.core.SafeGetName()
 }
 
 // Create creates the necessary infrastructure of the Cluster
@@ -220,7 +221,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (er
 	// Starting from here, delete metadata if exiting with error
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := c.Core.Delete(task)
+			derr := c.core.Delete(task)
 			if derr != nil {
 				logrus.Errorf("after failure, cleanup failed to delete cluster metadata")
 			}
@@ -877,20 +878,39 @@ func complementSizingRequirements(req *abstract.HostSizingRequirements, def abst
 
 // Serialize converts cluster data to JSON
 // satisfies interface data.Serializable
-func (c *cluster) Serialize() ([]byte, error) {
+func (c *cluster) Serialize(task concurrency.Task) ([]byte, error) {
 	if c.IsNull() {
 		return []byte{}, scerr.InvalidInstanceError()
 	}
-	return serialize.ToJSON(c)
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
+
+	return json.Marshal(c)
 }
 
 // Deserialize reads json code and reinstantiates cluster
 // satisfies interface data.Serializable
-func (c *cluster) Deserialize(buf []byte) error {
+func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (err error) {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
-	return serialize.FromJSON(buf, c)
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if len(buf) == 0 {
+		return scerr.InvalidParameterError("buf", "cannot be empty []byte")
+	}
+
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
+
+	return json.Unmarshal(buf, c)
 }
 
 // Boostrap (re)connects controller with the appropriate Makers
@@ -901,6 +921,7 @@ func (c *cluster) Bootstrap(task concurrency.Task) (err error) {
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
+
 	defer scerr.OnPanic(&err)() // c.Lock()/Unlock() may panic
 
 	c.SafeLock(task)
@@ -929,7 +950,7 @@ func (c *cluster) Browse(task concurrency.Task, callback func([]byte) error) err
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	return c.Core.BrowseFolder(task, callback)
+	return c.core.BrowseFolder(task, callback)
 }
 
 // GetIdentity returns the identity of the cluster
@@ -2247,7 +2268,7 @@ func (c *cluster) CountNodes(task concurrency.Task) (count uint, err error) {
 		return 0, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, debug.IfTrace("cluster"), "").TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, debug.ShouldTrace("cluster"), "").TraceMessage(""), &err)()
 
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) error {
@@ -2490,7 +2511,7 @@ func (c *cluster) Delete(task concurrency.Task) error {
 		return scerr.ErrListError(cleaningErrors)
 	}
 
-	return c.Core.Delete(task)
+	return c.core.Delete(task)
 }
 
 // func deleteNodes(task concurrency.Task, svc iaas.Service, nodes []*propertiesv2.ClusterNode) {
