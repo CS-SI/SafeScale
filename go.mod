@@ -54,9 +54,12 @@ require (
 	golang.org/x/sys v0.0.0-20200212091648-12a6c2dcc1e4
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.15.0
+	google.golang.org/appengine v1.6.5
 	google.golang.org/grpc v1.27.1
 	gopkg.in/ini.v1 v1.52.0 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
+	mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed // indirect
+	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
