@@ -270,7 +270,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	//msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
-	if request.DefaultGateway == nil && !request.PublicIP {
+	if len(request.Networks) == 0 && !request.PublicIP {
 		return nil, userData, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without network and without public access (would be unreachable)")
 	}
 

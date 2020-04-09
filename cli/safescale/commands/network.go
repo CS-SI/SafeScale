@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -132,9 +132,9 @@ var networkInspect = &cli.Command{
 			err = scerr.FromGRPCStatus(err)
 			var what string
 			if network.GetSecondaryGatewayId() != "" {
-				what = "primary"
+				what = "primary "
 			}
-			casted := scerr.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %s gateway", what))
+			casted := scerr.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 		}
 		mapped["gateway_name"] = pgw.Name
@@ -142,13 +142,13 @@ var networkInspect = &cli.Command{
 			sgw, err = client.New().Host.Inspect(sgwID, temporal.GetExecutionTimeout())
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
-				casted := scerr.Wrap(err, "failed to inspect secondary gateway")
+				casted := scerr.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 			}
 			mapped["secondary_gateway_name"] = sgw.Name
 		}
 		// Removed entry 'virtual_ip' if empty
-		if len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+		if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
 			delete(mapped, "virtual_ip")
 		}
 

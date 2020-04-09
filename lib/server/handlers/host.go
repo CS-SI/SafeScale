@@ -251,8 +251,8 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, err error) 
 		return nil, err
 	}
 	hosts = abstract.HostList{}
-	err = objh.Browse(task, func(host *abstract.HostCore) error {
-		hosts = append(hosts, converters.HostCoreToHostFull(*host))
+	err = objh.Browse(task, func(ahc *abstract.HostCore) error {
+		hosts = append(hosts, converters.HostCoreToHostFull(*ahc))
 		return nil
 	})
 	return hosts, err

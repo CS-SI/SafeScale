@@ -616,7 +616,7 @@ func (c *cluster) createHosts(
 	keepOnFailure bool,
 ) error {
 
-	gwFailoverDisabled := network.HasVirtualIP()
+	gwFailoverDisabled := network.HasVirtualIP(task)
 
 	primaryGateway, err := network.GetGateway(task, true)
 	if err != nil {

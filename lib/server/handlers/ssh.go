@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
@@ -81,26 +81,9 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 	task := handler.job.SafeGetTask()
 	svc := handler.job.SafeGetService()
 
-	var (
-		hostRef string
-		host    resources.Host
-	)
-	switch hostParam := hostParam.(type) {
-	case string:
-		hostRef = hostParam
-		host, err = hostfactory.Load(task, svc, hostRef)
-		if err != nil {
-			return nil, err
-		}
-	case resources.Host:
-		host = hostParam
-		if host.SafeGetName() != "" {
-			hostRef = host.SafeGetName()
-		} else {
-			hostRef = host.SafeGetID()
-		}
-	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a resources.Host*abstract.Host")
+	_, hostRef, err := stacks.ValidateHostParam(hostParam)
+	if err != nil {
+		return nil, err
 	}
 
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
@@ -108,17 +91,24 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
 
+	host, err := hostfactory.Load(task, svc, hostRef)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg, err := svc.GetConfigurationOptions()
 	if err != nil {
 		return nil, err
 	}
-	user := abstract.DefaultUser
-	if userIf, ok := cfg.Get("OperatorUsername"); ok {
-		user = userIf.(string)
+	var user string
+	if anon, ok := cfg.Get("OperatorUsername"); ok {
+		user = anon.(string)
 		if user == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			user = abstract.DefaultUser
+			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
 		}
+	}
+	if user == "" {
+		user = abstract.DefaultUser
 	}
 
 	ip, err := host.GetAccessIP(task)
@@ -131,11 +121,11 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 		User: user,
 	}
 	err = host.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		hc, ok := clonable.(*abstract.HostCore)
+		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return scerr.InconsistentError("")
 		}
-		sshConfig.PrivateKey = hc.PrivateKey
+		sshConfig.PrivateKey = ahc.PrivateKey
 
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
@@ -143,11 +133,11 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if hostNetworkV1.DefaultNetworkID != "" {
-				objn, inErr := networkfactory.Load(task, svc, hostNetworkV1.DefaultNetworkID)
+				rn, inErr := networkfactory.Load(task, svc, hostNetworkV1.DefaultNetworkID)
 				if inErr != nil {
 					return inErr
 				}
-				gw, pgwErr := objn.GetGateway(task, true)
+				gw, pgwErr := rn.GetGateway(task, true)
 				if pgwErr == nil {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 						gwhc, ok := clonable.(*abstract.HostCore)
@@ -173,7 +163,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 				} else if _, ok := pgwErr.(scerr.ErrNotFound); !ok {
 					return pgwErr
 				}
-				gw, sgwErr := objn.GetGateway(task, false)
+				gw, sgwErr := rn.GetGateway(task, false)
 				if sgwErr == nil {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 						gwhc, ok := clonable.(*abstract.HostCore)
