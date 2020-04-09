@@ -682,7 +682,7 @@ install_keepalived() {
 
     cat >/etc/keepalived/keepalived.conf <<-EOF
 vrrp_instance vrrp_group_gws_internal {
-    state BACKUP
+    state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
     interface ${PR_IFs[0]}
     virtual_router_id 1
     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}

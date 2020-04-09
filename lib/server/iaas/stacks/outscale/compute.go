@@ -719,6 +719,21 @@ func (s *Stack) deleteHostOnError(err error, vm *oapi.Vm) error {
 	return err
 }
 
+func (s *Stack) addPublicIPs(primaryNIC *oapi.Nic, otherNICs []oapi.Nic) (*oapi.PublicIp, error) {
+	ip, err := s.addPublicIP(primaryNIC)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, nic := range otherNICs {
+		_, err = s.addPublicIP(&nic)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ip, nil
+}
+
 // CreateHost creates an host that fulfils the request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
 	if s == nil {
@@ -814,20 +829,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, s.deleteHostOnError(err, &vm)
 	}
 	if request.PublicIP {
-		ip, err := s.addPublicIP(&defaultNic)
-		if err != nil {
-			return nil, userData, s.deleteHostOnError(err, &vm)
-		}
+		ip, err := s.addPublicIPs(&defaultNic, nics)
 		if ip != nil {
 			userData.PublicIP = ip.PublicIp
 			vm.PublicIp = userData.PublicIP
 		}
-
-		for _, nic := range nics {
-			_, err = s.addPublicIP(&nic)
-			if err != nil {
-				return nil, userData, s.deleteHostOnError(err, &vm)
-			}
+		if err != nil {
+			return nil, userData, s.deleteHostOnError(err, &vm)
 		}
 	}
 
