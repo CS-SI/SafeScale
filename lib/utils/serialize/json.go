@@ -247,22 +247,16 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (err err
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	// defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
 
 	x.Lock()
 	defer x.Unlock()
 
 	// Decode JSON data
-	var unjsoned string
+	var unjsoned = map[string]string{}
 	err = json.Unmarshal(buf, &unjsoned)
 	if err != nil {
-		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed!")
-		return err
-	}
-	var mapped map[string]string
-	err = json.Unmarshal([]byte(unjsoned), &mapped)
-	if err != nil {
-		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling string to map failed!")
+		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", err.Error())
 		return err
 	}
 
@@ -270,18 +264,18 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (err err
 		prop *jsonProperty
 		ok   bool
 	)
-	for key, value := range mapped {
-		if prop, ok = x.Properties[key].(*jsonProperty); !ok {
-			zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+	for k, v := range unjsoned {
+		if prop, ok = x.Properties[k].(*jsonProperty); !ok {
+			zeroValue := PropertyTypeRegistry.ZeroValue(x.module, k)
 			item := &jsonProperty{
 				Shielded: concurrency.NewShielded(zeroValue),
 				module:   x.module,
-				key:      key,
+				key:      k,
 			}
-			x.Properties[key] = item
+			x.Properties[k] = item
 			prop = item
 		}
-		err = prop.Shielded.Deserialize(task, []byte(value))
+		err = prop.Shielded.Deserialize(task, []byte(v))
 		if err != nil {
 			return err
 		}

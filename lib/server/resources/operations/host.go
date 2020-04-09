@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -292,8 +291,8 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	if len(hostReq.Networks) > 0 {
 		// By convention, default network is the first of the list
-		rn := hostReq.Networks[0]
-		objn, err = LoadNetwork(task, svc, rn.ID)
+		an := hostReq.Networks[0]
+		objn, err = LoadNetwork(task, svc, an.ID)
 		if err != nil {
 			return err
 		}
@@ -826,7 +825,6 @@ func (rh *host) Delete(task concurrency.Task) error {
 				// FIXME: need to remove retry from svc.DeleteHost!
 				err := svc.DeleteHost(hostID)
 				if err != nil {
-					spew.Dump(err)
 					if _, ok := err.(scerr.ErrNotFound); !ok {
 						return scerr.Wrap(err, "cannot delete host")
 					}
@@ -878,46 +876,6 @@ func (rh *host) Delete(task concurrency.Task) error {
 		}
 		return err
 	}
-
-	//FIXME: do we really need to rebuild deleted host ? We lost all config, data, ... hosted so what is the point ?
-	// select { // FIXME Unorthodox usage of context
-	// case <-ctx.Done():
-	// 	logrus.Warnf("Host delete cancelled by safescale")
-	// 	var hostBis *abstract.Host
-	// 	err2 := host.properties.Inspect(hostproperty.SizingV1, func(v interface{}) error {
-	// 		hostSizingV1 := v.(*propertiesv1.HostSizing)
-	// 		return host.properties.Inspect(hostproperty.NetworkV1, func(v interface{}) error {
-	// 			hostNetworkV1 := v.(*propertiesv1.HostNetwork)
-	// 			//FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
-	// 			var err3 error
-	// 			sizing := abstract.SizingRequirements{
-	// 				MinCores:    hostSizingV1.AllocatedSize.Cores,
-	// 				MaxCores:    hostSizingV1.AllocatedSize.Cores,
-	// 				MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,
-	// 				MinGPU:      hostSizingV1.AllocatedSize.GPUNumber,
-	// 				MinRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
-	// 				MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
-	// 				MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
-	// 			}
-	// 			hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, "ubuntu 18.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, &sizing, true)
-	// 			if err3 != nil {
-	// 				return scerr.Wrap(err3, "failed to stop host deletion")
-	// 			}
-	// 			return nil
-	// 		})
-	// 	})
-	// 	if err2 != nil {
-	// 		return scerr.Wrap(err2, "failed to cancel host deletion")
-	// 	}
-
-	// 	buf, err2 := hostBis.Serialize()
-	// 	if err2 != nil {
-	// 		return scerr.Wrap(err2, "deleted host recreated by safescale")
-	// 	}
-	// 	return scerr.NewError("deleted Host recreated by safescale: %s", buf)
-
-	// default:
-	// }
 
 	return nil
 }
@@ -1106,7 +1064,7 @@ func (rh *host) Pull(task concurrency.Task, target, source string, timeout time.
 		return 0, "", "", err
 	}
 
-	// FIXME: reintroduce timeout on ssh.Copy
+	// FIXME: reintroduce timeout on ssh.
 	// if timeout < temporal.GetHostTimeout() {
 	// 	timeout = temporal.GetHostTimeout()
 	// }

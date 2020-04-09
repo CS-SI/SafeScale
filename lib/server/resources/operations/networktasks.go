@@ -98,17 +98,17 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		}
 	}()
 
-	objgw, err := NewHost(svc)
+	rgw, err := NewHost(svc)
 	if err != nil {
 		return nil, err
 	}
-	err = objgw.Carry(task, gwahf.Core)
+	err = rgw.Carry(task, gwahf.Core)
 	if err != nil {
 		return nil, err
 	}
 
 	// Updates properties in metadata
-	err = objgw.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+	err = rgw.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		innerErr := props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
 			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
@@ -124,7 +124,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		// Starting from here, delete host metadata if exiting with error
 		defer func() {
 			if innerErr != nil {
-				derr := objgw.(*host).core.Delete(task)
+				derr := rgw.(*host).core.Delete(task)
 				if derr != nil {
 					logrus.Errorf("After failure, failed to cleanup by removing host metadata")
 				}
@@ -186,8 +186,8 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 			userData.DefaultRouteIP = request.Network.VIP.PrivateIP
 			userData.EndpointIP = request.Network.VIP.PublicIP
 		} else {
-			userData.DefaultRouteIP, _ = objgw.GetPrivateIP(task)
-			userData.EndpointIP, _ = objgw.GetPublicIP(task)
+			userData.DefaultRouteIP, _ = rgw.GetPrivateIP(task)
+			userData.EndpointIP, _ = rgw.GetPublicIP(task)
 		}
 		userData.IsPrimaryGateway = primary
 		return nil
@@ -197,7 +197,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	}
 
 	r := data.Map{
-		"host":     objgw,
+		"host":     rgw,
 		"userdata": userData,
 	}
 	return r, nil
@@ -279,7 +279,7 @@ func (objn *network) taskInstallPhase2OnGateway(task concurrency.Task, params co
 	if returnCode != 0 {
 		RetrieveForensicsData(task, objgw)
 		warnings, errs := GetPhaseWarningsAndErrors(task, objgw)
-		return nil, scerr.NewError("failed to finalize gateway '%s' installation: returned code '%d', warnings '%s', errors '%s'", gwname, returnCode, warnings, errs)
+		return nil, scerr.NewError("failed to finalize gateway '%s' installation: phase2 returned code '%d', warnings '%s', errors '%s'", gwname, returnCode, warnings, errs)
 	}
 	logrus.Infof("Gateway '%s' successfully configured.", gwname)
 

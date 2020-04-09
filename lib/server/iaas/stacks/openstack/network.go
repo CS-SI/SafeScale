@@ -658,7 +658,7 @@ func (s *Stack) deleteSubnet(id string) (err error) {
 				neutronError := ParseNeutronError(err.Error())
 				switch neutronError["type"] {
 				case "SubnetInUse":
-					msg := fmt.Sprintf("hosts or services are still attached")
+					msg := "hosts or services are still attached"
 					logrus.Warnf(strprocess.Capitalize(msg))
 					return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
 				default:

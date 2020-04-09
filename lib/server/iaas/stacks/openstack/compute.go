@@ -357,7 +357,7 @@ func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
 	})
 	if (len(kpList) == 0) || (err != nil) {
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing keypairs"))
+			return nil, scerr.Wrap(err, "error listing keypairs")
 		}
 	}
 	return kpList, nil
@@ -671,7 +671,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
-	if request.DefaultGateway == nil && !request.PublicIP {
+	if len(request.Networks) == 0 && !request.PublicIP {
 		return nil, userData, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
@@ -1024,7 +1024,7 @@ func (s *Stack) WaitHostState(hostParam interface{}, state hoststate.Enum, timeo
 					return err
 				case gophercloud.ErrDefault409:
 					// specific handling for error 409
-					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", hostRef, ProviderErrorToString(err)))
+					return retry.StopRetryError(fmt.Errorf("error getting host '%s': %s", hostRef, ProviderErrorToString(err)), "")
 				case gophercloud.ErrDefault429:
 					// rate limiting defined by provider, retry
 					return err
@@ -1271,7 +1271,7 @@ func (s *Stack) DeleteHost(id string) error {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		return scerr.Wrap(outerRetryErr, fmt.Sprintf("error deleting host: retry error"))
+		return scerr.Wrap(outerRetryErr, "error deleting host: retry error")
 	}
 	return nil
 }

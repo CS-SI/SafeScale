@@ -43,6 +43,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -438,7 +439,7 @@ func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, s
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(task, false, "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 	// Set up the outputs (std and err)
@@ -450,56 +451,6 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, t
 	if err != nil {
 		return 0, "", "", err
 	}
-
-	// doneCh := make(chan bool)
-
-	// var msgOut []byte
-	// var msgErr []byte
-
-	// go func() {
-	// 	defer close(doneCh)
-
-	// 	clean := true
-	// 	var closeErr error
-
-	// 	msgOut, closeErr = ioutil.ReadAll(stdOut)
-	// 	if closeErr != nil {
-	// 		logrus.Debugf("error recovering standard output of command [%s]: %v", sc.Display(), closeErr)
-	// 		clean = false
-	// 	}
-
-	// 	msgErr, closeErr = ioutil.ReadAll(stderr)
-	// 	if closeErr != nil {
-	// 		logrus.Debugf("error recovering standard error of command [%s]: %v", sc.Display(), closeErr)
-	// 		clean = false
-	// 	}
-
-	// 	err = sc.Wait()
-	// 	if err != nil {
-	// 		logrus.Debugf("error waiting for command [%s]: %v", sc.Display(), err)
-	// 		clean = false
-	// 	}
-
-	// 	doneCh <- clean
-	// }()
-
-	// select {
-	// case issues := <-doneCh:
-	// 	if err != nil {
-	// 		msgError, retCode, erro := ExtractRetCode(err)
-	// 		if erro != nil {
-	// 			return 0, "", "", err
-	// 		}
-	// 		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
-	// 	}
-	// 	if !issues {
-	// 		logrus.Warnf("there have been issues running this command [%s], please check daemon logs", sc.Display()
-	// 	}
-	// case <-time.After(timeout):
-	// 	errMsg := fmt.Sprintf("timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display()
-	// 	logrus.Warnf(errMsg)
-	// 	return 0, "", "", fmt.Errorf(errMsg)
-	// }
 
 	subtask, err := concurrency.NewTaskWithParent(task)
 	if err != nil {
@@ -542,17 +493,17 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 	)
 	stdoutPipe, ok = params["stdout"].(io.ReadCloser)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p[stdout]", "is missing or is not of type io.ReadCloser")
+		return nil, scerr.InvalidParameterError("p['stdout']", "is missing or is not of type io.ReadCloser")
 	}
 	if stdoutPipe == nil {
-		return nil, scerr.InvalidParameterError("p[stdout]", "cannot be nil")
+		return nil, scerr.InvalidParameterError("p['stdout']", "cannot be nil")
 	}
 	stderrPipe, ok = params["stderr"].(io.ReadCloser)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p[stderr]", "is missing or is not of type io.ReadCloser")
+		return nil, scerr.InvalidParameterError("p['stderr']", "is missing or is not of type io.ReadCloser")
 	}
 	if stderrPipe == nil {
-		return nil, scerr.InvalidParameterError("p[stderr]", "cannot be nil")
+		return nil, scerr.InvalidParameterError("p['stderr']", "cannot be nil")
 	}
 	if collectOutputs, ok = params["collect_outputs"].(bool); !ok {
 		return nil, scerr.InvalidParameterError("p[collect_outputs]", "is missing or is not of type bool")
@@ -586,6 +537,14 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		}
 	}
 
+	// Starts pipebridge if needed
+	if !collectOutputs {
+		err = pipeBridgeCtrl.Start(task)
+		if err != nil {
+			return result, err
+		}
+	}
+
 	// Launch the command and wait for its execution
 	if err := sc.Start(); err != nil {
 		return result, err
@@ -601,11 +560,6 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		if err != nil {
 			return result, err
 		}
-	} else {
-		err = pipeBridgeCtrl.Start(task)
-		if err != nil {
-			return result, err
-		}
 	}
 
 	var pbcErr error
@@ -618,6 +572,11 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		if collectOutputs {
 			result["stdout"] = string(msgOut)
 			result["stderr"] = string(msgErr)
+		} else {
+			pbcErr = pipeBridgeCtrl.Wait()
+			if pbcErr != nil {
+				logrus.Error(pbcErr.Error())
+			}
 		}
 	} else {
 		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
@@ -634,6 +593,9 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		// Make sure all outputs have been processed
 		if !collectOutputs {
 			pbcErr = pipeBridgeCtrl.Wait()
+			if pbcErr != nil {
+				logrus.Error(pbcErr.Error())
+			}
 		}
 
 		// Extract execution information
@@ -649,10 +611,7 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 			result["stderr"] = msgError
 		}
 	}
-	// Error happening on PipeBridgeController, when command succeeded, deserves to be logged
-	if !collectOutputs && pbcErr != nil {
-		logrus.Debug(pbcErr)
-	}
+
 	return result, nil
 }
 
@@ -893,7 +852,7 @@ func (ssh *SSHConfig) copy(
 		return 0, "", "", scerr.Wrap(err, "unable to create temporary key file")
 	}
 
-	cmdTemplate, err := template.New("Command").Parse(`scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}'"{{.LocalPath}}"' {{.User}}@{{.Host}}:'"{{.RemotePath}}"'{{else}}{{.User}}@{{.Host}}:'"{{.RemotePath}}"' '"{{.LocalPath}}"'{{end}}`)
+	cmdTemplate, err := template.New("Command").Parse(`scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}"{{.LocalPath}}" {{.User}}@{{.Host}}:"{{.RemotePath}}"{{else}}{{.User}}@{{.Host}}:"{{.RemotePath}}" "{{.LocalPath}}"{{end}}`)
 	if err != nil {
 		return 0, "", "", scerr.Wrap(err, "error parsing command template")
 	}

@@ -23,8 +23,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -483,7 +481,7 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, err error) {
 	}
 	err = json.Unmarshal(shieldedJSONed, &shieldedMapped)
 	if err != nil {
-		logrus.Tracef("*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
+		// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
 		return nil, err
 	}
 
@@ -495,14 +493,14 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, err error) {
 		if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
 			err = json.Unmarshal(propsJSONed, &propsMapped)
 			if err != nil {
-				logrus.Tracef("*core.Serialize(): Unmarshalling JSONed properties into map failed!")
+				// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed properties into map failed!")
 				return nil, err
 			}
 		}
 	}
 
 	shieldedMapped["properties"] = propsMapped
-	logrus.Tracef("everything mapped:\n%s\n", spew.Sdump(shieldedMapped))
+	// logrus.Tracef("everything mapped:\n%s\n", spew.Sdump(shieldedMapped))
 
 	return json.Marshal(shieldedMapped)
 }
@@ -536,10 +534,9 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (err error) {
 	}
 
 	var (
-		mapped map[string]interface{}
-		props  map[string][]byte
-		ok     bool
-		jsoned []byte
+		mapped, props map[string]interface{}
+		ok            bool
+		jsoned        []byte
 	)
 
 	err = json.Unmarshal(buf, &mapped)
@@ -547,7 +544,7 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (err error) {
 		logrus.Tracef("*core.Deserialize(): Unmarshalling buf to map failed!")
 		return err
 	}
-	if props, ok = mapped["properties"].(map[string][]byte); ok {
+	if props, ok = mapped["properties"].(map[string]interface{}); ok {
 		delete(mapped, "properties")
 	}
 	jsoned, err = json.Marshal(mapped)

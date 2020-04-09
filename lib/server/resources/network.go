@@ -41,6 +41,6 @@ type Network interface {
 	SafeGetGateway(task concurrency.Task, primary bool) Host                                                                   // returns the gateway related to network
 	SafeGetDefaultRouteIP(task concurrency.Task) string                                                                        // returns the IP of the default route of the network
 	SafeGetEndpointIP(task concurrency.Task) string                                                                            // returns the IP address corresponding to the default route
-	HasVirtualIP() bool                                                                                                        // tells if the network is using a VIP a default route
+	HasVirtualIP(task concurrency.Task) bool                                                                                   // tells if the network is using a VIP a default route
 	ToProtocol(task concurrency.Task) (*protocol.Network, error)
 }
