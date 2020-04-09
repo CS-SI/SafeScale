@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/outscale/osc-sdk-go/oapi"
-	"github.com/sirupsen/logrus"
 )
 
 // CreateVIP ...
@@ -50,9 +49,16 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
 	nic := res.OK.Nic
-	ip, err := s.addPublicIP(&nic)
+	//ip, err := s.addPublicIP(&nic)
 	if res == nil || res.OK == nil || len(res.OK.Nic.PrivateIps) < 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
+	}
+
+	err = s.setResourceTags(nic.NicId, map[string]string{
+		"name": name,
+	})
+	if err != nil {
+		return nil, err
 	}
 	//primary := deviceNumber == 0
 	return &resources.VirtualIP{
@@ -60,7 +66,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 		PrivateIP: nic.PrivateIps[0].PrivateIp,
 		NetworkID: netID,
 		Hosts:     nil,
-		PublicIP:  ip.PublicIp,
+		PublicIP:  "",
 	}, nil
 }
 
@@ -110,39 +116,38 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	if hostID == "" {
 		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
-	deviceNumber, err := s.getFirstFreeDeviceNumber(hostID)
-	if err != nil {
-		return err
-	}
-	res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-		Filters: oapi.FiltersNic{
-			NicIds: []string{vip.ID},
-		},
-	})
-	if err != nil {
-		return err
-	}
-	if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
-		return scerr.InconsistentError("Inconsistent provider response")
-	}
-	if res.OK == nil || len(res.OK.Nics) == 0 {
-		return scerr.InvalidParameterError("vip", "VIP does not exixt")
-	}
-	_, err = s.client.POST_LinkNic(oapi.LinkNicRequest{
-		NicId:        res.OK.Nics[0].NicId,
-		VmId:         hostID,
-		DeviceNumber: deviceNumber,
-	})
-	if err != nil {
-		logrus.Errorf("BindHostToVIP %v", err)
-		return err
-	}
+	// deviceNumber, err := s.getFirstFreeDeviceNumber(hostID)
+	// if err != nil {
+	// 	return err
+	// }
+	// res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
+	// 	Filters: oapi.FiltersNic{
+	// 		NicIds: []string{vip.ID},
+	// 	},
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+	// if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
+	// 	return scerr.InconsistentError("Inconsistent provider response")
+	// }
+	// if res.OK == nil || len(res.OK.Nics) == 0 {
+	// 	return scerr.InvalidParameterError("vip", "VIP does not exixt")
+	// }
+	// _, err = s.client.POST_LinkNic(oapi.LinkNicRequest{
+	// 	NicId:        res.OK.Nics[0].NicId,
+	// 	VmId:         hostID,
+	// 	DeviceNumber: deviceNumber,
+	// })
+	// if err != nil {
+	// 	logrus.Errorf("BindHostToVIP %v", err)
+	// 	return err
+	// }
 	return nil
 
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-//TODO improve
 func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
@@ -153,25 +158,26 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 	if hostID == "" {
 		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
-	res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-		Filters: oapi.FiltersNic{
-			NicIds: []string{vip.ID},
-		},
-	})
-	if err != nil {
-		return err
-	}
-	if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
-		return scerr.InconsistentError("Inconsistent provider response")
-	}
-	if res.OK == nil || len(res.OK.Nics) == 0 {
-		return scerr.InvalidParameterError("vip", "VIP does not exixt")
-	}
-	nic := res.OK.Nics[0]
-	_, err = s.client.POST_UnlinkNic(oapi.UnlinkNicRequest{
-		LinkNicId: nic.LinkNic.LinkNicId,
-	})
-	return err
+	// res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
+	// 	Filters: oapi.FiltersNic{
+	// 		NicIds: []string{vip.ID},
+	// 	},
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+	// if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
+	// 	return scerr.InconsistentError("Inconsistent provider response")
+	// }
+	// if res.OK == nil || len(res.OK.Nics) == 0 {
+	// 	return scerr.InvalidParameterError("vip", "VIP does not exixt")
+	// }
+	// nic := res.OK.Nics[0]
+	// _, err = s.client.POST_UnlinkNic(oapi.UnlinkNicRequest{
+	// 	LinkNicId: nic.LinkNic.LinkNicId,
+	// })
+	// return err
+	return nil
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
@@ -182,8 +188,16 @@ func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	if vip == nil {
 		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
+
 	_, err := s.client.POST_DeleteNic(oapi.DeleteNicRequest{
 		NicId: vip.ID,
 	})
+	if err != nil {
+		return err
+	}
+	_, err = s.client.POST_DeletePublicIp(oapi.DeletePublicIpRequest{
+		PublicIp: vip.PublicIP,
+	})
+
 	return err
 }
