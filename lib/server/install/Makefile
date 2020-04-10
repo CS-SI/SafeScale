@@ -9,7 +9,7 @@ vet:
 
 generate:
 	@$(GO) generate -run rice
-	@(cd enums && make $(@))
+	@(cd enums && $(MAKE) $(@))
 
 clean:
 	@$(RM) rice-box.go enums/*/enum_string.go
