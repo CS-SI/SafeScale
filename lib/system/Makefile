@@ -12,7 +12,7 @@ nfs:
 
 generate:
 	@(cd nfs && $(MAKE) $(@))
-	@(go generate .)
+	@($(GO) generate .)
 
 clean:
 	@(cd nfs && $(MAKE) $(@))

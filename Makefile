@@ -94,7 +94,7 @@ getdevdeps: begin
 	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) || true); \
 	fi
-	@which gonangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) version | grep 1.10 > /dev/null || ($(GO) get -u  $(GOLANGCI) || true); \
 	fi
 
