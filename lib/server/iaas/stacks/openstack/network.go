@@ -635,7 +635,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				neutronError := ParseNeutronError(err.Error())
 				switch neutronError["type"] {
 				case "SubnetInUse":
-					msg := fmt.Sprintf("hosts or services are still attached")
+					msg := "hosts or services are still attached"
 					log.Warnf(utils.Capitalize(msg))
 					return resources.ResourceNotAvailableError("subnet", id)
 				default:

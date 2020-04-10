@@ -650,6 +650,45 @@ func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (str
 	return hosts[0], nil
 }
 
+func (c *Controller) getImageAndNodeDescriptionUsedInClusterFromMetadata(task *concurrency.Task) (_ string, _ *pb.HostDefinition, err error) {
+	c.RLock(*task)
+	defer c.RUnlock(*task)
+
+	var hostImage string
+	nodeDef := &pb.HostDefinition{}
+
+	properties := c.GetProperties(concurrency.RootTask())
+	if !properties.Lookup(property.DefaultsV2) {
+		// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
+		err := properties.LockForRead(property.DefaultsV1).ThenUse(func(clonable data.Clonable) error {
+			defaultsV1 := clonable.(*clusterpropsv1.Defaults)
+			return c.UpdateMetadata(*task, func() error {
+				return properties.LockForWrite(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
+					defaultsV2 := clonable.(*clusterpropsv2.Defaults)
+					convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
+					return nil
+				})
+			})
+		})
+		if err != nil {
+			return "", nodeDef, err
+		}
+	}
+
+	err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
+		defaultsV2 := clonable.(*clusterpropsv2.Defaults)
+		sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
+		nodeDef.Sizing = &sizing
+		hostImage = defaultsV2.Image
+		return nil
+	})
+	if err != nil {
+		return "", nodeDef, err
+	}
+
+	return hostImage, nodeDef, nil
+}
+
 // AddNodes adds <count> nodes
 func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) (hosts []string, err error) {
 	if c == nil {
@@ -666,39 +705,12 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	defer tracer.GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	c.RLock(task)
-	var hostImage string
-
-	properties := c.GetProperties(concurrency.RootTask())
-	if !properties.Lookup(property.DefaultsV2) {
-		// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
-		err := properties.LockForRead(property.DefaultsV1).ThenUse(func(clonable data.Clonable) error {
-			defaultsV1 := clonable.(*clusterpropsv1.Defaults)
-			return c.UpdateMetadata(task, func() error {
-				return properties.LockForWrite(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
-					defaultsV2 := clonable.(*clusterpropsv2.Defaults)
-					convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
-					return nil
-				})
-			})
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	nodeDef := &pb.HostDefinition{}
-	err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
-		defaultsV2 := clonable.(*clusterpropsv2.Defaults)
-		sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
-		nodeDef.Sizing = &sizing
-		hostImage = defaultsV2.Image
-		return nil
-	})
-	c.RUnlock(task)
+	// retrieve cluster characteristics
+	hostImage, nodeDef, err := c.getImageAndNodeDescriptionUsedInClusterFromMetadata(&task)
 	if err != nil {
-		return nil, err
+		return hosts, err
 	}
+
 	nodeDef = complementHostDefinition(req, *nodeDef)
 	if nodeDef.ImageId == "" {
 		nodeDef.ImageId = hostImage
@@ -717,6 +729,8 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 
 	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
+	creationFailed := false
+
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
 		subtask, err := task.New()
@@ -728,36 +742,64 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 			// "type":    nodeType,
 			"nodeDef": nodeDef,
 			"timeout": timeout,
-			"nokeep":  false,
+			"nokeep":  true,
 		})
 		if err != nil {
-			return nil, err
+			log.Warnf("failure creating node: %v", err)
+			creationFailed = true
+			errors = append(errors, err.Error())
+			break
 		}
 		subtasks = append(subtasks, subtask)
 	}
-	for _, s := range subtasks {
-		result, err := s.Wait()
-		if err != nil {
-			errors = append(errors, err.Error())
-		} else {
-			hostName := result.(string)
-			if hostName != "" {
-				hosts = append(hosts, hostName)
+
+	if creationFailed {
+		for _, s := range subtasks {
+			err := s.Abort()
+			if err != nil {
+				errors = append(errors, err.Error())
+			}
+		}
+	} else {
+		// FIXME Improvements: don't wait blocking with for, use channels and use abort when a Wait fails
+		for _, s := range subtasks {
+			result, err := s.Wait()
+			if err != nil {
+				errors = append(errors, err.Error())
+			} else {
+				hostId := result.(string)
+				if hostId != "" {
+					hosts = append(hosts, hostId)
+				}
 			}
 		}
 	}
-	hostClt := client.New().Host
 
 	// Starting from here, delete nodes if exiting with error
 	newHosts := hosts
 	defer func() {
-		if err != nil {
-			if len(newHosts) > 0 {
-				derr := hostClt.Delete(newHosts, temporal.GetExecutionTimeout())
-				if derr != nil {
-					log.Errorf("failed to delete nodes after failure to expand cluster")
+		if err != nil && len(newHosts) > 0 {
+			log.Warnf("Running taskDeleteNode after all")
+			var subtasks []concurrency.Task
+			for _, v := range newHosts {
+				subtask, tErr := task.New()
+				if tErr != nil {
+					err = scerr.AddConsequence(err, tErr)
+					continue
 				}
-				err = scerr.AddConsequence(err, derr)
+				subtask, tErr = subtask.Start(c.foreman.taskDeleteNode, v)
+				if tErr != nil {
+					err = scerr.AddConsequence(err, tErr)
+					continue
+				}
+				subtasks = append(subtasks, subtask)
+			}
+
+			for _, s := range subtasks {
+				_, state := s.Wait()
+				if state != nil {
+					err = scerr.AddConsequence(err, state)
+				}
 			}
 		}
 	}()
@@ -770,12 +812,14 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	// Now configure new nodes
 	err = c.foreman.configureNodesFromList(task, hosts)
 	if err != nil {
+		log.Debugf("failure configuring nodes after being added...")
 		return nil, err
 	}
 
 	// At last join nodes to cluster
 	err = c.foreman.joinNodesFromList(task, hosts)
 	if err != nil {
+		log.Debugf("failure joining nodes after successful addition and configuration...")
 		return nil, err
 	}
 
