@@ -81,7 +81,7 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, err er
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.volume"), "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -116,7 +116,7 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -175,7 +175,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err 
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -255,7 +255,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -297,7 +297,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
 	defer tracer.WithStopwatch().Entering().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -517,7 +517,7 @@ func (handler *volumeHandler) listAttachedDevices(host resources.Host) (set maps
 		return nil, scerr.InvalidParameterError("host", "cannot be nil")
 	}
 	task := handler.job.SafeGetTask()
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, debug.IfTrace("handlers.volume"), "").TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "").TraceMessage(""), &err)()
 
 	var (
 		retcode        int
@@ -567,7 +567,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()

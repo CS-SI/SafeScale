@@ -669,6 +669,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, 
 		TemplateID:   req.TemplateID,
 		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
+		Password:     "safescale", //VPL: for debug purposes, remove when not used anymore
 	}
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {

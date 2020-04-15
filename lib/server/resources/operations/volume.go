@@ -52,13 +52,13 @@ const (
 
 // Volume links Object Storage folder and Volumes
 type volume struct {
-	*Core
+	*core
 }
 
 // nullVolume returns an instance of share corresponding to its null value.
 // The idea is to avoid nil pointer using nullVolume()
 func nullVolume() *volume {
-	return &volume{Core: nullCore()}
+	return &volume{core: nullCore()}
 }
 
 // NewVolume creates an instance of Volume
@@ -71,7 +71,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, err error) {
 	if err != nil {
 		return nullVolume(), err
 	}
-	return &volume{Core: core}, nil
+	return &volume{core: core}, nil
 }
 
 // LoadVolume loads the metadata of a network
@@ -109,7 +109,7 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 
 // IsNull tells if the instance is a null value
 func (objv *volume) IsNull() bool {
-	return objv == nil || objv.Core.IsNull()
+	return objv == nil || objv.core.IsNull()
 }
 
 // GetSpeed ...
@@ -212,7 +212,7 @@ func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	return objv.Core.BrowseFolder(task, func(buf []byte) error {
+	return objv.core.BrowseFolder(task, func(buf []byte) error {
 		av := abstract.NewVolume()
 		err := av.Deserialize(buf)
 		if err != nil {
@@ -259,7 +259,7 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 			}
 			logrus.Warnf("Unable to find the volume on provider side, cleaning up metadata")
 		}
-		return objv.Core.Delete(task)
+		return objv.core.Delete(task)
 	})
 	if err != nil {
 		return err

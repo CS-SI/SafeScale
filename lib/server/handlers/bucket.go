@@ -72,7 +72,7 @@ func (handler *bucketHandler) Create(name string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -104,7 +104,7 @@ func (handler *bucketHandler) Delete(name string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -125,7 +125,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, err err
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -149,7 +149,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (err erro
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -182,7 +182,7 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

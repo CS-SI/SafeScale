@@ -118,7 +118,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Ne
 	network.CIDR = cidr
 	network.IPVersion = ipVersion
 	//network.GatewayID
-	//network.Properties
+	//network.properties
 
 	return network, nil
 }

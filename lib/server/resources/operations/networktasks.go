@@ -75,7 +75,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		}
 	}
 
-	// Starting from here, deletes the primary gateway if exiting with error
+	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if err != nil {
 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
@@ -98,30 +98,17 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		}
 	}()
 
-	objgw, err := NewHost(svc)
+	rgw, err := NewHost(svc)
 	if err != nil {
 		return nil, err
 	}
-	err = objgw.Carry(task, gwahf.Core)
+	err = rgw.Carry(task, gwahf.Core)
 	if err != nil {
 		return nil, err
 	}
-
-	// Binds gateway to VIP
-	if request.Network.VIP != nil {
-		err := svc.BindHostToVIP(request.Network.VIP, gwahf.Core.ID)
-		if err != nil {
-			return nil, err
-		}
-		userData.DefaultRouteIP = request.Network.VIP.PrivateIP
-		userData.EndpointIP = request.Network.VIP.PublicIP
-	} else {
-		userData.DefaultRouteIP = objgw.SafeGetPrivateIP(task)
-	}
-	userData.IsPrimaryGateway = primary
 
 	// Updates properties in metadata
-	err = objgw.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+	err = rgw.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		innerErr := props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
 			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
@@ -137,7 +124,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		// Starting from here, delete host metadata if exiting with error
 		defer func() {
 			if innerErr != nil {
-				derr := objgw.(*host).Core.Delete(task)
+				derr := rgw.(*host).core.Delete(task)
 				if derr != nil {
 					logrus.Errorf("After failure, failed to cleanup by removing host metadata")
 				}
@@ -176,7 +163,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		// 	defaultNetworkID string
 		// 	gatewayID string
 		// )
-		return props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		innerErr = props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -186,16 +173,34 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 			hostNetworkV1.IsGateway = true
 			return nil
 		})
+		if innerErr != nil {
+			return innerErr
+		}
+
+		// Binds gateway to VIP
+		if request.Network.VIP != nil {
+			innerErr = svc.BindHostToVIP(request.Network.VIP, gwahf.Core.ID)
+			if innerErr != nil {
+				return innerErr
+			}
+			userData.DefaultRouteIP = request.Network.VIP.PrivateIP
+			userData.EndpointIP = request.Network.VIP.PublicIP
+		} else {
+			userData.DefaultRouteIP, _ = rgw.GetPrivateIP(task)
+			userData.EndpointIP, _ = rgw.GetPublicIP(task)
+		}
+		userData.IsPrimaryGateway = primary
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	res := data.Map{
-		"host":     objgw,
+	r := data.Map{
+		"host":     rgw,
 		"userdata": userData,
 	}
-	return res, nil
+	return r, nil
 }
 
 func (objn *network) taskWaitForInstallPhase1OnGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
@@ -274,7 +279,7 @@ func (objn *network) taskInstallPhase2OnGateway(task concurrency.Task, params co
 	if returnCode != 0 {
 		RetrieveForensicsData(task, objgw)
 		warnings, errs := GetPhaseWarningsAndErrors(task, objgw)
-		return nil, scerr.NewError("failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gwname, returnCode, warnings, errs)
+		return nil, scerr.NewError("failed to finalize gateway '%s' installation: phase2 returned code '%d', warnings '%s', errors '%s'", gwname, returnCode, warnings, errs)
 	}
 	logrus.Infof("Gateway '%s' successfully configured.", gwname)
 

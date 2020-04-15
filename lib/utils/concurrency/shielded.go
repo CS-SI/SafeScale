@@ -17,9 +17,12 @@
 package concurrency
 
 import (
+	"encoding/json"
+
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/sirupsen/logrus"
 )
 
 // Shielded allows to store data with controlled access to it
@@ -40,22 +43,6 @@ func NewShielded(witness data.Clonable) *Shielded {
 func (d *Shielded) Clone() *Shielded {
 	return NewShielded(d.witness.Clone())
 }
-
-// // LockShared is used to lock a clonable for read
-// // Returns a Protector, on which can be applied method 'Shield()'
-// func (d *Shielded) LockShared(task Task) (Protector, error) {
-// 	if d == nil {
-// 		return nil, scerr.InvalidInstanceError()
-// 	}
-// 	if task == nil {
-// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
-// 	}
-// 	if d.witness == nil {
-// 		return nil, scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
-// 	}
-// 	d.lock.RLock(task)
-// 	return &protector{shielded: d, readLock: true}, nil
-// }
 
 // Inspect is used to lock a clonable for read
 func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) error) (err error) {
@@ -88,23 +75,6 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 
 	return inspector(d.witness.Clone())
 }
-
-// // LockExclusive is used to lock a clonable for write
-// // Returns a Protector, on which can be applied methods 'ShieldXXX()'
-// func (d *Shielded) LockExclusive(task Task) (Protector, error) {
-// 	if d == nil {
-// 		return nil, scerr.InvalidInstanceError()
-// 	}
-// 	if task == nil {
-// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
-// 	}
-// 	if d.witness == nil {
-// 		return nil, scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
-// 	}
-
-// 	d.lock.Lock(task)
-// 	return &protector{shielded: d, readLock: false}, nil
-// }
 
 // Alter allows to update a cloneable using a write lock
 func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) (err error) {
@@ -142,4 +112,44 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) (err erro
 	}
 	_ = d.witness.Replace(clone)
 	return nil
+}
+
+// Serialize transforms content of Shielded instance to data suitable for serialization
+// Note: doesn't follow interface data.Serializable (task parameter not used in it)
+func (d *Shielded) Serialize(task Task) ([]byte, error) {
+	if d == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	var jsoned []byte
+	err := d.Inspect(task, func (clonable data.Clonable) error {
+		var innerErr error
+		jsoned, innerErr = json.Marshal(clonable)
+		return innerErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return jsoned, nil
+}
+
+// Deserialize transforms serialization data to valid content of Shielded instance
+// Note: doesn't follow interface data.Serializable (task parameter not used in it)
+func (d *Shielded) Deserialize(task Task, buf []byte) error {
+	if d == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if len(buf) == 0 {
+		return scerr.InvalidParameterError("buf", "cannot be empty []byte")
+	}
+
+	return d.Alter(task, func(clonable data.Clonable) error {
+		return json.Unmarshal(buf, clonable)
+	})
 }

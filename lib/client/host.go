@@ -60,7 +60,6 @@ func (h *host) Inspect(name string, timeout time.Duration) (*protocol.Host, erro
 	}
 
 	return service.Inspect(ctx, &protocol.Reference{Name: name})
-
 }
 
 // GetStatus gets host status

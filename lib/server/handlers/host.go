@@ -73,7 +73,7 @@ func (handler *hostHandler) Start(ref string) (err error) { // FIXME Unused ctx
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -97,7 +97,7 @@ func (handler *hostHandler) Stop(ref string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -121,7 +121,7 @@ func (handler *hostHandler) Reboot(ref string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -145,7 +145,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -210,7 +210,7 @@ func (handler *hostHandler) Create(
 	}
 	tracer := concurrency.NewTracer(
 		task,
-		debug.IfTrace("handlers.host"),
+		debug.ShouldTrace("handlers.host"),
 		"('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, networkName, req.ImageID, req.PublicIP, force,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
@@ -238,7 +238,7 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, err error) 
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -251,8 +251,8 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, err error) 
 		return nil, err
 	}
 	hosts = abstract.HostList{}
-	err = objh.Browse(task, func(host *abstract.HostCore) error {
-		hosts = append(hosts, converters.HostCoreToHostFull(*host))
+	err = objh.Browse(task, func(ahc *abstract.HostCore) error {
+		hosts = append(hosts, converters.HostCoreToHostFull(*ahc))
 		return nil
 	})
 	return hosts, err
@@ -272,7 +272,7 @@ func (handler *hostHandler) Inspect(ref string) (host resources.Host, err error)
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -299,7 +299,7 @@ func (handler *hostHandler) Delete(ref string) (err error) {
 	}
 
 	task := handler.job.SafeGetTask()
-	tracer := concurrency.NewTracer(task, debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)()
@@ -323,7 +323,7 @@ func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, err er
 		return nil, scerr.InvalidParameterError("ref", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

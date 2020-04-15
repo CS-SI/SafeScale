@@ -185,11 +185,15 @@ func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	ph := &protocol.Host{
 		Id:         in.Core.ID,
 		Name:       in.Core.Name,
-		PublicIp:   in.Network.PublicIPv4,
-		PrivateIp:  in.Network.IPv4Addresses[in.Network.DefaultNetworkID],
 		State:      HostStateFromAbstractToProtocol(in.Core.LastState),
 		PrivateKey: in.Core.PrivateKey,
-		GatewayId:  in.Network.DefaultGatewayID,
+	}
+	if in.Network != nil {
+		ph.PublicIp = in.Network.PublicIPv4
+		if ip, ok := in.Network.IPv4Addresses[in.Network.DefaultNetworkID]; ok {
+			ph.PrivateIp = ip
+		}
+		ph.GatewayId = in.Network.DefaultGatewayID
 	}
 	return ph
 }
@@ -199,7 +203,7 @@ func HostCoreToHostFull(in abstract.HostCore) *abstract.HostFull {
 	return &abstract.HostFull{Core: &in}
 }
 
-// HostDescriptionFromAbstractToProperty
+// HostDescriptionFromAbstractToProperty ...
 func HostDescriptionFromAbstractToPropertyV1(src abstract.HostDescription) *propertiesv1.HostDescription {
 	return &propertiesv1.HostDescription{
 		Created: src.Created,
@@ -210,7 +214,7 @@ func HostDescriptionFromAbstractToPropertyV1(src abstract.HostDescription) *prop
 	}
 }
 
-// HostNetworkFromAbstractToPropertyV1
+// HostNetworkFromAbstractToPropertyV1 ...
 func HostNetworkFromAbstractToPropertyV1(src abstract.HostNetwork) *propertiesv1.HostNetwork {
 	return &propertiesv1.HostNetwork{
 		IsGateway:               src.IsGateway,
@@ -226,10 +230,12 @@ func HostNetworkFromAbstractToPropertyV1(src abstract.HostNetwork) *propertiesv1
 	}
 }
 
+// HostStateFromAbstractToProtocol ...
 func HostStateFromAbstractToProtocol(in hoststate.Enum) protocol.HostState {
 	return protocol.HostState(in)
 }
 
+// BucketListFromAbstractToProtocol ...
 func BucketListFromAbstractToProtocol(in []string) *protocol.BucketList {
 	out := protocol.BucketList{Buckets: []*protocol.Bucket{}}
 	for _, v := range in {
@@ -241,6 +247,7 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketList {
 	return &out
 }
 
+// SSHConfigFromAbstractToProtocol ...
 func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
 	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
 	if in.GatewayConfig != nil {

@@ -101,7 +101,7 @@ func (tg *taskGroup) GetSignature() (string, error) {
 		return "", err
 	}
 
-	if !debug.IfTrace("concurrency.task") {
+	if !debug.ShouldTrace("concurrency.task") {
 		return "", nil
 	}
 

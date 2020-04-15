@@ -17,12 +17,12 @@
 package abstract
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // KeyPair represents a SSH key pair
@@ -101,8 +101,8 @@ type HostRequest struct {
 	Networks []*Network
 	// DefaultRouteIP is the IP used as default route
 	DefaultRouteIP string
-	// DefaultGateway is the host used as default gateway
-	DefaultGateway *HostCore
+	// // DefaultGateway is the host used as default gateway
+	// DefaultGateway *HostCore
 	// PublicIP a flag telling if the host must have a public IP
 	PublicIP bool
 	// TemplateID is the UUID of the template used to size the host (see SelectTemplates)
@@ -178,7 +178,7 @@ func (hc *HostCore) IsConsistent() bool {
 	result = result && hc.Name != ""
 	// result = result && h.PrivateKey != ""
 	// result = result && h.Password != ""
-	// result = result && h.Properties != nil
+	// result = result && h.properties != nil
 	return result
 }
 
@@ -204,13 +204,17 @@ func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
 
 // Serialize serializes Host instance into bytes (output json code)
 func (hc *HostCore) Serialize() ([]byte, error) {
-	return serialize.ToJSON(hc)
+	return json.Marshal(hc)
 }
 
 // Deserialize reads json code and reinstantiates an Host
 func (hc *HostCore) Deserialize(buf []byte) (err error) {
-	defer scerr.OnPanic(&err)()
-	return serialize.FromJSON(buf, hc)
+	if hc == nil {
+		return scerr.InvalidInstanceError()
+	}
+
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	return json.Unmarshal(buf, hc)
 }
 
 // SafeGetName returns the name of the host

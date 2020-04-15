@@ -263,13 +263,13 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
-	defaultGatewayID := request.DefaultGateway.ID
-	isGateway := request.DefaultRouteIP == "" && defaultNetwork.Name != abstract.SingleHostNetworkName
+	// defaultGatewayID := request.DefaultGateway.ID
+	isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
 	//VPL: moved to ojects.Host.Create()
 	// defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
 	// if defaultGateway != nil {
-	// err := defaultGateway.Properties.Inspect(HostProperty.NetworkV1, func(v interface{}) error {
+	// err := defaultGateway.properties.Inspect(HostProperty.NetworkV1, func(v interface{}) error {
 	// 	hostNetworkV1 := v.(*propertiesv1.HostNetwork)
 	// 	defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 	// 	defaultGatewayID = defaultGateway.ID
@@ -348,7 +348,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	hostCore.Password = request.Password
 
 	//VPL: moved to objects.Host.Create()
-	// err = host.Properties.Alter(HostProperty.NetworkV1, func(v interface{}) error {
+	// err = host.properties.Alter(HostProperty.NetworkV1, func(v interface{}) error {
 	// 	hostNetworkV1 := v.(*propertiesv1.HostNetwork)
 	// 	hostNetworkV1.DefaultNetworkID = defaultNetworkID
 	// 	hostNetworkV1.DefaultGatewayID = defaultGatewayID
@@ -361,7 +361,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// }
 
 	// // Adds Host property SizingV1
-	// err = host.Properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
+	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
 	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
 	// 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 	// 	hostSizingV1.Template = request.TemplateID
@@ -449,8 +449,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 	newHost.Network.IsGateway = isGateway
 	newHost.Network.DefaultNetworkID = defaultNetworkID
-	newHost.Network.DefaultGatewayID = defaultGatewayID
-	newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
+	// newHost.Network.DefaultGatewayID = defaultGatewayID
+	// newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
 
 	// Starting from here, delete host if exiting with error
 	defer func() {

@@ -872,7 +872,7 @@ func (w *worker) setReverseProxy() (err error) {
 		return scerr.Wrap(err, "failed to apply reverse proxy rules")
 	}
 	var secondaryKongController *KongController
-	if network.HasVirtualIP() {
+	if network.HasVirtualIP(w.feature.task) {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
 			return scerr.Wrap(err, "failed to apply reverse proxy rules")
