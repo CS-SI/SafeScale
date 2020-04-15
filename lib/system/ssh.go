@@ -128,7 +128,7 @@ type SSHConfig struct {
 	LocalPort              int
 	GatewayConfig          *SSHConfig
 	SecondaryGatewayConfig *SSHConfig
-	cmdTpl                 string
+	// cmdTpl                 string
 }
 
 // SSHTunnel a SSH tunnel
@@ -775,7 +775,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 		return "", scerr.InvalidInstanceContentError("ssh.Host", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(task, true, "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(task, debug.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().OnExitTrace()()
 	defer scerr.OnExitTraceError(
 		fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout)),
 		&err,

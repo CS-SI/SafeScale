@@ -651,8 +651,8 @@ func (svc *service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstra
 		PublicIP:       request.PublicIP,
 		Networks:       request.Networks,
 		DefaultRouteIP: request.DefaultRouteIP,
-		DefaultGateway: request.DefaultGateway,
-		TemplateID:     request.TemplateID,
+		// DefaultGateway: request.DefaultGateway,
+		TemplateID: request.TemplateID,
 	}
 	host, userData, err := svc.CreateHost(hostReq)
 	if err != nil {

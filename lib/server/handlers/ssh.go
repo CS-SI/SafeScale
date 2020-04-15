@@ -137,57 +137,66 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 				if inErr != nil {
 					return inErr
 				}
+
+				var gwahc *abstract.HostCore
+
 				gw, pgwErr := rn.GetGateway(task, true)
-				if pgwErr == nil {
+				if pgwErr != nil {
+					if _, ok := pgwErr.(scerr.ErrNotFound); !ok {
+						return pgwErr
+					}
+				} else {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-						gwhc, ok := clonable.(*abstract.HostCore)
+						gwahc, ok = clonable.(*abstract.HostCore)
 						if !ok {
 							return scerr.InconsistentError("'*abstract.Host' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
-						ip, rhErr := gw.GetAccessIP(task)
-						if rhErr != nil {
-							return rhErr
-						}
-						GatewayConfig := system.SSHConfig{
-							PrivateKey: gwhc.PrivateKey,
-							Port:       22,
-							Host:       ip,
-							User:       user,
-						}
-						sshConfig.GatewayConfig = &GatewayConfig
 						return nil
 					})
 					if inErr != nil {
 						return inErr
 					}
-				} else if _, ok := pgwErr.(scerr.ErrNotFound); !ok {
-					return pgwErr
+
+					ip, rhErr := gw.GetAccessIP(task)
+					if rhErr != nil {
+						return rhErr
+					}
+					GatewayConfig := system.SSHConfig{
+						PrivateKey: gwahc.PrivateKey,
+						Port:       22,
+						Host:       ip,
+						User:       user,
+					}
+					sshConfig.GatewayConfig = &GatewayConfig
 				}
+
 				gw, sgwErr := rn.GetGateway(task, false)
-				if sgwErr == nil {
+				if sgwErr != nil {
+					if _, ok := sgwErr.(scerr.ErrNotFound); !ok || sshConfig.GatewayConfig == nil {
+						return sgwErr
+					}
+				} else {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-						gwhc, ok := clonable.(*abstract.HostCore)
+						gwahc, ok = clonable.(*abstract.HostCore)
 						if !ok {
 							return scerr.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
-						ip, rhErr := gw.GetAccessIP(task)
-						if rhErr != nil {
-							return rhErr
-						}
-						GatewayConfig := system.SSHConfig{
-							PrivateKey: gwhc.PrivateKey,
-							Port:       22,
-							Host:       ip,
-							User:       user,
-						}
-						sshConfig.SecondaryGatewayConfig = &GatewayConfig
 						return nil
 					})
 					if inErr != nil {
 						return inErr
 					}
-				} else if _, ok := sgwErr.(scerr.ErrNotFound); !ok || sshConfig.GatewayConfig == nil {
-					return sgwErr
+					ip, rhErr := gw.GetAccessIP(task)
+					if rhErr != nil {
+						return rhErr
+					}
+					GatewayConfig := system.SSHConfig{
+						PrivateKey: gwahc.PrivateKey,
+						Port:       22,
+						Host:       ip,
+						User:       user,
+					}
+					sshConfig.SecondaryGatewayConfig = &GatewayConfig
 				}
 			}
 			return nil

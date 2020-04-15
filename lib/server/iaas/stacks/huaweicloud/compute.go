@@ -282,24 +282,24 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
-	defaultGateway := request.DefaultGateway
-	isGateway := defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName
-	defaultGatewayID := ""
-	defaultGatewayPrivateIP := ""
-	if defaultGateway != nil {
-		// // FIXME: defaultGatewayPrivateIP and defaultGatewayID must come by request
-		// err := defaultGateway.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) error {
-		// 	return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-		// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-		// 		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
-		defaultGatewayID = defaultGateway.ID
-		// 		return nil
-		// 	})
-		// })
-		// if err != nil {
-		// 	return nil, nil, nil, nil, userData, err
-		// }
-	}
+	// defaultGateway := request.DefaultGateway
+	isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
+	// defaultGatewayID := ""
+	// defaultGatewayPrivateIP := ""
+	// if defaultGateway != nil {
+	// 	// // FIXME: defaultGatewayPrivateIP and defaultGatewayID must come by request
+	// 	// err := defaultGateway.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) error {
+	// 	// 	return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+	// 	// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
+	// 	// 		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
+	// 	defaultGatewayID = defaultGateway.ID
+	// 	// 		return nil
+	// 	// 	})
+	// 	// })
+	// 	// if err != nil {
+	// 	// 	return nil, nil, nil, nil, userData, err
+	// 	// }
+	// }
 
 	var nets []servers.Network
 	// Add private networks
@@ -492,8 +492,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, nil, err
 	}
 	host.Network.DefaultNetworkID = defaultNetworkID
-	host.Network.DefaultGatewayID = defaultGatewayID
-	host.Network.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
+	// host.Network.DefaultGatewayID = defaultGatewayID
+	// host.Network.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
 	host.Network.IsGateway = isGateway
 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
@@ -526,7 +526,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		}
 		userData.PublicIP = fip.PublicIPAddress
 
-		if defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName {
+		if isGateway {
 			err = s.enableHostRouterMode(host)
 			if err != nil {
 				return nil, userData, scerr.NewError("error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))

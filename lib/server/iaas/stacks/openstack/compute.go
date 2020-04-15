@@ -678,13 +678,13 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
-	defaultGateway := request.DefaultGateway
-	isGateway := defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName
-	defaultGatewayID := ""
+	// defaultGateway := request.DefaultGateway
+	isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
+	// defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
-	if defaultGateway != nil {
-		defaultGatewayID = defaultGateway.ID
-	}
+	// if defaultGateway != nil {
+	// 	defaultGatewayID = defaultGateway.ID
+	// }
 
 	var nets []servers.Network
 	// If floating IPs are not used and host is public
@@ -857,8 +857,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, nil, err
 	}
 	newHost.Network.DefaultNetworkID = defaultNetworkID
-	newHost.Network.DefaultGatewayID = defaultGatewayID
-	newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
+	// newHost.Network.DefaultGatewayID = defaultGatewayID
+	// newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
 	newHost.Network.IsGateway = isGateway
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 
