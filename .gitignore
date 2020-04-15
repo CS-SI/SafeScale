@@ -108,3 +108,5 @@ lib/security/gateway/client/safe-security
 go.sum
 
 lib/server/iaas/.DS_Store
+
+.atom/

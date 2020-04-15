@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -43,24 +45,9 @@ func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
 	return jp
 }
 
-// // MarshalJSON ...
-// // satisfies json.Marshaller interface
-// func (jp *jsonProperty) MarshalJSON() ([]byte, error) {
-// 	var jsoned []byte
-// 	err := jp.Shielded.Inspect(concurrency.VoidTask(), func(clonable data.Clonable) error {
-// 		var inErr error
-// 		jsoned, inErr = ToJSON(clonable)
-// 		return inErr
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return ToJSON(string(jsoned))
-// }
-
 // JSONProperties ...
 type JSONProperties struct {
-	// Properties jsonProperties
+	// properties jsonProperties
 	Properties data.Map
 	// This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
 	sync.RWMutex
@@ -101,6 +88,14 @@ func (x *JSONProperties) Clone() *JSONProperties {
 	return newP
 }
 
+// Count returns thenumber of properties available
+func (x *JSONProperties) Count() int {
+	if x == nil {
+		return 0
+	}
+	return len(x.Properties)
+}
+
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
 func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector func(clonable data.Clonable) error) error {
@@ -108,7 +103,7 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 		return scerr.InvalidInstanceError()
 	}
 	if x.Properties == nil {
-		return scerr.InvalidInstanceContentError("x.Properties", "can't be nil")
+		return scerr.InvalidInstanceContentError("x.properties", "can't be nil")
 	}
 	if x.module == "" {
 		return scerr.InvalidInstanceContentError("x.module", "can't be empty string")
@@ -154,7 +149,7 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 		return scerr.InvalidInstanceError()
 	}
 	if x.Properties == nil {
-		return scerr.InvalidInstanceContentError("x.Properties", "cannot be nil")
+		return scerr.InvalidInstanceContentError("x.properties", "cannot be nil")
 	}
 	if x.module == "" {
 		return scerr.InvalidInstanceContentError("x.module", "cannot be empty string")
@@ -215,63 +210,75 @@ func (x *JSONProperties) SetModule(module string) error {
 	return nil
 }
 
-// MarshalJSON implements json.Marshaller
-// Note: DO NOT LOCK property here, deadlock risk
-func (x *JSONProperties) MarshalJSON() ([]byte, error) {
+// Serialize ...
+// satisfies interface data.Serializable
+func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, error) {
 	if x == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 	if x.Properties == nil {
-		return nil, scerr.InvalidParameterError("x.Properties", "can't be nil")
+		return nil, scerr.InvalidParameterError("x.properties", "can't be nil")
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	return ToJSON(&(x.Properties))
+	x.RLock()
+	defer x.RUnlock()
+
+	var mapped = map[string]string{}
+	for k, v := range x.Properties {
+		ser, err := v.(*jsonProperty).Serialize(task)
+		if err != nil {
+			return nil, err
+		}
+		mapped[k] = string(ser)
+	}
+	return json.Marshal(mapped)
 }
 
-// UnmarshalJSON implement json.Unmarshaller
-// Note: DO NOT LOCK property here, deadlock risk
-func (x *JSONProperties) UnmarshalJSON(b []byte) (err error) {
+// Deserialize ...
+// satisfies interface data.Serializable
+func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (err error) {
 	if x == nil {
 		return scerr.InvalidInstanceError()
 	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+
+	x.Lock()
+	defer x.Unlock()
 
 	// Decode JSON data
-	unjsoned := map[string]string{}
-	err = FromJSON(b, &unjsoned)
+	var unjsoned = map[string]string{}
+	err = json.Unmarshal(buf, &unjsoned)
 	if err != nil {
+		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", err.Error())
 		return err
 	}
 
-	// Now do the real work
-	for key, value := range unjsoned {
-		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-		err := FromJSON([]byte(value), zeroValue)
+	var (
+		prop *jsonProperty
+		ok   bool
+	)
+	for k, v := range unjsoned {
+		if prop, ok = x.Properties[k].(*jsonProperty); !ok {
+			zeroValue := PropertyTypeRegistry.ZeroValue(x.module, k)
+			item := &jsonProperty{
+				Shielded: concurrency.NewShielded(zeroValue),
+				module:   x.module,
+				key:      k,
+			}
+			x.Properties[k] = item
+			prop = item
+		}
+		err = prop.Shielded.Deserialize(task, []byte(v))
 		if err != nil {
 			return err
 		}
-		item := &jsonProperty{
-			Shielded: concurrency.NewShielded(zeroValue),
-			module:   x.module,
-			key:      key,
-		}
-		x.Properties[key] = item
 	}
 	return nil
-}
-
-// ToJSON serializes data into JSON
-func ToJSON(data interface{}) ([]byte, error) {
-	jsoned, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	return jsoned, nil
-}
-
-// FromJSON reads json code and restores data
-func FromJSON(buf []byte, data interface{}) error {
-	err := json.Unmarshal(buf, data)
-	return err
 }

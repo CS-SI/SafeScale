@@ -69,7 +69,7 @@ func (tm *taskedLock) RLock(task Task) error {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "")
+	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "")
 	defer tracer.Entering().OnExitTrace()()
 
 	tid, err := task.GetID()
@@ -115,7 +115,7 @@ func (tm *taskedLock) RUnlock(task Task) (err error) {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
+	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError("", &err)()
 
@@ -155,7 +155,7 @@ func (tm *taskedLock) SafeRUnlock(task Task) {
 
 // Lock acquires a write lock.
 func (tm *taskedLock) Lock(task Task) error {
-	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
+	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 
 	if task == nil {
@@ -198,7 +198,7 @@ func (tm *taskedLock) SafeLock(task Task) {
 
 // Unlock releases a write lock
 func (tm *taskedLock) Unlock(task Task) error {
-	tracer := NewTracer(task, debug.IfTrace("concurrency.lock"), "").Entering()
+	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "").Entering()
 	defer tracer.OnExitTrace()()
 
 	if task == nil {

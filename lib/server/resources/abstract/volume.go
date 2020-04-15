@@ -17,11 +17,11 @@
 package abstract
 
 import (
+	"encoding/json"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // VolumeRequest represents a volume request
@@ -62,12 +62,13 @@ func (v *Volume) Replace(p data.Clonable) data.Clonable {
 }
 
 // OK ...
-func (v Volume) OK() bool {
+func (v *Volume) OK() bool {
 	result := true
+	result = result && v != nil
 	result = result && v.ID != ""
 	result = result && v.Name != ""
 	result = result && v.Size != 0
-	// result = result && v.Properties != nil
+	// result = result && v.properties != nil
 	return result
 }
 
@@ -76,15 +77,17 @@ func (v *Volume) Serialize() ([]byte, error) {
 	if v == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	return serialize.ToJSON(v)
+	return json.Marshal(v)
 }
 
 // Deserialize reads json code and restores an Host
-func (v *Volume) Deserialize(buf []byte) error {
+func (v *Volume) Deserialize(buf []byte) (err error) {
 	if v == nil {
 		return scerr.InvalidInstanceError()
 	}
-	return serialize.FromJSON(buf, v)
+
+	defer scerr.OnPanic(&err)()	// json.Unmarshal may panic
+	return json.Unmarshal(buf, v)
 }
 
 // SafeGetName returns the name of the volume

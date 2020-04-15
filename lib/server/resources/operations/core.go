@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sync/atomic"
@@ -40,8 +41,8 @@ const (
 	byNameFolderName = "byName"
 )
 
-// Core contains the core functions of a persistent object
-type Core struct {
+// core contains the core functions of a persistent object
+type core struct {
 	concurrency.TaskedLock `json:"-"`
 
 	kind       string
@@ -54,12 +55,12 @@ type Core struct {
 	id         atomic.Value
 }
 
-func nullCore() *Core {
-	return &Core{kind: "nil"}
+func nullCore() *core {
+	return &core{kind: "nil"}
 }
 
 // NewCore creates an instance of core
-func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*Core, error) {
+func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*core, error) {
 	if svc == nil {
 		return nullCore(), scerr.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -70,7 +71,7 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		return nullCore(), scerr.InvalidParameterError("path", "cannot be empty string")
 	}
 
-	folder, err := newFolder(svc, path)
+	fld, err := newFolder(svc, path)
 	if err != nil {
 		return nullCore(), err
 	}
@@ -78,9 +79,9 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	if err != nil {
 		return nullCore(), err
 	}
-	c := Core{
+	c := core{
 		kind:       kind,
-		folder:     folder,
+		folder:     fld,
 		properties: props,
 		TaskedLock: concurrency.NewTaskedLock(),
 		shielded:   concurrency.NewShielded(instance),
@@ -88,13 +89,13 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	return &c, nil
 }
 
-// IsNull returns true if the core instance represents the null value for Core
-func (c *Core) IsNull() bool {
+// IsNull returns true if the core instance represents the null value for core
+func (c *core) IsNull() bool {
 	return c == nil || c.kind == "" || c.kind == "nil"
 }
 
 // SafeGetService returns the iaas.Service used to create/load the persistent object
-func (c *Core) SafeGetService() iaas.Service {
+func (c *core) SafeGetService() iaas.Service {
 	if !c.IsNull() && c.folder != nil {
 		return c.folder.SafeGetService()
 	}
@@ -104,7 +105,7 @@ func (c *Core) SafeGetService() iaas.Service {
 // SafeGetID returns the id of the data protected
 //
 // satisfies interface data.Identifyable
-func (c *Core) SafeGetID() string {
+func (c *core) SafeGetID() string {
 	if c.IsNull() {
 		return "<NullCore>"
 	}
@@ -117,7 +118,7 @@ func (c *Core) SafeGetID() string {
 // SafeGetName returns the name of the data protected
 //
 // satisfies interface data.Identifyable
-func (c *Core) SafeGetName() string {
+func (c *core) SafeGetName() string {
 	if c.IsNull() {
 		return "<NullCore>"
 	}
@@ -128,7 +129,7 @@ func (c *Core) SafeGetName() string {
 }
 
 // Inspect protects the data for shared read
-func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err error) {
+func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err error) {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
@@ -139,16 +140,16 @@ func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
-
 	// Check c.properties is populated
+	c.SafeLock(task)
 	if c.properties == nil {
 		c.properties, err = serialize.NewJSONProperties("resources." + c.kind)
 		if err != nil {
+			c.SafeUnlock(task)
 			return err
 		}
 	}
+	c.SafeUnlock(task)
 
 	// Reload reloads data from objectstorage to be sure to have the last revision
 	err = c.Reload(task)
@@ -162,7 +163,7 @@ func (c *Core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 }
 
 // Alter protects the data for exclusive write
-func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err error) {
+func (c *core) Alter(task concurrency.Task, callback resources.Callback) (err error) {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
@@ -210,8 +211,8 @@ func (c *Core) Alter(task concurrency.Task, callback resources.Callback) (err er
 // errors returned :
 // - scerr.ErrInvalidInstance
 // - scerr.ErrInvalidParameter
-// - scerr.ErrNotAvailable if the Core instance already carries a data
-func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
+// - scerr.ErrNotAvailable if the core instance already carries a data
+func (c *core) Carry(task concurrency.Task, clonable data.Clonable) error {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
@@ -232,17 +233,16 @@ func (c *Core) Carry(task concurrency.Task, clonable data.Clonable) error {
 		return scerr.InvalidInstanceContentError("c.shielded", "cannot be nil")
 	}
 
-	var err error
 	c.shielded = concurrency.NewShielded(clonable)
 	c.loaded = true
-	err = c.updateIdentity(task)
+	err := c.updateIdentity(task)
 	if err != nil {
 		return err
 	}
 	return c.write(task)
 }
 
-func (c *Core) updateIdentity(task concurrency.Task) error {
+func (c *core) updateIdentity(task concurrency.Task) error {
 	if c.loaded {
 		return c.shielded.Inspect(task, func(clonable data.Clonable) error {
 			ident, ok := clonable.(data.Identifyable)
@@ -264,7 +264,7 @@ func (c *Core) updateIdentity(task concurrency.Task) error {
 // if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 // In case of any other error, abort the retry to propagate the error
 // If retry times out, returns errNotFound
-func (c *Core) Read(task concurrency.Task, ref string) error {
+func (c *core) Read(task concurrency.Task, ref string) error {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
@@ -311,7 +311,7 @@ func (c *Core) Read(task concurrency.Task, ref string) error {
 	return c.updateIdentity(task)
 }
 
-func (c *Core) readByReference(task concurrency.Task, ref string) error {
+func (c *core) readByReference(task concurrency.Task, ref string) error {
 	err := c.readByID(task, ref)
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); !ok {
@@ -323,61 +323,42 @@ func (c *Core) readByReference(task concurrency.Task, ref string) error {
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (c *Core) readByID(task concurrency.Task, id string) error {
-	return c.shielded.Alter(task, func(clonable data.Clonable) error {
-		d, ok := clonable.(data.Serializable)
-		if !ok {
-			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		return c.folder.Read(byIDFolderName, id, d.Deserialize)
+func (c *core) readByID(task concurrency.Task, id string) error {
+	return c.folder.Read(byIDFolderName, id, func(buf []byte) error {
+		return c.Deserialize(task, buf)
 	})
 }
 
 // readByName reads a metadata identified by name
-func (c *Core) readByName(task concurrency.Task, name string) error {
-	return c.shielded.Alter(task, func(clonable data.Clonable) error {
-		d, ok := clonable.(data.Serializable)
-		if !ok {
-			return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		return c.folder.Read(byNameFolderName, name, d.Deserialize)
+func (c *core) readByName(task concurrency.Task, name string) error {
+	return c.folder.Read(byNameFolderName, name, func(buf []byte) error {
+		return c.Deserialize(task, buf)
 	})
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (c *Core) write(task concurrency.Task) error {
+func (c *core) write(task concurrency.Task) error {
 	if !c.committed {
-		return c.shielded.Inspect(task, func(clonable data.Clonable) error {
-			ser, ok := clonable.(data.Serializable)
-			if !ok {
-				return scerr.InconsistentError("'data.Serializable' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			buf, err := ser.Serialize()
-			if err != nil {
-				return err
-			}
-			ident, ok := clonable.(data.Identifyable)
-			if !ok {
-				return scerr.InconsistentError("'data.Identifyable' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			err = c.folder.Write(byNameFolderName, ident.SafeGetName(), buf)
-			if err != nil {
-				return err
-			}
-			err = c.folder.Write(byIDFolderName, ident.SafeGetID(), buf)
-			if err != nil {
-				return err
-			}
-			c.loaded = true
-			c.committed = true
-			return nil
-		})
+		jsoned, err := c.Serialize(task)
+		if err != nil {
+			return err
+		}
+		err = c.folder.Write(byNameFolderName, c.SafeGetName(), jsoned)
+		if err != nil {
+			return err
+		}
+		err = c.folder.Write(byIDFolderName, c.SafeGetID(), jsoned)
+		if err != nil {
+			return err
+		}
+		c.loaded = true
+		c.committed = true
 	}
 	return nil
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance (being written or not...)
-func (c *Core) Reload(task concurrency.Task) error {
+func (c *core) Reload(task concurrency.Task) error {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
@@ -396,7 +377,7 @@ func (c *Core) Reload(task concurrency.Task) error {
 }
 
 // BrowseFolder walks through host folder and executes a callback for each entries
-func (c *Core) BrowseFolder(task concurrency.Task, callback func(buf []byte) error) error {
+func (c *core) BrowseFolder(task concurrency.Task, callback func(buf []byte) error) error {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
@@ -413,7 +394,7 @@ func (c *Core) BrowseFolder(task concurrency.Task, callback func(buf []byte) err
 }
 
 // Delete deletes the matadata
-func (c *Core) Delete(task concurrency.Task) error {
+func (c *core) Delete(task concurrency.Task) error {
 	if c.IsNull() {
 		return scerr.InvalidInstanceError()
 	}
@@ -469,23 +450,120 @@ func (c *Core) Delete(task concurrency.Task) error {
 }
 
 // Serialize serializes instance into bytes (output json code)
-func (c *Core) Serialize() ([]byte, error) {
-	return serialize.ToJSON(c)
+// Note: doesn't follow interface data.Serializable (task parameter not used in it)
+func (c *core) Serialize(task concurrency.Task) (_ []byte, err error) {
+	if c.IsNull() {
+		return nil, scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "failed to serialize %s resource '%s'", c.kind, c.SafeGetName())
+		}
+	}()
+
+	var (
+		shieldedJSONed []byte
+		shieldedMapped = map[string]interface{}{}
+		propsMapped    = map[string]string{}
+	)
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
+
+	shieldedJSONed, err = c.shielded.Serialize(task)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(shieldedJSONed, &shieldedMapped)
+	if err != nil {
+		// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
+		return nil, err
+	}
+
+	if c.properties.Count() > 0 {
+		propsJSONed, err := c.properties.Serialize(task)
+		if err != nil {
+			return nil, err
+		}
+		if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
+			err = json.Unmarshal(propsJSONed, &propsMapped)
+			if err != nil {
+				// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed properties into map failed!")
+				return nil, err
+			}
+		}
+	}
+
+	shieldedMapped["properties"] = propsMapped
+	// logrus.Tracef("everything mapped:\n%s\n", spew.Sdump(shieldedMapped))
+
+	return json.Marshal(shieldedMapped)
 }
 
 // Deserialize reads json code and reinstantiates
-func (c *Core) Deserialize(buf []byte) error {
-	var err error
+// Note: doesn't follow interface data.Serializable (task parameter not used in it)
+func (c *core) Deserialize(task concurrency.Task, buf []byte) (err error) {
+	if c.IsNull() {
+		return scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, "failed to deserialize %s resource", c.kind)
+		}
+	}()
+
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
+
 	if c.properties == nil {
 		c.properties, err = serialize.NewJSONProperties("resources." + c.kind)
 		if err != nil {
 			return err
 		}
 	}
-	err = serialize.FromJSON(buf, c)
+
+	var (
+		mapped, props map[string]interface{}
+		ok            bool
+		jsoned        []byte
+	)
+
+	err = json.Unmarshal(buf, &mapped)
+	if err != nil {
+		logrus.Tracef("*core.Deserialize(): Unmarshalling buf to map failed!")
+		return err
+	}
+	if props, ok = mapped["properties"].(map[string]interface{}); ok {
+		delete(mapped, "properties")
+	}
+	jsoned, err = json.Marshal(mapped)
 	if err != nil {
 		return err
 	}
-
+	err = c.shielded.Deserialize(task, jsoned)
+	if err != nil {
+		return err
+	}
+	if len(props) > 0 {
+		jsoned, err = json.Marshal(props)
+		if err != nil {
+			return err
+		}
+		err = c.properties.Deserialize(task, jsoned)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

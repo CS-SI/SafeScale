@@ -320,7 +320,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	// VPL: properties are not inside stack instances anymore
 	// TODO: see if there is something to test at this level
 	// gw1NetworkV1 := propertiesv1.NewHostNetwork()
-	// err = gw1.Properties.Inspect(HostProperty.NetworkV1, func(clonable interface{}) error {
+	// err = gw1.properties.Inspect(HostProperty.NetworkV1, func(clonable interface{}) error {
 	// 	gw1NetworkV1 = clonable.(*propertiesv1.HostNetwork)
 	// 	return nil
 	// })

@@ -29,7 +29,7 @@ import (
 )
 
 // RetrieveForensicsData ...
-// FIXME: documentationÒ
+// FIXME: documentation
 func RetrieveForensicsData(task concurrency.Task, host resources.Host) {
 	if host == nil {
 		return

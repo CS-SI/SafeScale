@@ -153,7 +153,7 @@ func (handler *scannerHandler) Scan() (err error) {
 		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.IfTrace("handlers.tenant")).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
