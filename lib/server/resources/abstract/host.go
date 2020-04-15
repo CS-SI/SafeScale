@@ -101,8 +101,8 @@ type HostRequest struct {
 	Networks []*Network
 	// DefaultRouteIP is the IP used as default route
 	DefaultRouteIP string
-	// DefaultGateway is the host used as default gateway
-	DefaultGateway *HostCore
+	// // DefaultGateway is the host used as default gateway
+	// DefaultGateway *HostCore
 	// PublicIP a flag telling if the host must have a public IP
 	PublicIP bool
 	// TemplateID is the UUID of the template used to size the host (see SelectTemplates)
@@ -213,7 +213,7 @@ func (hc *HostCore) Deserialize(buf []byte) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer scerr.OnPanic(&err)()	// json.Unmarshal may panic
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
 	return json.Unmarshal(buf, hc)
 }
 

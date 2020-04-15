@@ -217,42 +217,6 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return scerr.DuplicateError(fmt.Sprintf("failed to create host '%s': name is already used", hostReq.ResourceName))
 	}
 
-	// var (
-	// 	// networkID, networkName string
-	// 	objn resources.Network
-	// 	// objpgw, objsgw *host
-	// )
-
-	// if len(hostReq.Networks) > 0 {
-	// 	// By convention, default network is the first of the list
-	// 	rn := hostReq.Networks[0]
-	// 	objn, err = LoadNetwork(task, svc, rn.ID)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// } else {
-	// 	objn, _, err = getOrCreateDefaultNetwork(task, svc)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	err = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-	// 		rn, ok := clonable.(*abstract.Network)
-	// 		if !ok {
-	// 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	// 		hostReq.Networks = append(hostReq.Networks, rn)
-	// 		return nil
-	// 	})
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-	// // networkName := objn.Name()
-
-	// // if hostReq.DefaultGatewayID == "" {
-	// // 	hostReq.DefaultGatewayID = objpgw.GetID()task)
-	// // }
-
 	// If TemplateID is not explicitely provided, search the appropriate template to satisfy 'hostDef'
 	if hostReq.TemplateID == "" {
 		useScannerDB := hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0
@@ -283,18 +247,16 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		hostReq.TemplateID = template.ID
 	}
 
-	var (
-		// networkID, networkName string
-		objn resources.Network
-		// objpgw, objsgw *host
-	)
-
+	var objn resources.Network
 	if len(hostReq.Networks) > 0 {
 		// By convention, default network is the first of the list
 		an := hostReq.Networks[0]
 		objn, err = LoadNetwork(task, svc, an.ID)
 		if err != nil {
 			return err
+		}
+		if hostReq.DefaultRouteIP == "" {
+			hostReq.DefaultRouteIP = objn.SafeGetDefaultRouteIP(task)
 		}
 	} else {
 		objn, _, err = getOrCreateDefaultNetwork(task, svc)
@@ -313,11 +275,6 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return err
 		}
 	}
-	// networkName := objn.Name()
-
-	// if hostReq.DefaultGatewayID == "" {
-	// 	hostReq.DefaultGatewayID = objpgw.GetID()task)
-	// }
 
 	// If hostReq.ImageID is not explicitely defined, find an image ID corresponding to the content of hostDef.Image
 	if hostReq.ImageID == "" {
@@ -433,12 +390,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			}
 			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Network))
 			hostNetworkV1.DefaultNetworkID = objn.SafeGetID()
-			if objn.SafeGetName() != abstract.SingleHostNetworkName {
-				hostNetworkV1.IsGateway = (hostReq.DefaultRouteIP == "")
-			} else {
-				hostNetworkV1.IsGateway = false
-			}
-
+			hostNetworkV1.IsGateway = hostReq.DefaultRouteIP == "" && objn.SafeGetName() != abstract.SingleHostNetworkName
 			return nil
 		})
 	})
@@ -1591,7 +1543,7 @@ func (rh *host) GetAccessIP(task concurrency.Task) (ip string, err error) {
 	}
 
 	ip, err = rh.GetPublicIP(task)
-	if err == nil && ip == "" {
+	if err != nil || ip == "" {
 		ip, err = rh.GetPrivateIP(task)
 	}
 	return ip, err

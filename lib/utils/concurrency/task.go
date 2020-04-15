@@ -233,14 +233,12 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 
 // taskCancelReceiver captures cancel signal if it arrives and abort the task
 func (t *task) taskCancelReceiver() {
-	sig := t.SafeGetSignature()
 	finish := false
 	for !finish {
 		select {
 		case <-t.closeCh: // Close channel receives something, stop capturing
 			finish = true
 		case <-t.context.Done(): // Cancel signal received, abort task
-			logrus.Debugf("%s: cancel received, aborting task", sig)
 			_ = t.Abort()
 			finish = true
 		default:
@@ -264,12 +262,6 @@ func (t *task) GetID() (string, error) {
 	return t.id, nil
 }
 
-// SafeGetID ...
-func (t *task) SafeGetID() string {
-	sig, _ := t.GetID()
-	return sig
-}
-
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
 func (t *task) GetSignature() (string, error) {
@@ -282,12 +274,6 @@ func (t *task) GetSignature() (string, error) {
 	return t.sig, nil
 }
 
-// SafeGetSignature ...
-func (t *task) SafeGetSignature() string {
-	sig, _ := t.GetSignature()
-	return sig
-}
-
 // GetStatus returns the current task status
 func (t *task) GetStatus() (TaskStatus, error) {
 	if t == nil {
@@ -297,12 +283,6 @@ func (t *task) GetStatus() (TaskStatus, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.status, nil
-}
-
-// SafeGetStatus ...
-func (t *task) SafeGetStatus() TaskStatus {
-	st, _ := t.GetStatus()
-	return st
 }
 
 // GetContext returns the context associated to the task
@@ -352,8 +332,8 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid := t.SafeGetID()
-	status := t.SafeGetStatus()
+	tid, _ := t.GetID()
+	status, _ := t.GetStatus()
 	if status != READY {
 		return nil, scerr.InvalidRequestError("cannot start task '%s': not ready", tid)
 	}
@@ -394,7 +374,7 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, e
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
 	go t.run(action, params)
 
-	sig := t.SafeGetSignature()
+	sig, _ := t.GetSignature()
 	// tracer := NewTracer(true, t, "")
 	finish := false
 
@@ -546,8 +526,8 @@ func (t *task) Wait() (TaskResult, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tid := t.SafeGetID()
-	status := t.SafeGetStatus()
+	tid, _ := t.GetID()
+	status, _ := t.GetStatus()
 	if status == DONE {
 		return t.result, t.err
 	}
@@ -598,7 +578,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 		return false, nil, scerr.InvalidInstanceError()
 	}
 
-	tid := t.SafeGetID()
+	tid, _ := t.GetID()
 
 	for {
 		select {
@@ -621,8 +601,8 @@ func (t *task) Reset() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	tid := t.SafeGetID()
-	status := t.SafeGetStatus()
+	tid, _ := t.GetID()
+	status, _ := t.GetStatus()
 	if status == RUNNING {
 		return scerr.InconsistentError("cannot reset task '%s': task running", tid)
 	}

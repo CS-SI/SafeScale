@@ -263,8 +263,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
-	defaultGatewayID := request.DefaultGateway.ID
-	isGateway := request.DefaultRouteIP == "" && defaultNetwork.Name != abstract.SingleHostNetworkName
+	// defaultGatewayID := request.DefaultGateway.ID
+	isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
 	//VPL: moved to ojects.Host.Create()
 	// defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
@@ -449,8 +449,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 	newHost.Network.IsGateway = isGateway
 	newHost.Network.DefaultNetworkID = defaultNetworkID
-	newHost.Network.DefaultGatewayID = defaultGatewayID
-	newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
+	// newHost.Network.DefaultGatewayID = defaultGatewayID
+	// newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
