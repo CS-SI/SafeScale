@@ -48,7 +48,7 @@ func TestChildrenWaitingGame(t *testing.T) {
 		}
 	}
 
-	res, err := overlord.WaitGroup()
+	res, err := overlord.Wait()
 
 	require.Nil(t, err)
 	require.NotEmpty(t, res)
@@ -181,6 +181,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 		}, nil)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
+			t.Fail()
 		}
 		tasks = append(tasks, rt)
 	}
@@ -196,6 +197,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 		res, err = overlord.WaitGroup()
 		if err != nil {
 			t.Errorf("It shouldn't happen")
+			t.Fail()
 		}
 		c <- struct{}{} // done
 		close(c)
@@ -203,7 +205,10 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	select {
 	case <-time.After(time.Duration(300) * time.Millisecond):
-		stats := overlord.Stats()
+		stats, statsErr := overlord.Stats()
+		if statsErr != nil {
+			t.Fatal(statsErr)
+		}
 
 		if len(stats[RUNNING]) == 0 {
 			t.Errorf("We should have dangling goroutines here...")
@@ -230,6 +235,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 10; ind++ {
+		fmt.Println("Iterating...")
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
 			rint := tools.RandomInt(30, 50)
 			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
@@ -242,19 +248,106 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	}
 
 	begin := time.Now()
-	waited, _, err := overlord.WaitGroupFor(time.Duration(10) * 10 * time.Millisecond)
+	waited, _, err := overlord.WaitFor(time.Duration(10) * 10 * time.Millisecond)
 	if err != nil {
 		if _, ok := err.(scerr.ErrTimeout); !ok {
-			t.Errorf("Unexpected group wait: %s", err)
+			t.Errorf("Unexpected group wait, wrong error type: %s", err)
 		}
 	}
 	end := time.Since(begin)
 
-	if end >= (time.Millisecond * 10 * 12) {
-		t.Errorf("It should have finished near 100 ms but it didn't, it was %s !!", end)
+	if !(((time.Millisecond * 300) >= end) && (end >= (time.Millisecond * 100))) {
+		t.Errorf("It should have finished between 100 ms and 300ms but it didn't, it was %s !!", end)
 	}
 
 	if waited {
 		t.Errorf("It shouldn't happen")
+	}
+}
+
+func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
+	overlord, err := NewTaskGroup(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	fmt.Println("Begin")
+
+	for ind := 0; ind < 10; ind++ {
+		fmt.Println("Iterating...")
+		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
+			rint := tools.RandomInt(30, 50)
+			fmt.Println("Entering")
+			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
+			fmt.Println("Exiting")
+
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		}
+	}
+
+	begin := time.Now()
+	time.Sleep(10 * time.Millisecond)
+	overlord.Abort()
+	end := time.Since(begin)
+
+	fmt.Println("Here we are")
+
+	if end >= (time.Millisecond * 20) {
+		t.Errorf("It should have finished near 20 ms but it didn't, it was %s !!", end)
+	}
+}
+
+func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
+	overlord, err := NewTaskGroup(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	fmt.Println("Begin")
+
+	for ind := 0; ind < 10; ind++ {
+		fmt.Println("Iterating...")
+		_, err := overlord.Start(func(t Task, parameters TaskParameters) (result TaskResult, e error) {
+			rint := tools.RandomInt(30, 50)
+			fmt.Println("Entering")
+			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
+			fmt.Println("Exiting")
+
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		}
+	}
+
+	begin := time.Now()
+	go func() {
+		time.Sleep(310 * time.Millisecond)
+		err = overlord.Abort()
+		if err != nil {
+			t.Fail()
+		}
+	}()
+
+	_, err = overlord.WaitGroup()
+	if err != nil {
+		t.Fail()
+	}
+
+	end := time.Since(begin)
+
+	fmt.Println("Here we are")
+
+	if end >= (time.Millisecond * 350) {
+		t.Errorf("It should have finished near 350 ms but it didn't, it was %s !!", end)
 	}
 }

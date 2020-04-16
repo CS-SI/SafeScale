@@ -337,11 +337,10 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		}
 	}
 
-	task, err := concurrency.NewTaskWithContext(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
 
 	shareRef := srvutils.GetReference(in)
 	tracer := concurrency.NewTracer(task, true, "('%s')", shareRef).WithStopwatch().Entering()

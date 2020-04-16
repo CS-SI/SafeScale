@@ -47,7 +47,7 @@ func Test_Command(t *testing.T) {
 		Port:       22,
 		PrivateKey: string(content),
 	}
-	voidtask, err := concurrency.NewTask()
+	voidtask, err := concurrency.NewTask(nil)
 	assert.Nil(t, err)
 	cmd, err := sshConf.Command(voidtask, "whoami")
 	assert.Nil(t, err)

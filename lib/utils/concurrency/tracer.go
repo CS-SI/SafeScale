@@ -33,6 +33,7 @@ import (
 // Tracer ...
 type Tracer struct {
 	taskSig      string
+	generation   uint
 	funcName     string
 	inOutMessage string
 	enabled      bool

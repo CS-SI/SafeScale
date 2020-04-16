@@ -48,12 +48,28 @@ func Capitalize(value string) string {
 // FormatStrings formats the strings passed as parameters, using first one as format specifier for fmt.Sprintf if
 // there are more than 1 string.
 func FormatStrings(msg ...interface{}) string {
+	if msg == nil {
+		return ""
+	}
 	l := len(msg)
 	if l == 0 {
 		return ""
 	}
 	if len(msg) > 1 {
-		return fmt.Sprintf(msg[0].(string), msg[1:]...)
+		if _, ok := msg[0].(string); ok {
+			return fmt.Sprintf(msg[0].(string), msg[1:]...)
+		}
+
+		return ""
 	}
+
+	if msg[0] == nil {
+		return ""
+	}
+
+	if _, ok := msg[0].(string); !ok {
+		return ""
+	}
+
 	return fmt.Sprint(msg[0].(string))
 }

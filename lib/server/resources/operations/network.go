@@ -461,7 +461,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	// Starts gateway(s) installation
-	primaryTask, err = concurrency.NewTask()
+	primaryTask, err = concurrency.NewTask(nil)
 	if err != nil {
 		return err
 	}
@@ -471,7 +471,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		return err
 	}
 	if failover && secondaryTask != nil {
-		secondaryTask, err = concurrency.NewTask()
+		secondaryTask, err = concurrency.NewTask(nil)
 		if err != nil {
 			return err
 		}
@@ -514,7 +514,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	// Starts gateway(s) installation
-	primaryTask, err = concurrency.NewTask()
+	primaryTask, err = concurrency.NewTask(nil)
 	if err != nil {
 		return err
 	}
@@ -541,7 +541,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		return err
 	}
 	if failover && secondaryTask != nil {
-		secondaryTask, err = concurrency.NewTask()
+		secondaryTask, err = concurrency.NewTask(nil)
 		if err != nil {
 			return err
 		}
@@ -844,7 +844,8 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 		}
 
 		// Leave a chance to abort
-		if task.Aborted() {
+		taskStatus, _ := task.GetStatus()
+		if taskStatus == concurrency.ABORTED {
 			return scerr.AbortedError("", nil)
 		}
 
