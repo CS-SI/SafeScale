@@ -23,17 +23,17 @@ type Config interface {
 	// Config gets a string configuration value and a
 	// bool indicating whether the value was present or not.
 	Config(name string) (interface{}, bool)
-	//Get is an alias to Config()
+	// Get is an alias to Config()
 	Get(name string) (interface{}, bool)
-	//Set sets the configuration name to specified value
+	// Set sets the configuration name to specified value
 	Set(name string, value interface{})
-	//GetString returns a string corresponding to the key, empty string if it doesn't exist
+	// GetString returns a string corresponding to the key, empty string if it doesn't exist
 	GetString(name string) string
-	//GetSliceOfStrings returns a slice of strings corresponding to the key, empty string slice if it doesn't exist
+	// GetSliceOfStrings returns a slice of strings corresponding to the key, empty string slice if it doesn't exist
 	GetSliceOfStrings(name string) []string
-	//GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
+	// GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
 	GetMapOfStrings(name string) map[string]string
-	//GetInteger returns an integer corresponding to the key, 0 if it doesn't exist
+	// GetInteger returns an integer corresponding to the key, 0 if it doesn't exist
 	GetInteger(name string) int
 }
 

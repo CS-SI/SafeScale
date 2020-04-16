@@ -47,7 +47,7 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	//FIXME: validate params
+	// FIXME: validate params
 	return nil, c.service.StartHost(params.(string))
 }
 
@@ -59,7 +59,7 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	//FIXME: validate params
+	// FIXME: validate params
 	return nil, c.service.StopHost(params.(string))
 }
 

@@ -92,13 +92,13 @@ func ExtractRetCode(err error) (string, int, error) {
 	retCode := -1
 	msg := "__ NO MESSAGE __"
 	if ee, ok := err.(*exec.ExitError); ok {
-		//Try to get retCode
+		// Try to get retCode
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
 			retCode = status.ExitStatus()
 		} else {
 			return msg, retCode, scerr.NewError("ExitError.Sys is not a 'syscall.WaitStatus'")
 		}
-		//Retrieve error Message
+		// Retrieve error Message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}

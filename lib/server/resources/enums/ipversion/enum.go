@@ -27,9 +27,9 @@ import (
 type Enum int
 
 const (
-	//IPv4 is IP v4 version
+	// IPv4 is IP v4 version
 	IPv4 Enum = 4
-	//IPv6 is IP v6 version
+	// IPv6 is IP v6 version
 	IPv6 Enum = 6
 )
 

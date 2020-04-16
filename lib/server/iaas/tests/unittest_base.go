@@ -232,7 +232,7 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abst
 	return tester.Service.CreateHost(hostRequest)
 }
 
-//CreateGW creates a test GW
+// CreateGW creates a test GW
 func (tester *ServiceTester) CreateGW(t *testing.T, network *abstract.Network) error {
 	tpls, err := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
 		MinCores:    1,
@@ -294,7 +294,7 @@ func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
 	}()
 }
 
-//Networks test
+// Networks test
 func (tester *ServiceTester) Networks(t *testing.T) {
 	// Get initial number of networks
 	nets, err := tester.Service.ListNetworks()
@@ -462,7 +462,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		//assert.Equal(t, host.State, hoststate.STOPPED)
+		// assert.Equal(t, host.State, hoststate.STOPPED)
 	}
 	{
 		err := tester.Service.StartHost(host.ID)
@@ -477,7 +477,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 
 }
 
-//Volumes test
+// Volumes test
 func (tester *ServiceTester) Volumes(t *testing.T) {
 	// Get initial number of volumes
 	lst, err := tester.Service.ListVolumes()
@@ -649,7 +649,7 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 	assert.NotContains(t, cl, "testC", "testC2")
 }
 
-//TODO: disabled, need overhaul
+// TODO: disabled, need overhaul
 // // Objects test
 // func (tester *ServiceTester) Objects(t *testing.T) {
 // 	_, err := tester.Service.CreateBucket("testC")

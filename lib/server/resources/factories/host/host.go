@@ -75,7 +75,7 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	//FIXME: tracer...
+	// FIXME: tracer...
 
 	return operations.LoadHost(task, svc, ref)
 }

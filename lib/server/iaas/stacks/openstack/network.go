@@ -44,7 +44,7 @@ import (
 // RouterRequest represents a router request
 type RouterRequest struct {
 	Name string `json:"name,omitempty"`
-	//NetworkID is the Network ID which the router gateway is connected to.
+	// NetworkID is the Network ID which the router gateway is connected to.
 	NetworkID string `json:"network_id,omitempty"`
 }
 
@@ -52,7 +52,7 @@ type RouterRequest struct {
 type Router struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
-	//NetworkID is the Network ID which the router gateway is connected to.
+	// NetworkID is the Network ID which the router gateway is connected to.
 	NetworkID string `json:"network_id,omitempty"`
 }
 
@@ -60,11 +60,11 @@ type Router struct {
 type Subnet struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
-	//IPVersion is IPv4 or IPv6 (see IPVersion)
+	// IPVersion is IPv4 or IPv6 (see IPVersion)
 	IPVersion ipversion.Enum `json:"ip_version,omitempty"`
-	//Mask mask in CIDR notation
+	// Mask mask in CIDR notation
 	Mask string `json:"mask,omitempty"`
-	//NetworkID id of the parent network
+	// NetworkID id of the parent network
 	NetworkID string `json:"network_id,omitempty"`
 }
 
@@ -217,7 +217,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 		newNet.Name = network.Name
 		newNet.CIDR = sn.Mask
 		newNet.IPVersion = sn.IPVersion
-		//net.GatewayID = network.GatewayId
+		// net.GatewayID = network.GatewayId
 		return newNet, nil
 	}
 
@@ -388,7 +388,7 @@ func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostF
 		}
 	}()
 
-	//VPL: moved in resources.Host
+	// VPL: moved in resources.Host
 	// // Updates Host Property propertiesv1.HostSizing
 	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
 	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
@@ -572,7 +572,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 // 	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
 // }
 
-//VPL: not used
+// VPL: not used
 // // getSubnet returns the sub network identified by id
 // func (s *Stack) getSubnet(id string) (*Subnet, error) {
 // 	// Execute the operation and get back a subnets.Subnet struct

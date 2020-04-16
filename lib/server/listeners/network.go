@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/asaskevich/govalidator"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
@@ -229,7 +228,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}

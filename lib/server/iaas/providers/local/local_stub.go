@@ -1,4 +1,4 @@
-//+build !libvirt
+// +build !libvirt
 
 /*
  * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
@@ -37,7 +37,7 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
-//AuthOptions fields are the union of those recognized by each identity implementation and provider.
+// AuthOptions fields are the union of those recognized by each identity implementation and provider.
 type AuthOptions struct {
 }
 

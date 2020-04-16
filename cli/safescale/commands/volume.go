@@ -34,7 +34,7 @@ import (
 
 var volumeCmdName = "volume"
 
-//VolumeCmd volume command
+// VolumeCmd volume command
 var VolumeCmd = &cli.Command{
 	Name:  "volume",
 	Usage: "volume COMMAND",

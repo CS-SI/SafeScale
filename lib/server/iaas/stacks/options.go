@@ -73,13 +73,13 @@ type AuthenticationOptions struct {
 	// authentication token ID.
 	TokenID string
 
-	//Openstack region (data center) where the infrastructure will be created
+	// Openstack region (data center) where the infrastructure will be created
 	Region string `valid:"alphanumwithdashesandunderscores,required"`
 
 	AvailabilityZone string `valid:"alphanumwithdashesandunderscores,required"`
 
-	//FloatingIPPool name of the floating IP pool
-	//Necessary only if UseFloatingIP is true
+	// FloatingIPPool name of the floating IP pool
+	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
 	// Name of the VPC (Virtual Private Cloud)
@@ -120,7 +120,7 @@ type ConfigurationOptions struct {
 	// MetadataBucket contains the name of the Object Storage bucket that will store metadata
 	MetadataBucket string
 
-	//OperatorUsername contain the name of the safescale created user
+	// OperatorUsername contain the name of the safescale created user
 	OperatorUsername string
 
 	// Customizations map[string]string

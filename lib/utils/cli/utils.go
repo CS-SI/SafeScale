@@ -28,13 +28,13 @@ func ExtractRetCode(err error) (string, int, error) {
 	retCode := -1
 	msg := "__ NO MESSAGE __"
 	if ee, ok := err.(*exec.ExitError); ok {
-		//Try to get retCode
+		// Try to get retCode
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
 			retCode = status.ExitStatus()
 		} else {
 			return msg, retCode, scerr.InvalidParameterError("err", "must be a *exec.ExitError and err.Sys() must be a 'syscall.WaitStatus'")
 		}
-		//Retrieve error message
+		// Retrieve error message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}

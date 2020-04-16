@@ -31,7 +31,7 @@ import (
 
 // safescale image list --all=false
 
-//ImageListener image service server grpc
+// ImageListener image service server grpc
 type ImageListener struct{}
 
 // List available images

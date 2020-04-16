@@ -521,12 +521,12 @@ func (svc *service) FilterImages(filter string) ([]abstract.Image, error) {
 		return imgs, nil
 	}
 	var simgs []scoredImage
-	//fields := strings.Split(strings.ToUpper(osname), " ")
+	// fields := strings.Split(strings.ToUpper(osname), " ")
 	for _, img := range imgs {
-		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
+		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
 		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(filter), 0.7, 5)
-		//score := matchScore(fields, strings.ToUpper(img.Name))
-		//score := SimilarityScore(filter, img.Name)
+		// score := matchScore(fields, strings.ToUpper(img.Name))
+		// score := SimilarityScore(filter, img.Name)
 		if score > 0.5 {
 			simgs = append(simgs, scoredImage{
 				Image: img,
@@ -597,20 +597,20 @@ func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
 
 	maxscore := 0.0
 	maxi := -1
-	//fields := strings.Split(strings.ToUpper(osname), " ")
+	// fields := strings.Split(strings.ToUpper(osname), " ")
 	for i, img := range imgs {
-		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
+		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
 		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
-		//score := matchScore(fields, strings.ToUpper(img.Name))
-		//score := SimilarityScore(osname, img.Name)
+		// score := matchScore(fields, strings.ToUpper(img.Name))
+		// score := SimilarityScore(osname, img.Name)
 		if score > maxscore {
 			maxscore = score
 			maxi = i
 		}
 
 	}
-	//fmt.Println(fields, len(fields))
-	//fmt.Println(len(fields))
+	// fmt.Println(fields, len(fields))
+	// fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
 		return nil, scerr.NotFoundError("unable to find an image matching '%s'", osname)
 	}

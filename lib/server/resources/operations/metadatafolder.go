@@ -31,7 +31,7 @@ import (
 
 // folder describes a metadata folder
 type folder struct {
-	//path contains the base path where to read/write record in Object Storage
+	// path contains the base path where to read/write record in Object Storage
 	path     string
 	service  iaas.Service
 	crypt    bool

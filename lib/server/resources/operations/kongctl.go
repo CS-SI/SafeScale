@@ -52,7 +52,7 @@ var kongProxyCheckedCache = utils.NewMapCache()
 type KongController struct {
 	network resources.Network
 	// host      *pb.Host
-	//safescale safescale.Client
+	// safescale safescale.Client
 
 	gateway          resources.Host
 	gatewayPrivateIP string

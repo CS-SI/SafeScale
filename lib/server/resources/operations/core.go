@@ -35,9 +35,9 @@ import (
 )
 
 const (
-	//byIDFolderName tells in what folder to put 'byID' information
+	// byIDFolderName tells in what folder to put 'byID' information
 	byIDFolderName = "byID"
-	//byNameFolderName tells in what folder to store 'byName' information
+	// byNameFolderName tells in what folder to store 'byName' information
 	byNameFolderName = "byName"
 )
 
