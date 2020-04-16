@@ -1052,7 +1052,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		hnV1.DefaultGatewayPrivateIP = gateway.PrivateIP()
 	}
 
-	host := abstract.NewHostFull()
+	host = abstract.NewHostFull()
 	host.Core = hostCore
 	host.Network = hostNetwork
 	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
@@ -1075,7 +1075,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 		return nil, err
 	}
 
-	host := abstract.NewHostFulle()
+	host = abstract.NewHostFull()
 	host.Core = ahc
 	if err = s.complementHost(host, newHost); err != nil {
 		return nil, scerr.Wrap(err, "failed to complement the host")

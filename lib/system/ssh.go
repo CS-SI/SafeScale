@@ -794,7 +794,8 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			if task.Aborted() {
+			taskStatus, _ := task.GetStatus()
+			if taskStatus == concurrency.ABORTED {
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 

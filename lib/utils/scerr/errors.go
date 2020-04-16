@@ -674,6 +674,8 @@ type ErrAborted struct {
 func AbortedError(msg string, err error) ErrAborted {
 	if msg == "" {
 		msg = "aborted"
+	} else {
+		msg = fmt.Sprintf("aborted: %s", msg)
 	}
 	return ErrAborted{
 		errCore: errCore{

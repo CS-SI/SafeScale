@@ -93,11 +93,10 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", uuid).Entering()
 	defer tracer.OnExitTrace()()
@@ -149,11 +148,10 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 		}
 	}
 
-	task, err := concurrency.NewTaskWithContext(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
 
 	tracer := concurrency.NewTracer(task, true, "").Entering()
 	defer tracer.OnExitTrace()()
@@ -178,7 +176,8 @@ func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty
 	jobMap := server.ListJobs()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {
-		if task.Aborted() {
+		status, _ := task.GetStatus()
+		if status == concurrency.ABORTED {
 			return nil, scerr.AbortedError("aborted", nil)
 		}
 		pbProcessList = append(pbProcessList, &protocol.JobDefinition{Uuid: uuid, Info: info})

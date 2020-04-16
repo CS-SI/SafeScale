@@ -89,11 +89,10 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
@@ -138,13 +137,12 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
 
-	tracer := concurrency.NewTracer(nil, true, "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -182,11 +180,10 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
 
 	name := in.GetName()
 
@@ -233,11 +230,10 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx)
+	task, err := concurrency.NewTaskWithContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer task.Close()
 
 	name := in.GetName()
 

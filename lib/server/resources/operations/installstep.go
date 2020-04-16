@@ -304,11 +304,6 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 				return nil, err
 			}
 			outcomes.AddSingle(h.SafeGetName(), outcome.(resources.UnitResult))
-			subtask.Close()
-			// err = subtask.Reset()
-			// if err != nil {
-			// 	return nil, err
-			// }
 
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok

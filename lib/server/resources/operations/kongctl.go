@@ -69,7 +69,7 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 	}
 
 	// Check if 'edgeproxy4network' feature is installed on host
-	voidtask, err := concurrency.NewTask()
+	voidtask, err := concurrency.NewTask(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	voidtask, err := concurrency.NewTask()
+	voidtask, err := concurrency.NewTask(nil)
 	if err != nil {
 		return "", err
 	}
@@ -355,7 +355,7 @@ func (k *KongController) addSourceControl(
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, error) {
 	cmd := fmt.Sprintf(curlGet, url)
-	task, err := concurrency.NewTask()
+	task, err := concurrency.NewTask(nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -376,7 +376,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 
 // post creates a rule
 func (k *KongController) post(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
-	task, err := concurrency.NewTask()
+	task, err := concurrency.NewTask(nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -404,7 +404,7 @@ func (k *KongController) post(name, url, data string, v *data.Map, propagate boo
 
 // put updates or creates a rule
 func (k *KongController) put(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
-	task, err := concurrency.NewTask()
+	task, err := concurrency.NewTask(nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -432,7 +432,7 @@ func (k *KongController) put(name, url, data string, v *data.Map, propagate bool
 
 // patch updates an existing rule
 func (k *KongController) patch(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, error) {
-	task, err := concurrency.NewTask()
+	task, err := concurrency.NewTask(nil)
 	if err != nil {
 		return nil, "", err
 	}

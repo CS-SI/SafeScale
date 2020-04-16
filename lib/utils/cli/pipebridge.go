@@ -143,7 +143,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) error {
 		return err
 	}
 	for _, v := range pbc.bridges {
-		_, err = taskGroup.(concurrency.Task).Start(taskRead, data.Map{
+		_, err = taskGroup.Start(taskRead, data.Map{
 			"bridge":    v,
 			"displayCh": pbc.displayCh,
 		})
@@ -200,7 +200,8 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 
 	for {
 		// If task aborted, stop the loop
-		if t.Aborted() {
+		theStatus, _ := t.GetStatus()
+		if theStatus == concurrency.ABORTED {
 			break
 		}
 		if scanner.Scan() {

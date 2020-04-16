@@ -218,14 +218,16 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abst
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
-	gw, _ := tester.Service.InspectHost(network.GatewayID)
 	hostRequest := abstract.HostRequest{
-		ImageID:        img.ID,
 		ResourceName:   name,
-		TemplateID:     tpls[0].ID,
 		Networks:       []*abstract.Network{network},
-		DefaultGateway: gw.Core,
+		DefaultRouteIP: "",
 		PublicIP:       public,
+		TemplateID:     tpls[0].ID,
+		ImageID:        img.ID,
+		KeyPair:        nil,
+		Password:       "",
+		DiskSize:       0,
 	}
 	return tester.Service.CreateHost(hostRequest)
 }
