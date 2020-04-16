@@ -2422,7 +2422,7 @@ func (c *cluster) Delete(task concurrency.Task) error {
 	err = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
 		// Deletes the nodes
 		list, innerErr := c.ListNodes(task)
-		if err != nil {
+		if innerErr != nil {
 			return innerErr
 		}
 		length := uint(len(list))
@@ -2472,7 +2472,7 @@ func (c *cluster) Delete(task concurrency.Task) error {
 		// Deletes the network and gateway
 		networkID := ""
 		if props.Lookup(clusterproperty.NetworkV2) {
-			err = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
+			innerErr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2481,7 +2481,7 @@ func (c *cluster) Delete(task concurrency.Task) error {
 				return nil
 			})
 		} else {
-			err = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) error {
+			innerErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) error {
 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
 				if !ok {
 					return scerr.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
