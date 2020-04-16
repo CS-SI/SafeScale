@@ -293,7 +293,9 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 
 	begin := time.Now()
 	time.Sleep(10 * time.Millisecond)
-	overlord.Abort()
+	err = overlord.Abort()
+	require.Nil(t, err)
+
 	end := time.Since(begin)
 
 	fmt.Println("Here we are")

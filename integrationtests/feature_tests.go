@@ -179,7 +179,7 @@ func RemoteDesktop(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 	_ = out
 
-	//TODO : try to connect to the host through guacamole?
+	// TODO : try to connect to the host through guacamole?
 	out, err = GetOutput("wget " + host.PublicIP + ":9080/guacamole")
 	fmt.Print(out)
 	require.Nil(t, err)

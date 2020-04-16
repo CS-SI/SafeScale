@@ -114,7 +114,7 @@ func indexOf(element string, data []string) int {
 			return k
 		}
 	}
-	return -1 //not found.
+	return -1 // not found.
 }
 
 func getRegionFromSelfLink(link SelfLink) (string, error) {

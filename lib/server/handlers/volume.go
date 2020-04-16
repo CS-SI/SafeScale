@@ -663,7 +663,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 					if err != nil {
 						// FIXME Think about this
 						logrus.Error(err)
-						//return err
+						// return err
 					}
 
 					// ... then detach volume

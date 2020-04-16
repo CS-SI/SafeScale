@@ -29,7 +29,7 @@ var clientRPCUUID uuid.UUID
 var uuidSet bool
 var mutexContextManager sync.Mutex
 
-//--------------------- CLIENT ---------------------------------
+// --------------------- CLIENT ---------------------------------
 
 // GetContext ...
 func GetContext(storeUUID bool) (context.Context, error) {

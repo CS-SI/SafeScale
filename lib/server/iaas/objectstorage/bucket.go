@@ -91,7 +91,7 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 
 	fullPath := buildFullPath(path, prefix)
 
-	//log.Println("Location.Container => : ", c.Name()
+	// log.Println("Location.Container => : ", c.Name()
 	err := stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {

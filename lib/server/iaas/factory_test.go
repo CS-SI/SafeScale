@@ -54,15 +54,15 @@ func TestTenants(t *testing.T) {
 }
 
 func TestTenantsWithNoTenantFile(t *testing.T) {
-	//ARRANGE
+	// ARRANGE
 	// "Hide" any existing tenants.toml
 	hideTenantFiles()
 	defer unhideTenantFiles()
 
-	//ACT
+	// ACT
 	_, err := iaas.GetTenantNames()
 
-	//ASSERT
+	// ASSERT
 	require.Error(t, err)
 }
 func TestTenantsWithNoNameTenantFile(t *testing.T) {

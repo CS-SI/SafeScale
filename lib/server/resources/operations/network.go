@@ -860,13 +860,15 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				stop = true
 			}
 			if !stop {
-				logrus.Debugf("Deleting gateway '%s'...", rh.SafeGetName())
-				innerErr = objn.deleteGateway(task, rh)
-				if innerErr != nil { // allow no gateway, but log it
-					if _, ok := err.(scerr.ErrNotFound); ok {
-						logrus.Errorf("Failed to delete primary gateway: %s", innerErr.Error())
-					} else {
-						return innerErr
+				if rh != nil {
+					logrus.Debugf("Deleting gateway '%s'...", rh.SafeGetName())
+					innerErr = objn.deleteGateway(task, rh)
+					if innerErr != nil { // allow no gateway, but log it
+						if _, ok := err.(scerr.ErrNotFound); ok {
+							logrus.Errorf("Failed to delete primary gateway: %s", innerErr.Error())
+						} else {
+							return innerErr
+						}
 					}
 				}
 			} else {
@@ -885,13 +887,15 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				stop = true
 			}
 			if !stop {
-				logrus.Debugf("Deleting gateway '%s'...", rh.SafeGetName())
-				innerErr = objn.deleteGateway(task, rh)
-				if innerErr != nil { // allow no gateway, but log it
-					if _, ok := innerErr.(scerr.ErrNotFound); ok { // nolint
-						logrus.Errorf("failed to delete secondary gateway: %s", innerErr.Error())
-					} else {
-						return innerErr
+				if rh != nil {
+					logrus.Debugf("Deleting gateway '%s'...", rh.SafeGetName())
+					innerErr = objn.deleteGateway(task, rh)
+					if innerErr != nil { // allow no gateway, but log it
+						if _, ok := innerErr.(scerr.ErrNotFound); ok { // nolint
+							logrus.Errorf("failed to delete secondary gateway: %s", innerErr.Error())
+						} else {
+							return innerErr
+						}
 					}
 				}
 			} else {

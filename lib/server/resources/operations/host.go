@@ -116,9 +116,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (resources.Ho
 		}
 		return nullHost(), scerr.Wrap(err, "failed to read metadata of host '%s'", ref)
 	}
-	if err != nil {
-		return nullHost(), err
-	}
+
 	return rh, nil
 }
 
@@ -1455,12 +1453,6 @@ func (rh *host) SafeGetPublicIP(task concurrency.Task) string {
 // GetPrivateIP returns the private IP of the host on its default Network
 func (rh *host) GetPrivateIP(task concurrency.Task) (ip string, err error) {
 	ip = ""
-	if rh.IsNull() {
-		return ip, scerr.InvalidInstanceError()
-	}
-	if task == nil {
-		return ip, scerr.InvalidParameterError("task", "cannot be nil")
-	}
 
 	if rh == nil {
 		return ip, scerr.InvalidInstanceError()

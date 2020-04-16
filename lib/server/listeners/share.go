@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/asaskevich/govalidator"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
@@ -272,7 +271,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}

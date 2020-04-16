@@ -41,7 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-//-------------IMAGES---------------------------------------------------------------------------------------------------
+// -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
 func (s *Stack) ListImages() (images []abstract.Image, err error) {
@@ -102,7 +102,7 @@ func (s *Stack) GetImage(id string) (*abstract.Image, error) {
 	return nil, scerr.NotFoundError("image with id '%s' not found", id)
 }
 
-//-------------TEMPLATES------------------------------------------------------------------------------------------------
+// -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err error) {
@@ -126,8 +126,8 @@ func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err 
 				ht := abstract.HostTemplate{
 					Cores:   int(matype.GuestCpus),
 					RAMSize: float32(matype.MemoryMb / 1024),
-					//VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
-					//DiskSize: int(matype.ImageSpaceGb),
+					// VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
+					// DiskSize: int(matype.ImageSpaceGb),
 					DiskSize: 0,
 					ID:       strconv.FormatUint(matype.Id, 10),
 					Name:     matype.Name,
@@ -146,7 +146,7 @@ func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err 
 	return templates, nil
 }
 
-//GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
+// GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
 func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -169,7 +169,7 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	return nil, scerr.NotFoundError("template with id '%s' not found", id)
 }
 
-//-------------SSH KEYS-------------------------------------------------------------------------------------------------
+// -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
@@ -239,7 +239,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	if request.KeyPair == nil {
 		id, err := uuid.NewV4()
 		if err != nil {
-			msg := fmt.Sprintf("failed to create host UUID: %+s", err.Error())
+			msg := fmt.Sprintf("failed to create host UUID: %s", err.Error())
 			logrus.Debugf(strprocess.Capitalize(msg))
 			return nil, userData, scerr.NewError(msg)
 		}
@@ -247,7 +247,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
 		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %+s", err.Error())
+			msg := fmt.Sprintf("failed to create host key pair: %s", err.Error())
 			logrus.Debugf(strprocess.Capitalize(msg))
 			return nil, userData, scerr.NewError(msg)
 		}
@@ -265,7 +265,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	defaultNetworkID := defaultNetwork.ID
 	// defaultGatewayID := request.DefaultGateway.ID
 	isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
-	//VPL: moved to ojects.Host.Create()
+	// VPL: moved to ojects.Host.Create()
 	// defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
 	// if defaultGateway != nil {
@@ -347,7 +347,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	hostCore.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	hostCore.Password = request.Password
 
-	//VPL: moved to objects.Host.Create()
+	// VPL: moved to objects.Host.Create()
 	// err = host.properties.Alter(HostProperty.NetworkV1, func(v interface{}) error {
 	// 	hostNetworkV1 := v.(*propertiesv1.HostNetwork)
 	// 	hostNetworkV1.DefaultNetworkID = defaultNetworkID
@@ -1013,7 +1013,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	return host.Core.LastState, nil
 }
 
-//-------------Provider Infos-------------------------------------------------------------------------------------------
+// -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {

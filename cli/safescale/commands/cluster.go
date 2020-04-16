@@ -68,7 +68,7 @@ var ClusterCommand = &cli.Command{
 		clusterInspectCommand,
 		clusterStateCommand,
 		clusterRunCommand,
-		//clusterSshCommand,
+		// clusterSshCommand,
 		clusterStartCommand,
 		clusterStopCommand,
 		clusterExpandCommand,
@@ -271,7 +271,7 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, error) {
 	result["admin_login"] = "cladm"
 
 	// Add information not directly in cluster GetConfig()
-	//TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
+	// TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
 	disabled := result["features"].(map[string]interface{})["disabled"].(map[string]string)
 	if _, ok := disabled["remotedesktop"]; !ok {
 		remoteDesktops := map[string][]string{}
@@ -1218,7 +1218,7 @@ var clusterNodeListCommand = &cli.Command{
 			if err != nil {
 				err = scerr.FromGRPCStatus(err)
 				msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
-				//fmt.Println(msg)
+				// fmt.Println(msg)
 				logrus.Warnln(msg)
 				continue
 			}

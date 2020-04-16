@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	//"github.com/CS-SI/SafeScale/lib/server/iaas/providers/aws"
+	// "github.com/CS-SI/SafeScale/lib/server/iaas/providers/aws"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine"

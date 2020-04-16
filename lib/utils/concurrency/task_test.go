@@ -656,7 +656,9 @@ func TestOneShotIgnoringAbort(t *testing.T) {
 	err = single.Abort()
 	require.NotNil(t, err)
 
-	single.IgnoreAbortSignal(false)
+	err = single.IgnoreAbortSignal(false)
+	require.Nil(t, err)
+
 	err = single.Abort()
 	require.Nil(t, err)
 

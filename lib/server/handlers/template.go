@@ -28,7 +28,7 @@ import (
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-//TemplateHandler defines API to manipulate hosts
+// TemplateHandler defines API to manipulate hosts
 type TemplateHandler interface {
 	List(all bool) ([]abstract.HostTemplate, error)
 }
@@ -39,7 +39,7 @@ type templateHandler struct {
 }
 
 // NewTemplateHandler creates a template service
-//FIXME: what to do if job == nil ?
+// FIXME: what to do if job == nil ?
 func NewTemplateHandler(job server.Job) TemplateHandler {
 	return &templateHandler{job: job}
 }

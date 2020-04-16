@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/asaskevich/govalidator"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -62,14 +62,14 @@ func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (
 type JobManagerListener struct{}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *google_protobuf.Empty, err error) {
+func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot stop job").ToGRPCStatus()
 		}
 	}()
 
-	empty = &google_protobuf.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, scerr.InvalidInstanceError()
 	}
@@ -127,7 +127,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 }
 
 // List running process
-func (s *JobManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (jl *protocol.JobList, err error) {
+func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, "cannot list jobs").ToGRPCStatus()

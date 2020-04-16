@@ -288,7 +288,7 @@ func NewHostFull() *HostFull {
 
 // IsConsistent returns true if the struct is consistent
 func (hc *HostFull) IsConsistent() bool {
-	return hc != nil && hc.Core.OK() //&& hc.Description.OK() && hc.Sizing.OK() && hc.Network.OK()
+	return hc != nil && hc.Core.OK() // && hc.Description.OK() && hc.Sizing.OK() && hc.Network.OK()
 }
 
 // OK is a synonym to IsConsistent

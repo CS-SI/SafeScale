@@ -40,11 +40,11 @@ type ExportOptions struct {
 
 // ExportACL ...
 type ExportACL struct {
-	//Host contains the pattern of hosts authorized (cf. exports man page)
+	// Host contains the pattern of hosts authorized (cf. exports man page)
 	Host string
-	//SecurityMode contains all the security mode allowed for the Host
+	// SecurityMode contains all the security mode allowed for the Host
 	SecurityModes []securityflavor.Enum
-	//Options contains the options of the export ACL
+	// Options contains the options of the export ACL
 	Options ExportOptions
 }
 
@@ -79,7 +79,7 @@ func NewShare(server *Server, path, options string) (*Share, error) {
 // 	s.ACLs = acls
 // }
 
-//Add configures and exports the share
+// Add configures and exports the share
 func (s *Share) Add(task concurrency.Task) error {
 	// var acls string
 	// for _, a := range s.ACLs {

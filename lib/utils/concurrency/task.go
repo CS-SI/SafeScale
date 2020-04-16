@@ -62,7 +62,7 @@ type TaskResult interface{}
 //        ...
 //    }
 //    return nil
-//}, nil)
+// }, nil)
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, error)
 
 // TaskGuard ...
