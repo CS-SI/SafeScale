@@ -23,11 +23,12 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"github.com/antihax/optional"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/outscale/osc-sdk-go/oapi"
+	"github.com/outscale-dev/osc-sdk-go/osc"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -57,9 +58,12 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		},
 	)
 	priKey := string(priKeyPem)
-	_, err := s.client.POST_CreateKeypair(oapi.CreateKeypairRequest{
+	createKeypairRequest := osc.CreateKeypairRequest{
 		KeypairName: name,
 		PublicKey:   base64.StdEncoding.EncodeToString(pubBytes),
+	}
+	_, _, err := s.client.KeypairApi.CreateKeypair(s.auth, &osc.CreateKeypairOpts{
+		CreateKeypairRequest: optional.NewInterface(createKeypairRequest),
 	})
 	if err != nil {
 		return nil, err
@@ -84,19 +88,22 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 	if id == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
-	resp, err := s.client.POST_ReadKeypairs(oapi.ReadKeypairsRequest{Filters: oapi.FiltersKeypair{
+	readKeypairsRequest := osc.ReadKeypairsRequest{Filters: osc.FiltersKeypair{
 		KeypairNames: []string{id},
-	}})
+	}}
+	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, &osc.ReadKeypairsOpts{
+		ReadKeypairsRequest: optional.NewInterface(readKeypairsRequest),
+	})
 	if err != nil {
 		return nil, err
 	}
-	if resp == nil || resp.OK == nil || len(resp.OK.Keypairs) > 1 {
+	if len(resp.Keypairs) > 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
-	if len(resp.OK.Keypairs) == 0 {
+	if len(resp.Keypairs) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
 	}
-	kp := resp.OK.Keypairs[0]
+	kp := resp.Keypairs[0]
 	return &resources.KeyPair{
 		ID:   kp.KeypairName,
 		Name: kp.KeypairName,
@@ -109,12 +116,12 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	resp, err := s.client.POST_ReadKeypairs(oapi.ReadKeypairsRequest{})
+	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, nil)
 	if err != nil {
 		return nil, err
 	}
 	var kps []resources.KeyPair
-	for _, kp := range resp.OK.Keypairs {
+	for _, kp := range resp.Keypairs {
 		kps = append(kps, resources.KeyPair{
 			ID:   kp.KeypairName,
 			Name: kp.KeypairName,
@@ -132,8 +139,11 @@ func (s *Stack) DeleteKeyPair(id string) error {
 	if id == "" {
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
-	_, err := s.client.POST_DeleteKeypair(oapi.DeleteKeypairRequest{
+	deleteKeypairRequest := osc.DeleteKeypairRequest{
 		KeypairName: id,
+	}
+	_, _, err := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
+		DeleteVmsRequest: optional.NewInterface(deleteKeypairRequest),
 	})
 	return err
 }

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"github.com/antihax/optional"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,7 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/outscale/osc-sdk-go/oapi"
+	"github.com/outscale-dev/osc-sdk-go/osc"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -53,16 +54,16 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
+func (s *Stack) ListImages(bool) ([]resources.Image, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	res, err := s.client.POST_ReadImages(oapi.ReadImagesRequest{})
+	res, _, err := s.client.ImageApi.ReadImages(s.auth, nil)
 	if err != nil {
 		return nil, err
 	}
 	var images []resources.Image
-	for _, omi := range res.OK.Images {
+	for _, omi := range res.Images {
 		images = append(images, resources.Image{
 			Description: omi.Description,
 			ID:          omi.ImageId,
@@ -172,18 +173,18 @@ func (s *Stack) parseTemplateID(id string) (*resources.HostTemplate, error) {
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 // TODO manage performance instance
-func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 	//without GPU
 	cpus := intRange(1, 78, 1)
 	ramPerCore := intRange(1, 16, 1)
-	perfs := []int{1, 2, 3}
+	perfLevels := []int{1, 2, 3}
 	var templates []resources.HostTemplate
 	for _, cpu := range cpus {
 		for _, ramCore := range ramPerCore {
-			for _, perf := range perfs {
+			for _, perf := range perfLevels {
 				ram := cpu * ramCore
 				//Outscale maximum memory size
 				if ram > 1039 {
@@ -210,7 +211,7 @@ func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	for _, gpu := range gpus {
 		for _, cpu := range cpus {
 			for _, ramCore := range ramPerCore {
-				for _, perf := range perfs {
+				for _, perf := range perfLevels {
 					ram := cpu * ramCore
 					//Outscale maximum memory size
 					if ram > 1039 {
@@ -238,7 +239,7 @@ func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	for _, gpu := range gpus {
 		for _, cpu := range cpus {
 			for _, ramCore := range ramPerCore {
-				for _, perf := range perfs {
+				for _, perf := range perfLevels {
 					ram := cpu * ramCore
 					//Outscale maximum memory size
 					if ram > 1039 {
@@ -265,7 +266,7 @@ func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	for _, gpu := range gpus {
 		for _, cpu := range cpus {
 			for _, ramCore := range ramPerCore {
-				for _, perf := range perfs {
+				for _, perf := range perfLevels {
 					ram := cpu * ramCore
 					//Outscale maximum memory size
 					if ram > 1039 {
@@ -293,18 +294,21 @@ func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
-	res, err := s.client.POST_ReadImages(oapi.ReadImagesRequest{
-		Filters: oapi.FiltersImage{
-			ImageIds: []string{id},
-		},
+	res, _, err := s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
+		ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
+			DryRun: false,
+			Filters: osc.FiltersImage{
+				ImageIds: []string{id},
+			},
+		}),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(res.OK.Images) != 1 {
+	if len(res.Images) != 1 {
 		return nil, scerr.InconsistentError("more than one image with the same id")
 	}
-	img := res.OK.Images[0]
+	img := res.Images[0]
 	return &resources.Image{
 		Description: img.Description,
 		ID:          img.ImageId,
@@ -355,7 +359,7 @@ func (s *Stack) getOrCreatePassword(request resources.HostRequest) (string, erro
 }
 
 func (s *Stack) prepareUserData(request resources.HostRequest, ud *userdata.Content) error {
-	err := ud.Prepare(*s.configrationOptions, request, request.Networks[0].CIDR, "")
+	err := ud.Prepare(*s.configurationOptions, request, request.Networks[0].CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		logrus.Debugf(utils.Capitalize(msg))
@@ -364,40 +368,34 @@ func (s *Stack) prepareUserData(request resources.HostRequest, ud *userdata.Cont
 	return nil
 }
 
-func (s *Stack) createNIC(request *resources.HostRequest, net *resources.Network) (*oapi.Nic, error) {
+func (s *Stack) createNIC(request *resources.HostRequest, net *resources.Network) (*osc.Nic, error) {
 
 	group, err := s.getNetworkSecurityGroup(s.Options.Network.VPCID)
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.client.POST_CreateNic(oapi.CreateNicRequest{
+	nicRequest := osc.CreateNicRequest{
 		Description:      request.ResourceName,
 		SubnetId:         net.ID,
 		SecurityGroupIds: []string{group.SecurityGroupId},
+	}
+	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
+		CreateNicRequest: optional.NewInterface(nicRequest),
 	})
 
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
-	}
 	//primary := deviceNumber == 0
-	return &res.OK.Nic, nil
+	return &res.Nic, nil
 }
 
-func (s *Stack) createNICS(request *resources.HostRequest) ([]oapi.Nic, error) {
-	var nics []oapi.Nic
+func (s *Stack) createNICS(request *resources.HostRequest) ([]osc.Nic, error) {
+	var nics []osc.Nic
 	var err error
 	//first network is the default network
-	for _, n := range request.Networks[1:] {
-		nic, err := s.createNIC(request, n)
-		if err != nil {
-			break
-		}
-		nics = append(nics, *nic)
-	}
-	if err != nil {
+	nics, err = s.tryCreateNICS(request, nics)
+	if err != nil { //if error delete created NICS
 		for _, ni := range nics {
 			err := s.deleteNic(&ni)
 			if err != nil {
@@ -405,11 +403,21 @@ func (s *Stack) createNICS(request *resources.HostRequest) ([]oapi.Nic, error) {
 			}
 		}
 	}
-
 	return nics, err
 }
 
-func (s *Stack) deleteNics(nics []oapi.Nic) error {
+func (s *Stack) tryCreateNICS(request *resources.HostRequest, nics []osc.Nic) ([]osc.Nic, error) {
+	for _, n := range request.Networks[1:] {
+		nic, err := s.createNIC(request, n)
+		if err != nil {
+			return nics, err
+		}
+		nics = append(nics, *nic)
+	}
+	return nics, nil
+}
+
+func (s *Stack) deleteNics(nics []osc.Nic) error {
 	for _, nic := range nics {
 		err := s.deleteNic(&nic)
 		if err != nil {
@@ -419,9 +427,12 @@ func (s *Stack) deleteNics(nics []oapi.Nic) error {
 	return nil
 }
 
-func (s *Stack) deleteNic(nic *oapi.Nic) error {
-	_, err := s.client.POST_DeleteNic(oapi.DeleteNicRequest{
+func (s *Stack) deleteNic(nic *osc.Nic) error {
+	request := osc.DeleteNicRequest{
 		NicId: nic.NicId,
+	}
+	_, _, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
+		DeleteNicRequest: optional.NewInterface(request),
 	})
 	return err
 }
@@ -462,12 +473,11 @@ func (s *Stack) hostState(id string) (hoststate.Enum, error) {
 //WaitForHostState wait for host to be in the specifed state
 func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
-		hstate, err := s.hostState(hostID)
-		println("host", hstate.String())
+		hostState, err := s.hostState(hostID)
 		if err != nil {
 			return scerr.AbortedError("", err)
 		}
-		if state != hstate {
+		if state != hostState {
 			return fmt.Errorf("wrong state")
 		}
 		if state == hoststate.ERROR {
@@ -489,17 +499,20 @@ func outscaleTemplateID(id string) (string, error) {
 	return fmt.Sprintf("%s.%s", tokens[0], tokens[1]), nil
 }
 
-func (s *Stack) addNICS(request *resources.HostRequest, vmID string) ([]oapi.Nic, error) {
+func (s *Stack) addNICS(request *resources.HostRequest, vmID string) ([]osc.Nic, error) {
 	if len(request.Networks) > 1 {
 		nics, err := s.createNICS(request)
 		if err != nil {
 			return nil, err
 		}
 		for i, nic := range nics {
-			_, err := s.client.POST_LinkNic(oapi.LinkNicRequest{
+			nicRequest := osc.LinkNicRequest{
 				VmId:         vmID,
 				NicId:        nic.NicId,
-				DeviceNumber: int64(i + 1),
+				DeviceNumber: int32(i + 1),
+			}
+			_, _, err := s.client.NicApi.LinkNic(s.auth, &osc.LinkNicOpts{
+				LinkNicRequest: optional.NewInterface(nicRequest),
 			})
 			if err != nil {
 				logrus.Errorf("Error attaching NIC %s to VM %s: %v", nic.NicId, vmID, err)
@@ -523,7 +536,7 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 		return nil
 	}
 	for gpu := 1; gpu < tpl.GPUNumber; gpu++ {
-		//TODO complet when v1 ready
+		//TODO complete when v1 ready
 	}
 	return nil
 }
@@ -546,53 +559,59 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) error {
 	})
 	if err != nil {
 		err2 := s.DeleteVolume(v.ID)
-		return scerr.Wrap(err, err2.Error())
+		msg := func () string{
+			if err2==nil{
+				return ""
+			}
+			return err2.Error()
+		}
+		return scerr.Wrap(err, msg())
 	}
 	return nil
 }
 
-func (s *Stack) getNICS(vmID string) ([]oapi.Nic, error) {
-	res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-		Filters: oapi.FiltersNic{
+func (s *Stack) getNICS(vmID string) ([]osc.Nic, error) {
+	request := osc.ReadNicsRequest{
+		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{vmID},
 		},
-	})
+	}
+	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{ReadNicsRequest: optional.NewInterface(request)})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
-	}
-	return res.OK.Nics, nil
+	return res.Nics, nil
 }
 
-func (s *Stack) addPublicIP(nic *oapi.Nic) (*oapi.PublicIp, error) {
+func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, error) {
 
-	resIP, err := s.client.POST_CreatePublicIp(oapi.CreatePublicIpRequest{})
+	resIP, _, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
 	if err != nil {
 		return nil, err
 	}
-	if resIP.OK == nil {
-		return nil, scerr.InconsistentError("Provider inconstent response")
-	}
-
-	_, err = s.client.POST_LinkPublicIp(oapi.LinkPublicIpRequest{
+	linkPublicIpRequest := osc.LinkPublicIpRequest{
 		NicId:      nic.NicId,
-		PublicIpId: resIP.OK.PublicIp.PublicIpId,
-	})
+		PublicIpId: resIP.PublicIp.PublicIpId,
+	}
+	_, _, err = s.client.PublicIpApi.LinkPublicIp(s.auth, &osc.LinkPublicIpOpts{
+		LinkPublicIpRequest: optional.NewInterface(linkPublicIpRequest)},
+	)
 	if err != nil {
-		_, err := s.client.POST_DeletePublicIp(oapi.DeletePublicIpRequest{
-			PublicIpId: resIP.OK.PublicIp.PublicIpId,
+		deletePublicIpRequest := osc.DeletePublicIpRequest{
+			PublicIpId: resIP.PublicIp.PublicIpId,
+		}
+		_, _, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
 		})
 		if err != nil {
-			logrus.Warnf("Cannot delete public ip %s: %v", resIP.OK.PublicIp.PublicIpId, err)
+			logrus.Warnf("Cannot delete public ip %s: %v", resIP.PublicIp.PublicIpId, err)
 			return nil, err
 		}
 	}
-	return &resIP.OK.PublicIp, nil
+	return &resIP.PublicIp, nil
 }
 
-func (s *Stack) setHostProperties(host *resources.Host, networks []*resources.Network, vm *oapi.Vm, nics []oapi.Nic) error {
+func (s *Stack) setHostProperties(host *resources.Host, networks []*resources.Network, vm *osc.Vm, nics []osc.Nic) error {
 	// Updates Host Property propsv1.HostDescription
 	err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
 		hpDescriptionV1 := clonable.(*propertiesv1.HostDescription)
@@ -711,7 +730,7 @@ func (s *Stack) initHostProperties(request *resources.HostRequest, host *resourc
 	})
 }
 
-func (s *Stack) deleteHostOnError(err error, vm *oapi.Vm) error {
+func (s *Stack) deleteHostOnError(err error, vm *osc.Vm) error {
 	err2 := s.DeleteHost(vm.VmId)
 	if err2 != nil {
 		return scerr.Wrap(err, err2.Error())
@@ -719,7 +738,7 @@ func (s *Stack) deleteHostOnError(err error, vm *oapi.Vm) error {
 	return err
 }
 
-func (s *Stack) addPublicIPs(primaryNIC *oapi.Nic, otherNICs []oapi.Nic) (*oapi.PublicIp, error) {
+func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, error) {
 	ip, err := s.addPublicIP(primaryNIC)
 	if err != nil {
 		return nil, err
@@ -792,24 +811,25 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	buf := bytes.NewBuffer(userDataPhase1)
 	buf.WriteString(patchSSH)
 
-	resVM, err := s.client.POST_CreateVms(oapi.CreateVmsRequest{
+	vmsRequest := osc.CreateVmsRequest{
 		ImageId:  request.ImageID,
 		UserData: base64.StdEncoding.EncodeToString(buf.Bytes()),
 		VmType:   vmType,
 		SubnetId: subnetID,
-		Placement: oapi.Placement{
+		Placement: osc.Placement{
 			SubregionName: s.Options.Compute.Subregion,
 			Tenancy:       s.Options.Compute.DefaultTenancy,
 		},
 		KeypairName: keyPair.ID,
+	}
+	resVM, _, err := s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
+		CreateVmsRequest: optional.NewInterface(vmsRequest),
 	})
 	if err != nil {
 		return nil, userData, err
 	}
-	if resVM.OK == nil || len(resVM.OK.Vms) != 1 {
-		return nil, userData, scerr.InconsistentError("Inconsistent provider response")
-	}
-	vm := resVM.OK.Vms[0]
+
+	vm := resVM.Vms[0]
 	err = s.WaitForHostState(vm.VmId, hoststate.STARTED)
 	if err != nil {
 		return nil, userData, s.deleteHostOnError(err, &vm)
@@ -866,24 +886,30 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	return host, userData, err
 }
 
-func (s *Stack) getVM(vmID string) (*oapi.Vm, error) {
-	vm, err := s.client.POST_ReadVms(oapi.ReadVmsRequest{
-		Filters: oapi.FiltersVm{
+func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
+	readVmsRequest := osc.ReadVmsRequest{
+		Filters: osc.FiltersVm{
 			VmIds: []string{vmID},
 		},
+	}
+	vm, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
+		ReadVmsRequest: optional.NewInterface(readVmsRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(vm.OK.Vms) == 0 {
+	if len(vm.Vms) == 0 {
 		return nil, nil
 	}
-	return &vm.OK.Vms[0], nil
+	return &vm.Vms[0], nil
 }
 
 func (s *Stack) deleteHost(id string) error {
-	_, err := s.client.POST_DeleteVms(oapi.DeleteVmsRequest{
+	request := osc.DeleteVmsRequest{
 		VmIds: []string{id},
+	}
+	_, _, err := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
+		DeleteVmsRequest: optional.NewInterface(request),
 	})
 	if err != nil {
 		return err
@@ -899,8 +925,11 @@ func (s *Stack) DeleteHost(id string) error {
 	if id == "" {
 		return scerr.InvalidParameterError("id", "must not be empty")
 	}
-	res, err := s.client.POST_ReadPublicIps(oapi.ReadPublicIpsRequest{
-		Filters: oapi.FiltersPublicIp{VmIds: []string{id}},
+	readPublicIpsRequest := osc.ReadPublicIpsRequest{
+		Filters: osc.FiltersPublicIp{VmIds: []string{id}},
+	}
+	res, _, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
+		ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
 	})
 	if err != nil {
 		logrus.Errorf("Unable to read public IPs of vm %s", id)
@@ -909,13 +938,16 @@ func (s *Stack) DeleteHost(id string) error {
 	if err != nil {
 		return err
 	}
-	if res.OK == nil || len(res.OK.PublicIps) == 0 {
+	if len(res.PublicIps) == 0 {
 		return nil
 	}
 	var lastErr error
-	for _, ip := range res.OK.PublicIps {
-		_, err = s.client.POST_DeletePublicIp(oapi.DeletePublicIpRequest{
+	for _, ip := range res.PublicIps {
+		deletePublicIpRequest := osc.DeletePublicIpRequest{
 			PublicIpId: ip.PublicIpId,
+		}
+		_, _, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
 		})
 		if err != nil { //continue to delete even if error
 			lastErr = nil
@@ -991,8 +1023,8 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	}
 	return nil, scerr.NotFoundError(fmt.Sprintf("No host named %s", name))
 	//TODO try in with v1
-	// res, err := s.client.POST_ReadVms(oapi.ReadVmsRequest{
-	// 	Filters: oapi.FiltersVm{
+	// res, err := s.client.POST_ReadVms(osc.ReadVmsRequest{
+	// 	Filters: osc.FiltersVm{
 	// 		SubregionNames: []string{s.Options.Compute.Subregion},
 	// 		Tags:           []string{fmt.Sprintf("name=%s", name)},
 	// 	},
@@ -1040,19 +1072,12 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	res, err := s.client.POST_ReadVms(oapi.ReadVmsRequest{
-		Filters: oapi.FiltersVm{
-			SubregionNames: []string{s.Options.Compute.Subregion},
-		},
-	})
+	res, _, err := s.client.VmApi.ReadVms(s.auth, nil)
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
-	}
 	var hosts []*resources.Host
-	for _, vm := range res.OK.Vms {
+	for _, vm := range res.Vms {
 		if hostState(vm.State) == hoststate.TERMINATED {
 			continue
 		}
@@ -1074,9 +1099,12 @@ func (s *Stack) StopHost(id string) error {
 	if id == "" {
 		return scerr.InvalidParameterError("id", "must not be empty")
 	}
-	_, err := s.client.POST_StopVms(oapi.StopVmsRequest{
+	stopVmsRequest := osc.StopVmsRequest{
 		VmIds:     []string{id},
 		ForceStop: true,
+	}
+	_, _, err := s.client.VmApi.StopVms(s.auth, &osc.StopVmsOpts{
+		StopVmsRequest: optional.NewInterface(stopVmsRequest),
 	})
 	return err
 }
@@ -1089,8 +1117,11 @@ func (s *Stack) StartHost(id string) error {
 	if id == "" {
 		return scerr.InvalidParameterError("id", "must not be empty")
 	}
-	_, err := s.client.POST_StartVms(oapi.StartVmsRequest{
+	startVmsRequest := osc.StartVmsRequest{
 		VmIds: []string{id},
+	}
+	_, _, err := s.client.VmApi.StartVms(s.auth, &osc.StartVmsOpts{
+		StartVmsRequest: optional.NewInterface(startVmsRequest),
 	})
 	return err
 }
@@ -1103,8 +1134,11 @@ func (s *Stack) RebootHost(id string) error {
 	if id == "" {
 		return scerr.InvalidParameterError("id", "must not be empty")
 	}
-	_, err := s.client.POST_RebootVms(oapi.RebootVmsRequest{
+	rebootVmsRequest := osc.RebootVmsRequest{
 		VmIds: []string{id},
+	}
+	_,_, err := s.client.VmApi.RebootVms(s.auth, &osc.RebootVmsOpts{
+		RebootVmsRequest: optional.NewInterface(rebootVmsRequest),
 	})
 	return err
 }
@@ -1133,10 +1167,13 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 	}
 	perf := s.perfFromFreq(request.MinFreq)
 	t := gpuTemplateName(0, request.MaxCores, int(request.MaxRAMSize), perf, 0, "")
-	_, err := s.client.POST_UpdateVm(oapi.UpdateVmRequest{
+	updateVmRequest := osc.UpdateVmRequest{
 		VmId:   id,
 		VmType: t,
 		// VmType: request.,
+	}
+	_,_, err := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
+		UpdateVmRequest: optional.NewInterface(updateVmRequest),
 	})
 	if err != nil {
 		return nil, err

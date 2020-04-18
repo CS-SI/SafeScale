@@ -18,14 +18,15 @@ package outscale
 
 import (
 	"fmt"
+	"github.com/antihax/optional"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/outscale/osc-sdk-go/oapi"
+	"github.com/outscale-dev/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
 )
 
-func (s *Stack) checkDhcpOptionsName(onet *oapi.Net) (bool, error) {
+func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, error) {
 	tags, err := s.getResourceTags(onet.DhcpOptionsSetId)
 	if err != nil {
 		return false, err
@@ -33,40 +34,49 @@ func (s *Stack) checkDhcpOptionsName(onet *oapi.Net) (bool, error) {
 	_, ok := tags["name"]
 	return ok, nil
 }
-func (s *Stack) deleteDhcpOptions(onet *oapi.Net, checkName bool) error {
+func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) error {
 	//Delete DHCP options
-	namedDhcpOptions, err := s.checkDhcpOptionsName(onet)
+	namedDHCPOptions, err := s.checkDHCPOptionsName(onet)
 	//prevent deleting default dhcp options
-	if checkName && !namedDhcpOptions {
+	if checkName && !namedDHCPOptions {
 		return nil
 	}
-	_, err = s.client.POST_DeleteDhcpOptions(oapi.DeleteDhcpOptionsRequest{
+	deleteDhcpOptionsRequest := osc.DeleteDhcpOptionsRequest{
 		DhcpOptionsSetId: onet.DhcpOptionsSetId,
+	}
+	_, _, err = s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &osc.DeleteDhcpOptionsOpts{
+		DeleteDhcpOptionsRequest: optional.NewInterface(deleteDhcpOptionsRequest),
 	})
 	return err
 
 }
 
-func (s *Stack) deleteInternetService(onet *oapi.Net) error {
+func (s *Stack) deleteInternetService(onet *osc.Net) error {
 	//Unlink and delete internet service
-	resIS, err := s.client.POST_ReadInternetServices(oapi.ReadInternetServicesRequest{})
+	resIS, _, err := s.client.InternetServiceApi.ReadInternetServices(s.auth, nil)
 
-	if err == nil && resIS != nil && resIS.OK != nil && len(resIS.OK.InternetServices) > 0 { //internet service found
-		for _, ois := range resIS.OK.InternetServices {
+	if err == nil && len(resIS.InternetServices) > 0 { //internet service found
+		for _, ois := range resIS.InternetServices {
 			tags := unwrapTags(ois.Tags)
 			if _, ok := tags["name"]; ois.NetId != onet.NetId || !ok {
 				continue
 			}
-			_, err := s.client.POST_UnlinkInternetService(oapi.UnlinkInternetServiceRequest{
+			unlinkInternetServiceRequest := osc.UnlinkInternetServiceRequest{
 				InternetServiceId: ois.InternetServiceId,
 				NetId:             onet.NetId,
+			}
+			_, _, err := s.client.InternetServiceApi.UnlinkInternetService(s.auth, &osc.UnlinkInternetServiceOpts{
+				UnlinkInternetServiceRequest: optional.NewInterface(unlinkInternetServiceRequest),
 			})
 			if err != nil {
 				logrus.Errorf("cannot unlink internet service %s from network %s", ois.InternetServiceId, onet.NetId)
 				return err
 			}
-			_, err = s.client.POST_DeleteInternetService(oapi.DeleteInternetServiceRequest{
+			deleteInternetServiceRequest := osc.DeleteInternetServiceRequest{
 				InternetServiceId: ois.InternetServiceId,
+			}
+			_, _, err = s.client.InternetServiceApi.DeleteInternetService(s.auth, &osc.DeleteInternetServiceOpts{
+				DeleteInternetServiceRequest: optional.NewInterface(deleteInternetServiceRequest),
 			})
 			if err != nil {
 				logrus.Errorf("internet service %s linked to network %s cannot be deleted: %v", ois.InternetServiceId, onet.NetId, err)
@@ -81,87 +91,94 @@ func (s *Stack) deleteInternetService(onet *oapi.Net) error {
 	return nil
 }
 
-func (s *Stack) getDefaultRouteTable(onet *oapi.Net) (*oapi.RouteTable, error) {
-	res, err := s.client.POST_ReadRouteTables(oapi.ReadRouteTablesRequest{
-		Filters: oapi.FiltersRouteTable{
+func (s *Stack) getDefaultRouteTable(onet *osc.Net) (*osc.RouteTable, error) {
+	readRouteTablesRequest := osc.ReadRouteTablesRequest{
+		Filters: osc.FiltersRouteTable{
 			NetIds: []string{onet.NetId},
 		},
+	}
+	res, _, err := s.client.RouteTableApi.ReadRouteTables(s.auth, &osc.ReadRouteTablesOpts{
+		ReadRouteTablesRequest: optional.NewInterface(readRouteTablesRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil || len(res.OK.RouteTables) != 1 {
+	if len(res.RouteTables) != 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
-	return &res.OK.RouteTables[0], nil
+	return &res.RouteTables[0], nil
 }
 
-func (s *Stack) updateRouteTable(onet *oapi.Net, is *oapi.InternetService) error {
+func (s *Stack) updateRouteTable(onet *osc.Net, is *osc.InternetService) error {
 	table, err := s.getDefaultRouteTable(onet)
 	if err != nil {
 		return err
 	}
-	_, err = s.client.POST_CreateRoute(oapi.CreateRouteRequest{
+	createRouteRequest := osc.CreateRouteRequest{
 		DestinationIpRange: "0.0.0.0/0",
 		GatewayId:          is.InternetServiceId,
 		RouteTableId:       table.RouteTableId,
+	}
+	_, _, err = s.client.RouteApi.CreateRoute(s.auth, &osc.CreateRouteOpts{
+		CreateRouteRequest: optional.NewInterface(createRouteRequest),
 	})
 
 	return err
 }
 
-func (s *Stack) createInternetService(req resources.NetworkRequest, onet *oapi.Net) error {
+func (s *Stack) createInternetService(req resources.NetworkRequest, onet *osc.Net) error {
 	//Create internet service to allow internet access from VMs attached to the network
-	isResp, err := s.client.POST_CreateInternetService(oapi.CreateInternetServiceRequest{})
+	isResp, _, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
 	if err != nil {
 		return err
 	}
-	if isResp == nil || isResp.OK == nil {
-		return scerr.InconsistentError("invalid provider response")
-	}
-	err = s.setResourceTags(isResp.OK.InternetService.InternetServiceId, map[string]string{
+
+	err = s.setResourceTags(isResp.InternetService.InternetServiceId, map[string]string{
 		"name": req.Name,
 	})
 	if err != nil {
 		return err
 	}
-	_, err = s.client.POST_LinkInternetService(oapi.LinkInternetServiceRequest{
-		InternetServiceId: isResp.OK.InternetService.InternetServiceId,
+	linkInternetServiceRequest := osc.LinkInternetServiceRequest{
+		InternetServiceId: isResp.InternetService.InternetServiceId,
 		NetId:             onet.NetId,
+	}
+	_, _, err = s.client.InternetServiceApi.LinkInternetService(s.auth, &osc.LinkInternetServiceOpts{
+		LinkInternetServiceRequest: optional.NewInterface(linkInternetServiceRequest),
 	})
 	if err != nil {
 		return err
 	}
-	return s.updateRouteTable(onet, &isResp.OK.InternetService)
+	return s.updateRouteTable(onet, &isResp.InternetService)
 }
 
 //open all ports, ingress is controlled by the vm firewall
-func (s *Stack) createTCPPermissions() []oapi.SecurityGroupRule {
-	rule := oapi.SecurityGroupRule{
+func (s *Stack) createTCPPermissions() []osc.SecurityGroupRule {
+	rule := osc.SecurityGroupRule{
 		FromPortRange: 1,
 		ToPortRange:   65535,
 		IpRanges:      []string{"0.0.0.0/0"},
 		IpProtocol:    "tcp",
 	}
-	return []oapi.SecurityGroupRule{rule}
+	return []osc.SecurityGroupRule{rule}
 }
 
 //open all ports, ingress is controlled by the vm firewall
-func (s *Stack) createUDPPermissions() []oapi.SecurityGroupRule {
-	rule := oapi.SecurityGroupRule{
+func (s *Stack) createUDPPermissions() []osc.SecurityGroupRule {
+	rule := osc.SecurityGroupRule{
 		FromPortRange: 1,
 		ToPortRange:   65535,
 		IpRanges:      []string{"0.0.0.0/0"},
 		IpProtocol:    "udp",
 	}
-	return []oapi.SecurityGroupRule{rule}
+	return []osc.SecurityGroupRule{rule}
 }
 
 //ingress is controlled by the vm firewall
-func (s *Stack) createICMPPermissions() []oapi.SecurityGroupRule {
-	var rules []oapi.SecurityGroupRule
+func (s *Stack) createICMPPermissions() []osc.SecurityGroupRule {
+	var rules []osc.SecurityGroupRule
 	//Echo reply
-	rules = append(rules, oapi.SecurityGroupRule{
+	rules = append(rules, osc.SecurityGroupRule{
 		FromPortRange: -1,
 		ToPortRange:   -1,
 		IpRanges:      []string{"0.0.0.0/0"},
@@ -170,59 +187,68 @@ func (s *Stack) createICMPPermissions() []oapi.SecurityGroupRule {
 	return rules
 }
 
-func (s *Stack) removeDefaultSecurityRules(sg *oapi.SecurityGroup) error {
-	_, err := s.client.POST_DeleteSecurityGroupRule(oapi.DeleteSecurityGroupRuleRequest{
+func (s *Stack) removeDefaultSecurityRules(sg *osc.SecurityGroup) error {
+	deleteSecurityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
 		SecurityGroupId: sg.SecurityGroupId,
 		Rules:           sg.InboundRules,
 		Flow:            "Inbound",
+	}
+	_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
+		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
 	})
 	if err != nil {
 		return err
 	}
-	_, err = s.client.POST_DeleteSecurityGroupRule(oapi.DeleteSecurityGroupRuleRequest{
+	securityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
 		SecurityGroupId: sg.SecurityGroupId,
 		Rules:           sg.OutboundRules,
 		Flow:            "Outbound",
+	}
+	_, _, err = s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
+		DeleteSecurityGroupRuleRequest: optional.NewInterface(securityGroupRuleRequest),
 	})
 	return err
 }
 
-func (s *Stack) updateDefaultSecurityRules(sg *oapi.SecurityGroup) error {
+func (s *Stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) error {
 	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
 	rules = append(rules, s.createICMPPermissions()...)
-	_, err := s.client.POST_CreateSecurityGroupRule(oapi.CreateSecurityGroupRuleRequest{
+	createSecurityGroupRuleRequest := osc.CreateSecurityGroupRuleRequest{
 		SecurityGroupId: sg.SecurityGroupId,
 		Rules:           rules,
 		Flow:            "Inbound",
+	}
+	_, _, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
+		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
 	})
 	if err != nil {
 		return err
 	}
-	_, err = s.client.POST_CreateSecurityGroupRule(oapi.CreateSecurityGroupRuleRequest{
+	createSecurityGroupRuleRequest = osc.CreateSecurityGroupRuleRequest{
 		SecurityGroupId: sg.SecurityGroupId,
 		Rules:           rules,
 		Flow:            "Outbound",
+	}
+	_, _, err = s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
+		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
 	})
 	return err
 }
 
-func (s *Stack) getNetworkSecurityGroup(netID string) (*oapi.SecurityGroup, error) {
-	res, err := s.client.POST_ReadSecurityGroups(oapi.ReadSecurityGroupsRequest{
-		Filters: oapi.FiltersSecurityGroup{
-			NetIds:             []string{netID},
+func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, error) {
+	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
+		Filters: osc.FiltersSecurityGroup{
 			SecurityGroupNames: []string{"default"},
 		},
+	}
+	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
+		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if res == nil || res.OK == nil {
-		return nil, scerr.InconsistentError("invalid provider response")
-	}
-	// POST_ReadSecurityGroups should return only one security group
-	// but NetIds filter is not yet implemented
-	for _, sg := range res.OK.SecurityGroups {
+	for _, sg := range res.SecurityGroups {
 		if sg.NetId == netID {
 			return &sg, nil
 		}
@@ -232,7 +258,7 @@ func (s *Stack) getNetworkSecurityGroup(netID string) (*oapi.SecurityGroup, erro
 
 }
 
-func (s *Stack) deleteNetworkOnError(err error, onet *oapi.Net) error {
+func (s *Stack) deleteNetworkOnError(err error, onet *osc.Net) error {
 
 	err2 := s.DeleteNetwork(onet.NetId)
 	if err2 != nil {
@@ -241,19 +267,19 @@ func (s *Stack) deleteNetworkOnError(err error, onet *oapi.Net) error {
 	return err
 }
 
-func (s *Stack) createVpc(name, cidr string) (*oapi.Net, error) {
+func (s *Stack) createVpc(name, cidr string) (*osc.Net, error) {
 
-	respNet, err := s.client.POST_CreateNet(oapi.CreateNetRequest{
+	createNetRequest := osc.CreateNetRequest{
 		IpRange: cidr,
 		Tenancy: s.Options.Compute.DefaultTenancy,
+	}
+	respNet, _, err := s.client.NetApi.CreateNet(s.auth, &osc.CreateNetOpts{
+		CreateNetRequest: optional.NewInterface(createNetRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if respNet == nil || respNet.OK == nil {
-		return nil, scerr.InconsistentError("invalid provider response")
-	}
-	onet := respNet.OK.Net
+	onet := respNet.Net
 
 	err = s.setResourceTags(onet.NetId, map[string]string{
 		"name": name,
@@ -264,19 +290,19 @@ func (s *Stack) createVpc(name, cidr string) (*oapi.Net, error) {
 
 	req := resources.NetworkRequest{
 		CIDR:       cidr,
-		DNSServers: s.configrationOptions.DNSList,
+		DNSServers: s.configurationOptions.DNSList,
 		Name:       name,
 	}
-	//update defaut security group to allow external trafic
-	secgroup, err := s.getNetworkSecurityGroup(onet.NetId)
+	//update default security group to allow external traffic
+	securityGroup, err := s.getNetworkSecurityGroup(onet.NetId)
 	if err != nil {
 		return nil, s.deleteNetworkOnError(err, &onet)
 	}
-	if secgroup == nil {
+	if securityGroup == nil {
 		return nil, s.deleteNetworkOnError(scerr.InconsistentError("no default security group"), &onet)
 	}
 
-	err = s.updateDefaultSecurityRules(secgroup)
+	err = s.updateDefaultSecurityRules(securityGroup)
 	if err != nil {
 		return nil, s.deleteNetworkOnError(err, &onet)
 	}
@@ -294,61 +320,70 @@ func (s *Stack) createVpc(name, cidr string) (*oapi.Net, error) {
 	return &onet, nil
 }
 
-func (s *Stack) getVpc(id string) (*oapi.Net, error) {
+func (s *Stack) getVpc(id string) (*osc.Net, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	resNet, err := s.client.POST_ReadNets(oapi.ReadNetsRequest{
-		Filters: oapi.FiltersNet{
+	readNetsRequest := osc.ReadNetsRequest{
+		Filters: osc.FiltersNet{
 			NetIds: []string{id},
 		},
+	}
+	resNet, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+		ReadNetsRequest: optional.NewInterface(readNetsRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if resNet == nil || resNet.OK == nil || len(resNet.OK.Nets) == 0 {
+	if len(resNet.Nets) == 0 {
 		return nil, nil
 	}
-	return &resNet.OK.Nets[0], nil
+	return &resNet.Nets[0], nil
 }
 
 // GetNetworkByName returns the network identified by name)
-func (s *Stack) getVpcByName(name string) (*oapi.Net, error) {
+func (s *Stack) getVpcByName(name string) (*osc.Net, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	res, err := s.client.POST_ReadNets(oapi.ReadNetsRequest{
-		Filters: oapi.FiltersNet{
+	readNetsRequest := osc.ReadNetsRequest{
+		Filters: osc.FiltersNet{
 			Tags: []string{fmt.Sprintf("%s=%s", "name", name)},
 		},
+	}
+	res, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+		ReadNetsRequest: optional.NewInterface(readNetsRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || len(res.OK.Nets) == 0 {
+	if len(res.Nets) == 0 {
 		return nil, nil
 	}
-	return &res.OK.Nets[0], nil
+	return &res.Nets[0], nil
 
 }
 
-func (s *Stack) getDefaultDhcpNptpServers(net *oapi.Net) ([]string, error) {
-	res, err := s.client.POST_ReadDhcpOptions(oapi.ReadDhcpOptionsRequest{
-		Filters: oapi.FiltersDhcpOptions{
+func (s *Stack) getDefaultDhcpNptpServers(net *osc.Net) ([]string, error) {
+	readDhcpOptionsRequest := osc.ReadDhcpOptionsRequest{
+		Filters: osc.FiltersDhcpOptions{
 			DhcpOptionsSetIds: []string{net.DhcpOptionsSetId},
 		},
+	}
+	res, _, err := s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &osc.ReadDhcpOptionsOpts{
+		ReadDhcpOptionsRequest: optional.NewInterface(readDhcpOptionsRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil || len(res.OK.DhcpOptionsSets) != 1 {
+	if len(res.DhcpOptionsSets) != 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
-	return res.OK.DhcpOptionsSets[0].NtpServers, err
+	return res.DhcpOptionsSets[0].NtpServers, err
 }
 
-func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *oapi.Net) error {
+func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) error {
 	if len(req.DNSServers) == 0 {
 		return nil
 	}
@@ -356,19 +391,18 @@ func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *oapi.Net)
 	if err != nil {
 		return err
 	}
-	dhcpOptions, err := s.client.POST_CreateDhcpOptions(oapi.CreateDhcpOptionsRequest{
+	createDhcpOptionsRequest := osc.CreateDhcpOptionsRequest{
 		NtpServers:        ntpServers,
 		DomainNameServers: req.DNSServers,
+	}
+	dhcpOptions, _, err := s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &osc.CreateDhcpOptionsOpts{
+		CreateDhcpOptionsRequest: optional.NewInterface(createDhcpOptionsRequest),
 	})
 	if err != nil {
 		return err
 	}
-	if dhcpOptions == nil || dhcpOptions.OK == nil {
-		err2 := s.deleteDhcpOptions(net, false)
-		return scerr.Wrap(err, err2.Error())
-	}
 
-	dhcpOptionID := dhcpOptions.OK.DhcpOptionsSet.DhcpOptionsSetId
+	dhcpOptionID := dhcpOptions.DhcpOptionsSet.DhcpOptionsSetId
 	err = s.setResourceTags(dhcpOptionID, map[string]string{
 		"name": req.Name,
 	})
@@ -376,8 +410,11 @@ func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *oapi.Net)
 		err2 := s.deleteDhcpOptions(net, false)
 		return scerr.Wrap(err, err2.Error())
 	}
-	_, err = s.client.POST_UpdateNet(oapi.UpdateNetRequest{
+	updateNetRequest := osc.UpdateNetRequest{
 		DhcpOptionsSetId: dhcpOptionID,
+	}
+	_, _, err = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+		ReadNetsRequest: optional.NewInterface(updateNetRequest),
 	})
 	return err
 }

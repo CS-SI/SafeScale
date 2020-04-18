@@ -117,7 +117,7 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 			VPCID:   get(network, "VPCID"),
 			VPCName: get(network, "VPCName", "safecale-net"),
 		},
-		Objectstorage: outscale.StorageConfiguration{
+		ObjectStorage: outscale.StorageConfiguration{
 			AccessKey: get(objectstorage, "AccessKey", get(identity, "AccessKey")),
 			SecretKey: get(objectstorage, "SecretKey", get(identity, "SecretKey")),
 			Endpoint:  get(objectstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region"))),
@@ -128,8 +128,8 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 			SecretKey: get(metadata, "SecretKey", get(objectstorage, "SecretKey", get(identity, "SecretKey"))),
 			Endpoint:  get(metadata, "Endpoint", get(objectstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region")))),
 			Type:      get(metadata, "Type", get(objectstorage, "Type", "s3")),
-			Bucket:    get(metadata, "Bucket", "safecale"),
-			CryptKey:  get(metadata, "CryptKey", "safecale"),
+			Bucket:    get(metadata, "Bucket", "safescale"),
+			CryptKey:  get(metadata, "CryptKey", "safescale"),
 		},
 	}
 
