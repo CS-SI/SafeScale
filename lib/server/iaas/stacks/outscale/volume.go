@@ -2,6 +2,7 @@ package outscale
 
 import (
 	"fmt"
+	"github.com/antihax/optional"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
@@ -9,10 +10,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/outscale/osc-sdk-go/oapi"
+	"github.com/outscale-dev/osc-sdk-go/osc"
 )
 
-func (s *Stack) deleteVolumeOnError(err error, v *oapi.Volume) error {
+func (s *Stack) deleteVolumeOnError(err error, v *osc.Volume) error {
 	err2 := s.DeleteVolume(v.VolumeId)
 	if err2 != nil {
 		return scerr.Wrap(err, err2.Error())
@@ -32,28 +33,28 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	if v != nil {
 		return nil, resources.ResourceDuplicateError("volume", request.Name)
 	}
-	iops := 0
+	IOPS := 0
 	if request.Speed == volumespeed.SSD {
-		iops = request.Size * 300
-		if iops > 13000 {
-			iops = 13000
+		IOPS = request.Size * 300
+		if IOPS > 13000 {
+			IOPS = 13000
 		}
 	}
-	res, err := s.client.POST_CreateVolume(oapi.CreateVolumeRequest{
-		Size:          int64(request.Size),
+	createVolumeRequest := osc.CreateVolumeRequest{
+		Size:          int32(request.Size),
 		VolumeType:    s.volumeType(request.Speed),
 		SubregionName: s.Options.Compute.Subregion,
-		Iops:          int64(iops),
+		Iops:          int32(IOPS),
+	}
+	res, _, err := s.client.VolumeApi.CreateVolume(s.auth, &osc.CreateVolumeOpts{
+		CreateVolumeRequest: optional.NewInterface(createVolumeRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil {
-		return nil, scerr.InconsistentError("Invalid provider response")
-	}
 
-	ov := res.OK.Volume
-	err = s.setResourceTags(res.OK.Volume.VolumeId, map[string]string{
+	ov := res.Volume
+	err = s.setResourceTags(res.Volume.VolumeId, map[string]string{
 		"name": request.Name,
 	})
 	if err != nil {
@@ -73,14 +74,14 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 }
 
 func (s *Stack) volumeSpeed(t string) volumespeed.Enum {
-	if s, ok := s.configrationOptions.VolumeSpeeds[t]; ok {
+	if s, ok := s.configurationOptions.VolumeSpeeds[t]; ok {
 		return s
 	}
 	return volumespeed.HDD
 }
 
 func (s *Stack) volumeType(speed volumespeed.Enum) string {
-	for t, s := range s.configrationOptions.VolumeSpeeds {
+	for t, s := range s.configurationOptions.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
@@ -132,22 +133,25 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	if id == "" {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
-	res, err := s.client.POST_ReadVolumes(oapi.ReadVolumesRequest{
-		Filters: oapi.FiltersVolume{
+	readVolumesRequest := osc.ReadVolumesRequest{
+		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
 		},
+	}
+	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil || len(res.OK.Volumes) > 1 {
+	if len(res.Volumes) > 1 {
 		return nil, scerr.InconsistentError("Invalid provider response")
 	}
-	if len(res.OK.Volumes) == 0 {
+	if len(res.Volumes) == 0 {
 		return nil, nil
 	}
 
-	ov := res.OK.Volumes[0]
+	ov := res.Volumes[0]
 	volume := resources.NewVolume()
 	volume.ID = ov.VolumeId
 	volume.Speed = s.volumeSpeed(ov.VolumeType)
@@ -166,25 +170,26 @@ func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 	subregion := s.Options.Compute.Subregion
-	res, err := s.client.POST_ReadVolumes(oapi.ReadVolumesRequest{
-		Filters: oapi.FiltersVolume{
+	readVolumesRequest := osc.ReadVolumesRequest{
+		Filters: osc.FiltersVolume{
 			Tags:           []string{fmt.Sprintf("name=%s", name)},
 			SubregionNames: []string{subregion},
 		},
+	}
+	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil || len(res.OK.Volumes) == 0 {
+	if len(res.Volumes) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No volume named %s", name))
 	}
-	if res == nil || res.OK == nil {
-		return nil, scerr.InconsistentError("Invalid provider response")
-	}
-	if len(res.OK.Volumes) > 1 {
+
+	if len(res.Volumes) > 1 {
 		return nil, scerr.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
 	}
-	ov := res.OK.Volumes[0]
+	ov := res.Volumes[0]
 	volume := resources.NewVolume()
 	volume.ID = ov.VolumeId
 	volume.Speed = s.volumeSpeed(ov.VolumeType)
@@ -200,19 +205,20 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	subregion := s.Options.Compute.Subregion
-	res, err := s.client.POST_ReadVolumes(oapi.ReadVolumesRequest{
-		Filters: oapi.FiltersVolume{
+	readVolumesRequest := osc.ReadVolumesRequest{
+		Filters: osc.FiltersVolume{
 			SubregionNames: []string{subregion},
 		},
+	}
+	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil {
-		return nil, scerr.InconsistentError("Invalid provider response")
-	}
+
 	var volumes []resources.Volume
-	for _, ov := range res.OK.Volumes {
+	for _, ov := range res.Volumes {
 		volume := resources.NewVolume()
 		volume.ID = ov.VolumeId
 		volume.Speed = s.volumeSpeed(ov.VolumeType)
@@ -232,8 +238,11 @@ func (s *Stack) DeleteVolume(id string) error {
 	if id == "" {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
-	_, err := s.client.POST_DeleteVolume(oapi.DeleteVolumeRequest{
+	deleteVolumeRequest := osc.DeleteVolumeRequest{
 		VolumeId: id,
+	}
+	_, _, err := s.client.VolumeApi.DeleteVolume(s.auth, &osc.DeleteVolumeOpts{
+		DeleteVolumeRequest: optional.NewInterface(deleteVolumeRequest),
 	})
 	return err
 }
@@ -276,10 +285,13 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		return "", scerr.InvalidParameterError("VolumeID", "cannot be empty string")
 	}
 
-	_, err := s.client.POST_LinkVolume(oapi.LinkVolumeRequest{
+	linkVolumeRequest := osc.LinkVolumeRequest{
 		DeviceName: s.getFirstFreeDeviceName(request.HostID),
 		VmId:       request.HostID,
 		VolumeId:   request.VolumeID,
+	}
+	_, _, err := s.client.VolumeApi.LinkVolume(s.auth, &osc.LinkVolumeOpts{
+		LinkVolumeRequest: optional.NewInterface(linkVolumeRequest),
 	})
 	if err != nil {
 		return "", err
@@ -298,22 +310,25 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 	if id == "" {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
-	res, err := s.client.POST_ReadVolumes(oapi.ReadVolumesRequest{
-		Filters: oapi.FiltersVolume{
+	readVolumesRequest := osc.ReadVolumesRequest{
+		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
 		},
+	}
+	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil || len(res.OK.Volumes) > 1 {
+	if len(res.Volumes) > 1 {
 		return nil, scerr.InconsistentError("Invalid provider response")
 	}
-	if len(res.OK.Volumes) == 0 {
+	if len(res.Volumes) == 0 {
 		return nil, nil
 	}
 
-	ov := res.OK.Volumes[0]
+	ov := res.Volumes[0]
 	for _, lv := range ov.LinkedVolumes {
 		if lv.VmId == serverID {
 			return &resources.VolumeAttachment{
@@ -364,8 +379,11 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	if id == "" {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
-	_, err := s.client.POST_UnlinkVolume(oapi.UnlinkVolumeRequest{
+	unlinkVolumeRequest := osc.UnlinkVolumeRequest{
 		VolumeId: id,
+	}
+	_, _, err := s.client.VolumeApi.UnlinkVolume(s.auth, &osc.UnlinkVolumeOpts{
+		UnlinkVolumeRequest: optional.NewInterface(unlinkVolumeRequest),
 	})
 	if err != nil {
 		return err
@@ -373,15 +391,15 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	return s.WaitForVolumeState(id, volumestate.AVAILABLE)
 }
 
-func toVolumeSpeed(s string) volumespeed.Enum {
-	if s == "COLD" {
-		return volumespeed.COLD
-	}
-	if s == "HDD" {
-		return volumespeed.HDD
-	}
-	if s == "SSD" {
-		return volumespeed.SSD
-	}
-	return volumespeed.HDD
-}
+//func toVolumeSpeed(s string) volumespeed.Enum {
+//	if s == "COLD" {
+//		return volumespeed.COLD
+//	}
+//	if s == "HDD" {
+//		return volumespeed.HDD
+//	}
+//	if s == "SSD" {
+//		return volumespeed.SSD
+//	}
+//	return volumespeed.HDD
+//}

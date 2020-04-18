@@ -18,11 +18,12 @@ package outscale
 
 import (
 	"fmt"
+	"github.com/antihax/optional"
 	"sort"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/outscale/osc-sdk-go/oapi"
+	"github.com/outscale-dev/osc-sdk-go/osc"
 )
 
 // CreateVIP ...
@@ -36,21 +37,24 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.client.POST_CreateNic(oapi.CreateNicRequest{
+	createNicRequest := osc.CreateNicRequest{
 		Description:      name,
 		SubnetId:         subnetID,
 		SecurityGroupIds: []string{group.SecurityGroupId},
+	}
+	res,_, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
+		CreateNicRequest: optional.NewInterface(createNicRequest),
 	})
 
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil || len(res.OK.Nic.PrivateIps) < 1 {
+	if len(res.Nic.PrivateIps) < 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
-	nic := res.OK.Nic
+	nic := res.Nic
 	//ip, err := s.addPublicIP(&nic)
-	if res == nil || res.OK == nil || len(res.OK.Nic.PrivateIps) < 1 {
+	if len(res.Nic.PrivateIps) < 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
 
@@ -80,20 +84,23 @@ func (s *Stack) AddPublicIPToVIP(*resources.VirtualIP) error {
 }
 
 func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
-	res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-		Filters: oapi.FiltersNic{
+	readNicsRequest := osc.ReadNicsRequest{
+		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{hostID},
 		},
+	}
+	res,_, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
+		ReadNicsRequest: optional.NewInterface(readNicsRequest),
 	})
 	if err != nil {
 		return 0, err
 	}
 	//No nics linked to the VM
-	if res == nil || res.OK == nil || len(res.OK.Nics) == 0 {
-		return 1, err
+	if len(res.Nics) == 0 {
+		return -1, err
 	}
 	var numbers sort.IntSlice
-	for _, nic := range res.OK.Nics {
+	for _, nic := range res.Nics {
 		numbers = append(numbers, int(nic.LinkNic.DeviceNumber))
 	}
 	sort.Sort(numbers)
@@ -120,8 +127,8 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	// if err != nil {
 	// 	return err
 	// }
-	// res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-	// 	Filters: oapi.FiltersNic{
+	// res, err := s.client.POST_ReadNics(osc.ReadNicsRequest{
+	// 	Filters: osc.FiltersNic{
 	// 		NicIds: []string{vip.ID},
 	// 	},
 	// })
@@ -134,7 +141,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	// if res.OK == nil || len(res.OK.Nics) == 0 {
 	// 	return scerr.InvalidParameterError("vip", "VIP does not exixt")
 	// }
-	// _, err = s.client.POST_LinkNic(oapi.LinkNicRequest{
+	// _, err = s.client.POST_LinkNic(osc.LinkNicRequest{
 	// 	NicId:        res.OK.Nics[0].NicId,
 	// 	VmId:         hostID,
 	// 	DeviceNumber: deviceNumber,
@@ -158,8 +165,8 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 	if hostID == "" {
 		return scerr.InvalidParameterError("host", "cannot be empty string")
 	}
-	// res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-	// 	Filters: oapi.FiltersNic{
+	// res, err := s.client.POST_ReadNics(osc.ReadNicsRequest{
+	// 	Filters: osc.FiltersNic{
 	// 		NicIds: []string{vip.ID},
 	// 	},
 	// })
@@ -173,7 +180,7 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 	// 	return scerr.InvalidParameterError("vip", "VIP does not exixt")
 	// }
 	// nic := res.OK.Nics[0]
-	// _, err = s.client.POST_UnlinkNic(oapi.UnlinkNicRequest{
+	// _, err = s.client.POST_UnlinkNic(osc.UnlinkNicRequest{
 	// 	LinkNicId: nic.LinkNic.LinkNicId,
 	// })
 	// return err
@@ -189,14 +196,20 @@ func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 		return scerr.InvalidParameterError("vip", "cannot be nil")
 	}
 
-	_, err := s.client.POST_DeleteNic(oapi.DeleteNicRequest{
+	deleteNicRequest := osc.DeleteNicRequest{
 		NicId: vip.ID,
+	}
+	_,_, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
+		DeleteNicRequest: optional.NewInterface(deleteNicRequest),
 	})
 	if err != nil {
 		return err
 	}
-	_, err = s.client.POST_DeletePublicIp(oapi.DeletePublicIpRequest{
+	deletePublicIpRequest := osc.DeletePublicIpRequest{
 		PublicIp: vip.PublicIP,
+	}
+	_,_, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+		DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
 	})
 
 	return err

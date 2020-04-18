@@ -18,20 +18,24 @@ package outscale
 
 import (
 	"fmt"
+	"github.com/antihax/optional"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/outscale/osc-sdk-go/oapi"
+	"github.com/outscale-dev/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
 )
 
-func (s *Stack) deleteSubnetOnError(err error, subnet *oapi.Subnet) error {
+func (s *Stack) deleteSubnetOnError(err error, subnet *osc.Subnet) error {
 	if err == nil {
 		return nil
 	}
-	_, err2 := s.client.POST_DeleteSubnet(oapi.DeleteSubnetRequest{
+	deleteSubnetRequest := osc.DeleteSubnetRequest{
 		SubnetId: subnet.SubnetId,
+	}
+	_, _, err2 := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
+		CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
 	})
 	if err2 != nil {
 		return scerr.Wrap(err, err2.Error())
@@ -39,35 +43,39 @@ func (s *Stack) deleteSubnetOnError(err error, subnet *oapi.Subnet) error {
 	return err
 }
 
-func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (*oapi.Subnet, error) {
+func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (*osc.Subnet, error) {
 	//Create a subnet with the same CIDR than the network
-	resSubnet, err := s.client.POST_CreateSubnet(oapi.CreateSubnetRequest{
+	createSubnetRequest := osc.CreateSubnetRequest{
 		IpRange:       req.CIDR,
 		NetId:         vpcID,
 		SubregionName: s.Options.Compute.Subregion,
+	}
+	resSubnet, _, err := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
+		CreateSubnetRequest: optional.NewInterface(createSubnetRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if resSubnet == nil || resSubnet.OK == nil {
-		return nil, s.deleteSubnetOnError(scerr.InconsistentError("invalid provider response"), &resSubnet.OK.Subnet)
-	}
-	err = s.setResourceTags(resSubnet.OK.Subnet.SubnetId, map[string]string{
+
+	err = s.setResourceTags(resSubnet.Subnet.SubnetId, map[string]string{
 		"name": req.Name,
 	})
 
 	if err != nil {
-		return nil, s.deleteSubnetOnError(err, &resSubnet.OK.Subnet)
+		return nil, s.deleteSubnetOnError(err, &resSubnet.Subnet)
 	}
 	//Prevent automatic assignment of public ip to VM created in the subnet
-	_, err = s.updateSubnet(UpdateSubnetRequest{
+	updateSubnetRequest := osc.UpdateSubnetRequest{
 		MapPublicIpOnLaunch: false,
-		SubnetId:            resSubnet.OK.Subnet.SubnetId,
+		SubnetId:            resSubnet.Subnet.SubnetId,
+	}
+	_, _, err = s.client.SubnetApi.UpdateSubnet(s.auth, &osc.UpdateSubnetOpts{
+		UpdateSubnetRequest: optional.NewInterface(updateSubnetRequest),
 	})
 	if err != nil {
-		return nil, s.deleteSubnetOnError(err, &resSubnet.OK.Subnet)
+		return nil, s.deleteSubnetOnError(err, &resSubnet.Subnet)
 	}
-	return &resSubnet.OK.Subnet, nil
+	return &resSubnet.Subnet, nil
 }
 
 // CreateNetwork creates a network named name
@@ -102,26 +110,29 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	return net, nil
 }
 
-func (s *Stack) getSubnet(id string) (*oapi.Subnet, error) {
-	res, err := s.client.POST_ReadSubnets(oapi.ReadSubnetsRequest{
-		Filters: oapi.FiltersSubnet{
+func (s *Stack) getSubnet(id string) (*osc.Subnet, error) {
+	readSubnetsRequest := osc.ReadSubnetsRequest{
+		Filters: osc.FiltersSubnet{
 			SubnetIds: []string{id},
 		},
+	}
+	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
+		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res.OK == nil || len(res.OK.Subnets) > 1 {
+	if len(res.Subnets) > 1 {
 		return nil, scerr.InconsistentError("Inconstent provider response")
 	}
-	if len(res.OK.Subnets) == 0 {
+	if len(res.Subnets) == 0 {
 		return nil, nil
 	}
-	return &res.OK.Subnets[0], nil
+	return &res.Subnets[0], nil
 
 }
 
-func toNetwork(subnet *oapi.Subnet) *resources.Network {
+func toNetwork(subnet *osc.Subnet) *resources.Network {
 	net := resources.NewNetwork()
 	net.ID = subnet.SubnetId
 	net.CIDR = subnet.IpRange
@@ -155,24 +166,25 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	res, err := s.client.POST_ReadSubnets(
-		oapi.ReadSubnetsRequest{
-			Filters: oapi.FiltersSubnet{
-				NetIds: []string{s.Options.Network.VPCID},
-			},
+	readSubnetsRequest := osc.ReadSubnetsRequest{
+		Filters: osc.FiltersSubnet{
+			NetIds: []string{s.Options.Network.VPCID},
 		},
-	)
+	}
+	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
+		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
+	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || len(res.OK.Subnets) == 0 {
+	if len(res.Subnets) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No network named %s", name))
 	}
-	if len(res.OK.Subnets) > 1 {
+	if len(res.Subnets) > 1 {
 		return nil, scerr.InconsistentError(fmt.Sprintf("Two network with the same name %s", name))
 	}
 
-	return toNetwork(&res.OK.Subnets[0]), nil
+	return toNetwork(&res.Subnets[0]), nil
 }
 
 // ListNetworks lists all networks
@@ -180,19 +192,19 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	res, err := s.client.POST_ReadSubnets(oapi.ReadSubnetsRequest{
-		Filters: oapi.FiltersSubnet{
+	readSubnetsRequest := osc.ReadSubnetsRequest{
+		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
 		},
+	}
+	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
+		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.OK == nil {
-		return nil, nil
-	}
 	var nets []*resources.Network
-	for _, onet := range res.OK.Subnets {
+	for _, onet := range res.Subnets {
 		nets = append(nets, toNetwork(&onet))
 	}
 
@@ -200,50 +212,58 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 }
 
 // ListNetworks lists all networks
-func (s *Stack) listNetworksByHost(hostID string) ([]*resources.Network, []oapi.Nic, error) {
+func (s *Stack) listNetworksByHost(hostID string) ([]*resources.Network, []osc.Nic, error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
-	res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-		Filters: oapi.FiltersNic{
+	readNicsRequest := osc.ReadNicsRequest{
+		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{hostID},
 		},
+	}
+	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
+		ReadNicsRequest: optional.NewInterface(readNicsRequest),
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	if res == nil || res.OK == nil {
-		return nil, nil, scerr.InconsistentError("Inconsistent provider response")
-	}
 
 	var subnets []*resources.Network
-	for _, nic := range res.OK.Nics {
+	for _, nic := range res.Nics {
 		subnet, err := s.getSubnet(nic.SubnetId)
 		if err != nil {
 			return nil, nil, err
 		}
 		subnets = append(subnets, toNetwork(subnet))
 	}
-	return subnets, res.OK.Nics, nil
+	return subnets, res.Nics, nil
 
 }
 
-func (s *Stack) deleteSecurityGroup(onet *oapi.Net) error {
-	res, err := s.client.POST_ReadSecurityGroups(oapi.ReadSecurityGroupsRequest{
-		Filters: oapi.FiltersSecurityGroup{
-			NetIds: []string{onet.NetId},
-		},
+func (s *Stack) deleteSecurityGroup(onet *osc.Net) error {
+	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
+		DryRun:  false,
+		Filters: osc.FiltersSecurityGroup{},
+	}
+	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
+		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
 	})
 	if err != nil {
 		return err
 	}
-	if res == nil || res.OK == nil || len(res.OK.SecurityGroups) == 0 {
+	if len(res.SecurityGroups) == 0 {
 		logrus.Warnf("No security group in network %s", onet.NetId)
 		return nil
 	}
-	for _, sg := range res.OK.SecurityGroups {
-		_, err = s.client.POST_DeleteSecurityGroup(oapi.DeleteSecurityGroupRequest{
+	for _, sg := range res.SecurityGroups {
+		if sg.NetId != onet.NetId {
+			break
+		}
+		deleteSecurityGroupRequest := osc.DeleteSecurityGroupRequest{
 			SecurityGroupId: sg.SecurityGroupId,
+		}
+		_, _, err = s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &osc.DeleteSecurityGroupOpts{
+			DeleteSecurityGroupRequest: optional.NewInterface(deleteSecurityGroupRequest),
 		})
 		if err != nil {
 			return err
@@ -254,11 +274,13 @@ func (s *Stack) deleteSecurityGroup(onet *oapi.Net) error {
 
 func (s *Stack) deleteSubnet(id string) error {
 	//Delete subnets
-	_, err := s.client.POST_DeleteSubnet(oapi.DeleteSubnetRequest{
+	deleteSubnetRequest := osc.DeleteSubnetRequest{
 		SubnetId: id,
+	}
+	_, _, err := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
+		CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
 	})
 	return err
-
 }
 
 // DeleteNetwork deletes the network identified by id
@@ -267,18 +289,21 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 	//Reads NIS that belong to the subnet
-	res, err := s.client.POST_ReadNics(oapi.ReadNicsRequest{
-		Filters: oapi.FiltersNic{
+	readNicsRequest := osc.ReadNicsRequest{
+		Filters: osc.FiltersNic{
 			SubnetIds: []string{id},
 		},
+	}
+	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
+		ReadNicsRequest: optional.NewInterface(readNicsRequest),
 	})
 	if err != nil {
 		logrus.Debugf("Error reading NICS :%v", err)
 	}
 
-	if res != nil && res.OK != nil && len(res.OK.Nics) > 0 {
+	if len(res.Nics) > 0 {
 		//Delete should succeed only when something goes wrong when deleting VMs
-		err = s.deleteNics(res.OK.Nics)
+		err = s.deleteNics(res.Nics)
 		if err == nil {
 			logrus.Debugf("Check if nothing goes wrong deleting a VM")
 		}

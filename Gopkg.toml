@@ -8,6 +8,9 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/aws/aws-sdk-go"
   version = "=v1.20.12"
 
+[[override]]
+  name = "github.com/outscale-dev/osc-sdk-go"
+  version = "=v1.0.0"
 #[[override]]
 #  name = "github.com/Azure/azure-sdk-for-go"
 #  version = "=v31.1.0"

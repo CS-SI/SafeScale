@@ -291,7 +291,7 @@ func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
 	require.True(t, nbAllNetworks > 0)
 
 	fmt.Println("Creating unit_test_network_6")
-	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_6", true, "1.1.1.0/24")
+	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_6", true, "192.168.1.0/24")
 	require.NotNil(t, network1)
 	require.NotNil(t, kp1)
 	fmt.Println(fmt.Sprintf("Created a Network with name %v and id %v", network1.Name, kp1.ID))
@@ -328,7 +328,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Nil(t, err)
 	nbAllNetworks := len(nets)
 
-	net1CIDR := "1.1.2.0/24"
+	net1CIDR := "192.168.4.0/24"
 	net1Name := "unit_test_network_1"
 	fmt.Println("Creating unit_test_network1")
 	network1, gw1 := tester.CreateNetwork(t, net1Name, true, net1CIDR)
@@ -357,7 +357,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Equal(t, gw1NetworkV1.IsGateway, true)
 
 	fmt.Println("Creating unit_test_network2")
-	network2, gw2 := tester.CreateNetwork(t, "unit_test_network_2", false, "1.1.3.0/24")
+	network2, gw2 := tester.CreateNetwork(t, "unit_test_network_2", false, "192.168.5.0/24")
 	fmt.Println("unit_test_network2 created")
 
 	assert.Nil(t, gw2)
@@ -395,7 +395,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	nbHosts := len(hosts)
 
 	// TODO: handle kp delete
-	network, gw := tester.CreateNetwork(t, "unit_test_network_3", false, "1.1.4.0/24")
+	network, gw := tester.CreateNetwork(t, "unit_test_network_3", false, "192.168.1.0/24")
 	defer func() {
 		_ = tester.Service.DeleteNetwork(network.ID)
 	}()
@@ -469,7 +469,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 
 // StartStopHost test
 func (tester *ServiceTester) StartStopHost(t *testing.T) {
-	net, gw := tester.CreateNetwork(t, "unit_test_network_4", true, "1.1.5.0/24")
+	net, gw := tester.CreateNetwork(t, "unit_test_network_4", true, "192.168.6.0/24")
 	defer func() {
 		_ = tester.Service.DeleteGateway(gw.ID)
 		_ = tester.Service.DeleteNetwork(net.ID)
@@ -559,7 +559,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 //VolumeAttachment test
 func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
-	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "1.1.6.0/24")
+	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "192.168.8.0/24")
 
 	// FIXME Handle test errors
 	defer func() {
