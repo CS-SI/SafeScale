@@ -115,6 +115,8 @@ type HostRequest struct {
 	Password string
 	// DiskSize allows to ask for a specific size for system disk (in GB)
 	DiskSize int
+	// IsGateway tells if the host will act as a gateway
+	IsGateway bool
 }
 
 // HostEffectiveSizing ...

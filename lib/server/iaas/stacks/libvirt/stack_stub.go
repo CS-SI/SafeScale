@@ -114,15 +114,15 @@ func (s *Stack) DeleteNetwork(id string) error {
 	return gError
 }
 
-// CreateGateway stub
-func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
-	return nil, nil, gError
-}
-
-// DeleteGateway stub
-func (s *Stack) DeleteGateway(string) error {
-	return gError
-}
+// // CreateGateway stub
+// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
+// 	return nil, nil, gError
+// }
+//
+// // DeleteGateway stub
+// func (s *Stack) DeleteGateway(string) error {
+// 	return gError
+// }
 
 // CreateVIP stub
 func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {

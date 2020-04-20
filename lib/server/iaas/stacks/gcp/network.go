@@ -27,7 +27,6 @@ import (
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -440,59 +439,59 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	return nil
 }
 
-// CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
-
-	defer scerr.OnPanic(&err)()
-
-	gwname := req.Name
-	if gwname == "" {
-		gwname = "gw-" + req.Network.Name
-	}
-
-	hostReq := abstract.HostRequest{
-		ImageID:      req.ImageID,
-		KeyPair:      req.KeyPair,
-		ResourceName: gwname,
-		TemplateID:   req.TemplateID,
-		Networks:     []*abstract.Network{req.Network},
-		PublicIP:     true,
-	}
-
-	host, userData, err := s.CreateHost(hostReq)
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrInvalidRequest:
-			return nil, userData, err
-		default:
-			return nil, userData, scerr.Wrap(err, "error creating gateway")
-		}
-	}
-
-	// VPL: Moved in objects.Host
-	// // Updates Host Property propertiesv1.HostSizing
-	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
-	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
-	// 	hostSizingV1.Template = req.TemplateID
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return nil, userData, err
-	// }
-
-	return host, userData, err
-}
-
-// DeleteGateway delete the public gateway referenced by ref (id or name)
-func (s *Stack) DeleteGateway(ref string) error {
-	return s.DeleteHost(ref)
-}
+// // CreateGateway creates a public Gateway for a private network
+// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
+// 	if s == nil {
+// 		return nil, nil, scerr.InvalidInstanceError()
+// 	}
+// 	if req.Network == nil {
+// 		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+// 	}
+//
+// 	defer scerr.OnPanic(&err)()
+//
+// 	gwname := req.Name
+// 	if gwname == "" {
+// 		gwname = "gw-" + req.Network.Name
+// 	}
+//
+// 	hostReq := abstract.HostRequest{
+// 		ImageID:      req.ImageID,
+// 		KeyPair:      req.KeyPair,
+// 		ResourceName: gwname,
+// 		TemplateID:   req.TemplateID,
+// 		Networks:     []*abstract.Network{req.Network},
+// 		PublicIP:     true,
+// 	}
+//
+// 	host, userData, err := s.CreateHost(hostReq)
+// 	if err != nil {
+// 		switch err.(type) {
+// 		case scerr.ErrInvalidRequest:
+// 			return nil, userData, err
+// 		default:
+// 			return nil, userData, scerr.Wrap(err, "error creating gateway")
+// 		}
+// 	}
+//
+// 	// VPL: Moved in objects.Host
+// 	// // Updates Host Property propertiesv1.HostSizing
+// 	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
+// 	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
+// 	// 	hostSizingV1.Template = req.TemplateID
+// 	// 	return nil
+// 	// })
+// 	// if err != nil {
+// 	// 	return nil, userData, err
+// 	// }
+//
+// 	return host, userData, err
+// }
+//
+// // DeleteGateway delete the public gateway referenced by ref (id or name)
+// func (s *Stack) DeleteGateway(ref string) error {
+// 	return s.DeleteHost(ref)
+// }
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,

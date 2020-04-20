@@ -111,12 +111,13 @@ func (provider *provider) ListNetworks() ([]*abstract.Network, error) {
 func (provider *provider) DeleteNetwork(id string) error {
 	return gError
 }
-func (provider *provider) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
-	return nil, nil, gError
-}
-func (provider *provider) DeleteGateway(string) error {
-	return gError
-}
+
+// func (provider *provider) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
+// 	return nil, nil, gError
+// }
+// func (provider *provider) DeleteGateway(string) error {
+// 	return gError
+// }
 func (provider *provider) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
 	return nil, gError
 }

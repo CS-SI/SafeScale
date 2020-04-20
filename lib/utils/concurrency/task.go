@@ -24,13 +24,10 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
-
-// TaskStatus ...
-type TaskStatus int
 
 const (
 	UNKNOWN TaskStatus = iota // status is unknown
@@ -40,6 +37,9 @@ const (
 	ABORTED                   // the task has been aborted
 	TIMEOUT                   // the task ran out of time
 )
+
+// TaskStatus ...
+type TaskStatus int
 
 // TaskParameters ...
 type TaskParameters interface{}
@@ -123,7 +123,7 @@ var globalTask atomic.Value
 func RootTask() (Task, error) {
 	anon := globalTask.Load()
 	if anon == nil {
-		newT, err := newTask(context.TODO(), nil)
+		newT, err := newTask(nil, nil) // nolint
 		if err != nil {
 			return nil, err
 		}
@@ -344,8 +344,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 
 	go t.run(action, params)
 
-	sig, _ := t.GetSignature()
-	// tracer := NewTracer(true, t, "")
+	tracer := NewTracer(t, debug.ShouldTrace("concurrency.task"), "")
 	finish := false
 	defer close(t.finishCh)
 
@@ -366,18 +365,21 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				finish = true
 				t.finishCh <- struct{}{}
 			case <-t.doneCh:
-				// tracer.Trace("receiving done signal from go routine")
-				t.lock.Lock()
-				defer t.lock.Unlock()
-				t.status = DONE
+				tracer.Trace("receiving done signal from go routine")
+				t.mu.Lock()
+				if t.status == RUNNING {
+					t.status = DONE
+					t.finishCh <- struct{}{}
+					close(t.finishCh)
+				}
+				t.mu.Unlock()
 				finish = true
 				t.finishCh <- struct{}{}
 				break
 			case <-t.abortCh:
 				// Abort signal received
-				// tracer.Trace("receiving abort signal")
-				t.lock.Lock()
-				defer t.lock.Unlock()
+				tracer.Trace("receiving abort signal")
+				t.mu.Lock()
 				if !t.abortDisengaged {
 					if t.status != TIMEOUT {
 						t.status = ABORTED
@@ -386,7 +388,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					finish = true
 					t.finishCh <- struct{}{}
 				} else {
-					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
+					tracer.Trace("abort signal is disengaged, ignored")
 				}
 			case <-time.After(timeout):
 				t.lock.Lock()
@@ -410,19 +412,21 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				finish = true
 				t.finishCh <- struct{}{}
 			case <-t.doneCh:
-				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
-				// tracer.Trace("receiving done signal from go routine")
-				t.lock.Lock()
-				defer t.lock.Unlock()
-				t.status = DONE
+				tracer.Trace("receiving done signal from go routine")
+				t.mu.Lock()
+				if t.status == RUNNING {
+					t.status = DONE
+					t.finishCh <- struct{}{}
+					close(t.finishCh)
+				}
+				t.mu.Unlock()
 				finish = true
 				t.finishCh <- struct{}{}
 				break
 			case <-t.abortCh:
 				// Abort signal received
-				// tracer.Trace("receiving abort signal")
-				t.lock.Lock()
-				defer t.lock.Unlock()
+				tracer.Trace("receiving abort signal")
+				t.mu.Lock()
 				if !t.abortDisengaged {
 					if t.status != TIMEOUT {
 						t.status = ABORTED
@@ -431,14 +435,13 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					finish = true
 					t.finishCh <- struct{}{}
 				} else {
-					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
+					tracer.Trace("abort signal is disengaged, ignored")
 				}
 			}
 		}
 	}
 
-	logrus.Debugf("%s controller ended properly", sig)
-	return nil
+	// logrus.Debugf("%s controller ended properly", sig)
 }
 
 // run executes the function 'action'
@@ -681,4 +684,27 @@ func (t *task) IgnoreAbortSignal(ignore bool) error {
 
 	t.abortDisengaged = ignore
 	return nil
+}
+
+// Close cleans up the task
+// Must be called to prevent memory leaks
+func (t *task) Close() {
+	_ = t.Abort()
+	for k := range t.subtasks {
+		_ = k.Abort()
+		_, _ = k.Wait()
+	}
+	t.subtasks = nil
+	_, _ = t.Wait()
+
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if t.context != nil {
+		t.closeCh <- struct{}{}
+		close(t.closeCh)
+	}
+	// if set, CancelFunc t.cancel has to be called to prevent memory leak
+	if t.cancel != nil {
+		t.cancel()
+	}
 }

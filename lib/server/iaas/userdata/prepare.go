@@ -99,6 +99,9 @@ type Content struct {
 var (
 	userdataPhase1Template atomic.Value
 	userdataPhase2Template atomic.Value
+	userdataPhase3Template atomic.Value
+	userdataPhase4Template atomic.Value
+	userdataPhase5Template atomic.Value
 )
 
 // NewContent ...
@@ -176,8 +179,8 @@ func (ud *Content) Prepare(
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
-	ud.IsGateway = request.DefaultRouteIP == "" && request.Networks[0].Name != abstract.SingleHostNetworkName && !useLayer3Networking
-	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
+	ud.IsGateway = request.IsGateway && request.Networks[0].Name != abstract.SingleHostNetworkName
+	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr
 	ud.DefaultRouteIP = ip
@@ -217,7 +220,12 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 				problems = err != nil
 				_, err = box.String(fmt.Sprintf("userdata%s.phase2.sh", suffixCandidate))
 				problems = problems || (err != nil)
-
+				_, err = box.String(fmt.Sprintf("userdata%s.phase3.sh", suffixCandidate))
+				problems = problems || (err != nil)
+				_, err = box.String(fmt.Sprintf("userdata%s.phase4.sh", suffixCandidate))
+				problems = problems || (err != nil)
+				_, err = box.String(fmt.Sprintf("userdata%s.phase5.sh", suffixCandidate))
+				problems = problems || (err != nil)
 				if !problems {
 					provider = fmt.Sprintf(".%s", suffixCandidate)
 				}
@@ -230,7 +238,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 	}
 
 	switch phase {
-	case "phase1":
+	case "init", "phase1":
 		anon := userdataPhase1Template.Load()
 		if anon == nil {
 			box, err = rice.FindBox("../userdata/scripts")
@@ -256,7 +264,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 		}
 		result = buf.Bytes()
 
-	case "phase2":
+	case "netsec", "phase2":
 		anon := userdataPhase2Template.Load()
 		if anon == nil {
 			box, err = rice.FindBox("../userdata/scripts")
@@ -288,6 +296,102 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 			}
 		}
 
+	case "sysfix", "phase3":
+		anon := userdataPhase3Template.Load()
+		if anon == nil {
+			box, err = rice.FindBox("../userdata/scripts")
+			if err != nil {
+				return nil, err
+			}
+
+			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase3.sh", provider))
+			if err != nil {
+				return nil, scerr.Wrap(err, "error loading script template for phase2")
+			}
+			tmpl, err := template.New("userdata.phase3").Parse(tmplString)
+			if err != nil {
+				return nil, scerr.Wrap(err, "error parsing script template for phase2")
+			}
+			userdataPhase3Template.Store(tmpl)
+			anon = userdataPhase3Template.Load()
+		}
+		tmpl := anon.(*template.Template)
+		buf := bytes.NewBufferString("")
+		err = tmpl.Execute(buf, ud)
+		if err != nil {
+			return nil, err
+		}
+		result = buf.Bytes()
+		for tagname, tagcontent := range ud.Tags[phase] {
+			for _, str := range tagcontent {
+				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
+			}
+		}
+
+	case "gwha", "phase4":
+		anon := userdataPhase4Template.Load()
+		if anon == nil {
+			box, err = rice.FindBox("../userdata/scripts")
+			if err != nil {
+				return nil, err
+			}
+
+			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase4.sh", provider))
+			if err != nil4 {
+				return nil, scerr.Wrap(err, "error loading script template for phase2")
+			}
+			tmpl, err := template.New("userdata.phase4").Parse(tmplString)
+			if err != nil {
+				return nil, scerr.Wrap(err, "error parsing script template for phase4")
+			}
+			userdataPhase2Template.Store(tmpl)
+			anon = userdataPhase2Template.Load()
+		}
+		tmpl := anon.(*template.Template)
+		buf := bytes.NewBufferString("")
+		err = tmpl.Execute(buf, ud)
+		if err != nil {
+			return nil, err
+		}
+		result = buf.Bytes()
+		for tagname, tagcontent := range ud.Tags[phase] {
+			for _, str := range tagcontent {
+				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
+			}
+		}
+
+	case "final", "phase5":
+		anon := userdataPhase5Template.Load()
+		if anon == nil {
+			box, err = rice.FindBox("../userdata/scripts")
+			if err != nil {
+				return nil, err
+			}
+
+			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase5.sh", provider))
+			if err != nil {
+				return nil, scerr.Wrap(err, "error loading script template for phase5")
+			}
+			tmpl, err := template.New("userdata.phase5").Parse(tmplString)
+			if err != nil {
+				return nil, scerr.Wrap(err, "error parsing script template for phase5")
+			}
+			userdataPhase5Template.Store(tmpl)
+			anon = userdataPhase5Template.Load()
+		}
+		tmpl := anon.(*template.Template)
+		buf := bytes.NewBufferString("")
+		err = tmpl.Execute(buf, ud)
+		if err != nil {
+			return nil, err
+		}
+		result = buf.Bytes()
+		for tagname, tagcontent := range ud.Tags[phase] {
+			for _, str := range tagcontent {
+				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
+			}
+		}
+
 	default:
 		return nil, scerr.NotImplementedError("phase '%s' not managed", phase)
 	}
@@ -304,7 +408,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 	return result, nil
 }
 
-// AddInTag adds some useful code on the end of userdata.phase2.sh just before the end (on the label #insert_tag)
+// AddInTag adds some useful code on the end of userdata.2.netsec.sh just before the end (on the label #insert_tag)
 func (ud Content) AddInTag(phase string, tagname string, content string) {
 	if _, ok := ud.Tags[phase]; !ok {
 		ud.Tags[tagname] = map[string][]string{}

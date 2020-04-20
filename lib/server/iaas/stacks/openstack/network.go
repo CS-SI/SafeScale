@@ -29,10 +29,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -331,89 +329,89 @@ func (s *Stack) DeleteNetwork(id string) error {
 	return nil
 }
 
-// CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostFull, userData *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
+// // CreateGateway creates a public Gateway for a private network
+// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostFull, userData *userdata.Content, err error) {
+// 	if s == nil {
+// 		return nil, nil, scerr.InvalidInstanceError()
+// 	}
+//
+// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()()
+// 	defer scerr.OnPanic(&err)()
+//
+// 	userData = userdata.NewContent()
+//
+// 	// Ensure network exists
+// 	if req.Network == nil {
+// 		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+// 	}
+// 	gwname := req.Name
+// 	if gwname == "" {
+// 		gwname = "gw-" + req.Network.Name
+// 	}
+//
+// 	password, err := utils.GeneratePassword(16)
+// 	if err != nil {
+// 		return nil, userData, scerr.Wrap(err, "failed to generate password")
+// 	}
+// 	hostReq := abstract.HostRequest{
+// 		ImageID:      req.ImageID,
+// 		KeyPair:      req.KeyPair,
+// 		ResourceName: gwname,
+// 		TemplateID:   req.TemplateID,
+// 		Networks:     []*abstract.Network{req.Network},
+// 		PublicIP:     true,
+// 		Password:     password,
+// 	}
+// 	host, userData, err = s.CreateHost(hostReq)
+// 	if err != nil {
+// 		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
+// 	}
+//
+// 	// delete the host when found problem starting from here
+// 	newHost := host
+// 	defer func() {
+// 		if err != nil {
+// 			derr := s.DeleteHost(newHost.Core.ID)
+// 			if derr != nil {
+// 				switch derr.(type) {
+// 				case scerr.ErrNotFound:
+// 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Core.Name, derr)
+// 				case scerr.ErrTimeout:
+// 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Core.Name, derr)
+// 				default:
+// 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Core.Name, derr)
+// 				}
+// 				err = scerr.AddConsequence(err, derr)
+// 			}
+// 		}
+// 	}()
+//
+// 	//VPL: moved in resources.Host
+// 	// // Updates Host Property propertiesv1.HostSizing
+// 	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
+// 	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
+// 	// 	hostSizingV1.Template = req.TemplateID
+// 	// 	return nil
+// 	// })
+// 	// if err != nil {
+// 	// 	return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
+// 	// }
+// 	return host, userData, nil
+// }
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()()
-	defer scerr.OnPanic(&err)()
-
-	userData = userdata.NewContent()
-
-	// Ensure network exists
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
-	gwname := req.Name
-	if gwname == "" {
-		gwname = "gw-" + req.Network.Name
-	}
-
-	password, err := utils.GeneratePassword(16)
-	if err != nil {
-		return nil, userData, scerr.Wrap(err, "failed to generate password")
-	}
-	hostReq := abstract.HostRequest{
-		ImageID:      req.ImageID,
-		KeyPair:      req.KeyPair,
-		ResourceName: gwname,
-		TemplateID:   req.TemplateID,
-		Networks:     []*abstract.Network{req.Network},
-		PublicIP:     true,
-		Password:     password,
-	}
-	host, userData, err = s.CreateHost(hostReq)
-	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
-	}
-
-	// delete the host when found problem starting from here
-	newHost := host
-	defer func() {
-		if err != nil {
-			derr := s.DeleteHost(newHost.Core.ID)
-			if derr != nil {
-				switch derr.(type) {
-				case scerr.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Core.Name, derr)
-				case scerr.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Core.Name, derr)
-				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Core.Name, derr)
-				}
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
-
-	// VPL: moved in resources.Host
-	// // Updates Host Property propertiesv1.HostSizing
-	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
-	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
-	// 	hostSizingV1.Template = req.TemplateID
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
-	// }
-	return host, userData, nil
-}
-
-// DeleteGateway delete the public gateway of a private network
-func (s *Stack) DeleteGateway(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
-
-	return s.DeleteHost(id)
-}
+// // DeleteGateway delete the public gateway of a private network
+// func (s *Stack) DeleteGateway(id string) error {
+// 	if s == nil {
+// 		return scerr.InvalidInstanceError()
+// 	}
+// 	if id == "" {
+// 		return scerr.InvalidParameterError("id", "cannot be empty string")
+// 	}
+//
+// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+//
+// 	return s.DeleteHost(id)
+// }
 
 // ToGopherIPversion ...
 func ToGopherIPversion(v ipversion.Enum) gophercloud.IPVersion {
@@ -651,7 +649,7 @@ func (s *Stack) deleteSubnet(id string) (err error) {
 			err = r.ExtractErr()
 			switch err.(type) {
 			case gophercloud.ErrDefault409:
-				msg := fmt.Sprintf("hosts or services are still attached")
+				msg := "hosts or services are still attached"
 				logrus.Warnf(strprocess.Capitalize(msg))
 				return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
 			case gophercloud.ErrUnexpectedResponseCode:
