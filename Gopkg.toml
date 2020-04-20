@@ -101,6 +101,12 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "=v1.15.0"
 
 [[override]]
+  name = "github.com/vmware/go-vcloud-director"
+  # version = "2.0.0"
+  branch = "master"
+  source = "github.com/oscarpicas/go-vcloud-director.git"
+
+[[override]]
   name = "google.golang.org/api"
   version = "=v0.15.0"
 

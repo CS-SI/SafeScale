@@ -22,6 +22,7 @@ package utils
 import (
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/aws"            // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ebrc"           // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialise tenants

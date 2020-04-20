@@ -11,6 +11,7 @@ generate:
 	@(cd local && $(MAKE) $(@))
 	@(cd gcp && $(MAKE) $(@))
 	@(cd aws && $(MAKE) $(@))
+	@(cd ebrc && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...
@@ -24,4 +25,5 @@ clean:
 	@(cd local && $(MAKE) $(@))
 	@(cd gcp && $(MAKE) $(@))
 	@(cd aws && $(MAKE) $(@))
+	@(cd ebrc && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true
