@@ -781,7 +781,6 @@ func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string, withSudo bool) (*SSHCommand, error) {
-	// FIXME Add traces
 	return ssh.command(cmdString, false, true)
 }
 

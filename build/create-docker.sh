@@ -1,6 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-WRKDIR=$(readlink -f $(dirname "$0"))
+if [ "$(uname -s)" = "Darwin" ]; then
+    WRKDIR=$(readlink -n $(dirname "$0"))
+    [ -z "$WRKDIR" ] && WRKDIR=$(dirname "$0")
+else
+    WRKDIR=$(readlink -f $(dirname "$0"))
+fi
 
 if [ ! -z "$1" ]
 then
@@ -18,8 +23,10 @@ fi
 
 stamp=`date +"%s"`
 
-BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) GOVERSION=1.13.5 envsubst <Dockerfile > Dockerfile.$stamp
-docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.$stamp -t safescale:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') $WRKDIR
+#BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) GOVERSION=1.13.5 envsubst <Dockerfile > Dockerfile.$stamp
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+echo docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME -f ${WRKDIR}/Dockerfile -t safescale:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') $WRKDIR
+docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME -f ${WRKDIR}/Dockerfile -t safescale:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') $WRKDIR
 [ $? -ne 0 ] && echo "Docker build failed !!" && rm -f ./marker && exit 1
 
 echo "Docker build OK"

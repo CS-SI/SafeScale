@@ -47,7 +47,6 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 	})
 }
 
-// TODO concurent access if deleting multiple networks
 // Delete deletes several networks at the same time in goroutines
 func (n *network) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
@@ -70,8 +69,8 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 
@@ -87,7 +86,6 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	return nil
 }
 
-// TODO concurent access if deleting multiple networks
 // Delete deletes several networks at the same time in goroutines
 func (n *network) Destroy(names []string, timeout time.Duration) error {
 	n.session.Connect()
@@ -110,8 +108,8 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 
@@ -125,7 +123,6 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
-
 }
 
 // Inspect ...

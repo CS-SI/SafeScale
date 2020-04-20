@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -43,7 +44,10 @@ func (c *bucket) List(timeout time.Duration) (*pb.BucketList, error) {
 		return nil, err
 	}
 
-	return service.List(ctx, &googleprotobuf.Empty{})
+	ctxWithTo, cancelCtx := context.WithTimeout(ctx, timeout)
+	defer cancelCtx()
+
+	return service.List(ctxWithTo, &googleprotobuf.Empty{})
 }
 
 // Create ...
@@ -57,7 +61,10 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 		return err
 	}
 
-	_, err = service.Create(ctx, &pb.Bucket{Name: name})
+	ctxWithTo, cancelCtx := context.WithTimeout(ctx, timeout)
+	defer cancelCtx()
+
+	_, err = service.Create(ctxWithTo, &pb.Bucket{Name: name})
 	return err
 }
 
@@ -93,9 +100,12 @@ func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 		errs  []string
 	)
 
+	ctxWithTo, cancelCtx := context.WithTimeout(ctx, timeout)
+	defer cancelCtx()
+
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Destroy(ctx, &pb.Bucket{Name: aname})
+		_, err := service.Destroy(ctxWithTo, &pb.Bucket{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
@@ -131,6 +141,9 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 		return err
 	}
 
+	ctxWithTo, cancelCtx := context.WithTimeout(ctx, timeout)
+	defer cancelCtx()
+
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
@@ -139,7 +152,7 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Bucket{Name: aname})
+		_, err := service.Delete(ctxWithTo, &pb.Bucket{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
@@ -175,9 +188,10 @@ func (c *bucket) Inspect(name string, timeout time.Duration) (*pb.BucketMounting
 		return nil, err
 	}
 
-	// FIXME Use waitTimeout with other functions
+	ctxWithTo, cancelCtx := context.WithTimeout(ctx, timeout)
+	defer cancelCtx()
 
-	return service.Inspect(ctx, &pb.Bucket{Name: name})
+	return service.Inspect(ctxWithTo, &pb.Bucket{Name: name})
 }
 
 // Mount ...
@@ -190,7 +204,10 @@ func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dur
 		return err
 	}
 
-	_, err = service.Mount(ctx, &pb.BucketMountingPoint{
+	ctxWithTo, cancelCtx := context.WithTimeout(ctx, timeout)
+	defer cancelCtx()
+
+	_, err = service.Mount(ctxWithTo, &pb.BucketMountingPoint{
 		Bucket: bucketName,
 		Host: &pb.Reference{
 			Name: hostName,
@@ -210,7 +227,10 @@ func (c *bucket) Unmount(bucketName, hostName string, timeout time.Duration) err
 		return err
 	}
 
-	_, err = service.Unmount(ctx, &pb.BucketMountingPoint{
+	ctxWithTo, cancelCtx := context.WithTimeout(ctx, timeout)
+	defer cancelCtx()
+
+	_, err = service.Unmount(ctxWithTo, &pb.BucketMountingPoint{
 		Bucket: bucketName,
 		Host:   &pb.Reference{Name: hostName},
 	})
