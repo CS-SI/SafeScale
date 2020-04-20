@@ -34,7 +34,6 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -643,50 +642,50 @@ func fromIntIPVersion(v int) ipversion.Enum {
 	return ipversion.IPv4
 }
 
-// CreateGateway creates a gateway for a network.
-// By current implementation, only one gateway can exist by Network because the object is intended
-// to contain only one hostID
-func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
-
-	gwname := req.Name
-	if gwname == "" {
-		gwname = "gw-" + req.Network.Name
-	}
-
-	tracer := concurrency.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-
-	hostReq := abstract.HostRequest{
-		ImageID:      req.ImageID,
-		KeyPair:      req.KeyPair,
-		ResourceName: gwname,
-		TemplateID:   req.TemplateID,
-		Networks:     []*abstract.Network{req.Network},
-		PublicIP:     true,
-		Password:     "safescale", // VPL: for debug purposes, remove when not used anymore
-	}
-	host, userData, err := s.CreateHost(hostReq)
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrInvalidRequest:
-			return nil, userData, err
-		default:
-			return nil, userData, scerr.NewError("error creating gateway: %s", openstack.ProviderErrorToString(err))
-		}
-	}
-	return host, userData, err
-}
-
-// DeleteGateway deletes the gateway associated with network identified by ID
-func (s *Stack) DeleteGateway(id string) error {
-	return s.DeleteHost(id)
-}
+// // CreateGateway creates a gateway for a network.
+// // By current implementation, only one gateway can exist by Network because the object is intended
+// // to contain only one hostID
+// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
+// 	if s == nil {
+// 		return nil, nil, scerr.InvalidInstanceError()
+// 	}
+// 	if req.Network == nil {
+// 		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+// 	}
+//
+// 	gwname := req.Name
+// 	if gwname == "" {
+// 		gwname = "gw-" + req.Network.Name
+// 	}
+//
+// 	tracer := concurrency.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
+// 	defer tracer.OnExitTrace()()
+//
+// 	hostReq := abstract.HostRequest{
+// 		ImageID:      req.ImageID,
+// 		KeyPair:      req.KeyPair,
+// 		ResourceName: gwname,
+// 		TemplateID:   req.TemplateID,
+// 		Networks:     []*abstract.Network{req.Network},
+// 		PublicIP:     true,
+// 		Password:     "safescale", //VPL: for debug purposes, remove when not used anymore
+// 	}
+// 	host, userData, err := s.CreateHost(hostReq)
+// 	if err != nil {
+// 		switch err.(type) {
+// 		case scerr.ErrInvalidRequest:
+// 			return nil, userData, err
+// 		default:
+// 			return nil, userData, scerr.NewError("error creating gateway: %s", openstack.ProviderErrorToString(err))
+// 		}
+// 	}
+// 	return host, userData, err
+// }
+//
+// // DeleteGateway deletes the gateway associated with network identified by ID
+// func (s *Stack) DeleteGateway(id string) error {
+// 	return s.DeleteHost(id)
+// }
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,

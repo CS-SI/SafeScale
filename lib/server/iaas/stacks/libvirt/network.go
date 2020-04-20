@@ -31,7 +31,6 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -290,55 +289,55 @@ func (s *Stack) DeleteNetwork(ref string) error {
 	return nil
 }
 
-// CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *abstract.HostTemplate, *userdata.Content, error) {
-	if s == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
-	}
-
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
-
-	network := req.Network
-	templateID := req.TemplateID
-	imageID := req.ImageID
-	keyPair := req.KeyPair
-	gwName := req.Name
-
-	networkLibvirt, err := getNetworkFromRef(network.ID, s.LibvirtService)
-	if err != nil {
-		return nil, nil, err
-	}
-	if gwName == "" {
-		name, err := networkLibvirt.Name()
-		if err != nil {
-			return nil, nil, scerr.Wrap(err, "failed to get network name")
-		}
-		gwName = "gw-" + name
-	}
-
-	hostReq := abstract.HostRequest{
-		ImageID:      imageID,
-		KeyPair:      keyPair,
-		ResourceName: gwName,
-		TemplateID:   templateID,
-		Networks:     []*abstract.Network{network},
-		PublicIP:     true,
-	}
-
-	host, userData, err := s.CreateHost(hostReq)
-	if err != nil {
-		return nil, nil, scerr.Wrap(err, "failed to create gateway host")
-	}
-
-	return host, userData, nil
-}
-
-// DeleteGateway delete the public gateway referenced by ref (id or name)
-func (s *Stack) DeleteGateway(ref string) error {
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
-
-	return s.DeleteHost(ref)
-}
+// // CreateGateway creates a public Gateway for a private network
+// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *abstract.HostTemplate, *userdata.Content, error) {
+// 	if s == nil {
+// 		return nil, nil, nil, scerr.InvalidInstanceError()
+// 	}
+//
+// 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+//
+// 	network := req.Network
+// 	templateID := req.TemplateID
+// 	imageID := req.ImageID
+// 	keyPair := req.KeyPair
+// 	gwName := req.Name
+//
+// 	networkLibvirt, err := getNetworkFromRef(network.ID, s.LibvirtService)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+// 	if gwName == "" {
+// 		name, err := networkLibvirt.Name()
+// 		if err != nil {
+// 			return nil, nil, scerr.Wrap(err, "failed to get network name")
+// 		}
+// 		gwName = "gw-" + name
+// 	}
+//
+// 	hostReq := abstract.HostRequest{
+// 		ImageID:      imageID,
+// 		KeyPair:      keyPair,
+// 		ResourceName: gwName,
+// 		TemplateID:   templateID,
+// 		Networks:     []*abstract.Network{network},
+// 		PublicIP:     true,
+// 	}
+//
+// 	host, userData, err := s.CreateHost(hostReq)
+// 	if err != nil {
+// 		return nil, nil, scerr.Wrap(err, "failed to create gateway host")
+// 	}
+//
+// 	return host, userData, nil
+// }
+//
+// // DeleteGateway delete the public gateway referenced by ref (id or name)
+// func (s *Stack) DeleteGateway(ref string) error {
+// 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+//
+// 	return s.DeleteHost(ref)
+// }
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,

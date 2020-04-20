@@ -29,12 +29,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -163,7 +161,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Create the network
 	logrus.Debugf("Creating network '%s' ...", req.Name)
-	rn, err := svc.CreateNetwork(req)
+	an, err := svc.CreateNetwork(req)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound, scerr.ErrInvalidRequest, scerr.ErrTimeout:
@@ -175,8 +173,8 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Starting from here, delete network if exiting with error
 	defer func() {
-		if err != nil && rn != nil {
-			derr := svc.DeleteNetwork(rn.ID)
+		if err != nil && an != nil {
+			derr := svc.DeleteNetwork(an.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case scerr.ErrNotFound:
@@ -204,7 +202,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Creates VIP for gateways if asked for
 	if failover {
-		rn.VIP, err = svc.CreateVIP(rn.ID, fmt.Sprintf("for gateways of network %s", rn.Name))
+		an.VIP, err = svc.CreateVIP(an.ID, fmt.Sprintf("for gateways of network %s", an.Name))
 		if err != nil {
 			switch err.(type) {
 			case scerr.ErrNotFound, scerr.ErrTimeout:
@@ -217,8 +215,8 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
 			if err != nil {
-				if rn != nil {
-					derr := svc.DeleteVIP(rn.VIP)
+				if an != nil {
+					derr := svc.DeleteVIP(an.VIP)
 					if derr != nil {
 						logrus.Errorf("failed to delete VIP: %+v", derr)
 						err = scerr.AddConsequence(err, derr)
@@ -230,7 +228,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Write network object metadata
 	// logrus.Debugf("Saving network metadata '%s' ...", network.Name)
-	err = objn.Carry(task, rn)
+	err = objn.Carry(task, an)
 	if err != nil {
 		return err
 	}
@@ -304,12 +302,11 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		return err
 	}
 
-	gwRequest := abstract.GatewayRequest{
+	gwRequest := abstract.HostRequest{
 		ImageID:    img.ID,
-		Network:    rn,
+		Networks:   []*abstract.Network{an},
 		KeyPair:    keypair,
 		TemplateID: template.ID,
-		CIDR:       rn.CIDR,
 	}
 
 	var (
@@ -322,7 +319,11 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
-	primaryRequest.Name = primaryGatewayName
+	primaryRequest.ResourceName = primaryGatewayName
+	primaryRequest.HostName = primaryGatewayName
+	if req.Domain != "" {
+		primaryRequest.HostName += "." + req.Domain
+	}
 	primaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 		"request": primaryRequest,
 		"sizing":  *gwSizing,
@@ -335,7 +336,11 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	// Starts secondary gateway creation if asked for
 	if failover {
 		secondaryRequest := gwRequest
-		secondaryRequest.Name = secondaryGatewayName
+		secondaryRequest.ResourceName = secondaryGatewayName
+		secondaryRequest.HostName = secondaryGatewayName
+		if req.Domain != "" {
+			secondaryRequest.HostName += "." + req.Domain
+		}
 		secondaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 			"request": secondaryRequest,
 			"sizing":  *gwSizing,
@@ -371,26 +376,26 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 					logrus.Infof("Cleaning up on failure, gateway '%s' deleted", primaryGateway.SafeGetName())
 				}
 				if failover {
-					failErr := objn.unbindHostFromVIP(task, rn.VIP, primaryGateway)
+					failErr := objn.unbindHostFromVIP(task, an.VIP, primaryGateway)
 					err = scerr.AddConsequence(err, failErr)
 				}
 			}
 		}()
-
-		err = primaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-			// Updates requested sizing in gateway property propertiesv1.HostSizing
-			return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
-				gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-				if !ok {
-					return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
-				return nil
-			})
-		})
-		if err != nil {
-			return err
-		}
+		//
+		// err = primaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+		// 	// Updates requested sizing in gateway property propertiesv1.HostSizing
+		// 	return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
+		// 		gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+		// 		if !ok {
+		// 			return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// 		}
+		// 		gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
+		// 		return nil
+		// 	})
+		// })
+		// if err != nil {
+		// 	return err
+		// }
 	}
 	if failover && secondaryTask != nil {
 		secondaryResult, secondaryErr = secondaryTask.Wait()
@@ -415,31 +420,30 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 						}
 						err = scerr.AddConsequence(err, derr)
 					}
-					failErr := objn.unbindHostFromVIP(task, rn.VIP, secondaryGateway)
+					failErr := objn.unbindHostFromVIP(task, an.VIP, secondaryGateway)
 					err = scerr.AddConsequence(err, failErr)
 				}
 			}()
-
-			err = secondaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-				// Updates requested sizing in gateway property propertiesv1.HostSizing
-				return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
-					gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-					if !ok {
-						return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
-					gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
-					return nil
-				})
-			})
-			if err != nil {
-				return err
-			}
+			//
+			// err = secondaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+			// 	// Updates requested sizing in gateway property propertiesv1.HostSizing
+			// 	return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
+			// 		gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+			// 		if !ok {
+			// 			return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// 		}
+			// 		gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
+			// 		return nil
+			// 	})
+			// })
+			// if err != nil {
+			// 	return err
+			// }
 		}
 	}
 	if primaryErr != nil {
 		return primaryErr
 	}
-
 	if secondaryErr != nil {
 		return secondaryErr
 	}
@@ -450,69 +454,88 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		if !ok {
 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		an.GatewayID = primaryGateway.SafeGetID()
+		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetID()
+		primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetID()
+		primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.SafeGetPublicIP(task)
 		if secondaryGateway != nil {
 			an.SecondaryGatewayID = secondaryGateway.SafeGetID()
+			secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
+			secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
+			primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.SafeGetPublicIP(task)
+			secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
+			secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
 		}
+
+		if an.VIP != nil {
+			primaryUserdata.DefaultRouteIP = an.VIP.PrivateIP
+			primaryUserdata.EndpointIP = an.VIP.PublicIP
+		} else {
+			primaryUserdata.DefaultRouteIP = primaryGateway.SafeGetPrivateIP(task)
+			primaryUserdata.EndpointIP = primaryGateway.SafeGetPublicIP(task)
+		}
+		primaryUserdata.IsPrimaryGateway = true
+		secondaryUserdata.IsPrimaryGateway = false
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	// Starts gateway(s) installation
-	primaryTask, err = concurrency.NewTask(nil)
-	if err != nil {
-		return err
-	}
+	// // Starts final gateway(s) configuration script
+	// primaryTask, err = concurrency.NewTask()
+	// if err != nil {
+	// 	return err
+	// }
 
-	primaryTask, err = primaryTask.Start(objn.taskWaitForInstallPhase1OnGateway, primaryGateway)
-	if err != nil {
-		return err
-	}
-	if failover && secondaryTask != nil {
-		secondaryTask, err = concurrency.NewTask(nil)
-		if err != nil {
-			return err
-		}
-		secondaryTask, err = secondaryTask.Start(objn.taskWaitForInstallPhase1OnGateway, secondaryGateway)
-		if err != nil {
-			return err
-		}
-	}
-	_, primaryErr = primaryTask.Wait()
-	if primaryErr != nil {
-		return primaryErr
-	}
-	if failover && secondaryTask != nil {
-		_, secondaryErr = secondaryTask.Wait()
-		if secondaryErr != nil {
-			return secondaryErr
-		}
-	}
-
-	if primaryUserdata == nil {
-		return scerr.NewError("error creating network: primaryUserdata is nil")
-	}
-
-	// Complement userdata for gateway(s) with allocated IP
-	primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetPrivateIP(task)
-	primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.SafeGetPublicIP(task)
-
-	if failover {
-		primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetPrivateIP(task)
-		primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.SafeGetPublicIP(task)
-
-		if secondaryUserdata == nil {
-			return scerr.NewError("error creating network: secondaryUserdata is nil")
-		}
-
-		secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
-		secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
-		secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
-		secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
-	}
-
+	// primaryTask, err = primaryTask.Start(objn.taskWaitForInstallPhase1OnGateway, primaryGateway)
+	// if err != nil {
+	// 	return err
+	// }
+	// if failover && secondaryTask != nil {
+	// 	secondaryTask, err = concurrency.NewTask()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	secondaryTask, err = secondaryTask.Start(objn.taskWaitForInstallPhase1OnGateway, secondaryGateway)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+	// _, primaryErr = primaryTask.Wait()
+	// if primaryErr != nil {
+	// 	return primaryErr
+	// }
+	// if failover && secondaryTask != nil {
+	// 	_, secondaryErr = secondaryTask.Wait()
+	// 	if secondaryErr != nil {
+	// 		return secondaryErr
+	// 	}
+	// }
+	// //
+	// // if primaryUserdata == nil {
+	// // 	return scerr.NewError("error creating network: primaryUserdata is nil")
+	// // }
+	// //
+	// // Complement userdata for gateway(s) with allocated IP
+	// primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetPrivateIP(task)
+	// primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.SafeGetPublicIP(task)
+	//
+	// if failover {
+	// 	primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetPrivateIP(task)
+	// 	primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.SafeGetPublicIP(task)
+	//
+	// 	if secondaryUserdata == nil {
+	// 		return scerr.NewError("error creating network: secondaryUserdata is nil")
+	// 	}
+	//
+	// 	secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
+	// 	secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
+	// 	secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
+	// 	secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
+	// }
+	//
 	// Starts gateway(s) installation
 	primaryTask, err = concurrency.NewTask(nil)
 	if err != nil {
@@ -525,7 +548,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		if !ok {
 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		an.NetworkState = networkstate.PHASE2
+		an.NetworkState = networkstate.PHASE3
 		return nil
 	})
 	if err != nil {
@@ -533,7 +556,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	// Check if hosts are still attached to network according to metadata
-	primaryTask, err = primaryTask.Start(objn.taskInstallPhase2OnGateway, data.Map{
+	primaryTask, err = primaryTask.Start(objn.taskInstallPhase3OnGateway, data.Map{
 		"host":     primaryGateway,
 		"userdata": primaryUserdata,
 	})
@@ -545,7 +568,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		if err != nil {
 			return err
 		}
-		secondaryTask, err = secondaryTask.Start(objn.taskInstallPhase2OnGateway, data.Map{
+		secondaryTask, err = secondaryTask.Start(objn.taskInstallPhase3OnGateway, data.Map{
 			"host":     secondaryGateway,
 			"userdata": secondaryUserdata,
 		})
@@ -563,13 +586,6 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 			return secondaryErr
 		}
 	}
-
-	// select {
-	// case <-ctx.Done():
-	// 	logrus.Warnf("Network creation cancelled by user")
-	// 	return nil, scerr.AbortedError("network creation cancelled by user")
-	// default:
-	// }
 
 	// Updates network state in metadata
 	// logrus.Debugf("Updating network metadata '%s' ...", network.Name)

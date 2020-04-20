@@ -241,25 +241,25 @@ func (w ErrorTraceProvider) DeleteNetwork(id string) (err error) {
 	return w.InnerProvider.DeleteNetwork(id)
 }
 
-// CreateGateway ...
-func (w ErrorTraceProvider) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
-	defer func(prefix string) {
-		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
-		}
-	}(fmt.Sprintf("%s:CreateGateway", w.Label))
-	return w.InnerProvider.CreateGateway(req)
-}
-
-// DeleteGateway ...
-func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
-	defer func(prefix string) {
-		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
-		}
-	}(fmt.Sprintf("%s:DeleteGateway", w.Label))
-	return w.InnerProvider.DeleteGateway(networkID)
-}
+// // CreateGateway ...
+// func (w ErrorTraceProvider) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
+// 	defer func(prefix string) {
+// 		if err != nil {
+// 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+// 		}
+// 	}(fmt.Sprintf("%s:CreateGateway", w.Label))
+// 	return w.InnerProvider.CreateGateway(req)
+// }
+//
+// // DeleteGateway ...
+// func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
+// 	defer func(prefix string) {
+// 		if err != nil {
+// 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+// 		}
+// 	}(fmt.Sprintf("%s:DeleteGateway", w.Label))
+// 	return w.InnerProvider.DeleteGateway(networkID)
+// }
 
 // CreateVIP ...
 func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *abstract.VirtualIP, err error) {

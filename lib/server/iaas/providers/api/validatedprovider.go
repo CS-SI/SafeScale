@@ -239,28 +239,28 @@ func (w ValidatedProvider) DeleteNetwork(id string) (err error) {
 	return w.InnerProvider.DeleteNetwork(id)
 }
 
-// CreateGateway ...
-func (w ValidatedProvider) CreateGateway(req abstract.GatewayRequest) (res *abstract.HostFull, data *userdata.Content, err error) {
-	res, data, err = w.InnerProvider.CreateGateway(req)
-	if err != nil {
-		if res != nil {
-			if !res.OK() {
-				logrus.Warnf("Invalid host: %v", *res)
-			}
-		}
-		if data != nil {
-			if !data.OK() {
-				logrus.Warnf("Invalid userdata: %v", *data)
-			}
-		}
-	}
-	return res, data, err
-}
-
-// DeleteGateway ...
-func (w ValidatedProvider) DeleteGateway(networkID string) (err error) {
-	return w.InnerProvider.DeleteGateway(networkID)
-}
+// // CreateGateway ...
+// func (w ValidatedProvider) CreateGateway(req abstract.GatewayRequest) (res *abstract.HostFull, data *userdata.Content, err error) {
+// 	res, data, err = w.InnerProvider.CreateGateway(req)
+// 	if err != nil {
+// 		if res != nil {
+// 			if !res.OK() {
+// 				logrus.Warnf("Invalid host: %v", *res)
+// 			}
+// 		}
+// 		if data != nil {
+// 			if !data.OK() {
+// 				logrus.Warnf("Invalid userdata: %v", *data)
+// 			}
+// 		}
+// 	}
+// 	return res, data, err
+// }
+//
+// // DeleteGateway ...
+// func (w ValidatedProvider) DeleteGateway(networkID string) (err error) {
+// 	return w.InnerProvider.DeleteGateway(networkID)
+// }
 
 // CreateHost ...
 func (w ValidatedProvider) CreateHost(request abstract.HostRequest) (res *abstract.HostFull, ud *userdata.Content, err error) {

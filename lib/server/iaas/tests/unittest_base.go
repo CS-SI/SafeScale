@@ -179,28 +179,29 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 	})
 	require.NoError(t, err)
 
-	tpls, err := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
-		MinCores:    1,
-		MinRAMSize:  1,
-		MinDiskSize: 0,
-	}, false)
-	require.Nil(t, err)
-	img, err := tester.Service.SearchImage("Ubuntu 18.04")
-	require.Nil(t, err)
-	keypair, err := tester.Service.CreateKeyPair("kp_" + network.Name)
-	require.Nil(t, err)
-
-	gwRequest := abstract.GatewayRequest{
-		ImageID:    img.ID,
-		Network:    network,
-		KeyPair:    keypair,
-		TemplateID: tpls[0].ID,
-	}
-
 	var gateway *abstract.HostFull
-
 	if withGW {
-		gateway, _, err = tester.Service.CreateGateway(gwRequest)
+		tpls, err := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
+			MinCores:    1,
+			MinRAMSize:  1,
+			MinDiskSize: 0,
+		}, false)
+		require.Nil(t, err)
+		img, err := tester.Service.SearchImage("Ubuntu 18.04")
+		require.Nil(t, err)
+		keypair, err := tester.Service.CreateKeyPair("kp_" + network.Name)
+		require.Nil(t, err)
+
+		gwRequest := abstract.HostRequest{
+			ImageID:      img.ID,
+			Networks:     []*abstract.Network{network},
+			KeyPair:      keypair,
+			TemplateID:   tpls[0].ID,
+			ResourceName: "gw-" + name,
+			IsGateway:    true,
+		}
+
+		gateway, _, err = tester.Service.CreateHost(gwRequest)
 		require.Nil(t, err)
 		network.GatewayID = gateway.Core.ID
 	}
@@ -242,12 +243,14 @@ func (tester *ServiceTester) CreateGW(t *testing.T, network *abstract.Network) e
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
-	gwRequest := abstract.GatewayRequest{
-		ImageID:    img.ID,
-		TemplateID: tpls[0].ID,
-		Network:    network,
+	gwRequest := abstract.HostRequest{
+		ImageID:      img.ID,
+		TemplateID:   tpls[0].ID,
+		Networks:     []*abstract.Network{network},
+		ResourceName: "gw-" + network.Name,
+		IsGateway:    true,
 	}
-	gw, _, err := tester.Service.CreateGateway(gwRequest)
+	gw, _, err := tester.Service.CreateHost(gwRequest)
 	if err != nil {
 		return err
 	}
@@ -406,11 +409,11 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 
 	_, _, err = tester.CreateHost(t, "host2", network, false)
 	assert.Error(t, err)
-	err = tester.CreateGW(t, network)
-	assert.NoError(t, err)
-	defer func() {
-		_ = tester.Service.DeleteGateway(network.GatewayID)
-	}()
+	// err = tester.CreateGW(t, network)
+	// assert.NoError(t, err)
+	// defer func() {
+	// 	_ = tester.Service.DeleteGateway(network.GatewayID)
+	// }()
 	host2, _, err := tester.CreateHost(t, "host2", network, false)
 	assert.NoError(t, err)
 	defer func() {
@@ -448,7 +451,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 func (tester *ServiceTester) StartStopHost(t *testing.T) {
 	net, gw := tester.CreateNetwork(t, "unit_test_network_4", true, "1.1.5.0/24")
 	defer func() {
-		_ = tester.Service.DeleteGateway(gw.Core.ID)
+		_ = tester.Service.DeleteHost(gw.Core.ID)
 		_ = tester.Service.DeleteNetwork(net.ID)
 	}()
 	host, err := tester.Service.GetHostByName("gw-" + net.Name)
@@ -538,21 +541,14 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 	// TODO: handle kp delete
 	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "1.1.6.0/24")
 
-	// FIXME: Handle test errors
 	defer func() {
-		_ = tester.Service.DeleteGateway(gw.Core.ID)
-		defer func() {
-			_ = tester.Service.DeleteNetwork(net.ID)
-		}()
+		_ = tester.Service.DeleteHost(gw.Core.ID)
+		_ = tester.Service.DeleteNetwork(net.ID)
 	}()
 
 	host, err := tester.Service.GetHostByName("gw-" + net.Name)
 	require.Nil(t, err)
 	require.NotNil(t, host)
-
-	defer func() {
-		_ = tester.Service.DeleteHost(host.ID)
-	}()
 
 	v1, err := tester.Service.CreateVolume(abstract.VolumeRequest{
 		Name:  "test_volume1",

@@ -62,10 +62,10 @@ type Stack interface {
 	ListNetworks() ([]*abstract.Network, error)
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
-	// CreateGateway creates a public Gateway for a private network
-	CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error)
-	// DeleteGateway delete the public gateway of a private network
-	DeleteGateway(networkID string) error
+	// // CreateGateway creates a public Gateway for a private network
+	// CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error)
+	// // DeleteGateway delete the public gateway of a private network
+	// DeleteGateway(networkID string) error
 
 	// CreateVIP ...
 	CreateVIP(string, string) (*abstract.VirtualIP, error)

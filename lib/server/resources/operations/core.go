@@ -139,17 +139,9 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 	if callback == nil {
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
-
-	// Check c.properties is populated
-	c.SafeLock(task)
 	if c.properties == nil {
-		c.properties, err = serialize.NewJSONProperties("resources." + c.kind)
-		if err != nil {
-			c.SafeUnlock(task)
-			return err
-		}
+		return scerr.InvalidInstanceContentError("c.properties", "cannot be nil")
 	}
-	c.SafeUnlock(task)
 
 	// Reload reloads data from objectstorage to be sure to have the last revision
 	err = c.Reload(task)

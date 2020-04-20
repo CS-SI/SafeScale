@@ -250,7 +250,6 @@ configure_network() {
 
     {{- if .IsGateway }}
     configure_as_gateway || fail 194
-    install_keepalived || fail 195
     {{- end }}
 
     check_for_network || {
@@ -496,94 +495,6 @@ EOF
     echo done
 }
 
-install_keepalived() {
-    case $LINUX_KIND in
-        ubuntu|debian)
-            sfApt update && sfApt -y install keepalived || return 1
-            ;;
-
-        redhat|centos)
-            yum install -q -y keepalived || return 1
-            ;;
-        *)
-            echo "Unsupported Linux distribution '$LINUX_KIND'!"
-            return 1
-            ;;
-    esac
-
-    NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
-
-    cat >/etc/keepalived/keepalived.conf <<-EOF
-vrrp_instance vrrp_group_gws_internal {
-    state BACKUP
-    interface ${PR_IFs[0]}
-    virtual_router_id 1
-    priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
-    nopreempt
-    advert_int 2
-    authentication {
-        auth_type PASS
-        auth_pass password
-    }
-{{ if eq .IsPrimaryGateway true }}
-    # Unicast specific option, this is the IP of the interface keepalived listens on
-    unicast_src_ip {{ .PrimaryGatewayPrivateIP }}
-    # Unicast specific option, this is the IP of the peer instance
-    unicast_peer {
-        {{ .SecondaryGatewayPrivateIP }}
-    }
-{{ else }}
-    unicast_src_ip {{ .SecondaryGatewayPrivateIP }}
-    unicast_peer {
-        {{ .PrimaryGatewayPrivateIP }}
-    }
-{{ end }}
-    virtual_ipaddress {
-        {{ .PrivateVIP }}/${NETMASK}
-    }
-}
-
-# vrrp_instance vrrp_group_gws_external {
-#     state BACKUP
-#     interface ${PU_IF}
-#     virtual_router_id 2
-#     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
-#     nopreempt
-#     advert_int 2
-#     authentication {
-#         auth_type PASS
-#         auth_pass password
-#     }
-#     virtual_ipaddress {
-#         {{ .PublicVIP }}/${NETMASK}
-#     }
-# }
-EOF
-
-    if [ "$(sfGetFact "use_systemd")" = "1" ]; then
-        # Use systemd to ensure keepalived is restarted if network is restarted
-        # (otherwise, keepalived is in undetermined state)
-        mkdir -p /etc/systemd/system/keepalived.service.d
-        if [ "$(sfGetFact "redhat_like")" = "1" ]; then
-            cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
-[Unit]
-Requires=network.service
-PartOf=network.service
-EOF
-        else
-            cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
-[Unit]
-Requires=systemd-networkd.service
-PartOf=systemd-networkd.service
-EOF
-        fi
-        systemctl daemon-reload
-    fi
-
-    sfService enable keepalived && sfService restart keepalived || return 1
-    return 0
-}
-
 configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
     rm -f /etc/resolv.conf
@@ -653,52 +564,6 @@ DNSStubListener=yes
 EOF
     systemctl restart systemd-resolved
     echo done
-}
-
-install_drivers_nvidia() {
-    case $LINUX_KIND in
-        ubuntu)
-            sfFinishPreviousInstall
-            add-apt-repository -y ppa:graphics-drivers &>/dev/null
-            sfApt update
-            sfApt -y install nvidia-410 &>/dev/null || {
-                sfApt -y install nvidia-driver-410 &>/dev/null || fail 201
-            }
-            ;;
-
-        debian)
-            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-                echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
-                rmmod nouveau
-            fi
-            sfWaitForApt && apt update &>/dev/null
-            sfWaitForApt && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 202
-            dpkg --add-architecture i386 &>/dev/null
-            sfWaitForApt && apt update &>/dev/null
-            sfWaitForApt && apt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 203
-            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || fail 204
-            bash NVIDIA-Linux-x86_64-410.78.run -s || fail 205
-            ;;
-
-        redhat|centos)
-            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-                echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
-                dracut --force
-                rmmod nouveau
-            fi
-            yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null || fail 206
-            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 207
-            # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
-            if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
-                bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208
-            fi
-            rm -f NVIDIA-Linux-x86_64-410.78.run
-            ;;
-        *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 209
-            ;;
-    esac
 }
 
 early_packages_update() {
@@ -834,7 +699,6 @@ identify_nics
 configure_network
 
 install_packages
-lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 update_kernel_settings || fail 217
 

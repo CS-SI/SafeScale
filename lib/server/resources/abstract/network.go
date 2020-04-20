@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -25,18 +26,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GatewayRequest to create a Gateway into a network
-type GatewayRequest struct {
-	Network *Network
-	CIDR    string
-	// TemplateID the UUID of the template used to size the host (see SelectTemplates)
-	TemplateID string
-	// ImageID is the UUID of the image that contains the server's OS and initial state.
-	ImageID string
-	KeyPair *KeyPair
-	// Name is the name to give to the gateway
-	Name string
-}
+// // GatewayRequest to create a Gateway into a network
+// type GatewayRequest struct {
+// 	Network *Network
+// 	CIDR    string
+// 	// TemplateID the UUID of the template used to size the host (see SelectTemplates)
+// 	TemplateID string
+// 	// ImageID is the UUID of the image that contains the server's OS and initial state.
+// 	ImageID string
+// 	KeyPair *KeyPair
+// 	// Name is the name to give to the gateway
+// 	Name string
+// }
 
 // NetworkRequest represents network requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
@@ -46,6 +47,8 @@ type NetworkRequest struct {
 	IPVersion ipversion.Enum
 	// CIDR mask
 	CIDR string
+	// Domain contains the DNS suffix to use for this network
+	Domain string
 	// DNSServers
 	DNSServers []string
 	// HA tells if 2 gateways and a VIP needs to be created; the VIP IP address will be used as gateway
@@ -133,7 +136,7 @@ func (n *Network) Deserialize(buf []byte) (err error) {
 	if n == nil {
 		return scerr.InvalidInstanceError()
 	}
-	defer scerr.OnPanic(&err)()	// json.Unmarshal may panic
+	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
 	return json.Unmarshal(buf, n)
 }
 

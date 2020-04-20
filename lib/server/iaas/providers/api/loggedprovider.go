@@ -177,17 +177,17 @@ func (w LoggedProvider) DeleteNetwork(id string) error {
 	return w.InnerProvider.DeleteNetwork(id)
 }
 
-// CreateGateway ...
-func (w LoggedProvider) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
-	defer w.prepare(w.trace("CreateGateway"))
-	return w.InnerProvider.CreateGateway(req)
-}
-
-// DeleteGateway ...
-func (w LoggedProvider) DeleteGateway(networkID string) error {
-	defer w.prepare(w.trace("DeleteGateway"))
-	return w.InnerProvider.DeleteGateway(networkID)
-}
+// // CreateGateway ...
+// func (w LoggedProvider) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
+// 	defer w.prepare(w.trace("CreateGateway"))
+// 	return w.InnerProvider.CreateGateway(req)
+// }
+//
+// // DeleteGateway ...
+// func (w LoggedProvider) DeleteGateway(networkID string) error {
+// 	defer w.prepare(w.trace("DeleteGateway"))
+// 	return w.InnerProvider.DeleteGateway(networkID)
+// }
 
 // CreateVIP ...
 func (w LoggedProvider) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {

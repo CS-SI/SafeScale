@@ -2,14 +2,14 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/gophercloud/gophercloud"
 	"testing"
+
+	"github.com/gophercloud/gophercloud"
 )
 
 func TestGophercloudErrorCodes(t *testing.T) {
 
-	var srcErr error
-	srcErr = gophercloud.ErrDefault409{
+	srcErr := gophercloud.ErrDefault409{
 		ErrUnexpectedResponseCode: gophercloud.ErrUnexpectedResponseCode{
 			BaseError: gophercloud.BaseError{},
 			URL:       "",
