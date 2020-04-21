@@ -671,15 +671,16 @@ type ErrAborted struct {
 }
 
 // AbortedError creates a ErrAborted error
-func AbortedError(msg string, err error) ErrAborted {
-	if msg == "" {
-		msg = "aborted"
+func AbortedError(err error, msg ...interface{}) ErrAborted {
+	var message string
+	if len(msg) == 0 {
+		message = "aborted"
 	} else {
-		msg = fmt.Sprintf("aborted: %s", msg)
+		message = strprocess.FormatStrings(msg...)
 	}
 	return ErrAborted{
 		errCore: errCore{
-			message:      msg,
+			message:      message,
 			causer:       err,
 			consequences: []error{},
 			fields:       make(fields),

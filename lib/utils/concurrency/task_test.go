@@ -478,7 +478,7 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 			time.Sleep(time.Duration(10) * time.Millisecond)
 			status, err := t.GetStatus()
 			if status == ABORTED || status == TIMEOUT {
-				forever = false
+				// forever = false
 				break
 			}
 			if err != nil {
@@ -530,13 +530,13 @@ func TestDontCallMeUp(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
-	single, err = single.StartWithTimeout(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
+	_, err = single.StartWithTimeout(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
 		forever := true
 		for forever {
 			time.Sleep(time.Duration(10) * time.Millisecond)
 			status, _ := t.GetStatus()
 			if status == ABORTED || status == TIMEOUT {
-				forever = false
+				// forever = false
 				break
 			}
 			fmt.Println("Forever young...")
@@ -582,12 +582,10 @@ func TestOneShot(t *testing.T) {
 	require.Nil(t, err)
 
 	single, err = single.StartWithTimeout(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		forever := true
-		for forever {
+		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
 			status, _ := t.GetStatus()
 			if status == ABORTED || status == TIMEOUT {
-				forever = false
 				break
 			}
 			fmt.Println("Forever young...")
@@ -638,12 +636,10 @@ func TestOneShotIgnoringAbort(t *testing.T) {
 	require.Nil(t, err)
 
 	single, err = single.StartWithTimeout(func(t Task, parameters TaskParameters) (result TaskResult, err error) {
-		forever := true
-		for forever {
+		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
 			status, _ := t.GetStatus()
 			if status == ABORTED || status == TIMEOUT {
-				forever = false
 				break
 			}
 			fmt.Println("Forever young...")

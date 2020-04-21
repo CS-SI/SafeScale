@@ -80,9 +80,9 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err erro
 
 	if parentTask == nil {
 		if ctx == nil {
-			t, err = NewTaskWithParent(parentTask)
+			t, err = NewTask()
 		} else {
-			t, err = NewTaskWithContext(ctx, parentTask)
+			t, err = NewTaskWithContext(ctx, nil)
 		}
 	} else {
 		switch parentTask := parentTask.(type) {
@@ -197,9 +197,9 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 
 	tg.subtasks = append(tg.subtasks, subtask)
 	if status != RUNNING {
-		tg.task.lock.Lock()
+		tg.task.mu.Lock()
 		tg.task.status = RUNNING
-		tg.task.lock.Unlock()
+		tg.task.mu.Unlock()
 	}
 	return tg, nil
 }
@@ -234,8 +234,8 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 	results := make(map[string]TaskResult)
 
 	if taskStatus == DONE {
-		tg.task.lock.Lock()
-		defer tg.task.lock.Unlock()
+		tg.task.mu.Lock()
+		defer tg.task.mu.Unlock()
 		results[tid] = tg.result
 		return results, tg.task.err
 	}
@@ -251,7 +251,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 				errors = append(errors, lerr)
 			}
 		}
-		return nil, scerr.AbortedError("taskgroup was already aborted", scerr.ErrListError(errors))
+		return nil, scerr.AbortedError(scerr.ErrListError(errors), "taskgroup was already aborted")
 	}
 	if taskStatus != RUNNING && taskStatus != READY {
 		return nil, scerr.ForbiddenError("cannot wait task group '%s': not running", tid)
@@ -276,8 +276,8 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 		errors = append(errors, fmt.Sprintf("%s: %s", i, e))
 	}
 
-	tg.task.lock.Lock()
-	defer tg.task.lock.Unlock()
+	tg.task.mu.Lock()
+	defer tg.task.mu.Unlock()
 
 	tg.task.result = results
 	if len(errors) > 0 {

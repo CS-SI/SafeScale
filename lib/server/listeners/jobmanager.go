@@ -178,7 +178,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	for uuid, info := range jobMap {
 		status, _ := task.GetStatus()
 		if status == concurrency.ABORTED {
-			return nil, scerr.AbortedError("aborted", nil)
+			return nil, scerr.AbortedError(nil)
 		}
 		pbProcessList = append(pbProcessList, &protocol.JobDefinition{Uuid: uuid, Info: info})
 	}

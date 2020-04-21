@@ -1,6 +1,6 @@
 GO?=go
 
-.PHONY:	vet
+.PHONY:	vet clean
 
 vet:
 	@$(GO) vet ./...
