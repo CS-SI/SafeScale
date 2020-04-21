@@ -148,15 +148,15 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		return "", err
 	}
 	err = k.network.Inspect(voidtask, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-		core, ok := clonable.(*abstract.Network)
+		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		if core.VIP != nil {
+		if an.VIP != nil {
 			// VPL: for now, no public IP on VIP, so uses the IP of the first Gateway
-			// (*values)["EndpointIP"] = core.VIP.PublicIP
+			// (*values)["EndpointIP"] = an.VIP.PublicIP
 			(*values)["EndpointIP"] = k.gatewayPublicIP
-			(*values)["DefaultRouteIP"] = core.VIP.PrivateIP
+			(*values)["DefaultRouteIP"] = an.VIP.PrivateIP
 		} else {
 			(*values)["EndpointIP"] = k.gatewayPublicIP
 			(*values)["DefaultRouteIP"] = k.gatewayPrivateIP

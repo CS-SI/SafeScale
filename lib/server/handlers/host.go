@@ -221,7 +221,7 @@ func (handler *hostHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	err = objh.Create(task, req, sizing)
+	_, err = objh.Create(task, req, sizing)
 	if err != nil {
 		return nil, err
 	}

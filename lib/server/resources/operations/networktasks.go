@@ -22,9 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -62,10 +60,10 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	if !ok {
 		hostSizing = abstract.HostSizingRequirements{}
 	}
-	primary, ok := inputs["primary"].(bool)
-	if !ok {
-		return nil, scerr.InvalidParameterError("params['primary']", "must be a bool")
-	}
+	// primary, ok := inputs["primary"].(bool)
+	// if !ok {
+	// 	return nil, scerr.InvalidParameterError("params['primary']", "must be a bool")
+	// }
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostRequest.ResourceName, hostRequest.TemplateID, hostRequest.ImageID)
 	svc := objn.SafeGetService()
@@ -309,14 +307,14 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 //
 // }
 
-func (objn *network) taskInstallPhase3OnGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (objn *network) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
-		objgw    resources.Host
+		objgw    *host
 		userData *userdata.Content
 		ok       bool
 	)
-	if objgw, ok = params.(data.Map)["host"].(resources.Host); !ok {
-		return nil, scerr.InvalidParameterError("params['host']", "is missing or is not a 'resources.Host'")
+	if objgw, ok = params.(data.Map)["host"].(*host); !ok {
+		return nil, scerr.InvalidParameterError("params['host']", "is missing or is not a '*operations.host'")
 	}
 	if userData, ok = params.(data.Map)["userdata"].(*userdata.Content); !ok {
 		return nil, scerr.InvalidParameterError("params['userdata']", "is missing or is not a '*userdata.Content'")
@@ -333,56 +331,48 @@ func (objn *network) taskInstallPhase3OnGateway(task concurrency.Task, params co
 	)()
 	defer scerr.OnPanic(&err)()
 
-	content, err := userData.Generate("phase3")
+	err = objgw.runInstallPhase(task, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData)
 	if err != nil {
 		return nil, err
 	}
-	err = objgw.PushStringToFile(task, string(content), utils.TempFolder+"/user_data.phase3.sh", "", "")
-	if err != nil {
-		return nil, err
-	}
-	command := fmt.Sprintf("sudo bash %s/%s; exit $?", utils.TempFolder, "user_data.phase3.sh")
 
-	// logrus.Debugf("Configuring gateway '%s', phase 2", gw.Name)
-	returnCode, _, _, err := objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	err = objgw.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userData)
 	if err != nil {
-		RetrieveForensicsData(task, objgw)
 		return nil, err
 	}
-	if returnCode != 0 {
-		RetrieveForensicsData(task, objgw)
-		warnings, errs := GetPhaseWarningsAndErrors(task, objgw)
-		return nil, scerr.NewError("failed to finalize gateway '%s' installation: phase3 returned code '%d', warnings '%s', errors '%s'", gwname, returnCode, warnings, errs)
+
+	// intermediate gateway reboot
+	logrus.Debugf("Rebooting gateway '%s'", gwname)
+	command := "sudo systemctl reboot"
+	retcode, _, _, err := objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if err != nil {
+		return nil, err
 	}
-	logrus.Infof("Gateway '%s' successfully configured.", gwname)
-	//
-	// // Reboot gateway
-	// logrus.Debugf("Rebooting gateway '%s'", gwname)
-	// command = "sudo systemctl reboot"
-	// returnCode, _, _, err = objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if returnCode != 0 {
-	// 	logrus.Warnf("Unexpected problem rebooting...")
-	// }
-	//
-	// ssh, err := objgw.GetSSHConfig(task)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	// sshDefaultTimeout := temporal.GetHostTimeout()
-	// _, err = ssh.WaitServerReady(task, "ready", sshDefaultTimeout)
-	// if err != nil {
-	// 	if _, ok := err.(scerr.ErrTimeout); ok {
-	// 		return nil, err
-	// 	}
-	// 	if abstract.IsProvisioningError(err) {
-	// 		logrus.Errorf("%+v", err)
-	// 		return nil, scerr.NewError("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gwname)
-	// 	}
-	// 	return nil, err
-	// }
+	if retcode != 0 {
+		logrus.Warnf("Unexpected problem rebooting...")
+	}
+
+	// final phase...
+	err = objgw.runInstallPhase(task, userdata.PHASE5_FINAL, userData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Final gatewqay reboot
+	logrus.Debugf("Rebooting gateway '%s'", gwname)
+	command = "sudo systemctl reboot"
+	retcode, _, _, err = objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if err != nil {
+		return nil, err
+	}
+	if retcode != 0 {
+		logrus.Warnf("Unexpected problem rebooting...")
+	}
+
+	_, err = objgw.waitInstallPhase(task, "final")
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
