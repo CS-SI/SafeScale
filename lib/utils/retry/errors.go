@@ -37,5 +37,5 @@ func StopRetryError(err error, msg ...interface{}) ErrStopRetry {
 	} else {
 		newMessage = fmt.Sprintf("stopping retries: %s", newMessage)
 	}
-	return scerr.AbortedError(newMessage, err)
+	return scerr.AbortedError(err, newMessage)
 }

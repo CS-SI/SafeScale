@@ -1131,7 +1131,7 @@ func toHostState(status string) hoststate.Enum {
 // 	// 				return err
 // 	// 			case gophercloud.ErrDefault409:
 // 	// 				// specific handling for error 409
-// 	// 				return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", ahc.ID, err))
+// 	// 				return scerr.AbortedError(fmt.Errorf("error getting host '%s': %s", ahc.ID, err))
 // 	// 			case gophercloud.ErrDefault429:
 // 	// 				// rate limiting defined by provider, retry
 // 	// 				return err

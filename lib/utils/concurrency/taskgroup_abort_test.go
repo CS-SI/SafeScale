@@ -2,13 +2,14 @@ package concurrency
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/stretchr/testify/require"
 )
 
 // this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' and checks if abortion is requested between operations
@@ -185,9 +186,9 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 	}
 }
 
-func typeof(v interface{}) string {
-	return fmt.Sprintf("%T", v)
-}
+// func typeof(v interface{}) string {
+// 	return fmt.Sprintf("%T", v)
+// }
 
 func TestBadTaskActionCitizen(t *testing.T) {
 	overlord, err := NewTaskGroup(nil)

@@ -862,7 +862,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 		// Leave a chance to abort
 		taskStatus, _ := task.GetStatus()
 		if taskStatus == concurrency.ABORTED {
-			return scerr.AbortedError("", nil)
+			return scerr.AbortedError(nil)
 		}
 
 		// 1st delete primary gateway

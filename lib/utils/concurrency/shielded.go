@@ -125,7 +125,7 @@ func (d *Shielded) Serialize(task Task) ([]byte, error) {
 	}
 
 	var jsoned []byte
-	err := d.Inspect(task, func (clonable data.Clonable) error {
+	err := d.Inspect(task, func(clonable data.Clonable) error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
 		return innerErr

@@ -29,6 +29,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
+// TaskStatus ...
+type TaskStatus int
+
 const (
 	UNKNOWN TaskStatus = iota // status is unknown
 	READY                     // the task is ready to start
@@ -37,9 +40,6 @@ const (
 	ABORTED                   // the task has been aborted
 	TIMEOUT                   // the task ran out of time
 )
-
-// TaskStatus ...
-type TaskStatus int
 
 // TaskParameters ...
 type TaskParameters interface{}
@@ -99,8 +99,8 @@ type Task interface {
 
 // task is a structure allowing to identify (indirectly) goroutines
 type task struct {
-	lock sync.Mutex
-	id   string
+	mu sync.Mutex
+	id string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -109,7 +109,7 @@ type task struct {
 	finishCh chan struct{} // Used to signal the routine that Wait() the go routine is done
 	doneCh   chan bool     // Used by routine to signal it has done its processing
 	abortCh  chan bool     // Used to signal the routine it has to stop processing
-	closeCh  chan struct{} // Used to signal the routine capturing the cancel signal to stop capture
+	// closeCh  chan struct{} // Used to signal the routine capturing the cancel signal to stop capture
 
 	err    error
 	result TaskResult
@@ -124,7 +124,7 @@ var globalTask atomic.Value
 func RootTask() (Task, error) {
 	anon := globalTask.Load()
 	if anon == nil {
-		newT, err := newTask(nil, nil) // nolint
+		newT, err := newTask(context.TODO(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -170,8 +170,8 @@ func (t *task) GetLastError() (error, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	return t.err, nil
 }
@@ -231,8 +231,8 @@ func (t *task) GetID() (string, error) {
 		return "", scerr.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	return t.id, nil
 }
@@ -255,8 +255,8 @@ func (t *task) GetStatus() (TaskStatus, error) {
 		return 0, scerr.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.status, nil
 }
 
@@ -266,8 +266,8 @@ func (t *task) GetContext() (context.Context, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.ctx, nil
 }
 
@@ -283,8 +283,8 @@ func (t *task) SetID(id string) error {
 	if id == "0" {
 		return scerr.InvalidParameterError("id", "cannot be '0', reserved for root task")
 	}
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	t.id = id
 	return nil
@@ -311,8 +311,8 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 		return nil, err
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.status != READY {
 		return nil, scerr.NewError("can't start task '%s': not ready", tid)
@@ -342,8 +342,8 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, e
 		return nil, err
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	subtaskId, _ := st.GetID()
 	t.subtasks[subtaskId] = st
@@ -357,9 +357,10 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 		return scerr.InvalidInstanceError()
 	}
 
+	tracer := NewTracer(t, debug.ShouldTrace("concurrency.task"))
+
 	go t.run(action, params)
 
-	tracer := NewTracer(t, debug.ShouldTrace("concurrency.task"), "")
 	finish := false
 	defer close(t.finishCh)
 
@@ -372,25 +373,19 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				// tracer.Trace("receiving signal from context, aborting task...")
-				t.lock.Lock()
-				defer t.lock.Unlock()
+				tracer.Trace("receiving signal from context, aborting task...")
+				t.mu.Lock()
 				t.status = ABORTED
-				t.err = scerr.AbortedError("cancel signal received", t.err)
-				finish = true
+				t.err = scerr.AbortedError(t.err)
 				t.finishCh <- struct{}{}
+				finish = true
+				t.mu.Unlock() // Avoid defer in loop
 			case <-t.doneCh:
 				tracer.Trace("receiving done signal from go routine")
 				t.mu.Lock()
-				if t.status == RUNNING {
-					t.status = DONE
-					t.finishCh <- struct{}{}
-					close(t.finishCh)
-				}
-				t.mu.Unlock()
+				t.status = DONE
 				finish = true
-				t.finishCh <- struct{}{}
-				break
+				t.mu.Unlock() // Avoid defer in loop
 			case <-t.abortCh:
 				// Abort signal received
 				tracer.Trace("receiving abort signal")
@@ -399,19 +394,20 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					if t.status != TIMEOUT {
 						t.status = ABORTED
 					}
-					t.err = scerr.AbortedError("", t.err)
-					finish = true
+					t.err = scerr.AbortedError(t.err)
 					t.finishCh <- struct{}{}
+					finish = true
 				} else {
 					tracer.Trace("abort signal is disengaged, ignored")
 				}
+				t.mu.Unlock() // Avoid defer in loop
 			case <-time.After(timeout):
-				t.lock.Lock()
-				defer t.lock.Unlock()
+				t.mu.Lock()
 				t.status = TIMEOUT
 				t.err = scerr.TimeoutError(t.err, timeout, "task is out of time")
-				finish = true
 				t.finishCh <- struct{}{}
+				finish = true
+				t.mu.Unlock() // Avoid defer in loop
 			}
 		}
 	} else {
@@ -419,25 +415,22 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				// tracer.Trace("receiving signal from context, aborting task...")
-				t.lock.Lock()
-				defer t.lock.Unlock()
+				tracer.Trace("receiving signal from context, aborting task...")
+				t.mu.Lock()
 				t.status = ABORTED
-				t.err = scerr.AbortedError("cancel signal received", t.err)
-				finish = true
+				t.err = scerr.AbortedError(t.err)
 				t.finishCh <- struct{}{}
+				finish = true
+				t.mu.Unlock() // Avoid defer in loop
 			case <-t.doneCh:
 				tracer.Trace("receiving done signal from go routine")
 				t.mu.Lock()
 				if t.status == RUNNING {
 					t.status = DONE
 					t.finishCh <- struct{}{}
-					close(t.finishCh)
 				}
-				t.mu.Unlock()
 				finish = true
-				t.finishCh <- struct{}{}
-				break
+				t.mu.Unlock() // Avoid defer in loop
 			case <-t.abortCh:
 				// Abort signal received
 				tracer.Trace("receiving abort signal")
@@ -446,17 +439,18 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					if t.status != TIMEOUT {
 						t.status = ABORTED
 					}
-					t.err = scerr.AbortedError("", t.err)
-					finish = true
+					t.err = scerr.AbortedError(t.err)
 					t.finishCh <- struct{}{}
+					finish = true
 				} else {
 					tracer.Trace("abort signal is disengaged, ignored")
 				}
+				t.mu.Unlock() // Avoid defer in loop
 			}
 		}
 	}
 
-	// logrus.Debugf("%s controller ended properly", sig)
+	return nil
 }
 
 // run executes the function 'action'
@@ -464,8 +458,8 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	var err error
 	defer func() {
 		if err := recover(); err != nil {
-			t.lock.Lock()
-			defer t.lock.Unlock()
+			t.mu.Lock()
+			defer t.mu.Unlock()
 
 			t.err = scerr.RuntimePanicError(fmt.Sprintf("panic happened: %v", err))
 			t.result = nil
@@ -476,8 +470,8 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 
 	result, err := action(t, params)
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	t.err = err
 	t.result = result
@@ -544,8 +538,8 @@ func (t *task) Wait() (TaskResult, error) {
 
 	<-t.finishCh
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.status == ABORTED || t.status == TIMEOUT {
 		return nil, t.err
@@ -643,8 +637,8 @@ func (t *task) Abort() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.abortDisengaged {
 		return scerr.NotAvailableError("abort signal is disengaged on task %s", t.id)
@@ -662,30 +656,30 @@ func (t *task) Abort() (err error) {
 		defer t.cancel()
 
 		t.status = ABORTED
-		t.err = scerr.AbortedError("", t.err)
-	} else if t.status != DONE {
+		t.err = scerr.AbortedError(t.err)
+		// } else if t.status == DONE {
+		// 	t.status = ABORTED
+		// 	t.err = scerr.AbortedError(t.err)
+	} else {
 		t.status = ABORTED
-		t.err = scerr.AbortedError("", t.err)
-	} else if t.status == DONE {
-		t.status = ABORTED
-		t.err = scerr.AbortedError("", t.err)
+		t.err = scerr.AbortedError(t.err)
 	}
 
 	if previousErr != nil && previousStatus != TIMEOUT {
-		return scerr.AbortedError("", previousErr)
+		return scerr.AbortedError(previousErr)
 	}
 
 	return nil
 }
 
-// NewSubtask creates a subtask from current task
-func (t *task) newSubtask() (Task, error) {
-	if t == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
-	return newTask(context.TODO(), t)
-}
+// // NewSubtask creates a subtask from current task
+// func (t *task) newSubtask() (Task, error) {
+// 	if t == nil {
+// 		return nil, scerr.InvalidInstanceError()
+// 	}
+//
+// 	return newTask(context.TODO(), t)
+// }
 
 // Abortable tells if task can be aborted
 func (t *task) Abortable() (bool, error) {
@@ -693,8 +687,8 @@ func (t *task) Abortable() (bool, error) {
 		return false, scerr.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return !t.abortDisengaged, nil
 }
 
@@ -703,32 +697,9 @@ func (t *task) IgnoreAbortSignal(ignore bool) error {
 	if t == nil {
 		return scerr.InvalidInstanceError()
 	}
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	t.abortDisengaged = ignore
 	return nil
-}
-
-// Close cleans up the task
-// Must be called to prevent memory leaks
-func (t *task) Close() {
-	_ = t.Abort()
-	for k := range t.subtasks {
-		_ = k.Abort()
-		_, _ = k.Wait()
-	}
-	t.subtasks = nil
-	_, _ = t.Wait()
-
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	if t.context != nil {
-		t.closeCh <- struct{}{}
-		close(t.closeCh)
-	}
-	// if set, CancelFunc t.cancel has to be called to prevent memory leak
-	if t.cancel != nil {
-		t.cancel()
-	}
 }
