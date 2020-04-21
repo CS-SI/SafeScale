@@ -80,7 +80,7 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err erro
 
 	if parentTask == nil {
 		if ctx == nil {
-			t, err = NewTask(parentTask)
+			t, err = NewTaskWithParent(parentTask)
 		} else {
 			t, err = NewTaskWithContext(ctx, parentTask)
 		}
@@ -88,10 +88,10 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err erro
 		switch parentTask := parentTask.(type) {
 		case *task:
 			p := parentTask
-			t, err = NewTask(p)
+			t, err = NewTaskWithParent(p)
 		case *taskGroup:
 			p := parentTask
-			t, err = NewTask(p.task)
+			t, err = NewTaskWithParent(p.task)
 		}
 	}
 	return &taskGroup{task: t.(*task)}, err
@@ -240,10 +240,21 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 		return results, tg.task.err
 	}
 	if taskStatus == ABORTED {
-		return nil, scerr.AbortedError("aborted", nil)
+		var errors []error
+		if tg.task.err != nil {
+			errors = append(errors, tg.task.err)
+		}
+
+		for _, s := range tg.subtasks {
+			lerr, _ := s.GetLastError()
+			if lerr != nil {
+				errors = append(errors, lerr)
+			}
+		}
+		return nil, scerr.AbortedError("taskgroup was already aborted", scerr.ErrListError(errors))
 	}
-	if taskStatus != RUNNING {
-		return nil, scerr.NewError("cannot wait task group '%s': not running", tid)
+	if taskStatus != RUNNING && taskStatus != READY {
+		return nil, scerr.ForbiddenError("cannot wait task group '%s': not running", tid)
 	}
 
 	for _, s := range tg.subtasks {
@@ -259,6 +270,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 
 		results[sid] = result
 	}
+
 	var errors []string
 	for i, e := range errs {
 		errors = append(errors, fmt.Sprintf("%s: %s", i, e))
@@ -311,7 +323,7 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
 		return false, nil, scerr.NewError("cannot wait task group '%s': not running", tid)
 	}
 	for _, s := range tg.subtasks {
-		ok, _, _ := s.TryWait() // FIXME Ouch
+		ok, _, _ := s.TryWait()
 		if !ok {
 			return false, nil, nil
 		}
@@ -368,39 +380,6 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 	case <-c:
 		return true, results, err
 	}
-}
-
-// Reset resets the task for reuse
-func (tg *taskGroup) Reset() (Task, error) {
-	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
-	tg.groupLock.Lock()
-	defer tg.groupLock.Unlock()
-
-	tid, err := tg.GetID()
-	if err != nil {
-		return nil, err
-	}
-
-	taskStatus, err := tg.task.GetStatus()
-	if err != nil {
-		return nil, err
-	}
-
-	if taskStatus == RUNNING {
-		return nil, scerr.InvalidRequestError("cannot reset task group '%s': group is running", tid)
-	}
-
-	tg.task.lock.Lock()
-	defer tg.task.lock.Unlock()
-
-	tg.task.status = READY
-	tg.task.err = nil
-	tg.task.result = nil
-	tg.subtasks = []Task{}
-	return tg, nil
 }
 
 // Abort aborts the task execution
