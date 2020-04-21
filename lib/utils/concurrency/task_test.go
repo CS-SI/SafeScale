@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -468,7 +468,7 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -526,7 +526,7 @@ func TestDontCallMeUp(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -577,7 +577,7 @@ func TestOneShot(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -630,7 +630,7 @@ func TestOneShotIgnoringAbort(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -711,7 +711,7 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	single, err := NewTask(nil)
+	single, err := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
@@ -741,11 +741,15 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 	time.Sleep(time.Duration(50) * time.Millisecond)
 	fmt.Println("Aborted")
 
-	require.Nil(t, err)
-
 	_ = w.Close()
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	require.Nil(t, err)
 
 	// Here, last 3 lines of the output should be:
 	// Forever young...
@@ -753,6 +757,7 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 	// Aborted
 
 	outString := string(out)
+
 	nah := strings.Split(outString, "\n")
 
 	if !strings.Contains(nah[len(nah)-4], "Forever young") {

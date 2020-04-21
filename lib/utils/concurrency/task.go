@@ -82,6 +82,7 @@ type TaskCore interface {
 	GetSignature() (string, error)
 	GetStatus() (TaskStatus, error)
 	GetContext() (context.Context, error)
+	GetLastError() (error, error)
 
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	RunInSubtask(TaskAction, TaskParameters) (TaskResult, error)
@@ -136,12 +137,12 @@ func RootTask() (Task, error) {
 
 // VoidTask is a new task that do nothing
 func VoidTask() (Task, error) {
-	return NewTask(nil)
+	return NewTask()
 }
 
 // NewTask ...
-func NewTask(parentTask Task) (Task, error) {
-	return newTask(context.TODO(), parentTask)
+func NewTask() (Task, error) {
+	return newTask(context.TODO(), nil)
 }
 
 // NewUnbreakableTask is a new task that cannot be aborted by default (but this can be changed with IgnoreAbortSignal(false))
@@ -158,7 +159,21 @@ func NewUnbreakableTask() (Task, error) {
 // NewTaskWithParent creates a subtask
 // Such a task can be aborted if the parent one can be
 func NewTaskWithParent(parentTask Task) (Task, error) {
+	if parentTask == nil {
+		return nil, scerr.InvalidParameterError("parentTask", "must not be nil")
+	}
 	return newTask(context.TODO(), parentTask)
+}
+
+func (t *task) GetLastError() (error, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.err, nil
 }
 
 // NewTaskWithContext ...
@@ -361,7 +376,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Lock()
 				defer t.lock.Unlock()
 				t.status = ABORTED
-				t.err = scerr.AbortedError("cancel signal received", nil)
+				t.err = scerr.AbortedError("cancel signal received", t.err)
 				finish = true
 				t.finishCh <- struct{}{}
 			case <-t.doneCh:
@@ -384,7 +399,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					if t.status != TIMEOUT {
 						t.status = ABORTED
 					}
-					t.err = scerr.AbortedError("", nil)
+					t.err = scerr.AbortedError("", t.err)
 					finish = true
 					t.finishCh <- struct{}{}
 				} else {
@@ -394,7 +409,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Lock()
 				defer t.lock.Unlock()
 				t.status = TIMEOUT
-				t.err = scerr.TimeoutError(nil, timeout, "task is out of time")
+				t.err = scerr.TimeoutError(t.err, timeout, "task is out of time")
 				finish = true
 				t.finishCh <- struct{}{}
 			}
@@ -408,7 +423,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Lock()
 				defer t.lock.Unlock()
 				t.status = ABORTED
-				t.err = scerr.AbortedError("cancel signal received", nil)
+				t.err = scerr.AbortedError("cancel signal received", t.err)
 				finish = true
 				t.finishCh <- struct{}{}
 			case <-t.doneCh:
@@ -431,7 +446,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					if t.status != TIMEOUT {
 						t.status = ABORTED
 					}
-					t.err = scerr.AbortedError("", nil)
+					t.err = scerr.AbortedError("", t.err)
 					finish = true
 					t.finishCh <- struct{}{}
 				} else {
@@ -635,6 +650,9 @@ func (t *task) Abort() (err error) {
 		return scerr.NotAvailableError("abort signal is disengaged on task %s", t.id)
 	}
 
+	previousErr := t.err
+	previousStatus := t.status
+
 	if t.status == RUNNING {
 		// Tell controller to stop go routine
 		t.abortCh <- true
@@ -644,11 +662,17 @@ func (t *task) Abort() (err error) {
 		defer t.cancel()
 
 		t.status = ABORTED
+		t.err = scerr.AbortedError("", t.err)
 	} else if t.status != DONE {
 		t.status = ABORTED
+		t.err = scerr.AbortedError("", t.err)
 	} else if t.status == DONE {
-		fmt.Println("It was finished already")
 		t.status = ABORTED
+		t.err = scerr.AbortedError("", t.err)
+	}
+
+	if previousErr != nil && previousStatus != TIMEOUT {
+		return scerr.AbortedError("", previousErr)
 	}
 
 	return nil
