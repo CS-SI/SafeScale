@@ -19,16 +19,16 @@
 {{.Header}}
 
 print_error() {
-  ec=$?
-  read line file <<<$(caller)
-  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+    {{.ExitOnError}}
 }
 trap print_error ERR
 
 fail() {
-  echo "PROVISIONING_ERROR: $1"
-	echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
-	exit $1
+    echo "PROVISIONING_ERROR: $1"
+    echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.init.done
+    exit $1
 }
 
 mkdir -p /opt/safescale/etc /opt/safescale/bin &>/dev/null
@@ -37,7 +37,7 @@ mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp 
 
 exec 1<&-
 exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.phase1.log
+exec 1<>/opt/safescale/var/log/user_data.init.log
 exec 2>&1
 set -x
 
@@ -186,6 +186,6 @@ ensure_network_connectivity
 
 touch /etc/cloud/cloud-init.disabled
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.init.done
 set +x
 exit 0

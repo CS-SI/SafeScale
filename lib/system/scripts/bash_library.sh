@@ -955,7 +955,7 @@ export -f sfGetFact
 # Waits the completion of the execution of userdata
 waitForUserdata() {
     while true; do
-        [ -f ${SF_VARDIR}/state/user_data.phase2.done ] && break
+        [ -f ${SF_VARDIR}/state/user_data.netsec.done ] && break
         echo "Waiting userdata completion..."
         sleep 5
     done

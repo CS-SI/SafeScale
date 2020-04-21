@@ -783,7 +783,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 
 	originalPhase := phase
 	if phase == "ready" {
-		phase = "phase2"
+		phase = "final"
 	}
 
 	var (
@@ -799,14 +799,14 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
-			cmd, err := ssh.Command(task, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
-			if err != nil {
+			cmd, innerErr := ssh.Command(task, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
+			if innerErr != nil {
 				return err
 			}
 
-			retcode, stdout, stderr, err = cmd.RunWithTimeout(task, outputs.COLLECT, timeout)
-			if err != nil {
-				return err
+			retcode, stdout, stderr, innerErr = cmd.RunWithTimeout(task, outputs.COLLECT, timeout)
+			if innerErr != nil {
+				return innerErr
 			}
 			if retcode != 0 {
 				if retcode == 255 {

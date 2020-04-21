@@ -19,27 +19,15 @@
 {{.Header}}
 
 print_error() {
-    ec=$?
     read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
 fail() {
-    if [ -z "$2" ]
-    then
-      if [ $1 -ne 0 ]; then
-        echo "PROVISIONING_ERROR: $1"
-      fi
-    else
-      if [ $1 -ne 0 ]; then
-        echo "PROVISIONING_ERROR: $1: $2"
-      fi
-    fi
-    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
-    # For compatibility with previous user_data implementation (until v19.03.x)...
-    ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
+    echo "PROVISIONING_ERROR: $1"
+    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.gwha.done
     exit $1
 }
 
@@ -71,11 +59,12 @@ install_keepalived() {
     esac
 
     NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
+    read -a IF_PR ignore <<<${SF_VARDIR}/state/private_nics
 
     cat >/etc/keepalived/keepalived.conf <<-EOF
 vrrp_instance vrrp_group_gws_internal {
     state BACKUP
-    interface ${PR_IFs[0]}
+    interface ${IF_PR}
     virtual_router_id 1
     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
     nopreempt
@@ -147,7 +136,9 @@ EOF
 
 {{- if .IsGateway }}
 install_keepalived
-{{ endif }}
+{{ end }}
+
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.gwha.done
 
 set +x
 exit 0

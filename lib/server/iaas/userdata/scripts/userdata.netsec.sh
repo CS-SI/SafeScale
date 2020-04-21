@@ -14,100 +14,94 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#{{.Revision}}
+# Script customized for {{.ProviderName}} driver
 
 {{.Header}}
 
 print_error() {
-    ec=$?
     read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
 fail() {
-    if [ -z "$2" ]
-    then
-      if [ $1 -ne 0 ]; then
-        echo "PROVISIONING_ERROR: $1"
-      fi
-    else
-      if [ $1 -ne 0 ]; then
-        echo "PROVISIONING_ERROR: $1: $2"
-      fi
-    fi
-    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
-    # For compatibility with previous user_data implementation (until v19.03.x)...
-    ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
+    echo "PROVISIONING_ERROR: $1"
+    echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
     exit $1
 }
 
-# Redirects outputs to /opt/safescale/log/user_data.phase2.log
+# Redirects outputs to /opt/safescale/log/user_data.netsec.log
 exec 1<&-
 exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.phase2.log
+exec 1<>/opt/safescale/var/log/user_data.netsec.log
 exec 2>&1
 set -x
 
-# Tricks BashLibrary's waitUserData to believe the current phase (2) is already done
->/opt/safescale/var/state/user_data.phase2.done
+# Tricks BashLibrary's waitUserData to believe the current phase 'netsec' is already done (otherwise will deadlock)
+>/opt/safescale/var/state/user_data.netsec.done
 # Includes the BashLibrary
 {{ .BashLibrary }}
+rm -f /opt/safescale/var/state/user_data.netsec.done
 
 reset_fw() {
     case $LINUX_KIND in
         debian|ubuntu)
-            sfApt update &>/dev/null
-            sfApt install -qy firewalld || return 1
+            sfApt update &>/dev/null || return 1
+            sfApt install -q -y firewalld || return 1
 
             systemctl stop ufw
-            systemctl start firewalld || return 1
+            # systemctl start firewalld || return 1
             systemctl disable ufw
-            systemctl enable firewalld
-            sfApt purge -qy ufw &>/dev/null || return 1
+            # systemctl enable firewalld
+            sfApt purge -q -y ufw &>/dev/null || return 1
             ;;
 
         rhel|centos)
             # firewalld may not be installed
             if ! systemctl is-active firewalld &>/dev/null; then
                 if ! systemctl status firewalld &>/dev/null; then
-                    yum install -qy firewalld || return 1
+                    yum install -q -y firewalld || return 1
                 fi
-                systemctl enable firewalld &>/dev/null
-                systemctl start firewalld &>/dev/null
+                # systemctl enable firewalld &>/dev/null
+                # systemctl start firewalld &>/dev/null
             fi
             ;;
     esac
 
-    # Clear interfaces attached to zones
-    for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
-        for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
-            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
+    # # Clear interfaces attached to zones
+    # for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
+    #     for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
+    #         sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
+    #     done
+    # done
+    for zone in public trusted; do
+        for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
+            firewall-offline-cmd --zone=$zone --remove-interface=$nic &>/dev/null || true
         done
     done
 
     # Attach Internet interface or source IP to zone public if host is gateway
     [ ! -z $PU_IF ] && {
-        sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
+        firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
     }
     {{- if or .PublicIP .IsGateway }}
     [ -z $PU_IF ] && {
-        sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
+        firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
     }
     {{- end }}
     # Attach LAN interfaces to zone trusted
     [ ! -z $PR_IFs ] && {
         for i in $PR_IFs; do
-            sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
+            firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
         done
     }
     # Attach lo interface to zone trusted
-    sfFirewallAdd --zone=trusted --add-interface=lo || return 1
+    firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
     # Allow service ssh on public zone
-    sfFirewallAdd --zone=public --add-service=ssh
+    firewall-offline-cmd --zone=public --add-service=ssh || return 1
     # Save current fw settings as permanent
-    sfFirewallReload
+    sfService enable firewalld
 }
 
 NICS=
@@ -117,6 +111,7 @@ PU_IP=
 PU_IF=
 i_PR_IF=
 o_PR_IF=
+AWS=
 
 # Don't request dns name servers from DHCP server
 # Don't update default route
@@ -188,6 +183,25 @@ identify_nics() {
     echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
     echo "$PU_IF" >${SF_VARDIR}/state/public_nics
 
+    if [ ! -z $PU_IP ]; then
+      if [ -z $PU_IF ]; then
+        if [ -z $NO404 ]; then
+          echo "It seems AWS"
+          AWS=1
+        else
+          AWS=0
+        fi
+      fi
+    fi
+
+    if [ "{{.ProviderName}}" == "aws" ]; then
+      echo "It actually IS AWS"
+      AWS=1
+    else
+      echo "It is NOT AWS"
+      AWS=0
+    fi
+
     echo "NICS identified: $NICS"
     echo "    private NIC(s): $PR_IFs"
     echo "    public NIC: $PU_IF"
@@ -202,20 +216,31 @@ substring_diff() {
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
+    op=-1
+    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
+    [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
+
     {{- if .AddGateway }}
         route del -net default &>/dev/null
         route add -net default gw {{ .DefaultRouteIP }}
     {{- else }}
     :
     {{- end}}
+
+    op=-1
+    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
+    [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
 }
 
 configure_dns() {
     if systemctl status systemd-resolved &>/dev/null; then
+        echo "Configuring dns with resolved"
         configure_dns_systemd_resolved
     elif systemctl status resolvconf &>/dev/null; then
+        echo "Configuring dns with resolvconf"
         configure_dns_resolvconf
     else
+        echo "Configuring dns legacy"
         configure_dns_legacy
     fi
 }
@@ -278,16 +303,35 @@ EOF
 auto ${IF}
 iface ${IF} inet dhcp
 {{- if .AddGateway }}
-  up route add -net default gw {{ .DefaultRouteIP }} || true
+  up route add -net default gw {{ .DefaultRouteIP }}
 {{- end}}
 EOF
         fi
     done
 
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 0"
+        fail 196
+    }
+
     configure_dhclient
 
     /sbin/dhclient || true
+
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 1"
+        fail 196
+    }
+
     systemctl restart networking
+
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 2"
+        fail 196
+    }
 
     reset_fw || fail 197
 
@@ -297,6 +341,12 @@ EOF
 # Configure network using systemd-networkd
 configure_network_systemd_networkd() {
     echo "Configuring network (using netplan and systemd-networkd)..."
+
+    {{- if .IsGateway }}
+    ISGW=1
+    {{- else}}
+    ISGW=0
+    {{- end}}
 
     mkdir -p /etc/netplan
     rm -f /etc/netplan/*
@@ -344,11 +394,101 @@ network:
 EOF
         fi
     done
+
+    if [ "{{.ProviderName}}" == "aws" ]; then
+      echo "It actually IS AWS"
+      AWS=1
+    else
+      echo "It is NOT AWS"
+      AWS=0
+    fi
+
+    if [[ $AWS -eq 1 ]]; then
+      if [[ $ISGW -eq 0 ]]; then
+        rm -f /etc/netplan/*
+        # Recreate netplan configuration with last netplan version and more settings
+        for IF in $NICS; do
+            if [ "$IF" = "$PU_IF" ]; then
+                cat <<-EOF >/etc/netplan/10-$IF-public.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    $IF:
+      dhcp4: true
+      dhcp6: false
+      critical: true
+      dhcp4-overrides:
+          use-dns: true
+          use-routes: true
+EOF
+            else
+                cat <<-EOF >/etc/netplan/11-$IF-private.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    $IF:
+      dhcp4: true
+      dhcp6: false
+      critical: true
+      dhcp4-overrides:
+        use-dns: true
+{{- if .AddGateway }}
+        use-routes: true
+      routes:
+      - to: 0.0.0.0/0
+        via: {{ .DefaultRouteIP }}
+        scope: global
+        on-link: true
+{{- else }}
+        use-routes: true
+{{- end}}
+EOF
+            fi
+        done
+      fi
+    fi
+
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 0"
+            fail 196
+        }
+    fi
+
     netplan generate && netplan apply || fail 198
+
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 1"
+            fail 196
+        }
+    fi
 
     configure_dhclient
 
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 2"
+            fail 196
+        }
+    fi
+
     systemctl restart systemd-networkd
+
+    if [[ $AWS -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 3"
+            fail 196
+        }
+    fi
 
     reset_fw || fail 199
 
@@ -357,7 +497,7 @@ EOF
 
 # Configure network for redhat7-like distributions (rhel, centos, ...)
 configure_network_redhat() {
-    echo "Configuring network (redhat-like)..."
+    echo "Configuring network (redhat7-like)..."
 
     if [ -z $VERSION_ID -o $VERSION_ID -lt 7 ]; then
         disable_svc() {
@@ -408,7 +548,12 @@ EOF
             i=$((i+1))
             {{- end }}
             {{- else }}
-            echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
+            if [ -z $EXISTING_DNS ]; then
+                echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            else
+                echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            fi
             {{- end }}
         fi
     done
@@ -439,11 +584,19 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-    if command -v wget; then
-      wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
-    else
-      ping -n -c1 -w30 -i5 www.google.com || return 1
-    fi
+    NETROUNDS=24
+    REACHED=0
+
+    for i in $(seq $NETROUNDS); do
+        if which wget; then
+            wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+        else
+            ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
+        fi
+    done
+
+    [ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
+
     [ ! -z "$PU_IF" ] && {
         check_for_ip $PU_IF || return 1
     }
@@ -476,17 +629,15 @@ EOF
         # Dedicated public interface available...
 
         # Allows ping
-        sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
+        firewall-offline-cmd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
         # Allows masquerading on public zone
-        sfFirewallAdd --zone=public --add-masquerade
+        firewall-offline-cmd --zone=public --add-masquerade
     fi
     # Enables masquerading on trusted zone (mainly for docker networks)
-    sfFirewallAdd --zone=trusted --add-masquerade
+    firewall-offline-cmd --zone=trusted --add-masquerade
 
     # Allows default services on public zone
-    sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
-    # Applies fw rules
-    sfFirewallReload
+    firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
 
     sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 196
     sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
@@ -497,6 +648,8 @@ EOF
 
 configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
+    cp /etc/resolv.conf /etc/resolv.conf.bak
+
     rm -f /etc/resolv.conf
     {{- if .DNSServers }}
     if [[ -e /etc/dhcp/dhclient.conf ]]; then
@@ -524,11 +677,18 @@ nameserver {{ . }}
 nameserver 1.1.1.1
 {{- end }}
 EOF
+
+    op=-1
+    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
+    [ $op -ne 0 ] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
+
     echo done
 }
 
 configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
+
+    EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
 
     cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
 {{- if .DNSServers }}
@@ -586,7 +746,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils
-            sfApt install -qy systemd pciutils || fail 210
+            sfApt install -q -y systemd pciutils || fail 210
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
             ;;
@@ -616,7 +776,7 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -qy systemd pciutils yum-utils || fail 213
+            yum install -q -y systemd pciutils yum-utils || fail 213
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -702,9 +862,7 @@ install_packages
 
 update_kernel_settings || fail 217
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
-# For compatibility with previous user_data implementation (until v19.03.x)...
-ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
 
 # !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
 #                      but after the template has been realized (cf. libvirt Stack)
