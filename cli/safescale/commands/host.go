@@ -440,7 +440,7 @@ var hostAddFeatureCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		task, err := concurrency.NewTask(nil)
+		task, err := concurrency.NewTask()
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -501,7 +501,7 @@ var hostCheckFeatureCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		task, err := concurrency.NewTask(nil)
+		task, err := concurrency.NewTask()
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -560,7 +560,7 @@ var hostRemoveFeatureCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		task, err := concurrency.NewTask(nil)
+		task, err := concurrency.NewTask()
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}

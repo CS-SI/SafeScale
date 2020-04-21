@@ -317,7 +317,7 @@ func TestWriteThenWriteThenRead(t *testing.T) {
 
 func TestRawCounter(t *testing.T) {
 	talo := NewTaskedLock()
-	tawri, _ := NewTask(nil)
+	tawri, _ := NewTask()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
