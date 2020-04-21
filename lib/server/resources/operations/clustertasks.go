@@ -315,7 +315,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	if err != nil {
 		return nil, err
 	}
-	err = host.Create(task, hostReq, *def)
+	_, err = host.Create(task, hostReq, *def)
 	if err != nil {
 		return nil, err
 	}
@@ -659,7 +659,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if err != nil {
 		return nil, err
 	}
-	err = host.Create(task, hostReq, *def)
+	_, err = host.Create(task, hostReq, *def)
 	if err != nil {
 		return nil, err
 	}

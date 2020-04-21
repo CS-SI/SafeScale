@@ -244,6 +244,18 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		}
 	}()
 
+	err = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		an, ok := clonable.(*abstract.Network)
+		if !ok {
+			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		an.NetworkState = networkstate.GATEWAY_CREATION
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
 	var template *abstract.HostTemplate
 	tpls, err := svc.SelectTemplatesBySize(*gwSizing, false)
 	if err != nil {
@@ -327,7 +339,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	primaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 		"request": primaryRequest,
 		"sizing":  *gwSizing,
-		"primary": true,
+		// "primary": true,
 	})
 	if err != nil {
 		return err
@@ -344,7 +356,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		secondaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 			"request": secondaryRequest,
 			"sizing":  *gwSizing,
-			"primary": false,
+			// "primary": false,
 		})
 		if err != nil {
 			return err
@@ -381,21 +393,6 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 				}
 			}
 		}()
-		//
-		// err = primaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		// 	// Updates requested sizing in gateway property propertiesv1.HostSizing
-		// 	return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
-		// 		gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-		// 		if !ok {
-		// 			return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 		}
-		// 		gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
-		// 		return nil
-		// 	})
-		// })
-		// if err != nil {
-		// 	return err
-		// }
 	}
 	if failover && secondaryTask != nil {
 		secondaryResult, secondaryErr = secondaryTask.Wait()
@@ -424,21 +421,6 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 					err = scerr.AddConsequence(err, failErr)
 				}
 			}()
-			//
-			// err = secondaryGateway.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-			// 	// Updates requested sizing in gateway property propertiesv1.HostSizing
-			// 	return props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
-			// 		gwSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-			// 		if !ok {
-			// 			return scerr.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			// 		}
-			// 		gwSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(*gwSizing)
-			// 		return nil
-			// 	})
-			// })
-			// if err != nil {
-			// 	return err
-			// }
 		}
 	}
 	if primaryErr != nil {
@@ -457,106 +439,50 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 		an.GatewayID = primaryGateway.SafeGetID()
 		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetID()
-		primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetID()
 		primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.SafeGetPublicIP(task)
+		primaryUserdata.IsPrimaryGateway = true
+		if an.VIP != nil {
+			primaryUserdata.DefaultRouteIP = an.VIP.PrivateIP
+			primaryUserdata.EndpointIP = an.VIP.PublicIP
+		} else {
+			primaryUserdata.DefaultRouteIP = primaryUserdata.PrimaryGatewayPrivateIP
+			primaryUserdata.EndpointIP = primaryUserdata.PrimaryGatewayPublicIP
+		}
 		if secondaryGateway != nil {
 			an.SecondaryGatewayID = secondaryGateway.SafeGetID()
+			primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetID()
 			secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
 			secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
 			primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.SafeGetPublicIP(task)
 			secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
 			secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
+			secondaryUserdata.IsPrimaryGateway = false
 		}
 
-		if an.VIP != nil {
-			primaryUserdata.DefaultRouteIP = an.VIP.PrivateIP
-			primaryUserdata.EndpointIP = an.VIP.PublicIP
-		} else {
-			primaryUserdata.DefaultRouteIP = primaryGateway.SafeGetPrivateIP(task)
-			primaryUserdata.EndpointIP = primaryGateway.SafeGetPublicIP(task)
-		}
-		primaryUserdata.IsPrimaryGateway = true
-		secondaryUserdata.IsPrimaryGateway = false
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	// // Starts final gateway(s) configuration script
-	// primaryTask, err = concurrency.NewTask()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// primaryTask, err = primaryTask.Start(objn.taskWaitForInstallPhase1OnGateway, primaryGateway)
-	// if err != nil {
-	// 	return err
-	// }
-	// if failover && secondaryTask != nil {
-	// 	secondaryTask, err = concurrency.NewTask()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	secondaryTask, err = secondaryTask.Start(objn.taskWaitForInstallPhase1OnGateway, secondaryGateway)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-	// _, primaryErr = primaryTask.Wait()
-	// if primaryErr != nil {
-	// 	return primaryErr
-	// }
-	// if failover && secondaryTask != nil {
-	// 	_, secondaryErr = secondaryTask.Wait()
-	// 	if secondaryErr != nil {
-	// 		return secondaryErr
-	// 	}
-	// }
-	// //
-	// // if primaryUserdata == nil {
-	// // 	return scerr.NewError("error creating network: primaryUserdata is nil")
-	// // }
-	// //
-	// // Complement userdata for gateway(s) with allocated IP
-	// primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetPrivateIP(task)
-	// primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.SafeGetPublicIP(task)
-	//
-	// if failover {
-	// 	primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetPrivateIP(task)
-	// 	primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.SafeGetPublicIP(task)
-	//
-	// 	if secondaryUserdata == nil {
-	// 		return scerr.NewError("error creating network: secondaryUserdata is nil")
-	// 	}
-	//
-	// 	secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
-	// 	secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
-	// 	secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
-	// 	secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
-	// }
-	//
-	// Starts gateway(s) installation
+	// As hosts are gateways, the configuration stopped on phase 'netsec', the remaining phases 'hwga', 'sysfix' and 'final' have to be run
 	primaryTask, err = concurrency.NewTask()
 	if err != nil {
 		return err
 	}
-
-	// logrus.Debugf("Updating network metadata '%s' ...", network.Name)
 	err = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		an.NetworkState = networkstate.PHASE3
+		an.NetworkState = networkstate.GATEWAY_CONFIGURATION
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	// Check if hosts are still attached to network according to metadata
-	primaryTask, err = primaryTask.Start(objn.taskInstallPhase3OnGateway, data.Map{
+	primaryTask, err = primaryTask.Start(objn.taskFinalizeGatewayConfiguration, data.Map{
 		"host":     primaryGateway,
 		"userdata": primaryUserdata,
 	})
@@ -568,7 +494,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		if err != nil {
 			return err
 		}
-		secondaryTask, err = secondaryTask.Start(objn.taskInstallPhase3OnGateway, data.Map{
+		secondaryTask, err = secondaryTask.Start(objn.taskFinalizeGatewayConfiguration, data.Map{
 			"host":     secondaryGateway,
 			"userdata": secondaryUserdata,
 		})

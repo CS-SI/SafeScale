@@ -1,23 +1,19 @@
 package operations
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_host_IsNull_Empty(t *testing.T) {
 	rh := &host{}
-	isNotNullButItsEmpty := rh.IsNull()
-	require.False(t, isNotNullButItsEmpty)
-
-	rh = nil
-	isnot := rh.IsNull()
-	require.True(t, isnot)
+	itis := rh.IsNull()
+	require.True(t, itis)
 }
 
 func Test_host_IsNull_Nil(t *testing.T) {
-	rh := &host{}
-	rh = nil
+	var rh *host
 	itis := rh.IsNull()
 	require.True(t, itis)
 }

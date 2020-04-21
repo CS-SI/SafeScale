@@ -301,7 +301,7 @@ func (handler *scannerHandler) analyze() (err error) {
 			def := abstract.HostSizingRequirements{
 				Image: "Ubuntu 18.04",
 			}
-			err = host.Create(task, req, def)
+			_, err = host.Create(task, req, def)
 			if err != nil {
 				return scerr.Wrap(err, "template [%s] host '%s': error creation", template.Name, hostName)
 			}
