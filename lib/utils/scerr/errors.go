@@ -887,6 +887,10 @@ func (e ErrList) Error() string {
 	return spew.Sdump(e.errors)
 }
 
+func (e ErrList) ToErrors() []error {
+	return e.errors
+}
+
 // ErrRuntimePanic ...
 type ErrRuntimePanic struct {
 	errCore

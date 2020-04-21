@@ -19,14 +19,14 @@ package concurrency
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 // TaskStatus ...
@@ -82,6 +82,7 @@ type TaskCore interface {
 	GetSignature() (string, error)
 	GetStatus() (TaskStatus, error)
 	GetContext() (context.Context, error)
+	GetLastError() (error, error)
 
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	RunInSubtask(TaskAction, TaskParameters) (TaskResult, error)
@@ -136,12 +137,12 @@ func RootTask() (Task, error) {
 
 // VoidTask is a new task that do nothing
 func VoidTask() (Task, error) {
-	return NewTask(nil)
+	return NewTask()
 }
 
 // NewTask ...
-func NewTask(parentTask Task) (Task, error) {
-	return newTask(context.TODO(), parentTask)
+func NewTask() (Task, error) {
+	return newTask(context.TODO(), nil)
 }
 
 // NewUnbreakableTask is a new task that cannot be aborted by default (but this can be changed with IgnoreAbortSignal(false))
@@ -158,7 +159,21 @@ func NewUnbreakableTask() (Task, error) {
 // NewTaskWithParent creates a subtask
 // Such a task can be aborted if the parent one can be
 func NewTaskWithParent(parentTask Task) (Task, error) {
+	if parentTask == nil {
+		return nil, scerr.InvalidParameterError("parentTask", "must not be nil")
+	}
 	return newTask(context.TODO(), parentTask)
+}
+
+func (t *task) GetLastError() (error, error) {
+	if t == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.err, nil
 }
 
 // NewTaskWithContext ...
@@ -362,51 +377,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Lock()
 				defer t.lock.Unlock()
 				t.status = ABORTED
-				t.err = scerr.AbortedError("cancel signal received", nil)
-				finish = true
-				t.finishCh <- struct{}{}
-			case <-t.doneCh:
-				// tracer.Trace("receiving done signal from go routine")
-				t.lock.Lock()
-				defer t.lock.Unlock()
-				t.status = DONE
-				finish = true
-				t.finishCh <- struct{}{}
-				break
-			case <-t.abortCh:
-				// Abort signal received
-				// tracer.Trace("receiving abort signal")
-				t.lock.Lock()
-				defer t.lock.Unlock()
-				if !t.abortDisengaged {
-					if t.status != TIMEOUT {
-						t.status = ABORTED
-					}
-					t.err = scerr.AbortedError("", nil)
-					finish = true
-					t.finishCh <- struct{}{}
-				} else {
-					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
-				}
-			case <-time.After(timeout):
-				t.lock.Lock()
-				defer t.lock.Unlock()
-				t.status = TIMEOUT
-				t.err = scerr.TimeoutError(nil, timeout, "task is out of time")
-				finish = true
-				t.finishCh <- struct{}{}
-			}
-		}
-	} else {
-		for !finish {
-			select {
-			case <-t.ctx.Done():
-				// Context cancel signal received, propagating using abort signal
-				// tracer.Trace("receiving signal from context, aborting task...")
-				t.lock.Lock()
-				defer t.lock.Unlock()
-				t.status = ABORTED
-				t.err = scerr.AbortedError("cancel signal received", nil)
+				t.err = scerr.AbortedError("cancel signal received", t.err)
 				finish = true
 				t.finishCh <- struct{}{}
 			case <-t.doneCh:
@@ -427,7 +398,52 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					if t.status != TIMEOUT {
 						t.status = ABORTED
 					}
-					t.err = scerr.AbortedError("", nil)
+					t.err = scerr.AbortedError("", t.err)
+					finish = true
+					t.finishCh <- struct{}{}
+				} else {
+					logrus.Debugf("%s abort signal is disengaged, ignored", sig)
+				}
+			case <-time.After(timeout):
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = TIMEOUT
+				t.err = scerr.TimeoutError(t.err, timeout, "task is out of time")
+				finish = true
+				t.finishCh <- struct{}{}
+			}
+		}
+	} else {
+		for !finish {
+			select {
+			case <-t.ctx.Done():
+				// Context cancel signal received, propagating using abort signal
+				// tracer.Trace("receiving signal from context, aborting task...")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = ABORTED
+				t.err = scerr.AbortedError("cancel signal received", t.err)
+				finish = true
+				t.finishCh <- struct{}{}
+			case <-t.doneCh:
+				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
+				// tracer.Trace("receiving done signal from go routine")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				t.status = DONE
+				finish = true
+				t.finishCh <- struct{}{}
+				break
+			case <-t.abortCh:
+				// Abort signal received
+				// tracer.Trace("receiving abort signal")
+				t.lock.Lock()
+				defer t.lock.Unlock()
+				if !t.abortDisengaged {
+					if t.status != TIMEOUT {
+						t.status = ABORTED
+					}
+					t.err = scerr.AbortedError("", t.err)
 					finish = true
 					t.finishCh <- struct{}{}
 				} else {
@@ -632,6 +648,9 @@ func (t *task) Abort() (err error) {
 		return scerr.NotAvailableError("abort signal is disengaged on task %s", t.id)
 	}
 
+	previousErr := t.err
+	previousStatus := t.status
+
 	if t.status == RUNNING {
 		// Tell controller to stop go routine
 		t.abortCh <- true
@@ -641,11 +660,17 @@ func (t *task) Abort() (err error) {
 		defer t.cancel()
 
 		t.status = ABORTED
+		t.err = scerr.AbortedError("", t.err)
 	} else if t.status != DONE {
 		t.status = ABORTED
+		t.err = scerr.AbortedError("", t.err)
 	} else if t.status == DONE {
-		fmt.Println("It was finished already")
 		t.status = ABORTED
+		t.err = scerr.AbortedError("", t.err)
+	}
+
+	if previousErr != nil && previousStatus != TIMEOUT {
+		return scerr.AbortedError("", previousErr)
 	}
 
 	return nil

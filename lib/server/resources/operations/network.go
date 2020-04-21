@@ -461,7 +461,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	// Starts gateway(s) installation
-	primaryTask, err = concurrency.NewTask(nil)
+	primaryTask, err = concurrency.NewTask()
 	if err != nil {
 		return err
 	}
@@ -471,7 +471,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		return err
 	}
 	if failover && secondaryTask != nil {
-		secondaryTask, err = concurrency.NewTask(nil)
+		secondaryTask, err = concurrency.NewTask()
 		if err != nil {
 			return err
 		}
@@ -514,7 +514,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	// Starts gateway(s) installation
-	primaryTask, err = concurrency.NewTask(nil)
+	primaryTask, err = concurrency.NewTask()
 	if err != nil {
 		return err
 	}
@@ -541,7 +541,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		return err
 	}
 	if failover && secondaryTask != nil {
-		secondaryTask, err = concurrency.NewTask(nil)
+		secondaryTask, err = concurrency.NewTask()
 		if err != nil {
 			return err
 		}
