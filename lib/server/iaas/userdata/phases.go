@@ -14,26 +14,14 @@
  * limitations under the License.
  */
 
-package networkstate
+package userdata
 
-//go:generate stringer -type=Enum
-
-// Enum represents the state of a network
-type Enum int
+type Phase string
 
 const (
-	// UNKNOWNSTATE
-	UNKNOWNSTATE Enum = iota
-
-	// GATEWAY_CREATION when gateway(s) is(are) created
-	GATEWAY_CREATION
-
-	// PHASE2 when gateway(s) is(are) configured
-	GATEWAY_CONFIGURATION
-
-	// READY when ready
-	READY
-
-	// NETWORKERROR when error
-	NETWORKERROR
+	PHASE1_INIT                      Phase = "init"
+	PHASE2_NETWORK_AND_SECURITY      Phase = "netsec"
+	PHASE3_GATEWAY_HIGH_AVAILABILITY Phase = "gwha"
+	PHASE4_SYSTEM_FIXES              Phase = "sysfix"
+	PHASE5_FINAL                     Phase = "final"
 )

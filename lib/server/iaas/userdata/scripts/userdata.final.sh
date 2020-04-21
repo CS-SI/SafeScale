@@ -19,39 +19,28 @@
 {{.Header}}
 
 print_error() {
-    ec=$?
     read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
 fail() {
-    if [ -z "$2" ]
-    then
-      if [ $1 -ne 0 ]; then
-        echo "PROVISIONING_ERROR: $1"
-      fi
-    else
-      if [ $1 -ne 0 ]; then
-        echo "PROVISIONING_ERROR: $1: $2"
-      fi
-    fi
-    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
+    echo "PROVISIONING_ERROR: $1"
+    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.final.done
+
     # For compatibility with previous user_data implementation (until v19.03.x)...
-    ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
+    ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
     exit $1
 }
 
-# Redirects outputs to /opt/safescale/log/user_data.phase2.log
+# Redirects outputs to /opt/safescale/log/user_data.final.log
 exec 1<&-
 exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.phase2.log
+exec 1<>/opt/safescale/var/log/user_data.final.log
 exec 2>&1
 set -x
 
-# Tricks BashLibrary's waitUserData to believe the current phase (3) is already done
->/opt/safescale/var/state/user_data.phase3.done
 # Includes the BashLibrary
 {{ .BashLibrary }}
 
@@ -60,7 +49,7 @@ install_drivers_nvidia() {
         ubuntu)
             sfFinishPreviousInstall
             add-apt-repository -y ppa:graphics-drivers &>/dev/null
-            sfApt update
+            sfApt update || fail 201
             sfApt -y install nvidia-410 &>/dev/null || {
                 sfApt -y install nvidia-driver-410 &>/dev/null || fail 201
             }
@@ -104,6 +93,10 @@ install_drivers_nvidia() {
 # ---- Main
 
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
+
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.final.done
+# For compatibility with previous user_data implementation (until v19.03.x)...
+ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
 
 set +x
 exit 0
