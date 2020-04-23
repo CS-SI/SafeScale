@@ -20,10 +20,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"strings"
 	"sync/atomic"
 	"text/template"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -324,6 +326,11 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 		return "", err
 	}
 	params["reserved_BashLibrary"] = bashLibrary
+
+	params["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
+	params["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
+	params["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
+	params["TemplatePullImagesTimeout"] = strings.Replace((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1)
 
 	dataBuffer := bytes.NewBufferString("")
 	err = anon.(*template.Template).Execute(dataBuffer, params)

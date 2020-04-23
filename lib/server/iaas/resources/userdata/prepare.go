@@ -21,7 +21,9 @@ package userdata
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"io/ioutil"
+	"math"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -92,6 +94,12 @@ type Content struct {
 	ProviderName     string
 	BuildSubnetworks bool
 	// Dashboard bool // Add kubernetes dashboard
+
+	// FIXME Add here the template timeouts...
+	TemplateOperationTimeout     string
+	TemplateLongOperationTimeout string
+	TemplatePullImagesTimeout    string
+	TemplateOperationDelay       uint
 }
 
 var (
@@ -178,6 +186,10 @@ func (ud *Content) Prepare(
 	ud.EmulatedPublicNet = defaultNetworkCIDR
 	ud.ProviderName = options.ProviderName
 	ud.BuildSubnetworks = options.BuildSubnetworks
+	ud.TemplateOperationDelay = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
+	ud.TemplateOperationTimeout = (temporal.GetHostTimeout() / 2).String()
+	ud.TemplateLongOperationTimeout = temporal.GetHostTimeout().String()
+	ud.TemplatePullImagesTimeout = (2 * temporal.GetHostTimeout()).String()
 
 	if request.HostName != "" {
 		ud.HostName = request.HostName

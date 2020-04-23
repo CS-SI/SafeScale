@@ -58,7 +58,7 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 5 "sfApt update && sfApt install -y ntp" || sfFail 192
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update && sfApt install -y ntp" || sfFail 192
                                     ;;
                                 centos|rhel)
                                     yum install -y ntp || sfFail 192
@@ -96,14 +96,14 @@ feature:
                                     sfService enable ntp || sfFail 195
                                     sfService restart ntp || sfFail 196
                                     op=-1
-                                    sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntp &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && sfFail 197
                                     ;;
                                 centos|rhel)
                                     sfService enable ntpd || sfFail 195
                                     sfService restart ntpd || sfFail 196
                                     op=-1
-                                    sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntpd &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && sfFail 197
                                     ;;
                                 *)
