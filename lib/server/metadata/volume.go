@@ -139,12 +139,12 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	}
 
 	errID := mv.mayReadByID(ref)
-	if errID != nil {
-		errName := mv.mayReadByName(ref)
-		if errName != nil {
-			return errName
-		}
+	errName := mv.mayReadByName(ref)
+
+	if errID != nil && errName != nil {
+		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError([]error{errID, errName}))
 	}
+
 	return nil
 }
 

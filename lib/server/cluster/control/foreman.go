@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -145,6 +146,11 @@ func (b *foreman) ExecuteScript(
 		return 0, "", "", err
 	}
 	data["reserved_BashLibrary"] = bashLibrary
+
+	data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
+	data["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
+	data["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
+	data["TemplatePullImagesTimeout"] = strings.Replace((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1)
 
 	path, err := uploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
 	if err != nil {
@@ -1117,6 +1123,13 @@ func uploadTemplateToFile(
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %s", err.Error())
 	}
+
+	// FIXME Time and again
+	data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
+	data["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
+	data["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
+	data["TemplatePullImagesTimeout"] = strings.Replace((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1)
+
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Execute(dataBuffer, data)
 	if err != nil {

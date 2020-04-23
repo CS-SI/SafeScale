@@ -262,6 +262,17 @@ func NotFoundError(msg string) ErrNotFound {
 	}
 }
 
+// NotFoundError creates a ErrNotFound error with a cause
+func NotFoundErrorWithCause(msg string, cause error) ErrNotFound {
+	return ErrNotFound{
+		ErrCore: ErrCore{
+			Message:      msg,
+			cause:        cause,
+			consequences: []error{},
+		},
+	}
+}
+
 // ErrNotAvailable resource not available error
 type ErrNotAvailable struct {
 	ErrCore

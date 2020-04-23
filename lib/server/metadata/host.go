@@ -17,6 +17,7 @@
 package metadata
 
 import (
+	"fmt"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -117,12 +118,12 @@ func (mh *Host) ReadByReference(ref string) (err error) {
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	errID := mh.mayReadByID(ref)
-	if errID != nil {
-		errName := mh.mayReadByName(ref)
-		if errName != nil {
-			return errName
-		}
+	errName := mh.mayReadByName(ref)
+
+	if errID != nil && errName != nil {
+		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError([]error{errID, errName}))
 	}
+
 	return nil
 }
 

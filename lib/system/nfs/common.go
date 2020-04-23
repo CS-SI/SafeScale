@@ -19,14 +19,13 @@ package nfs
 import (
 	"bytes"
 	"fmt"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"text/template"
-
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"

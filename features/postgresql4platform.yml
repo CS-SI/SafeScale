@@ -715,7 +715,7 @@ feature:
                             masters: any
                         run: |
                             docker stack deploy -c ${SF_ETCDIR}/postgresql4platform/stack.yml postgresql4platform || sfFail 197
-                            sfRetry 5m 5 sfDoesDockerRunStack postgresql4platform || sfFail 198
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfDoesDockerRunStack postgresql4platform || sfFail 198
                             sfExit
 
             remove:

@@ -17,6 +17,7 @@
 package metadata
 
 import (
+	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
@@ -142,12 +143,12 @@ func (ms *Share) ReadByReference(ref string) (err error) {
 	}
 
 	errID := ms.mayReadByID(ref)
-	if errID != nil {
-		errName := ms.mayReadByName(ref)
-		if errName != nil {
-			return errName
-		}
+	errName := ms.mayReadByName(ref)
+
+	if errID != nil && errName != nil {
+		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError([]error{errID, errName}))
 	}
+
 	return nil
 }
 

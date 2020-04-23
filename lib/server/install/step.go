@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -388,6 +389,12 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	// FIXME: validate parameters
 	host := p["host"].(*pb.Host)
 	variables := p["variables"].(Variables)
+
+	// FIXME Time and again
+	variables["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
+	variables["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
+	variables["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
+	variables["TemplatePullImagesTimeout"] = strings.Replace((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1)
 
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
