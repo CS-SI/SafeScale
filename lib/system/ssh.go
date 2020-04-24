@@ -432,7 +432,7 @@ func (sc *SSHCommand) Display() string {
 // WARNING : This function CAN lock, use .RunWithTimeout instead
 func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, string, error) {
 	tracer := concurrency.NewTracer(t, false, "(%s)", outs.String()).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	return sc.RunWithTimeout(t, outs, 0)
 }
@@ -441,7 +441,7 @@ func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, s
 func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, error) {
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("command=\n%s\n", sc.Display())
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 	// Set up the outputs (std and err)
 	stdoutPipe, err := sc.StdoutPipe()
 	if err != nil {
@@ -775,11 +775,11 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 		return "", scerr.InvalidInstanceContentError("ssh.Host", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(task, debug.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(task, debug.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().OnExitTrace()
 	defer scerr.OnExitTraceError(
 		fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout)),
 		&err,
-	)()
+	)
 
 	originalPhase := phase
 	if phase == "ready" {

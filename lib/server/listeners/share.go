@@ -82,8 +82,8 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// LEGACY: NFSExportOptions of protocol has been deprecated and replaced by OptionsAsString
 	if in.OptionsAsString == "" && in.Options != nil {
@@ -154,8 +154,8 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", shareName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	share, err := sharefactory.Load(job.SafeGetTask(), job.SafeGetService(), shareName)
 	if err != nil {
@@ -197,8 +197,8 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewShareHandler(job)
 	shares, err := handler.List()
@@ -252,8 +252,8 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	hostPath := in.GetPath()
 	shareType := in.GetType()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewShareHandler(job)
 	mount, err := handler.Mount(shareRef, hostRef, hostPath, in.GetWithCache())
@@ -300,8 +300,8 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 	hostPath := in.GetPath()
 	shareType := in.GetType()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewShareHandler(job)
 	err = handler.Unmount(shareRef, hostRef)
@@ -343,8 +343,8 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 
 	shareRef := srvutils.GetReference(in)
 	tracer := concurrency.NewTracer(task, true, "('%s')", shareRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	job, err := PrepareJob(ctx, "", "share inspect")
 	if err != nil {

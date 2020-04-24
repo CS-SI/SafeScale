@@ -87,9 +87,9 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 	}
 
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	host, err := hostfactory.Load(task, svc, hostRef)
 	if err != nil {
@@ -223,8 +223,8 @@ func (handler *sshHandler) WaitServerReady(hostParam interface{}, timeout time.D
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ssh, err := handler.GetConfig(hostParam)
 	if err != nil {
@@ -251,8 +251,8 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	host, err := hostfactory.Load(task, handler.job.SafeGetService(), hostRef)
@@ -345,8 +345,8 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostName := ""
 	var upload bool

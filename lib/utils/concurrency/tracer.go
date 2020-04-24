@@ -104,11 +104,8 @@ func (t *Tracer) Entering() *Tracer {
 }
 
 // OnExitTrace returns a function that will log the output message using TRACE level.
-func (t *Tracer) OnExitTrace() func() {
-	if t.outDone {
-		return func() {}
-	}
-	return func() { t.Exiting() }
+func (t *Tracer) OnExitTrace() {
+	_ = t.Exiting()
 }
 
 // ExitingMessage returns the content of the message when exiting the function
@@ -137,7 +134,7 @@ func (t *Tracer) Exiting() *Tracer {
 
 // TraceMessage returns a string containing a trace message
 func (t *Tracer) TraceMessage(format string, a ...interface{}) string {
-	return "---" + t.inOutMessage + ":" + fmt.Sprintf(format, a...)
+	return "---" + t.inOutMessage + ": " + fmt.Sprintf(format, a...)
 }
 
 // Trace traces a message

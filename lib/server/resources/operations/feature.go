@@ -140,8 +140,8 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err er
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	v := viper.New()
 	v.AddConfigPath(".")
@@ -191,8 +191,8 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ resources.Feature
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	casted := nullFeature()
 	if _, ok := allEmbeddedFeaturesMap[name]; !ok {
@@ -333,8 +333,8 @@ func (f *feature) Check(target resources.Targetable, v data.Map, s resources.Fea
 	targetType := target.SafeGetTargetType().String()
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// cacheKey := f.DisplayName() + "@" + t.Name()
 	// if anon, ok := checkCache.Get(cacheKey); ok {
@@ -413,8 +413,8 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 	targetType := target.SafeGetTargetType().String()
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	methods := target.SafeGetInstallMethods(f.task)
 	var (
@@ -498,8 +498,8 @@ func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.Fe
 	targetType := target.SafeGetTargetType().String()
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var (
 		results   resources.Results

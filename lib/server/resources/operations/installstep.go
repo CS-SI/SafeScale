@@ -270,8 +270,8 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 	outcomes = unitResults{}
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, true, "").Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 	nHosts := uint(len(hosts))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, strprocess.Plural(nHosts)),

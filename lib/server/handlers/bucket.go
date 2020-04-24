@@ -55,8 +55,8 @@ func (handler *bucketHandler) List() (rv []string, err error) {
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	rv, err = handler.job.SafeGetService().ListBuckets(objectstorage.RootPath)
 	return rv, err
@@ -73,8 +73,8 @@ func (handler *bucketHandler) Create(name string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	svc := handler.job.SafeGetService()
 	rb, err := bucketfactory.Load(svc, name)
@@ -105,8 +105,8 @@ func (handler *bucketHandler) Delete(name string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	rb, err := bucketfactory.Load(handler.job.SafeGetService(), name)
 	if err != nil {
@@ -126,8 +126,8 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, err err
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	rb, err = bucketfactory.Load(handler.job.SafeGetService(), name)
 	if err != nil {
@@ -150,8 +150,8 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (err erro
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	defer func() {
 		if err != nil {
@@ -183,8 +183,8 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	defer func() {
 		if err != nil {

@@ -92,9 +92,9 @@ func (handler *shareHandler) Create(
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objs, err := sharefactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -121,9 +121,9 @@ func (handler *shareHandler) Delete(name string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objs, err := sharefactory.Load(task, handler.job.SafeGetService(), name)
 	if err != nil {
@@ -143,9 +143,9 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	svc := handler.job.SafeGetService()
 	objs, err := sharefactory.New(svc)
@@ -210,9 +210,9 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	// Retrieve info about the share
 	objs, err := sharefactory.Load(task, handler.job.SafeGetService(), shareName)
@@ -458,9 +458,9 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objs, err := sharefactory.Load(task, handler.job.SafeGetService(), shareRef)
 	if err != nil {
@@ -581,9 +581,9 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, er
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	return sharefactory.Load(task, handler.job.SafeGetService(), shareRef)
 }

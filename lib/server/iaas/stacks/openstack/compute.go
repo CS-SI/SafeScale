@@ -59,7 +59,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, true, "").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, true, "").WithStopwatch().Entering().OnExitTrace()
 
 	listOpts := regions.ListOpts{
 		ParentRegionID: "RegionOne",
@@ -90,8 +90,8 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	allPages, err := az.List(s.ComputeClient).AllPages()
 	if err != nil {
@@ -124,8 +124,8 @@ func (s *Stack) ListImages() (imgList []abstract.Image, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	opts := images.ListOpts{}
 
@@ -164,8 +164,8 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	img, err := images.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -184,8 +184,8 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err err
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
@@ -217,7 +217,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	opts := flavors.ListOpts{}
 
@@ -275,7 +275,7 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	// privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	// publicKey := privateKey.PublicKey
@@ -310,7 +310,7 @@ func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -331,7 +331,7 @@ func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "").WithStopwatch().Entering().OnExitTrace()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := keypairs.List(s.ComputeClient)
@@ -372,7 +372,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -431,7 +431,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*abstract.HostFull, error) {
 		return nil, err
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
 	server, err := s.WaitHostState(ahc, hoststate.STARTED, 2*temporal.GetBigDelay())
 	if err != nil {
@@ -516,7 +516,7 @@ func (s *Stack) interpretAddresses(
 
 // complementHost complements Host data with content of server parameter
 func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Server) (host *abstract.HostFull, err error) {
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	networks, addresses, ipv4, ipv6, err := s.interpretAddresses(server.Addresses)
 	if err != nil {
@@ -628,7 +628,7 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "('%s')", name).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "('%s')", name).WithStopwatch().Entering().OnExitTrace()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
@@ -663,8 +663,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().OnExitTrace()()
-	defer scerr.OnPanic(&err)()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().OnExitTrace()
+	defer scerr.OnPanic(&err)
 
 	userData = userdata.NewContent()
 
@@ -770,7 +770,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	// --- query provider for host creation ---
 
-	logrus.Debugf("requesting host resource creation...")
+	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
 	// Retry creation until success, for 10 minutes
 	var server *servers.Server
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
@@ -1008,7 +1008,7 @@ func (s *Stack) WaitHostState(hostParam interface{}, state hoststate.Enum, timeo
 		return nil, scerr.InvalidParameterError("hostParam", "field 'ID' cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, true, "(%s, %s, %v)", hostRef, state.String(), timeout).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, true, "(%s, %s, %v)", hostRef, state.String(), timeout).WithStopwatch().Entering().OnExitTrace()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -1102,7 +1102,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 		return hoststate.ERROR, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, false, "").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, false, "").WithStopwatch().Entering().OnExitTrace()
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
@@ -1117,7 +1117,7 @@ func (s *Stack) ListHosts(details bool) (abstract.HostList, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "").WithStopwatch().Entering().OnExitTrace()
 
 	pager := servers.List(s.ComputeClient, servers.ListOpts{})
 	hostList := abstract.HostList{}
@@ -1194,7 +1194,7 @@ func (s *Stack) DeleteHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s", id).WithStopwatch().Entering().OnExitTrace()
 
 	if s.cfgOpts.UseFloatingIP {
 		fip, err := s.getFloatingIP(id)
@@ -1285,7 +1285,7 @@ func (s *Stack) StopHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1303,7 +1303,7 @@ func (s *Stack) RebootHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	err := servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
@@ -1326,7 +1326,7 @@ func (s *Stack) StartHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1345,7 +1345,7 @@ func (s *Stack) ResizeHost(id string, request abstract.HostSizingRequirements) (
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 
 	// TODO RESIZE Resize Host HERE
 	logrus.Warn("Trying to resize a Host...")

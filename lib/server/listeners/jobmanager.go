@@ -99,8 +99,8 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", uuid).Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
@@ -154,8 +154,8 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
 	// // LATER: handle jobregister error

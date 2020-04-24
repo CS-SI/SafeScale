@@ -77,7 +77,7 @@ func (si *ShareIdentity) Serialize() ([]byte, error) {
 // Deserialize ...
 // satisfies interface data.Serializable
 func (si *ShareIdentity) Deserialize(buf []byte) (err error) {
-	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	defer scerr.OnPanic(&err) // json.Unmarshal may panic
 	return json.Unmarshal(buf, si)
 }
 

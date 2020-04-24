@@ -188,7 +188,7 @@ func (s *Stack) DeleteVPC(id string) error {
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
 	tracer := concurrency.NewTracer(nil, true, "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
@@ -659,7 +659,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // 	}
 //
 // 	tracer := concurrency.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
-// 	defer tracer.OnExitTrace()()
+// 	defer tracer.OnExitTrace()
 //
 // 	hostReq := abstract.HostRequest{
 // 		ImageID:      req.ImageID,

@@ -65,8 +65,8 @@ func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	anon, err := NewBucket(svc)
 	if err != nil {
@@ -135,8 +135,8 @@ func (b *bucket) Create(task concurrency.Task, name string) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	bucket, err := b.svc.InspectBucket(name)
 	if err != nil {
@@ -160,8 +160,8 @@ func (b *bucket) Create(task concurrency.Task, name string) (err error) {
 // Delete a bucket
 func (b *bucket) Delete(task concurrency.Task) (err error) {
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	return b.svc.DeleteBucket(b.SafeGetName())
 }
@@ -169,8 +169,8 @@ func (b *bucket) Delete(task concurrency.Task) (err error) {
 // Mount a bucket on an host on the given mount point
 func (b *bucket) Mount(task concurrency.Task, hostName, path string) (err error) {
 	tracer := concurrency.NewTracer(task, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Get Host data
 	host, err := LoadHost(task, b.svc, hostName)
@@ -229,8 +229,8 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (err error)
 // Unmount a bucket
 func (b *bucket) Unmount(task concurrency.Task, hostName string) (err error) {
 	tracer := concurrency.NewTracer(task, true, "('%s')", hostName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	defer func() {
 		if err != nil {
@@ -273,7 +273,7 @@ func (b *bucket) exec(task concurrency.Task, host resources.Host, script string,
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-	defer scerr.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &err)
 
 	box, err := rice.FindBox("../operations/scripts")
 	if err != nil {

@@ -1128,24 +1128,24 @@ func getPartToRemove() string {
 // ----------- log helpers ---------------
 
 const (
-	errorOccurred       = "ERROR OCCURRED"
-	outputErrorTemplate = "%s " + errorOccurred + ": %+v"
+	// errorOccurred       = "ERROR OCCURRED"
+	// outputErrorTemplate = "%s " + errorOccurred + ": %+v"
+	outputErrorTemplate = "%s: %+v"
 )
 
 // OnExitLogErrorWithLevel returns a function that will log error with the log level wanted
 // Intended to be used with defer for example.
-func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
+func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) {
 	logLevelFn, ok := commonlog.LogLevelFnMap[level]
 	if !ok {
 		logLevelFn = logrus.Error
 	}
 
 	if IsGRPCError(*err) {
-		return func() {
-			if err != nil && *err != nil {
-				logLevelFn(fmt.Sprintf(outputErrorTemplate, in, grpcstatus.Convert(*err).Message()))
-			}
+		if err != nil && *err != nil {
+			logLevelFn(fmt.Sprintf(outputErrorTemplate, in, grpcstatus.Convert(*err).Message()))
 		}
+		return
 	}
 
 	if len(in) == 0 {
@@ -1169,31 +1169,27 @@ func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) func() {
 		}
 	}
 
-	return func() {
-		if err != nil && *err != nil {
-			logLevelFn(fmt.Sprintf(outputErrorTemplate, in, *err))
-		}
+	if err != nil && *err != nil {
+		logLevelFn(fmt.Sprintf(outputErrorTemplate, in, *err))
 	}
 }
 
 // OnExitLogError returns a function that will log error with level logrus.ErrorLevel.
 // Intended to be used with defer for example
-func OnExitLogError(in string, err *error) func() {
-	return OnExitLogErrorWithLevel(in, err, logrus.ErrorLevel)
+func OnExitLogError(in string, err *error) {
+	OnExitLogErrorWithLevel(in, err, logrus.ErrorLevel)
 }
 
 // OnExitTraceError returns a function that will log error with level logrus.TraceLevel.
 // Intended to be used with defer for example.
-func OnExitTraceError(in string, err *error) func() {
-	return OnExitLogErrorWithLevel(in, err, logrus.TraceLevel)
+func OnExitTraceError(in string, err *error) {
+	OnExitLogErrorWithLevel(in, err, logrus.TraceLevel)
 }
 
 // OnPanic returns a function intended to capture panic error and fill the error pointer with a ErrRuntimePanic.
-func OnPanic(err *error) func() {
-	return func() {
-		if x := recover(); x != nil {
-			*err = RuntimePanicError(fmt.Sprintf("runtime panic occurred: %+v", x))
-		}
+func OnPanic(err *error) {
+	if x := recover(); x != nil {
+		*err = RuntimePanicError(fmt.Sprintf("runtime panic occurred: %+v", x))
 	}
 }
 

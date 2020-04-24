@@ -18,7 +18,6 @@ package operations
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -111,7 +110,7 @@ func (f *folder) Search(path string, name string) error {
 			return nil
 		}
 	}
-	return scerr.NotFoundError(fmt.Sprintf("failed to find '%s'", fullPath))
+	return scerr.NotFoundError("failed to find '%s'", fullPath)
 }
 
 // Delete removes metadata passed as parameter
@@ -140,18 +139,18 @@ func (f *folder) Read(path string, name string, callback func([]byte) error) err
 	var buffer bytes.Buffer
 	_, err = f.service.SafeGetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
-		return scerr.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+		return scerr.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, err)
 	}
 	data := buffer.Bytes()
 	if f.crypt {
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			return scerr.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
+			return scerr.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
 	err = callback(data)
 	if err != nil {
-		return scerr.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
+		return scerr.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, err)
 	}
 	return nil
 }

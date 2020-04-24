@@ -30,17 +30,19 @@ func TestNotImplementedError(t *testing.T) {
 
 // -------- tests for log helpers ---------
 
+var itFailed = "it failed"
+
 func chaos() (err error) {
 	logrus.SetOutput(os.Stdout)
-	defer OnExitLogErrorWithLevel("Here it begins", &err, logrus.InfoLevel)()
+	defer OnExitLogErrorWithLevel("Here it begins", &err, logrus.InfoLevel)
 
 	// return nil
-	return fmt.Errorf("it failed")
+	return fmt.Errorf(itFailed)
 }
 
 func success() (err error) {
 	logrus.SetOutput(os.Stdout)
-	defer OnExitLogErrorWithLevel("Here it begins", &err, logrus.InfoLevel)()
+	defer OnExitLogErrorWithLevel("Here it begins", &err, logrus.InfoLevel)
 
 	return nil
 }
@@ -58,8 +60,8 @@ func TestLogErrorWithLevelChaos(t *testing.T) {
 	_ = w.Close()
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
-
-	if !strings.Contains(string(out), errorOccurred) {
+	fmt.Println(string(out))
+	if !strings.Contains(string(out), "it failed") {
 		t.Fail()
 	}
 }
@@ -78,7 +80,7 @@ func TestLogErrorWithLevelOrder(t *testing.T) {
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
 
-	if strings.Contains(string(out), errorOccurred) {
+	if strings.Contains(string(out), itFailed) {
 		t.Fail()
 	}
 }
@@ -88,7 +90,7 @@ func doPanic() {
 }
 
 func liveDangerously(panicflag bool) (err error) {
-	defer OnPanic(&err)()
+	defer OnPanic(&err)
 
 	if panicflag {
 		doPanic()
@@ -212,7 +214,7 @@ func TestKeepErrorType(t *testing.T) {
 }
 
 func getNotFoundErrorWithLog() (err error) {
-	defer OnExitLogError("", &err)()
+	defer OnExitLogError("", &err)
 	return NotFoundError("not there !!!")
 }
 
@@ -244,13 +246,13 @@ func callToSomethingThatReturnsErr() error {
 }
 
 func callToSomethingThatReturnsErrButLogsIt() (err error) {
-	defer OnExitLogErrorWithLevel("", &err, logrus.WarnLevel)()
+	defer OnExitLogErrorWithLevel("", &err, logrus.WarnLevel)
 	err = getNotFoundError()
 	return err
 }
 
 func callToSomethingThatReturnsErrButLogItWithWarning() (err error) {
-	defer OnExitLogError("", &err)()
+	defer OnExitLogError("", &err)
 	err = getNotFoundError()
 	return err
 }

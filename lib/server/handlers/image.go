@@ -57,8 +57,8 @@ func (handler *imageHandler) List(all bool) (images []abstract.Image, err error)
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	return handler.job.SafeGetService().ListImages(all)
 }

@@ -261,9 +261,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "(%s)", request.ResourceName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	userData = userdata.NewContent()
 
@@ -282,24 +282,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
-	// defaultGateway := request.DefaultGateway
-	isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
-	// defaultGatewayID := ""
-	// defaultGatewayPrivateIP := ""
-	// if defaultGateway != nil {
-	// 	// // FIXME: defaultGatewayPrivateIP and defaultGatewayID must come by request
-	// 	// err := defaultGateway.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) error {
-	// 	// 	return props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-	// 	// 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-	// 	// 		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
-	// 	defaultGatewayID = defaultGateway.ID
-	// 	// 		return nil
-	// 	// 	})
-	// 	// })
-	// 	// if err != nil {
-	// 	// 	return nil, nil, nil, nil, userData, err
-	// 	// }
-	// }
+	isGateway := request.IsGateway // || defaultNetwork.Name == abstract.SingleHostNetworkName
+	// Make sure to allocate Public IP if host is a gateway
+	request.PublicIP = request.PublicIP || isGateway
 
 	var nets []servers.Network
 	// Add private networks
@@ -591,7 +576,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 
 // complementHost complements Host data with content of server parameter
 func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, err error) {
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	networks, addresses, ipv4, ipv6, err := s.collectAddresses(host)
 	if err != nil {
@@ -1013,28 +998,28 @@ func (s *Stack) getOpenstackPortID(host *abstract.HostFull) (*string, error) {
 	return nil, abstract.ResourceNotFoundError("Port ID corresponding to host", host.Core.Name)
 }
 
-// toHostSizing converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-func (s *Stack) toHostSizing(flavor map[string]interface{}) *abstract.HostEffectiveSizing {
-	if i, ok := flavor["id"]; ok {
-		fid, ok := i.(string)
-		if !ok {
-			return nil
-		}
-		tpl, err := s.GetTemplate(fid)
-		if err != nil {
-			return nil
-		}
-		return converters.HostTemplateToHostEffectiveSizing(tpl)
-	}
-	hostSizing := &abstract.HostEffectiveSizing{}
-	if _, ok := flavor["vcpus"]; ok {
-		hostSizing.Cores, _ = flavor["vcpus"].(int)
-		hostSizing.DiskSize, _ = flavor["disk"].(int)
-		hostSizing.RAMSize, _ = flavor["ram"].(float32)
-		hostSizing.RAMSize /= 1000.0
-	}
-	return hostSizing
-}
+// // toHostSizing converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
+// func (s *Stack) toHostSizing(flavor map[string]interface{}) *abstract.HostEffectiveSizing {
+// 	if i, ok := flavor["id"]; ok {
+// 		fid, ok := i.(string)
+// 		if !ok {
+// 			return nil
+// 		}
+// 		tpl, err := s.GetTemplate(fid)
+// 		if err != nil {
+// 			return nil
+// 		}
+// 		return converters.HostTemplateToHostEffectiveSizing(tpl)
+// 	}
+// 	hostSizing := &abstract.HostEffectiveSizing{}
+// 	if _, ok := flavor["vcpus"]; ok {
+// 		hostSizing.Cores, _ = flavor["vcpus"].(int)
+// 		hostSizing.DiskSize, _ = flavor["disk"].(int)
+// 		hostSizing.RAMSize, _ = flavor["ram"].(float32)
+// 		hostSizing.RAMSize /= 1000.0
+// 	}
+// 	return hostSizing
+// }
 
 // toHostState converts host status returned by FlexibleEngine driver into HostState enum
 func toHostState(status string) hoststate.Enum {
@@ -1059,7 +1044,7 @@ func toHostState(status string) hoststate.Enum {
 // 		return scerr.InvalidInstanceError()
 // 	}
 
-// 	defer concurrency.NewTracer(nil, true, "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()()
+// 	defer concurrency.NewTracer(nil, true, "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
 // 	_, err := s.WaitHostState(hostParam, hoststate.STARTED, timeout)
 // 	return err
@@ -1115,7 +1100,7 @@ func toHostState(status string) hoststate.Enum {
 // 	// 	return scerr.InvalidParameterError("hostParam", "field 'ID' cannot be empty string")
 // 	// }
 
-// 	// defer concurrency.NewTracer(nil, true, "(%s)", ahc.ID).WithStopwatch().Entering().OnExitTrace()()
+// 	// defer concurrency.NewTracer(nil, true, "(%s)", ahc.ID).WithStopwatch().Entering().OnExitTrace()
 
 // 	// retryErr := retry.WhileUnsuccessful(
 // 	// 	func() error {

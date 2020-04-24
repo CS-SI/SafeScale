@@ -224,7 +224,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, nil, scerr.InvalidInstanceError()
 	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName
@@ -374,7 +374,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	// --- query provider for host creation ---
 
-	logrus.Debugf("requesting host resource creation...")
+	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
 	var desistError error
 
 	// Retry creation until success, for 10 minutes
@@ -491,8 +491,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (err
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "(%s)", hostRef).Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -643,7 +643,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	hostComplete := abstract.NewHostFull()
 

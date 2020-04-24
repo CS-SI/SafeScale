@@ -81,8 +81,8 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	all := in.GetAll()
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "(%v)", all).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := VolumeHandler(job)
 	volumes, err := handler.List(in.GetAll())
@@ -139,8 +139,8 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	size := in.GetSize()
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewVolumeHandler(job)
 	vol, err := handler.Create(name, int(size), volumespeed.Enum(speed))
@@ -205,8 +205,8 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := VolumeHandler(job)
 	err = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat)
@@ -259,8 +259,8 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := VolumeHandler(job)
 	err = handler.Detach(volumeRef, hostRef)
@@ -310,8 +310,8 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := VolumeHandler(job)
 	err = handler.Delete(ref)
@@ -361,8 +361,8 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := VolumeHandler(job)
 	volume, err := handler.Inspect(ref)

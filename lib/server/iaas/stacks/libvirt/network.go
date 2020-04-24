@@ -124,7 +124,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Ne
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
 	name := req.Name
 	ipVersion := req.IPVersion
@@ -206,7 +206,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 // GetNetwork returns the network identified by ref (id or name)
 func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
 	if err != nil {
@@ -233,14 +233,14 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 
 // GetNetworkByName returns the network identified by ref (id or name)
 func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 	return s.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
 	var networks []*abstract.Network
 
@@ -263,7 +263,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(ref string) error {
 	// FIXME: validate parameter
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
 	if err != nil {
@@ -295,7 +295,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 // 		return nil, nil, nil, scerr.InvalidInstanceError()
 // 	}
 //
-// 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+// 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 //
 // 	network := req.Network
 // 	templateID := req.TemplateID
@@ -334,7 +334,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 //
 // // DeleteGateway delete the public gateway referenced by ref (id or name)
 // func (s *Stack) DeleteGateway(ref string) error {
-// 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+// 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 //
 // 	return s.DeleteHost(ref)
 // }
