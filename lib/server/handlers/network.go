@@ -31,7 +31,7 @@ import (
 
 // NetworkHandler defines API to manage networks
 type NetworkHandler interface {
-	Create(string, string, ipversion.Enum, abstract.HostSizingRequirements, string, string, bool) (resources.Network, error)
+	Create(string, string, ipversion.Enum, abstract.HostSizingRequirements, string, string, bool, bool) (resources.Network, error)
 	List(bool) ([]*abstract.Network, error)
 	Inspect(string) (resources.Network, error)
 	Delete(string) error
@@ -54,7 +54,7 @@ func NewNetworkHandler(job server.Job) NetworkHandler {
 func (handler *networkHandler) Create(
 	name string, cidr string, ipVersion ipversion.Enum,
 	sizing abstract.HostSizingRequirements, theos string, gwname string,
-	failover bool,
+	failover bool, keepOnFailure bool,
 ) (network resources.Network, err error) {
 
 	if handler == nil {
@@ -76,18 +76,20 @@ func (handler *networkHandler) Create(
 		debug.ShouldTrace("handlers.network"),
 		"('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover,
 	).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objn, err := networkfactory.New(handler.job.SafeGetService())
 	if err != nil {
 		return nil, err
 	}
 	req := abstract.NetworkRequest{
-		Name:      name,
-		IPVersion: ipVersion,
-		CIDR:      cidr,
+		Name:          name,
+		IPVersion:     ipVersion,
+		CIDR:          cidr,
+		HA:            failover,
+		KeepOnFailure: keepOnFailure,
 	}
 	err = objn.Create(task, req, gwname, &sizing)
 	if err != nil {
@@ -107,9 +109,9 @@ func (handler *networkHandler) List(all bool) (netList []*abstract.Network, err 
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objn, err := networkfactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -137,9 +139,9 @@ func (handler *networkHandler) Inspect(ref string) (network resources.Network, e
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	return networkfactory.Load(task, handler.job.SafeGetService(), ref)
 }
@@ -158,9 +160,9 @@ func (handler *networkHandler) Delete(ref string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objn, err := networkfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {

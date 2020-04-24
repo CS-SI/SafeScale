@@ -289,11 +289,9 @@ func (c *core) Read(task concurrency.Task, ref string) error {
 	if err != nil {
 		switch err.(type) {
 		case retry.ErrTimeout:
-			logrus.Debugf("timeout reading metadata of %s '%s'", c.kind, ref)
-			return scerr.NotFoundError(fmt.Sprintf("failed to load metadata of %s '%s'", c.kind, ref))
+			return scerr.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
 		case retry.ErrStopRetry:
-			// return err.Cause()
-			return err
+			return scerr.Cause(err)
 		default:
 			return err
 		}
@@ -303,6 +301,8 @@ func (c *core) Read(task concurrency.Task, ref string) error {
 	return c.updateIdentity(task)
 }
 
+// readByReference gets the data from Object Storage
+// if error is ErrNotFound then read by name; if error is still ErrNotFound return this error
 func (c *core) readByReference(task concurrency.Task, ref string) error {
 	err := c.readByID(task, ref)
 	if err != nil {
@@ -462,7 +462,7 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, err error) {
 		shieldedMapped = map[string]interface{}{}
 		propsMapped    = map[string]string{}
 	)
-	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	defer scerr.OnPanic(&err) // json.Unmarshal may panic
 
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
@@ -513,7 +513,7 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (err error) {
 		}
 	}()
 
-	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	defer scerr.OnPanic(&err) // json.Unmarshal may panic
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)

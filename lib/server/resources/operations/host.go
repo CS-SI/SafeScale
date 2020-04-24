@@ -99,7 +99,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	if ref == "" {
 		return nullHost(), scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	rh, err := NewHost(svc)
 	if err != nil {
@@ -115,8 +115,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	if err != nil {
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := err.(retry.ErrTimeout); ok {
-			logrus.Debugf("timeout reading metadata of host '%s'", ref)
-			err = scerr.NotFoundError("timeout trying to read metadata")
+			err = scerr.NotFoundError("timeout trying to read metadata of host '%s'", ref)
 		}
 		return nullHost(), err
 	}
@@ -315,9 +314,9 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError("failed to create host", &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError("failed to create host", &err)
+	defer scerr.OnPanic(&err)
 
 	svc := rh.SafeGetService()
 
@@ -435,7 +434,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	defer func() {
-		if err != nil {
+		if err != nil && !hostReq.KeepOnFailure {
 			derr := svc.DeleteHost(ahf.Core.ID)
 			if derr != nil {
 				logrus.Errorf("cleaning up after failure, failed to delete host '%s': %v", ahf.Core.Name, derr)
@@ -467,7 +466,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 		// Starting from here, delete host metadata if exiting with error
 		defer func() {
-			if innerErr != nil {
+			if innerErr != nil && !hostReq.KeepOnFailure {
 				derr := rh.core.Delete(task)
 				if derr != nil {
 					logrus.Errorf("cleaning up after failure, failed to remove host metadata")
@@ -510,7 +509,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			}
 			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Network))
 			hostNetworkV1.DefaultNetworkID = rn.SafeGetID()
-			hostNetworkV1.IsGateway = hostReq.DefaultRouteIP == "" && rn.SafeGetName() != abstract.SingleHostNetworkName
+			hostNetworkV1.IsGateway = hostReq.IsGateway // hostReq.DefaultRouteIP == "" && rn.SafeGetName() != abstract.SingleHostNetworkName
 			return nil
 		})
 	})
@@ -562,10 +561,12 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	// -- Updates host link with networks --
-	for _, rn := range hostReq.Networks {
-		err := rh.updateNetwork(task, rn.ID)
-		if err != nil {
-			return nil, err
+	if !hostReq.IsGateway {
+		for _, rn := range hostReq.Networks {
+			err := rh.updateNetwork(task, rn.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -649,10 +650,12 @@ func (rh *host) runInstallPhase(task concurrency.Task, phase userdata.Phase, use
 	// Executes the script on the remote host
 	retcode, _, stderr, err := rh.Run(task, command, outputs.COLLECT, 0, 0)
 	if err != nil {
-		return err
+		return scerr.Wrap(err, "failed to apply configuration phase '%s'", phase)
 	}
-
 	if retcode != 0 {
+		if retcode == 255 {
+			return scerr.NewError("failed to execute install phase '%s' on host '%s': SSH connection failed", phase, rh.SafeGetName())
+		}
 		return scerr.NewError("failed to execute install phase '%s' on host '%s': %s", phase, rh.SafeGetName(), stderr)
 	}
 	return nil
@@ -1054,6 +1057,9 @@ func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connec
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			retCode, stdOut, stdErr, err = run(task, ssh, cmd, outs, executionTimeout)
+			if _, ok := err.(scerr.ErrTimeout); ok {
+				err = scerr.NewError("failed to run command in %v delay", executionTimeout)
+			}
 			return err
 		},
 		connectionTimeout,
@@ -1063,6 +1069,9 @@ func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connec
 			}
 		},
 	)
+	if _, ok := err.(retry.ErrTimeout); ok {
+		err = scerr.Cause(err)
+	}
 	return retCode, stdOut, stdErr, err
 }
 
@@ -1287,7 +1296,7 @@ func (rh *host) Start(task concurrency.Task) (err error) {
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
-	scerr.OnPanic(&err)()
+	scerr.OnPanic(&err)
 
 	hostName := rh.SafeGetName()
 	hostID := rh.SafeGetID()
@@ -1372,7 +1381,7 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 	}
 
 	tracer := concurrency.NewTracer(task, false /*Trace.Host*/, "(%s)", name).Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	feat, err := NewFeature(task, name)
 	if err != nil {
@@ -1421,7 +1430,7 @@ func (rh *host) CheckFeature(task concurrency.Task, name string, vars data.Map, 
 	}
 
 	tracer := concurrency.NewTracer(task, false /*Trace.Host, t*/, "(%s)", name).Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	feat, err := NewFeature(task, name)
 	if err != nil {
@@ -1514,7 +1523,7 @@ func (rh *host) GetPublicIP(task concurrency.Task) (ip string, err error) {
 	if task == nil {
 		return "", scerr.InvalidParameterError("task", "cannot be nil")
 	}
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
@@ -1557,7 +1566,7 @@ func (rh *host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (
 		return ip, scerr.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	err = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
@@ -1957,7 +1966,7 @@ func (rh *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, err error)
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	var (
 		ahc           *abstract.HostCore
