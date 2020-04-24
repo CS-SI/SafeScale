@@ -74,8 +74,8 @@ func (handler *hostHandler) Start(ref string) (err error) { // FIXME Unused ctx
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
@@ -98,8 +98,8 @@ func (handler *hostHandler) Stop(ref string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
@@ -122,8 +122,8 @@ func (handler *hostHandler) Reboot(ref string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
@@ -146,9 +146,9 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
@@ -213,9 +213,9 @@ func (handler *hostHandler) Create(
 		debug.ShouldTrace("handlers.host"),
 		"('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, networkName, req.ImageID, req.PublicIP, force,
 	).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objh, err := hostfactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -239,8 +239,8 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, err error) 
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if all {
 		return handler.job.SafeGetService().ListHosts(true)
@@ -273,8 +273,8 @@ func (handler *hostHandler) Inspect(ref string) (host resources.Host, err error)
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
@@ -300,9 +300,9 @@ func (handler *hostHandler) Delete(ref string) (err error) {
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
@@ -324,8 +324,8 @@ func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, err er
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	sshHandler := NewSSHHandler(handler.job)
 	sshConfig, err = sshHandler.GetConfig(ref)

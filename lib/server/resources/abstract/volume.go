@@ -86,7 +86,7 @@ func (v *Volume) Deserialize(buf []byte) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer scerr.OnPanic(&err)()	// json.Unmarshal may panic
+	defer scerr.OnPanic(&err) // json.Unmarshal may panic
 	return json.Unmarshal(buf, v)
 }
 

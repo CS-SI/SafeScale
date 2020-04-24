@@ -272,8 +272,8 @@ func (c *cluster) ExecuteScript(
 	host resources.Host,
 ) (errCode int, stdOut string, stdErr string, err error) {
 	tracer := concurrency.NewTracer(nil, true, "("+host.SafeGetName()+")").Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if c == nil {
 		return 0, "", "", scerr.InvalidInstanceError()
@@ -318,8 +318,8 @@ func (c *cluster) ExecuteScript(
 // installNodeRequirements ...
 func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (err error) {
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if c.makers.GetTemplateBox == nil {
 		return scerr.InvalidParameterError("c.makers.GetTemplateBox", "cannot be nil")
@@ -478,7 +478,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 
 // Installs reverseproxy
 func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	identity, err := c.GetIdentity(task)
 	if err != nil {
@@ -487,8 +487,8 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
 	clusterName := identity.Name
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
@@ -525,7 +525,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
 func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	identity, err := c.GetIdentity(task)
 	if err != nil {
@@ -534,8 +534,8 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
 	clusterName := identity.Name
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
@@ -584,9 +584,9 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
@@ -626,9 +626,9 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
@@ -671,8 +671,8 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
 	feat, err := NewFeature(task, "docker")

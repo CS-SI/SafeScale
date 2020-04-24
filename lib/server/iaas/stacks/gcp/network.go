@@ -42,7 +42,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	// disable subnetwork auto-creation
 	ne := compute.Network{
@@ -448,7 +448,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 // 		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 // 	}
 //
-// 	defer scerr.OnPanic(&err)()
+// 	defer scerr.OnPanic(&err)
 //
 // 	gwname := req.Name
 // 	if gwname == "" {

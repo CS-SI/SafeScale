@@ -71,8 +71,8 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewBucketHandler(job)
 	buckets, err := handler.List()
@@ -117,8 +117,8 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewBucketHandler(job)
 	err = handler.Create(bucketName)
@@ -163,8 +163,8 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewBucketHandler(job)
 	err = handler.Delete(bucketName)
@@ -208,8 +208,8 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewBucketHandler(job)
 	resp, err := handler.Inspect(bucketName)
@@ -258,8 +258,8 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().Name
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewBucketHandler(job)
 	err = handler.Mount(bucketName, hostName, in.GetPath())
@@ -304,8 +304,8 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().Name
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewBucketHandler(job)
 	err = handler.Unmount(bucketName, hostName)

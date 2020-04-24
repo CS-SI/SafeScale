@@ -64,8 +64,8 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 
 	all := in.GetAll()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewTemplateHandler(job)
 	templates, err := handler.List(all)

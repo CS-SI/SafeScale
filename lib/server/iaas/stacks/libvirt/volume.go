@@ -223,7 +223,7 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%d)", request.Name, request.Size), true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%d)", request.Name, request.Size), true).Entering().OnExitTrace()
 
 	//volume speed is ignored
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
@@ -273,7 +273,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().OnExitTrace()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
 	if err != nil {
@@ -291,7 +291,7 @@ func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
 //ListVolumes return the list of all volume known on the current tenant
 func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
 	if err != nil {
@@ -317,7 +317,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(ref string) error {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().OnExitTrace()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
 	if err != nil {
@@ -338,7 +338,7 @@ func (s *Stack) DeleteVolume(ref string) error {
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s'", request.Name, request.VolumeID, request.HostID), true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s'", request.Name, request.VolumeID, request.HostID), true).Entering().OnExitTrace()
 
 	_, domain, err := s.getHostAndDomainFromRef(request.HostID)
 	if err != nil {
@@ -395,7 +395,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().OnExitTrace()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {
@@ -418,7 +418,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 // DeleteVolumeAttachment ...
 func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().OnExitTrace()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {
@@ -467,7 +467,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
 	// FIXME: validate parameters
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", serverID), true).Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", serverID), true).Entering().OnExitTrace()
 
 	var volumes []*libvirt.StorageVol
 	var volumeAttachments []abstract.VolumeAttachment

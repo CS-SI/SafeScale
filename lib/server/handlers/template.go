@@ -54,8 +54,8 @@ func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, e
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	tlist, err = handler.job.SafeGetService().ListTemplates(all)
 	return tlist, err

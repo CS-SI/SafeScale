@@ -151,7 +151,6 @@ func (j *job) Abort() error {
 	if j.cancel == nil {
 		return scerr.InvalidInstanceContentError("j.cancel", "cannot be nil")
 	}
-	logrus.Debugf("{job:%s} cancelling from job.Abort()...", j.SafeGetID())
 	j.cancel()
 	j.cancel = nil
 	return nil
@@ -168,7 +167,6 @@ func (j *job) Aborted() bool {
 func (j *job) Close() {
 	_ = deregister(j)
 	if j.cancel != nil {
-		logrus.Debugf("{job:%s} cancelling from job.Close()...", j.SafeGetID())
 		j.cancel()
 	}
 }

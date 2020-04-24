@@ -404,7 +404,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			case <-time.After(timeout):
 				t.mu.Lock()
 				t.status = TIMEOUT
-				t.err = scerr.TimeoutError(t.err, timeout, "task is out of time")
+				t.err = scerr.TimeoutError(t.err, timeout)
 				t.finishCh <- struct{}{}
 				finish = true
 				t.mu.Unlock() // Avoid defer in loop

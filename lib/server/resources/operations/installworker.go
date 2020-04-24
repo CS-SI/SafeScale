@@ -564,12 +564,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, scerr.InvalidParameterError("params[variables]", "cannot be nil")
 	}
 
-	defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)()
+	defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
 		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
 		logrus.DebugLevel,
-	)()
+	)
 
 	var (
 		runContent string

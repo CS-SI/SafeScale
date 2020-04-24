@@ -337,7 +337,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	allTpls, err := svc.ListTemplates(false)
 	scannerTpls := map[string]bool{}

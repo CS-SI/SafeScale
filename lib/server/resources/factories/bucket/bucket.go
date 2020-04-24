@@ -15,8 +15,8 @@ func List(svc iaas.Service) ([]string, error) {
 	}
 
 	// tracer := concurrency.NewTracer(task, "", false).Entering()
-	// defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	// defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	return svc.ListBuckets(objectstorage.RootPath)
 }

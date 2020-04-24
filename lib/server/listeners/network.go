@@ -81,8 +81,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var (
 		sizing    *abstract.HostSizingRequirements
@@ -113,6 +113,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		gwImageID,
 		gwName,
 		in.FailOver,
+		in.KeepOnFailure,
 	)
 	if err != nil {
 		return nil, err
@@ -154,8 +155,8 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewNetworkHandler(job)
 	networks, err := handler.List(in.GetAll())
@@ -210,8 +211,8 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	network, err := networkfactory.Load(task, job.SafeGetService(), ref)
 	if err != nil {
@@ -258,8 +259,8 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewNetworkHandler(job)
 	_, err = job.SafeGetTask().Run(

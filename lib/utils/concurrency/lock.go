@@ -19,10 +19,11 @@ package concurrency
 import (
 	"fmt"
 
+	"sync"
+
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
@@ -77,7 +78,7 @@ func (tm *taskedLock) RLock(task Task) error {
 	}
 
 	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "")
-	defer tracer.Entering().OnExitTrace()()
+	defer tracer.Entering().OnExitTrace()
 
 	tid, err := task.GetID()
 	if err != nil {
@@ -120,8 +121,8 @@ func (tm *taskedLock) SafeRLock(task Task) {
 // only if no mu for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) (err error) {
 	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "").Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError("", &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError("", &err)
 
 	if tm == nil {
 		return scerr.InvalidInstanceError()
@@ -174,7 +175,7 @@ func (tm *taskedLock) SafeRUnlock(task Task) {
 // Lock acquires a write mu.
 func (tm *taskedLock) Lock(task Task) error {
 	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "").Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil")
@@ -222,7 +223,7 @@ func (tm *taskedLock) SafeLock(task Task) {
 // Unlock releases a write mu
 func (tm *taskedLock) Unlock(task Task) error {
 	tracer := NewTracer(task, debug.ShouldTrace("concurrency.lock"), "").Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	if task == nil {
 		return scerr.InvalidParameterError("task", "cannot be nil!")

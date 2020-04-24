@@ -73,13 +73,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-
-	// Checks if CIDR is valid...
-	_, _, err = net.ParseCIDR(req.CIDR)
-	if err != nil {
-		return nil, scerr.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
-	}
+	defer tracer.OnExitTrace()
 
 	// Checks if CIDR is valid...
 	if req.CIDR != "" {
@@ -150,7 +144,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().OnExitTrace()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
@@ -187,7 +181,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 
 	// If not found, we look for any network from provider
 	// 1st try with id
@@ -231,7 +225,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "").WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "").WithStopwatch().Entering().OnExitTrace()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*abstract.Network
@@ -282,7 +276,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
@@ -335,8 +329,8 @@ func (s *Stack) DeleteNetwork(id string) error {
 // 		return nil, nil, scerr.InvalidInstanceError()
 // 	}
 //
-// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()()
-// 	defer scerr.OnPanic(&err)()
+// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()
+// 	defer scerr.OnPanic(&err)
 //
 // 	userData = userdata.NewContent()
 //
@@ -408,7 +402,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 // 		return scerr.InvalidParameterError("id", "cannot be empty string")
 // 	}
 //
-// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()()
+// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
 //
 // 	return s.DeleteHost(id)
 // }
@@ -623,8 +617,8 @@ func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
 // deleteSubnet deletes the sub network identified by id
 func (s *Stack) deleteSubnet(id string) (err error) {
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "").Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	routerList, _ := s.ListRouters()
 	var router *Router

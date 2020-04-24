@@ -95,8 +95,8 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	tenants, err := iaas.GetTenantNames()
 	if err != nil {
@@ -143,8 +143,8 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	getCurrentTenant()
 	if currentTenant == nil {
@@ -188,8 +188,8 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	name := in.GetName()
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
@@ -238,8 +238,8 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	name := in.GetName()
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
@@ -283,8 +283,8 @@ func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (em
 
 	name := currentTenant.name
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", name).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer tracer.OnExitTrace()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewScannerHandler(job)
 	if err != nil {

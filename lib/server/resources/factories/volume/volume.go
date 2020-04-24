@@ -45,7 +45,7 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Volu
 	}
 
 	// FIXME: tracer...
-	// defer scerr.OnPanic(&err)()
+	// defer scerr.OnPanic(&err)
 
 	return operations.LoadVolume(task, svc, ref)
 }

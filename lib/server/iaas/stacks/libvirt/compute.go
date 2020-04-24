@@ -644,7 +644,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 
 // getHostFromDomain build a abstract.Host struct representing a Domain
 func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, err error) {
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	id, err := domain.GetUUIDString()
 	if err != nil {
@@ -742,7 +742,7 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err
 		return scerr.InvalidParameterError("newHost", "cannot be nil")
 	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	host.ID = newHost.ID
 	if host.Name == "" {
@@ -817,7 +817,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	resourceName := request.ResourceName
 	hostName := request.HostName

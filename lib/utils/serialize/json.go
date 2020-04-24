@@ -247,7 +247,7 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (err err
 		return scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	defer scerr.OnPanic(&err) // json.Unmarshal may panic
 
 	x.Lock()
 	defer x.Unlock()
