@@ -216,6 +216,11 @@ var hostCreate = &cli.Command{
 			Aliases: []string{"f"},
 			Usage:   "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
+		&cli.BoolFlag{
+			Name:    "keep-on-failure",
+			Aliases: []string{"k"},
+			Usage:   "If used, the resource is not deleted on failure (default: not set)",
+		},
 		&cli.StringFlag{
 			Name:    "sizing",
 			Aliases: []string{"S"},
@@ -270,6 +275,7 @@ var hostCreate = &cli.Command{
 			Public:         c.Bool("public"),
 			Force:          c.Bool("force"),
 			SizingAsString: sizing,
+			KeepOnFailure:  c.Bool("keep-on-failure"),
 		}
 		resp, err := client.New().Host.Create(req, temporal.GetExecutionTimeout())
 		if err != nil {

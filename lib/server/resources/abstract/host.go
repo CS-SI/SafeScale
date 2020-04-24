@@ -117,6 +117,8 @@ type HostRequest struct {
 	DiskSize int
 	// IsGateway tells if the host will act as a gateway
 	IsGateway bool
+	// KeepOnFailure tells if resource must be kept on failure
+	KeepOnFailure bool
 }
 
 // HostEffectiveSizing ...
@@ -215,7 +217,7 @@ func (hc *HostCore) Deserialize(buf []byte) (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	defer scerr.OnPanic(&err) // json.Unmarshal may panic
 	return json.Unmarshal(buf, hc)
 }
 

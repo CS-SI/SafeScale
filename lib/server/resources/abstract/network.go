@@ -55,6 +55,8 @@ type NetworkRequest struct {
 	HA bool
 	// Image ontains the string of the image requested for gateway(s)
 	Image string
+	// KeepOnFailure tells if resources have to be kept in case of failure (default behavior is to delete them)
+	KeepOnFailure bool
 }
 
 // Network represents a virtual network
@@ -136,7 +138,7 @@ func (n *Network) Deserialize(buf []byte) (err error) {
 	if n == nil {
 		return scerr.InvalidInstanceError()
 	}
-	defer scerr.OnPanic(&err)() // json.Unmarshal may panic
+	defer scerr.OnPanic(&err) // json.Unmarshal may panic
 	return json.Unmarshal(buf, n)
 }
 

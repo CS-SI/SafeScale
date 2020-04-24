@@ -123,9 +123,9 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		true,
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	// Check if network already exists and is managed by SafeScale
 	svc := objn.SafeGetService()
@@ -173,7 +173,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Starting from here, delete network if exiting with error
 	defer func() {
-		if err != nil && an != nil {
+		if err != nil && an != nil && !req.KeepOnFailure {
 			derr := svc.DeleteNetwork(an.ID)
 			if derr != nil {
 				switch derr.(type) {
@@ -214,7 +214,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
-			if err != nil {
+			if err != nil && !req.KeepOnFailure {
 				if an != nil {
 					derr := svc.DeleteVIP(an.VIP)
 					if derr != nil {
@@ -235,7 +235,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Starting from here, delete network metadata if exits with error
 	defer func() {
-		if err != nil {
+		if err != nil && !req.KeepOnFailure {
 			derr := objn.core.Delete(task)
 			if derr != nil {
 				logrus.Errorf("failed to delete network metadata: %+v", derr)
@@ -315,10 +315,11 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	gwRequest := abstract.HostRequest{
-		ImageID:    img.ID,
-		Networks:   []*abstract.Network{an},
-		KeyPair:    keypair,
-		TemplateID: template.ID,
+		ImageID:       img.ID,
+		Networks:      []*abstract.Network{an},
+		KeyPair:       keypair,
+		TemplateID:    template.ID,
+		KeepOnFailure: req.KeepOnFailure,
 	}
 
 	var (
@@ -374,7 +375,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 		// Starting from here, deletes the primary gateway if exiting with error
 		defer func() {
-			if err != nil {
+			if err != nil && !req.KeepOnFailure {
 				logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.SafeGetName())
 				derr := objn.deleteGateway(task, primaryGateway)
 				if derr != nil {
@@ -407,7 +408,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
-				if err != nil {
+				if err != nil && !req.KeepOnFailure {
 					derr := objn.deleteGateway(task, secondaryGateway)
 					if derr != nil {
 						switch derr.(type) {
@@ -424,10 +425,10 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		}
 	}
 	if primaryErr != nil {
-		return primaryErr
+		return scerr.Wrap(primaryErr, "failed to create gateway '%s'", primaryGatewayName)
 	}
 	if secondaryErr != nil {
-		return secondaryErr
+		return scerr.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
 	}
 
 	// Update metadata of network object
@@ -597,9 +598,9 @@ func (objn *network) AttachHost(task concurrency.Task, host resources.Host) (err
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "("+host.SafeGetName()+")").Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	hostID := host.SafeGetID()
 	hostName := host.SafeGetName()
@@ -630,9 +631,9 @@ func (objn *network) DetachHost(task concurrency.Task, hostID string) (err error
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "('"+hostID+"')").Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	return objn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
 		return props.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
@@ -660,9 +661,9 @@ func (objn *network) ListHosts(task concurrency.Task) (_ []resources.Host, err e
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	var list []resources.Host
 	err = objn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
@@ -697,12 +698,12 @@ func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resource
 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
 	}
 
-	defer scerr.OnPanic(&err)()
+	defer scerr.OnPanic(&err)
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	var gatewayID string
 	err = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
@@ -742,9 +743,9 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnPanic(&err)()
+	defer tracer.OnExitTrace()
+	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer scerr.OnPanic(&err)
 
 	objn.SafeLock(task)
 	defer objn.SafeUnlock(task)
@@ -1060,7 +1061,7 @@ func (objn *network) ToProtocol(task concurrency.Task) (_ *protocol.Network, err
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").Entering()
-	defer tracer.OnExitTrace()()
+	defer tracer.OnExitTrace()
 
 	defer func() {
 		if err != nil {
