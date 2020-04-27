@@ -204,6 +204,12 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 		return nil, scerr.Wrap(err, "network name '%s' invalid", req.Name)
 	}
 
+	// Validates CIDR regarding the existing subnets
+	subnetworks, err := s.listSubnets()
+	if err != nil {
+		return nil, err
+	}
+
 	// Checks if CIDR is valid...
 	_, vpcnetDesc, _ := net.ParseCIDR(s.vpc.CIDR)
 	if req.CIDR != "" {
@@ -218,21 +224,36 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 		if vpcnetDesc.IP.Equal(networkDesc.IP) {
 			return nil, scerr.InvalidRequestError("cannot create subnet with CIDR '%s': network part of CIDR is equal to VPC one (%s)", req.CIDR, networkDesc.IP.String())
 		}
-	} else { // CIDR is empty, choose the first Class C one possible
+	} else { // CIDR is empty, choose the first Class C available one
 		tracer.Trace("CIDR is empty, choosing one...")
 
+		var (
+			bitShift uint8
+			i, limit uint
+			newIPNet net.IPNet
+		)
 		mask, _ := vpcnetDesc.Mask.Size()
-		var bitShift uint8
 		if mask >= 24 {
 			bitShift = 1
 		} else {
 			bitShift = 24 - uint8(mask)
 		}
-		ipNet, err := utils.FirstIncludedSubnet(*vpcnetDesc, bitShift)
-		if err != nil {
-			return nil, scerr.Wrap(err, "failed to choose a CIDR for the subnet")
+		limit = 1 << bitShift
+
+		for i = uint(1); i < limit; i++ {
+			newIPNet, err = utils.NthIncludedSubnet(*vpcnetDesc, bitShift, i)
+			if err != nil {
+				return nil, scerr.Wrap(err, "failed to choose a CIDR for the subnet")
+			}
+			if wouldOverlap(subnetworks, newIPNet) == nil {
+				break
+			}
 		}
-		req.CIDR = ipNet.String()
+		if i >= limit {
+			return nil, scerr.OverflowError(nil, limit-1, "failed to find a free available subnet ")
+		}
+
+		req.CIDR = newIPNet.String()
 		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
@@ -282,6 +303,18 @@ func validateNetworkName(req abstract.NetworkRequest) (bool, error) {
 		return false, fmt.Errorf(strings.Join(errs, "; "))
 	}
 	return true, nil
+}
+
+// wouldOverlap returns scerr.ErrOverloadError if subnet overlaps one of the subnets in allSubnets
+// TODO: there is room for optimization here, 'allSubnets' is walked through at each call...
+func wouldOverlap(allSubnets []subnets.Subnet, subnet net.IPNet) error {
+	for _, s := range allSubnets {
+		_, sDesc, _ := net.ParseCIDR(s.CIDR)
+		if utils.CIDROverlap(subnet, *sDesc) {
+			return scerr.OverloadError("would intersect with '%s (%s)'", s.Name, s.CIDR)
+		}
+	}
+	return nil
 }
 
 // GetNetworkByName ...
@@ -347,7 +380,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 		return nil, scerr.NewError("failed to get networks list: %s", openstack.ProviderErrorToString(err))
 	}
 	var networkList []*abstract.Network
-	for _, subnet := range *subnetList {
+	for _, subnet := range subnetList {
 		newNet := abstract.NewNetwork()
 		newNet.ID = subnet.ID
 		newNet.Name = subnet.Name
@@ -415,12 +448,15 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range *subnetworks {
-		_, sDesc, _ := net.ParseCIDR(s.CIDR)
-		if utils.CIDROverlap(*networkDesc, *sDesc) {
-			return nil, scerr.Wrap(err, "would intersect with '%s (%s)'", s.Name, s.CIDR)
-		}
+	if err = wouldOverlap(subnetworks, *networkDesc); err != nil {
+		return nil, scerr.Wrap(err, CANNOT)
 	}
+	// for _, s := range subnetworks {
+	// 	_, sDesc, _ := net.ParseCIDR(s.CIDR)
+	// 	if utils.CIDROverlap(*networkDesc, *sDesc) {
+	// 		return nil, scerr.Wrap(err, "would intersect with '%s (%s)'", s.Name, s.CIDR)
+	// 	}
+	// }
 
 	// Calculate IP address for gateway
 	n := utils.IPv4ToUInt32(network)
@@ -518,7 +554,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 }
 
 // ListSubnets lists available subnet in VPC
-func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
+func (s *Stack) listSubnets() ([]subnets.Subnet, error) {
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets?vpc_id=" + s.vpc.ID
 	pager := pagination.NewPager(s.Stack.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return subnets.SubnetPage{LinkedPageBase: pagination.LinkedPageBase{PageResult: r}}
@@ -540,7 +576,7 @@ func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
 		logrus.Warnf("We have a pagination error: %v", paginationErr)
 	}
 
-	return &subnetList, nil
+	return subnetList, nil
 }
 
 // getSubnet lists available subnet in VPC
@@ -622,7 +658,7 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 	}
 	found := false
 	var subnet subnets.Subnet
-	for _, s := range *subnetList {
+	for _, s := range subnetList {
 		if s.Name == name {
 			found = true
 			subnet = s
