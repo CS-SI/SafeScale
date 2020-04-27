@@ -275,7 +275,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	// Validating name of the host
 	if ok, err := validatehostName(request); !ok {
-		return nil, userData, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, openstack.ProviderErrorToString(err))
+		return nil, userData, scerr.Errorf(fmt.Sprintf("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, openstack.ProviderErrorToString(err)), err)
 	}
 
 	// The Default Network is the first of the provided list, by convention
@@ -309,7 +309,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if request.KeyPair == nil {
 		id, err := uuid.NewV4()
 		if err != nil {
-			return nil, userData, fmt.Errorf("error creating UID : %v", err)
+			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating UID : %v", err), err)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
@@ -322,7 +322,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, userData, scerr.Errorf(fmt.Sprintf("failed to generate password: %s", err.Error()), err)
 		}
 		request.Password = password
 	}
@@ -334,13 +334,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		logrus.Debugf(utils.Capitalize(msg))
-		return nil, userData, fmt.Errorf(msg)
+		return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
 	}
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to get image: %s", openstack.ProviderErrorToString(err))
+		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to get image: %s", openstack.ProviderErrorToString(err)), err)
 	}
 
 	// Determines appropriate disk size
@@ -392,7 +392,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 	b, err := bdOpts.ToServerCreateMap()
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to build query to create host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
+		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to build query to create host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err)), err)
 	}
 
 	// --- Initializes resources.Host ---
@@ -448,8 +448,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				if httpResp != nil {
 					codeStr = fmt.Sprintf(" (HTTP return code: %d)", httpResp.StatusCode)
 				}
-				return fmt.Errorf("query to create host '%s' failed: %s%s",
-					request.ResourceName, openstack.ProviderErrorToString(ierr), codeStr)
+				return scerr.Errorf(fmt.Sprintf("query to create host '%s' failed: %s%s",
+					request.ResourceName, openstack.ProviderErrorToString(ierr), codeStr), ierr)
 			}
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
@@ -474,13 +474,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 			// Wait that Host is ready, not just that the build is started
 			var srv *servers.Server
-			srv, ierr = s.waitHostState(host, hoststate.STARTED, temporal.GetHostTimeout())
+			srv, ierr = s.waitHostState(host, []hoststate.Enum{hoststate.STARTED}, temporal.GetHostTimeout())
 			if ierr != nil {
-				return fmt.Errorf(openstack.ProviderErrorToString(ierr))
+				return scerr.Errorf(fmt.Sprintf(openstack.ProviderErrorToString(ierr)), ierr)
 			}
 
 			if ierr = s.complementHost(host, srv); ierr != nil {
-				return fmt.Errorf(openstack.ProviderErrorToString(ierr))
+				return scerr.Errorf(fmt.Sprintf(openstack.ProviderErrorToString(ierr)), ierr)
 			}
 
 			return nil
@@ -492,7 +492,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, err
 	}
 	if host == nil {
-		return nil, userData, fmt.Errorf("unexpected problem creating host")
+		return nil, userData, scerr.Errorf(fmt.Sprintf("unexpected problem creating host"), nil)
 	}
 
 	newHost := host
@@ -518,11 +518,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		var fip *FloatingIP
 		fip, err = s.attachFloatingIP(host)
 		if err != nil {
-			spew.Dump(err)
-			return nil, userData, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
+			spew.Dump(err) // FIXME Remove spew.Dump
+			return nil, userData, scerr.Errorf(fmt.Sprintf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err)), err)
 		}
 		if fip == nil {
-			return nil, userData, fmt.Errorf("error attaching public IP for host: unknown error")
+			return nil, userData, scerr.Errorf(fmt.Sprintf("error attaching public IP for host: unknown error"), nil)
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -554,7 +554,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName {
 			err = s.enableHostRouterMode(host)
 			if err != nil {
-				return nil, userData, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
+				return nil, userData, scerr.Errorf(fmt.Sprintf("error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err)), err)
 			}
 		}
 	}
@@ -580,7 +580,9 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 		for _, msg := range errorList {
 			errs = append(errs, msg.Error())
 		}
-		return false, fmt.Errorf(strings.Join(errs, " + "))
+
+		// FIXME Not like this, is not an empty cause
+		return false, scerr.Errorf(fmt.Sprintf(strings.Join(errs, " + ")), nil)
 	}
 	return true, nil
 }
@@ -624,7 +626,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 }
 
 func (s *Stack) queryServer(id string) (server *servers.Server, err error) {
-	server, err = s.waitHostState(id, hoststate.STARTED, 2*temporal.GetBigDelay())
+	server, err = s.waitHostState(id, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay())
 	if err != nil {
 		return nil, err
 	}
@@ -817,7 +819,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 		return true, nil
 	})
 	if len(hosts) == 0 && err != nil {
-		return nil, fmt.Errorf("error listing hosts: %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("error listing hosts: %s", openstack.ProviderErrorToString(err)), err)
 	}
 	return hosts, nil
 }
@@ -841,11 +843,11 @@ func (s *Stack) DeleteHost(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
+					return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
 				}
 				err = floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
+					return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
 				}
 			}
 		}
@@ -864,7 +866,7 @@ func (s *Stack) DeleteHost(id string) error {
 					// metadata deletion will return an error)
 					return nil
 				default:
-					return fmt.Errorf("failed to submit host '%s' deletion: %s", id, openstack.ProviderErrorToString(err))
+					return scerr.Errorf(fmt.Sprintf("failed to submit host '%s' deletion: %s", id, openstack.ProviderErrorToString(err)), err)
 				}
 			}
 			// 2nd, check host status every 5 seconds until check failed.
@@ -878,7 +880,7 @@ func (s *Stack) DeleteHost(id string) error {
 						if toHostState(host.Status) == hoststate.ERROR {
 							return nil
 						}
-						return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
+						return scerr.Errorf(fmt.Sprintf("host '%s' state is '%s'", host.Name, host.Status), err)
 					}
 
 					switch err.(type) { // nolint
@@ -900,7 +902,7 @@ func (s *Stack) DeleteHost(id string) error {
 			if !resourcePresent {
 				return nil
 			}
-			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
+			return scerr.Errorf(fmt.Sprintf("host '%s' in state 'ERROR', retrying to delete", id), nil)
 		},
 		0,
 		temporal.GetHostCleanupTimeout(),
@@ -932,13 +934,12 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, err
 	})
 	if len(fips) == 0 {
 		if err != nil {
-			return nil, fmt.Errorf("no floating IP found for host '%s': %s", hostID, openstack.ProviderErrorToString(err))
+			return nil, scerr.Errorf(fmt.Sprintf("no floating IP found for host '%s': %s", hostID, openstack.ProviderErrorToString(err)), err)
 		}
-		return nil, fmt.Errorf("no floating IP found for host '%s'", hostID)
-
+		return nil, scerr.Errorf(fmt.Sprintf("no floating IP found for host '%s'", hostID), nil)
 	}
 	if len(fips) > 1 {
-		return nil, fmt.Errorf("configuration error, more than one Floating IP associated to host '%s'", hostID)
+		return nil, scerr.Errorf(fmt.Sprintf("configuration error, more than one Floating IP associated to host '%s'", hostID), nil)
 	}
 	return &fips[0], nil
 }
@@ -947,16 +948,18 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, err
 func (s *Stack) attachFloatingIP(host *resources.Host) (*FloatingIP, error) {
 	fip, err := s.CreateFloatingIP()
 	if err != nil {
-		return nil, fmt.Errorf("failed to attach Floating IP on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("failed to attach Floating IP on host '%s': %s", host.Name, openstack.ProviderErrorToString(err)), nil)
 	}
 
 	err = s.AssociateFloatingIP(host, fip.ID)
 	if err != nil {
 		derr := s.DeleteFloatingIP(fip.ID)
 		if derr != nil {
-			logrus.Warnf("Error deleting floating ip: %v", derr)
+			logrus.Errorf("Error deleting Floating IP: %v", derr)
+			err = scerr.AddConsequence(err, derr)
 		}
-		return nil, fmt.Errorf("failed to attach Floating IP to host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+
+		return nil, err
 	}
 	return fip, nil
 }
@@ -973,17 +976,17 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 		func() error {
 			portID, err = s.getOpenstackPortID(host)
 			if err != nil {
-				return fmt.Errorf("%s", openstack.ProviderErrorToString(err))
+				return scerr.Errorf(fmt.Sprintf("%s", openstack.ProviderErrorToString(err)), err)
 			}
 			if portID == nil {
-				return fmt.Errorf("failed to find OpenStack port")
+				return scerr.Errorf(fmt.Sprintf("failed to find OpenStack port"), nil)
 			}
 			return nil
 		},
 		temporal.GetBigDelay(),
 	)
 	if retryErr != nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': %v", host.Name, retryErr)
+		return scerr.Errorf(fmt.Sprintf("failed to enable Router Mode on host '%s': %v", host.Name, retryErr), retryErr)
 	}
 
 	pairs := []ports.AddressPair{
@@ -994,7 +997,7 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
 	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return scerr.Errorf(fmt.Sprintf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err)), err)
 	}
 	return nil
 }
@@ -1003,16 +1006,16 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 func (s *Stack) disableHostRouterMode(host *resources.Host) error {
 	portID, err := s.getOpenstackPortID(host)
 	if err != nil {
-		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return scerr.Errorf(fmt.Sprintf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err)), err)
 	}
 	if portID == nil {
-		return fmt.Errorf("failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name)
+		return scerr.Errorf(fmt.Sprintf("failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name), nil)
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return scerr.Errorf(fmt.Sprintf("failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err)), err)
 	}
 	return nil
 }
@@ -1049,7 +1052,7 @@ func (s *Stack) getOpenstackPortID(host *resources.Host) (*string, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error browsing Openstack Interfaces of host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("error browsing Openstack Interfaces of host '%s': %s", host.Name, openstack.ProviderErrorToString(err)), err)
 	}
 	if found {
 		return &nic.PortID, nil
@@ -1091,7 +1094,7 @@ func toHostState(status string) hoststate.Enum {
 
 // waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
+func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -1130,7 +1133,7 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 					return err
 				case gc.ErrDefault409:
 					// specific handling for error 409
-					return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", host.ID, err))
+					return scerr.AbortedError("", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err))
 				case gc.ErrDefault429:
 					// rate limiting defined by provider, retry
 					return err
@@ -1154,7 +1157,7 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 					case 503:
 						return err
 					default:
-						return scerr.AbortedError("", fmt.Errorf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err))
+						return scerr.AbortedError("", scerr.Errorf(fmt.Sprintf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err), err))
 					}
 				}
 
@@ -1163,28 +1166,32 @@ func (s *Stack) waitHostState(hostParam interface{}, state hoststate.Enum, timeo
 				}
 
 				// Any other error stops the retry
-				return scerr.AbortedError("", fmt.Errorf("error getting host '%s': %s", host.ID, err))
+				return scerr.AbortedError("", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err))
 			}
 
 			if server == nil {
-				return fmt.Errorf("error getting host, nil response from gophercloud")
+				return scerr.Errorf(fmt.Sprintf("error getting host, nil response from gophercloud"), nil)
 			}
 
 			lastState := toHostState(server.Status)
 			// If state matches, we consider this a success no matter what
-			if lastState == state {
-				return nil
+			for _, state := range states {
+				if lastState == state {
+					return nil
+				}
 			}
+
+			// logrus.Warnf("Target state: %s, current state: %s", states, lastState)
 
 			if lastState == hoststate.ERROR {
 				return scerr.AbortedError("", resources.ResourceNotAvailableError("host", host.ID))
 			}
 
 			if !((lastState == hoststate.STARTING) || (lastState == hoststate.STOPPING)) {
-				return scerr.AbortedError("", fmt.Errorf("host status of '%s' is in state '%s', and that's not a transition state", host.ID, server.Status))
+				return scerr.Errorf(fmt.Sprintf("host status of '%s' is in state '%s', and that's not a transition state", host.ID, server.Status), nil)
 			}
 
-			return fmt.Errorf("server not ready yet")
+			return scerr.Errorf(fmt.Sprintf("server not ready yet"), nil)
 		},
 		temporal.GetMinDelay(),
 		timeout,

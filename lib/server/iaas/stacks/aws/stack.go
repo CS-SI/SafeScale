@@ -39,17 +39,14 @@ type Stack struct {
 	PricingService *pricing.Pricing
 }
 
-// FIXME Orphan method
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	return *s.Config
 }
 
-// FIXME Orphan method
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 	return *s.AuthOptions
 }
 
-// FIXME Orphan method
 // New Create and initialize a ClientAPI
 func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*Stack, error) {
 	stack := &Stack{
@@ -57,8 +54,6 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 		AuthOptions: &auth,
 		AwsConfig:   &localCfg,
 	}
-
-	// FIXME Validate region against endpoints.UsWest2RegionID // UsWest2RegionID      = "us-west-2"      // US West (Oregon).
 
 	accessKeyID := auth.AccessKeyID
 	secretAccessKey := auth.SecretAccessKey
@@ -94,8 +89,6 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	stack.EC2Service = ec2.New(sec2, &aws.Config{})
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})
-
-	// FIXME Populate things here
 
 	return stack, nil
 }

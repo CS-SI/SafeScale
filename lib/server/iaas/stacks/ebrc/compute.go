@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/govcd"
@@ -114,7 +114,6 @@ func (s *StackEbrc) GetImage(id string) (*resources.Image, error) {
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *StackEbrc) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	// FIXME On it
 	logrus.Debug(">>> stacks.ebrc::ListTemplates()")
 	defer logrus.Debug("<<< stacks.ebrc::ListTemplates()")
 
@@ -256,17 +255,17 @@ func (s *StackEbrc) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *StackEbrc) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, fmt.Errorf("Not implemented")
+	return nil, scerr.Errorf(fmt.Sprintf("Not implemented"), nil)
 }
 
 // ListKeyPairs lists available key pairs
 func (s *StackEbrc) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, fmt.Errorf("Not implemented")
+	return nil, scerr.Errorf(fmt.Sprintf("Not implemented"), nil)
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *StackEbrc) DeleteKeyPair(id string) error {
-	return fmt.Errorf("Not implemented")
+	return scerr.Errorf(fmt.Sprintf("Not implemented"), nil)
 }
 
 // CreateHost creates an host satisfying request
@@ -287,10 +286,10 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	keyPair := request.KeyPair
 
 	if networks == nil || len(networks) == 0 {
-		return nil, userData, fmt.Errorf("The host %s must be on at least one network (even if public)", resourceName)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("The host %s must be on at least one network (even if public)", resourceName), nil)
 	}
 	if defaultGateway == nil && !hostMustHavePublicIP {
-		return nil, userData, fmt.Errorf("The host %s must have a gateway or be public", resourceName)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("The host %s must have a gateway or be public", resourceName), nil)
 	}
 
 	org, vdc, err := s.getOrgVdc()
@@ -330,14 +329,14 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 	catalog, err := org.FindCatalog(catalogName)
 	if err != nil || utils.IsEmpty(catalog) {
-		return nil, userData, fmt.Errorf("error finding catalog: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding catalog: %#v", err), err)
 	}
 
 	logrus.Warningf("Selected image: [%s]", request.ImageID)
 
 	catalogitem, err := catalog.FindCatalogItem(itemName)
 	if err != nil || utils.IsEmpty(catalogitem) {
-		return nil, userData, fmt.Errorf("error finding catalog item: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding catalog item: %#v", err), err)
 	}
 
 	// FIXME Use template
@@ -345,20 +344,20 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to get image: %s", request.TemplateID)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to get image: %s", request.TemplateID), err)
 	}
 	_ = template
 
 	vapptemplate, err := catalogitem.GetVAppTemplate()
 	if err != nil || utils.IsEmpty(vapptemplate) {
-		return nil, userData, fmt.Errorf("error finding VAppTemplate: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding VAppTemplate: %#v", err), err)
 	}
 
 	log.Printf("[DEBUG] VAppTemplate: %#v", vapptemplate)
 
 	net, err := vdc.FindVDCNetwork(request.Networks[0].Name)
 	if err != nil {
-		return nil, userData, fmt.Errorf("error finding OrgVCD Network: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding OrgVCD Network: %#v", err), err)
 	}
 	nets := []*types.OrgVDCNetwork{net.OrgVDCNetwork}
 
@@ -368,14 +367,14 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		for _, sp := range sps.VdcStorageProfile {
 			storage_profile_reference, err = vdc.FindStorageProfileReference(sp.Name)
 			if err != nil {
-				return nil, userData, fmt.Errorf("error finding storage profile %s", sp.Name)
+				return nil, userData, scerr.Errorf(fmt.Sprintf("error finding storage profile %s", sp.Name), err)
 			}
 		}
 	}
 
 	log.Printf("storage_profile %s", storage_profile_reference)
 	// FIXME Remove this
-	logrus.Warningf("Request [%s]", spew.Sdump(request))
+	// logrus.Warningf("Request [%s]", spew.Sdump(request))
 
 	vapp, err := vdc.FindVAppByName(request.ResourceName)
 
@@ -395,11 +394,11 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		)
 
 		if retryErr != nil {
-			return nil, userData, fmt.Errorf("error creating vapp: %#v", err)
+			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating vapp: %#v", err), retryErr)
 		}
 		vapp, err = vdc.FindVAppByName(request.ResourceName)
 		if err != nil {
-			return nil, userData, fmt.Errorf("error creating vapp: %#v", err)
+			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating vapp: %#v", err), err)
 		}
 	}
 
@@ -451,7 +450,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		10*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, fmt.Errorf("error changing vmname: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error changing vmname: %#v", err), err)
 	}
 
 	//----Initialize----
@@ -459,14 +458,14 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		var err error
 		keyPair, err = s.CreateKeyPair(fmt.Sprintf("key_%s", resourceName))
 		if err != nil {
-			return nil, userData, fmt.Errorf("KeyPair creation failed : %s", err.Error())
+			return nil, userData, scerr.Errorf(fmt.Sprintf("KeyPair creation failed : %s", err.Error()), err)
 		}
 		request.KeyPair = keyPair
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, userData, scerr.Errorf(fmt.Sprintf("failed to generate password: %s", err.Error()), err)
 		}
 		request.Password = password
 	}
@@ -478,7 +477,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		logrus.Debugf(utils.Capitalize(msg))
-		return nil, userData, fmt.Errorf(msg)
+		return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
 	}
 
 	phase1Content, err := userData.Generate("phase1")
@@ -490,7 +489,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	userdataFileName := "/tmp/userdata.sh"
 	err = ioutil.WriteFile(userdataFileName, phase1Content, 0644)
 	if err != nil {
-		return nil, userData, fmt.Errorf("Failed to write userData locally : %s", err.Error())
+		return nil, userData, scerr.Errorf(fmt.Sprintf("Failed to write userData locally : %s", err.Error()), err)
 	}
 
 	err = retry.WhileUnsuccessfulDelay5Seconds(
@@ -504,7 +503,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		10*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, fmt.Errorf("error running customization script: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error running customization script: %#v", err), err)
 	}
 
 	err = retry.WhileUnsuccessfulDelay5Seconds(
@@ -518,7 +517,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		10*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, fmt.Errorf("error powering on machine: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error powering on machine: %#v", err), err)
 	}
 
 	capturedIP := ""
@@ -541,7 +540,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 			PublicIPv4 := cose.NetworkConnection[0].IPAddress
 			if PublicIPv4 == "" {
-				return fmt.Errorf("No IP detected")
+				return scerr.Errorf(fmt.Sprintf("No IP detected"), nil)
 			} else {
 				logrus.Warningf("IP Detected: [%s]", PublicIPv4)
 				capturedIP = PublicIPv4
@@ -552,7 +551,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		3*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, fmt.Errorf("error getting machine ip: %#v", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("error getting machine ip: %#v", err), err)
 	}
 
 	// FIXME Populate this
@@ -577,7 +576,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 			gateway, err := s.InspectHost(request.DefaultGateway)
 			if err != nil {
-				return fmt.Errorf("Failed to get gateway host : %s", err.Error())
+				return scerr.Errorf(fmt.Sprintf("Failed to get gateway host : %s", err.Error()), err)
 			}
 
 			hostNetworkV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
@@ -611,7 +610,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		return nil
 	})
 	if err != nil {
-		return nil, userData, fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
+		return nil, userData, scerr.Errorf(fmt.Sprintf("Failed to update HostProperty.SizingV1 : %s", err.Error()), err)
 	}
 
 	// FIXME Edge gateway smart tunnel only if public or gateway
@@ -619,9 +618,9 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		gateways, err := s.findEdgeGatewayNames()
 		if err != nil || utils.IsEmpty(gateways) {
 			if err != nil {
-				return nil, userData, fmt.Errorf("Unable to find edge gateways : %s", err.Error())
+				return nil, userData, scerr.Errorf(fmt.Sprintf("Unable to find edge gateways : %s", err.Error()), err)
 			}
-			return nil, userData, fmt.Errorf("Unable to find edge gateways")
+			return nil, userData, scerr.Errorf(fmt.Sprintf("Unable to find edge gateways"), err)
 		}
 
 		edgeGateway, err := vdc.FindEdgeGateway(gateways[0])
@@ -639,7 +638,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	}
 
 	// FIXME Remove this
-	logrus.Warningf(spew.Sdump(host.Properties))
+	// logrus.Warningf(spew.Sdump(host.Properties))
 
 	return host, userData, nil
 }
@@ -701,7 +700,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	}
 
 	if err := s.complementHost(host, newHost); err != nil {
-		return nil, fmt.Errorf("Failed to complement the host : %s", err.Error())
+		return nil, scerr.Errorf(fmt.Sprintf("Failed to complement the host : %s", err.Error()), err)
 	}
 
 	return host, nil
@@ -709,7 +708,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 
 func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host) error {
 	if host == nil || newHost == nil {
-		return fmt.Errorf("host and newHost have to been set")
+		return scerr.Errorf(fmt.Sprintf("host and newHost have to been set"), nil)
 	}
 
 	if s == nil {
@@ -732,7 +731,7 @@ func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return scerr.Errorf(fmt.Sprintf("Failed to update HostProperty.NetworkV1 : %s", err.Error()), err)
 	}
 
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
@@ -744,7 +743,7 @@ func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
+		return scerr.Errorf(fmt.Sprintf("Failed to update HostProperty.SizingV1 : %s", err.Error()), err)
 	}
 
 	return nil
@@ -844,7 +843,7 @@ func (s *StackEbrc) DeleteHost(id string) error {
 
 // ResizeHost change the template used by an host
 func (s *StackEbrc) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, fmt.Errorf("Not implemented yet")
+	return nil, scerr.Errorf(fmt.Sprintf("Not implemented yet"), nil)
 }
 
 // ListHosts lists available hosts
@@ -868,7 +867,6 @@ func (s *StackEbrc) ListHosts() ([]*resources.Host, error) {
 
 	var nets []*resources.Host
 	for _, ref := range refs {
-		// FIXME On it
 		nets = append(nets, &resources.Host{Name: ref.Name})
 	}
 

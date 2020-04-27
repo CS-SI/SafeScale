@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/types/v56"
@@ -58,28 +59,28 @@ func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Vo
 	if storageProfileValue != "" {
 		storageReference, err = vdc.FindStorageProfileReference(storageProfileValue)
 		if err != nil {
-			return nil, fmt.Errorf("error finding storage profile %s", storageProfileValue)
+			return nil, scerr.Errorf(fmt.Sprintf("error finding storage profile %s", storageProfileValue), err)
 		}
 		diskCreateParams.Disk.StorageProfile = &types.Reference{HREF: storageReference.HREF}
 	}
 
 	task, err := vdc.CreateDisk(diskCreateParams)
 	if err != nil {
-		return nil, fmt.Errorf("error creating independent disk: %s", err)
+		return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
 	}
 
 	err = task.WaitTaskCompletion()
 	if err != nil {
-		return nil, fmt.Errorf("error waiting to finish creation of independent disk: %s", err)
+		return nil, scerr.Errorf(fmt.Sprintf("error waiting to finish creation of independent disk: %s", err), err)
 	}
 
 	drec, err := vdc.QueryDisk(request.Name)
 	if err != nil {
-		return nil, fmt.Errorf("error creating independent disk: %s", err)
+		return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
 	}
 	disk, err := vdc.FindDiskByHREF(drec.Disk.HREF)
 	if err != nil {
-		return nil, fmt.Errorf("unable to find disk by reference: %s", err)
+		return nil, scerr.Errorf(fmt.Sprintf("unable to find disk by reference: %s", err), err)
 	}
 
 	revol := &resources.Volume{
@@ -237,7 +238,7 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 		}
 	}
 
-	return nil, fmt.Errorf("Attachment [%s] to [%s] not found", id, serverID)
+	return nil, scerr.Errorf(fmt.Sprintf("Attachment [%s] to [%s] not found", id, serverID), nil)
 }
 
 // DeleteVolumeAttachment ...

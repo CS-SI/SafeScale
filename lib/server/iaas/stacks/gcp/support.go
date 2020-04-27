@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"net/url"
 	"strings"
 	"time"
@@ -50,7 +51,7 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 
 		if oco.Operation == nil {
 			if err == nil {
-				return res, fmt.Errorf("no operation")
+				return res, scerr.Errorf(fmt.Sprintf("no operation"), err)
 			}
 			return res, err
 		}
@@ -62,7 +63,7 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 		return res, err
 	}
 
-	return res, fmt.Errorf("no operation")
+	return res, scerr.Errorf(fmt.Sprintf("no operation"), nil)
 }
 
 func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, duration time.Duration) (err error) {
@@ -72,7 +73,7 @@ func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, 
 			return anerr
 		}
 		if !r.Done {
-			return fmt.Errorf("not finished yet")
+			return scerr.Errorf(fmt.Sprintf("not finished yet"), nil)
 		}
 		return nil
 	}, poll, duration)
@@ -125,14 +126,14 @@ func getRegionFromSelfLink(link SelfLink) (string, error) {
 				return parts[regionPos+1], nil
 			}
 		}
-		return "", fmt.Errorf("not a region link")
+		return "", scerr.Errorf(fmt.Sprintf("not a region link"), nil)
 	}
-	return "", fmt.Errorf("not a region link")
+	return "", scerr.Errorf(fmt.Sprintf("not a region link"), nil)
 }
 
 // func assertEq(exp, got interface{}) error {
 // 	if !reflect.DeepEqual(exp, got) {
-// 		return fmt.Errorf("wanted %v; Got %v", exp, got)
+// 		return scerr.Errorf(fmt.Sprintf("wanted %v; Got %v", exp, got)
 // 	}
 // 	return nil
 // }

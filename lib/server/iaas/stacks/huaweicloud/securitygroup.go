@@ -194,7 +194,7 @@ import (
 // func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 // 	sg, err := s.Stack.GetSecurityGroup(s.defaultSecurityGroupName)
 // 	if err != nil {
-// 		return nil, fmt.Errorf("error listing routers: %s", openstack.ProviderErrorToString(err))
+// 		return nil, scerr.Errorf(fmt.Sprintf("error listing routers: %s", openstack.ProviderErrorToString(err))
 // 	}
 
 // 	return sg, nil

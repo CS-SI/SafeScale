@@ -157,6 +157,14 @@ func Wrap(cause error, message string) ErrCore {
 	return NewErrCore(message, cause, []error{})
 }
 
+func ErrorfWithCause(message string, cause error) ErrCore {
+	return NewErrCore(message, cause, nil)
+}
+
+func Errorf(message string, cause error) ErrCore {
+	return NewErrCore(message, cause, nil)
+}
+
 // NewErrCore creates a new error with a message 'message', a cause error 'cause' and a list of teardown problems 'consequences'
 func NewErrCore(message string, cause error, consequences []error) ErrCore {
 	if consequences == nil {
@@ -398,6 +406,8 @@ func (e ErrAborted) AddConsequence(err error) error {
 func AbortedError(msg string, err error) ErrAborted {
 	if msg == "" {
 		msg = "aborted"
+	} else {
+		msg = "aborted: " + msg
 	}
 	return ErrAborted{
 		ErrCore: ErrCore{

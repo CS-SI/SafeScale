@@ -2,6 +2,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"testing"
 
 	"github.com/gophercloud/gophercloud"
@@ -41,7 +42,7 @@ func TestEmptyGophercloudErrorCodes(t *testing.T) {
 }
 
 func TestNotGophercloudErrorCodes(t *testing.T) {
-	srcErr := fmt.Errorf("something else")
+	srcErr := scerr.Errorf(fmt.Sprintf("something else"), nil)
 	code, err := GetUnexpectedGophercloudErrorCode(srcErr)
 	if err == nil {
 		t.FailNow()

@@ -162,6 +162,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 					derr := svc.DeleteVIP(vip)
 					if derr != nil {
 						logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
+						err = scerr.AddConsequence(err, derr)
 					}
 				}
 			}()

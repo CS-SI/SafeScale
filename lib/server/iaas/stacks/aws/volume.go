@@ -18,6 +18,7 @@ package aws
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
@@ -211,7 +212,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("volume attachment of volume %s on server %s does not exist", serverID, id)
+	return nil, scerr.Errorf(fmt.Sprintf("volume attachment of volume %s on server %s does not exist", serverID, id), nil)
 }
 
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {

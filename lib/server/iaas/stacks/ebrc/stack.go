@@ -3,6 +3,7 @@ package ebrc
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/vmware/go-vcloud-director/govcd"
 	"net/url"
 )
@@ -30,13 +31,13 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationO
 
 	u, err := url.ParseRequestURI(auth.IdentityEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to pass url: %s", err)
+		return nil, scerr.Errorf(fmt.Sprintf("Unable to pass url: %s", err), err)
 	}
 
 	vcdclient := govcd.NewVCDClient(*u, localCfg.Insecure)
 	err = vcdclient.Authenticate(auth.Username, auth.Password, auth.ProjectName)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to authenticate: %s", err)
+		return nil, scerr.Errorf(fmt.Sprintf("Unable to authenticate: %s", err), err)
 	}
 	stack.EbrcService = vcdclient
 

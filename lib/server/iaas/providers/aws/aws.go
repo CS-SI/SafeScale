@@ -149,7 +149,6 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		operatorUsername = operatorUsernameIf.(string)
 	}
 
-	// FIXME Use authentication options
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -182,7 +181,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		OperatorUsername: operatorUsername,
 		UseNATService:    false,
 		ProviderName:     providerName,
-		BuildSubnetworks: false, // FIXME AWS pass this as a parameter, make it FALSE by default
+		BuildSubnetworks: false, // FIXME AWS by default don't build subnetworks
 	}
 
 	stack, err := aws.New(authOptions, awsConf, cfgOptions)

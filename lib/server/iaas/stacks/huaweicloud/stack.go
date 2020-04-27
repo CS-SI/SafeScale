@@ -65,7 +65,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	// Identity API
 	identity, err := gcos.NewIdentityV3(stack.Driver, gc.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("%s", openstack.ProviderErrorToString(err)), err)
 	}
 
 	// Recover Project ID of region
@@ -75,16 +75,16 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	}
 	allPages, err := projects.List(identity, listOpts).AllPages()
 	if err != nil {
-		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("failed to query project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err)), err)
 	}
 	allProjects, err := projects.ExtractProjects(allPages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("failed to load project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err)), err)
 	}
 	if len(allProjects) > 0 {
 		authOptions.ProjectID = allProjects[0].ID
 	} else {
-		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("failed to found project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err)), err)
 	}
 
 	s := Stack{
@@ -121,7 +121,7 @@ func (s *Stack) initVPC() error {
 		CIDR: s.authOpts.VPCCIDR,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to initialize VPC '%s': %s", s.authOpts.VPCName, openstack.ProviderErrorToString(err))
+		return scerr.Errorf(fmt.Sprintf("failed to initialize VPC '%s': %s", s.authOpts.VPCName, openstack.ProviderErrorToString(err)), err)
 	}
 	s.vpc = vpc
 	return nil
@@ -133,7 +133,7 @@ func (s *Stack) findVPCID() (*string, error) {
 	found := false
 	routers, err := s.Stack.ListRouters()
 	if err != nil {
-		return nil, fmt.Errorf("error listing routers: %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("error listing routers: %s", openstack.ProviderErrorToString(err)), err)
 	}
 	for _, r := range routers {
 		if r.Name == s.authOpts.VPCName {
