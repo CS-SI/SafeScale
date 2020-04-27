@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"text/template"
 
@@ -99,11 +100,14 @@ type Content struct {
 }
 
 var (
-	userdataPhase1Template atomic.Value
-	userdataPhase2Template atomic.Value
-	userdataPhase3Template atomic.Value
-	userdataPhase4Template atomic.Value
-	userdataPhase5Template atomic.Value
+	userdataPhaseTemplates = map[Phase]*atomic.Value{
+		PHASE1_INIT:                      nil,
+		PHASE2_NETWORK_AND_SECURITY:      nil,
+		PHASE3_GATEWAY_HIGH_AVAILABILITY: nil,
+		PHASE4_SYSTEM_FIXES:              nil,
+		PHASE5_FINAL:                     nil,
+	}
+	userdataPhaseTemplatesLock sync.RWMutex
 )
 
 // NewContent ...
@@ -241,163 +245,44 @@ func (ud *Content) Generate(phase Phase) ([]byte, error) {
 		}
 	}
 
-	switch phase {
-	case PHASE1_INIT, "phase1":
-		anon := userdataPhase1Template.Load()
-		if anon == nil {
-			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil {
-				return nil, err
-			}
-			tmplString, err := box.String(fmt.Sprintf("userdata%s.init.sh", provider))
-			if err != nil {
-				return nil, scerr.Wrap(err, "error loading script template for phase 'init'")
-			}
-			tmpl, err := template.New("userdata.init").Parse(tmplString)
-			if err != nil {
-				return nil, scerr.Wrap(err, "error parsing script template for phase 'init'")
-			}
-			userdataPhase1Template.Store(tmpl)
-			anon = userdataPhase1Template.Load()
-		}
-		tmpl := anon.(*template.Template)
-		buf := bytes.NewBufferString("")
-		err := tmpl.Execute(buf, ud)
-		if err != nil {
-			return nil, err
-		}
-		result = buf.Bytes()
-
-	case PHASE2_NETWORK_AND_SECURITY, "phase2":
-		anon := userdataPhase2Template.Load()
-		if anon == nil {
-			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil {
-				return nil, err
-			}
-
-			tmplString, err := box.String(fmt.Sprintf("userdata%s.netsec.sh", provider))
-			if err != nil {
-				return nil, scerr.Wrap(err, "error loading script template for phase 'netsec'")
-			}
-			tmpl, err := template.New("userdata.netsec").Parse(tmplString)
-			if err != nil {
-				return nil, scerr.Wrap(err, "error parsing script template for phase 'netsec")
-			}
-			userdataPhase2Template.Store(tmpl)
-			anon = userdataPhase2Template.Load()
-		}
-		tmpl := anon.(*template.Template)
-		buf := bytes.NewBufferString("")
-		err = tmpl.Execute(buf, ud)
-		if err != nil {
-			return nil, err
-		}
-		result = buf.Bytes()
-		for tagname, tagcontent := range ud.Tags[phase] {
-			for _, str := range tagcontent {
-				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
-			}
-		}
-
-	case PHASE3_GATEWAY_HIGH_AVAILABILITY, "phase3":
-		anon := userdataPhase3Template.Load()
-		if anon == nil {
-			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil {
-				return nil, err
-			}
-
-			tmplString, err := box.String(fmt.Sprintf("userdata%s.gwha.sh", provider))
-			if err != nil {
-				return nil, scerr.Wrap(err, "error loading script template for phase 'gwha'")
-			}
-			tmpl, err := template.New("userdata.gwha").Parse(tmplString)
-			if err != nil {
-				return nil, scerr.Wrap(err, "error parsing script template for phase 'gwha'")
-			}
-			userdataPhase3Template.Store(tmpl)
-			anon = userdataPhase3Template.Load()
-		}
-		tmpl := anon.(*template.Template)
-		buf := bytes.NewBufferString("")
-		err = tmpl.Execute(buf, ud)
-		if err != nil {
-			return nil, err
-		}
-		result = buf.Bytes()
-		for tagname, tagcontent := range ud.Tags[phase] {
-			for _, str := range tagcontent {
-				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
-			}
-		}
-
-	case PHASE4_SYSTEM_FIXES, "phase4":
-		anon := userdataPhase4Template.Load()
-		if anon == nil {
-			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil {
-				return nil, err
-			}
-
-			tmplString, err := box.String(fmt.Sprintf("userdata%s.sysfix.sh", provider))
-			if err != nil {
-				return nil, scerr.Wrap(err, "error loading script template for phase 'sysfix'")
-			}
-			tmpl, err := template.New("userdata.sysfix").Parse(tmplString)
-			if err != nil {
-				return nil, scerr.Wrap(err, "error parsing script template for phase 'sysfix'")
-			}
-			userdataPhase2Template.Store(tmpl)
-			anon = userdataPhase2Template.Load()
-		}
-		tmpl := anon.(*template.Template)
-		buf := bytes.NewBufferString("")
-		err = tmpl.Execute(buf, ud)
-		if err != nil {
-			return nil, err
-		}
-		result = buf.Bytes()
-		for tagname, tagcontent := range ud.Tags[phase] {
-			for _, str := range tagcontent {
-				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
-			}
-		}
-
-	case PHASE5_FINAL, "phase5":
-		anon := userdataPhase5Template.Load()
-		if anon == nil {
-			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil {
-				return nil, err
-			}
-
-			tmplString, err := box.String(fmt.Sprintf("userdata%s.final.sh", provider))
-			if err != nil {
-				return nil, scerr.Wrap(err, "error loading script template for phase 'final'")
-			}
-			tmpl, err := template.New("userdata.final").Parse(tmplString)
-			if err != nil {
-				return nil, scerr.Wrap(err, "error parsing script template for phase 'final'")
-			}
-			userdataPhase5Template.Store(tmpl)
-			anon = userdataPhase5Template.Load()
-		}
-		tmpl := anon.(*template.Template)
-		buf := bytes.NewBufferString("")
-		err = tmpl.Execute(buf, ud)
-		if err != nil {
-			return nil, err
-		}
-		result = buf.Bytes()
-		for tagname, tagcontent := range ud.Tags[phase] {
-			for _, str := range tagcontent {
-				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
-			}
-		}
-
-	default:
+	userdataPhaseTemplatesLock.RLock()
+	anon, ok := userdataPhaseTemplates[phase]
+	userdataPhaseTemplatesLock.RUnlock()
+	if !ok {
 		return nil, scerr.NotImplementedError("phase '%s' not managed", phase)
+	}
+	var tmpl *template.Template
+	if anon != nil {
+		tmpl = anon.Load().(*template.Template)
+	} else {
+		userdataPhaseTemplatesLock.Lock()
+		defer userdataPhaseTemplatesLock.Unlock()
+
+		box, err = rice.FindBox("../userdata/scripts")
+		if err != nil {
+			return nil, err
+		}
+		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
+		if err != nil {
+			return nil, scerr.Wrap(err, "error loading script template for phase 'init'")
+		}
+		tmpl, err = template.New("userdata." + string(phase)).Parse(tmplString)
+		if err != nil {
+			return nil, scerr.Wrap(err, "error parsing script template for phase 'init'")
+		}
+		userdataPhaseTemplates[phase] = new(atomic.Value)
+		userdataPhaseTemplates[phase].Store(tmpl)
+	}
+	buf := bytes.NewBufferString("")
+	err = tmpl.Execute(buf, ud)
+	if err != nil {
+		return nil, err
+	}
+	result = buf.Bytes()
+	for tagname, tagcontent := range ud.Tags[phase] {
+		for _, str := range tagcontent {
+			bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
+		}
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {

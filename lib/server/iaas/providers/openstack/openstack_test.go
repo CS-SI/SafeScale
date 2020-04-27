@@ -93,9 +93,9 @@ func Test_Template(t *testing.T) {
 	userData := userdata.NewContent()
 	err := userData.Prepare(client, dataBuffer, data)
 	assert.Nil(t, err)
-	output := userData.Generate("phase1")
+	output := userData.Generate(userdata.PHASE1_INIT)
 	fmt.Println(output.String())
-	output = userData.Generate("phase2")
+	output = userData.Generate(userdata.PHASE2_NETWORK_AND_SECURITY)
 	fmt.Println(output.String())
 }*/
 

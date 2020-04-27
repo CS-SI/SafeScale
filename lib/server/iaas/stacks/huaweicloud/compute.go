@@ -361,7 +361,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		VolumeSize:          template.DiskSize,
 	}
 	// Defines server
-	userDataPhase1, err := userData.Generate("phase1")
+	userDataPhase1, err := userData.Generate(userdata.PHASE1_INIT)
 	if err != nil {
 		return nil, userData, err
 	}

@@ -937,7 +937,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 				return nil, nil, userData, scerr.Wrap(err, "failed to get info waiter")
 			}
 
-			userData.AddInTag("phase2", "insert_tag", fmt.Sprintf(`
+			userData.AddInTag(string(userdata.PHASE2_NETWORK_AND_SECURITY), "insert_tag", fmt.Sprintf(`
  LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
  echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 
@@ -958,7 +958,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	}
 
-	userDataPhase1, err := userData.Generate("phase1")
+	userDataPhase1, err := userData.Generate(userdata.PHASE1_INIT)
 	if err != nil {
 		return nil, nil, userData, err
 	}

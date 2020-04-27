@@ -122,11 +122,19 @@ func CIDROverlap(n1, n2 net.IPNet) bool {
 	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
 }
 
-// FirstIncludedSubnet takes a parent CIDR range and creates the first subnet within it
+// FirstIncludedSubnet takes a parent CIDR range and gives the first subnet within it
 // with the given number of additional prefix bits 'maskAddition'.
 //
-// For example, 192.168.0.0/16, extended by 8 bits becomes 192.168.1.0/24.
+// For example, 192.168.0.0/16, extended by 8 bits becomes 192.168.0.0/24.
 func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, error) {
+	return NthIncludedSubnet(base, maskAddition, 0)
+}
+
+// NthIncludedSubnet takes a parent CIDR range and gives the 'nth' subnet within it with the
+// given numver of additional prefix bits 'maskAddition'
+//
+// For example, 192.168.0.0/16, extended by 8 bits gives as 4th subnet 192.168.4.0/24.
+func NthIncludedSubnet(base net.IPNet, maskAddition uint8, nth uint) (net.IPNet, error) {
 	ip := base.IP
 	mask := base.Mask
 
@@ -144,7 +152,7 @@ func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, error) 
 
 	ipAsNumber := IPv4ToUInt32(ip)
 	bitShift := uint32(32 - newPrefixLen)
-	ipAsNumber |= 1 << bitShift
+	ipAsNumber |= uint32(nth) << bitShift
 	return net.IPNet{
 		IP:   UInt32ToIPv4(ipAsNumber),
 		Mask: net.CIDRMask(newPrefixLen, addrLen),

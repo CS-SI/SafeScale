@@ -83,7 +83,7 @@ func Test_Template(t *testing.T) {
 		ResolvConf: "dskjfdshjjkdhsksdhhkjs\nsfdsfsdq\ndfsqdfqsdfq",
 		GatewayIP:  "172.1.2.1",
 	}
-	output, err := userdata.Prepare("phase1", client, dataBuffer, data)
+	output, err := userdata.Prepare(userdata.PHASE1_INIT, client, dataBuffer, data)
 	assert.Nil(t, err)
 	fmt.Println(output.String()
 }*/
