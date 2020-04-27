@@ -169,7 +169,7 @@ func (ud *Content) Prepare(
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
-	ud.IsGateway = request.DefaultRouteIP == "" && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking
+	ud.IsGateway = request.DefaultRouteIP == "" && len(request.Networks) != 0 && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking
 	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr

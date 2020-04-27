@@ -169,6 +169,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
+
 		},
 	}
 	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
@@ -180,8 +181,17 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	if len(res.Subnets) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No network named %s", name))
 	}
-	if len(res.Subnets) > 1 {
-		return nil, scerr.InconsistentError(fmt.Sprintf("Two network with the same name %s", name))
+	var subnets []osc.Subnet
+	for _, subnet := range  res.Subnets{
+		if getResourceTag(subnet.Tags, "name", "") == name{
+			subnets = append(subnets, subnet)
+		}
+	}
+	if len(subnets) > 1{
+		return nil, scerr.InconsistentError(fmt.Sprintf("More than one subnet with name %s", name))
+	}
+	if len(subnets) == 0{
+		return nil, scerr.NotFoundError(fmt.Sprintf("No ubnet with name %s", name))
 	}
 
 	return toNetwork(&res.Subnets[0]), nil
@@ -277,8 +287,8 @@ func (s *Stack) deleteSubnet(id string) error {
 	deleteSubnetRequest := osc.DeleteSubnetRequest{
 		SubnetId: id,
 	}
-	_, _, err := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-		CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
+	_, _, err := s.client.SubnetApi.DeleteSubnet(s.auth, &osc.DeleteSubnetOpts{
+		DeleteSubnetRequest: optional.NewInterface(deleteSubnetRequest),
 	})
 	return err
 }
