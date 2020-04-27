@@ -18,6 +18,7 @@ package operations
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/sirupsen/logrus"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -41,64 +43,81 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 		return nil, scerr.InvalidParameterError("params", "must be a data.Map")
 	}
 
-	hostRequest, ok := inputs["request"].(abstract.HostRequest)
+	hostReq, ok := inputs["request"].(abstract.HostRequest)
 	if !ok {
 		return nil, scerr.InvalidParameterError("params['request']", "must be a abstract.GatewayRequest")
 	}
-	if hostRequest.TemplateID == "" {
+	if hostReq.TemplateID == "" {
 		return nil, scerr.InvalidRequestError("params['request'].TemplateID", "cannot be empty string")
 	}
-	if len(hostRequest.Networks) == 0 {
+	if len(hostReq.Networks) == 0 {
 		return nil, scerr.InvalidRequestError("params['request'].Networks", "cannot be an empty '[]*abstract.Network'")
 	}
 	hostSizing, ok := inputs["sizing"].(abstract.HostSizingRequirements)
 	if !ok {
 		hostSizing = abstract.HostSizingRequirements{}
 	}
-	// primary, ok := inputs["primary"].(bool)
-	// if !ok {
-	// 	return nil, scerr.InvalidParameterError("params['primary']", "must be a bool")
-	// }
+	primary, ok := inputs["primary"].(bool)
+	if !ok {
+		return nil, scerr.InvalidRequestError("params['primary']", "is mandatory")
+	}
 
-	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostRequest.ResourceName, hostRequest.TemplateID, hostRequest.ImageID)
+	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
 	svc := objn.SafeGetService()
-	hostRequest.PublicIP = true
-	hostRequest.IsGateway = true
+	hostReq.PublicIP = true
+	hostReq.IsGateway = true
 
 	objgw, err := NewHost(svc)
 	if err != nil {
 		return nil, err
 	}
-	userData, err := objgw.Create(task, hostRequest, hostSizing)
+	userData, err := objgw.Create(task, hostReq, hostSizing)
 	if err != nil {
 		return nil, err
 	}
 
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
-		if err != nil {
-			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' host resource...", hostRequest.ResourceName)
-			derr := svc.DeleteHost(objgw.SafeGetID())
+		if err != nil && !hostReq.KeepOnFailure {
+			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' host resource...", hostReq.ResourceName)
+			derr := objgw.Delete(task)
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
 				case scerr.ErrNotFound:
-					logrus.Errorf(msgRoot+", resource not found: %v", hostRequest.ResourceName, derr)
+					logrus.Errorf(msgRoot+", resource not found: %v", hostReq.ResourceName, derr)
 				case scerr.ErrTimeout:
-					logrus.Errorf(msgRoot+", timeout: %v", hostRequest.ResourceName, derr)
+					logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
 				default:
-					logrus.Errorf(msgRoot+": %v", hostRequest.ResourceName, derr)
+					logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
 				}
 				err = scerr.AddConsequence(err, derr)
 			} else {
-				logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostRequest.ResourceName)
+				logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 			}
 			err = scerr.AddConsequence(err, derr)
 		}
 	}()
 
+	// Set link to network
+	err = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+		an, ok := clonable.(*abstract.Network)
+		if !ok {
+			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		if primary {
+			an.GatewayID = objgw.SafeGetID()
+		} else {
+			an.SecondaryGatewayID = objgw.SafeGetID()
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// Binds gateway to VIP if needed
-	if an := hostRequest.Networks[0]; an != nil && an.VIP != nil {
+	if an := hostReq.Networks[0]; an != nil && an.VIP != nil {
 		err = svc.BindHostToVIP(an.VIP, objgw.SafeGetID())
 		if err != nil {
 			return nil, err

@@ -386,7 +386,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	}()
 
 	// ssh, err := tester.Service.GetSSHConfig(host.ID)
-	// _, err = ssh.WaitServerReady("phase1", 1 * time.Minute)
+	// _, err = ssh.WaitServerReady(userdata.PHASE1_INIT, 1 * time.Minute)
 	// assert.NoError(t, err)
 	// cmd, err := ssh.Command("whoami")
 	// assert.Nil(t, err)

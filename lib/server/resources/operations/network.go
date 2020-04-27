@@ -340,7 +340,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	primaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 		"request": primaryRequest,
 		"sizing":  *gwSizing,
-		// "primary": true,
+		"primary": true,
 	})
 	if err != nil {
 		return err
@@ -357,7 +357,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		secondaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 			"request": secondaryRequest,
 			"sizing":  *gwSizing,
-			// "primary": false,
+			"primary": false,
 		})
 		if err != nil {
 			return err
@@ -438,7 +438,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		an.GatewayID = primaryGateway.SafeGetID()
+		// an.GatewayID = primaryGateway.SafeGetID()
 		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetID()
 		primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.SafeGetPublicIP(task)
 		primaryUserdata.IsPrimaryGateway = true
@@ -450,7 +450,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 			primaryUserdata.EndpointIP = primaryUserdata.PrimaryGatewayPublicIP
 		}
 		if secondaryGateway != nil {
-			an.SecondaryGatewayID = secondaryGateway.SafeGetID()
+			// an.SecondaryGatewayID = secondaryGateway.SafeGetID()
 			primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetID()
 			secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
 			secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
