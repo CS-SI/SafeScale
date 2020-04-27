@@ -18,6 +18,7 @@ package huaweicloud_test
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"os"
 	"testing"
 
@@ -56,7 +57,7 @@ func getClient() (iaas.Service, error) {
 		var err error
 		service, err = iaas.UseService(tenantName)
 		if err != nil || service == nil {
-			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
+			return nil, scerr.Errorf(fmt.Sprintf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName), err)
 		}
 	}
 	return service, nil

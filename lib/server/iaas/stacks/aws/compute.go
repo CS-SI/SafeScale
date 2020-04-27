@@ -114,7 +114,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 		return nil, err
 	}
 	if len(out.KeyPairs) == 0 {
-		return nil, fmt.Errorf("no keypairs found")
+		return nil, scerr.Errorf(fmt.Sprintf("no keypairs found"), nil)
 	}
 
 	kp := out.KeyPairs[0]
@@ -435,13 +435,13 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 			host = hostTmp
 
 			if host.LastState == hoststate.ERROR {
-				err = retry.AbortedError("error waiting for host in ready state", fmt.Errorf("last state: %s", host.LastState))
+				err = retry.AbortedError("error waiting for host in ready state", scerr.Errorf(fmt.Sprintf("last state: %s", host.LastState), nil))
 				logrus.Warn(err)
 				return err
 			}
 
 			if host.LastState != hoststate.STARTED {
-				err = fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
+				err = scerr.Errorf(fmt.Sprintf("not in ready state (current state: %s)", host.LastState.String()), nil)
 				logrus.Warn(err)
 				return err
 			}
@@ -452,7 +452,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return host, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.ID, timeout)
+			return host, scerr.Errorf(fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.ID, timeout), retryErr)
 		}
 		return host, retryErr
 	}
@@ -469,7 +469,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	hostMustHavePublicIP := request.PublicIP
 
 	if networks == nil || len(networks) == 0 {
-		return nil, userData, fmt.Errorf("the host %s must be on at least one network (even if public)", resourceName)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("the host %s must be on at least one network (even if public)", resourceName), nil)
 	}
 
 	keyPairName := ""
@@ -480,7 +480,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
 			logrus.Debugf(utils.Capitalize(msg))
-			return nil, userData, fmt.Errorf(msg)
+			return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
@@ -489,7 +489,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
 			logrus.Debugf(utils.Capitalize(msg))
-			return nil, userData, fmt.Errorf(msg)
+			return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
 		}
 	} else {
 		keyPairName = request.KeyPair.Name
@@ -508,7 +508,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, userData, scerr.Errorf(fmt.Sprintf("failed to generate password: %s", err.Error()), err)
 		}
 		request.Password = password
 	}
@@ -543,7 +543,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	if defaultGateway == nil && !hostMustHavePublicIP {
-		return nil, userData, fmt.Errorf("the host %s must have a gateway or be public", resourceName)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("the host %s must have a gateway or be public", resourceName), nil)
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -553,13 +553,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		logrus.Debugf(utils.Capitalize(msg))
-		return nil, userData, fmt.Errorf(msg)
+		return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
 	}
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to get image: %s", err)
+		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to get image: %s", err), err)
 	}
 
 	rim, err := s.GetImage(request.ImageID)
@@ -700,7 +700,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 
 			if server == nil {
-				return fmt.Errorf("failed to create server")
+				return scerr.Errorf(fmt.Sprintf("failed to create server"), nil)
 			}
 
 			host.ID = server.ID
@@ -741,7 +741,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}()
 
 	if host == nil {
-		return nil, nil, fmt.Errorf("unexpected nil host")
+		return nil, nil, scerr.Errorf(fmt.Sprintf("unexpected nil host"), nil)
 	}
 
 	if !host.OK() {
@@ -829,12 +829,12 @@ func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case "InvalidVpcID.NotFound":
-				return fmt.Errorf("unable to find VPC with ID %q.", vpcID)
+				return scerr.Errorf(fmt.Sprintf("unable to find VPC with ID %q.", vpcID), err)
 			case "InvalidGroup.Duplicate":
-				return fmt.Errorf("security group %q already exists.", name)
+				return scerr.Errorf(fmt.Sprintf("security group %q already exists.", name), err)
 			}
 		}
-		return fmt.Errorf("unable to create security group %q, %v", name, err)
+		return scerr.Errorf(fmt.Sprintf("unable to create security group %q, %v", name, err), err)
 	}
 	fmt.Printf("Created security group %s with VPC %s.\n",
 		aws.StringValue(createRes.GroupId), vpcID)
@@ -893,7 +893,7 @@ func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
 		IpPermissions: permissions,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to set security group %q ingress, %v", name, err)
+		return scerr.Errorf(fmt.Sprintf("unable to set security group %q ingress, %v", name, err), err)
 	}
 
 	return nil
@@ -1103,7 +1103,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	}
 
 	if instanceType == "" {
-		return nil, fmt.Errorf("error recovering instance type of %s", hostRef)
+		return nil, scerr.Errorf(fmt.Sprintf("error recovering instance type of %s", hostRef), nil)
 	}
 
 	var subnets []IPInSubnet
@@ -1154,7 +1154,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update hostproperty.NetworkV1 : %s", err.Error())
+		return nil, scerr.Errorf(fmt.Sprintf("failed to update hostproperty.NetworkV1 : %s", err.Error()), err)
 	}
 
 	allocated := fromMachineTypeToAllocatedSize(s, instanceType)
@@ -1167,7 +1167,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update hostproperty.SizingV1 : %s", err.Error())
+		return nil, scerr.Errorf(fmt.Sprintf("failed to update hostproperty.SizingV1 : %s", err.Error()), err)
 	}
 
 	host.Name = instanceName
@@ -1284,7 +1284,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 						ID:         aws.StringValue(instance.InstanceId),
 						Name:       name,
 						LastState:  state,
-						Properties: nil, // FIXME Problems here
+						Properties: nil,
 					})
 				}
 			}
@@ -1373,7 +1373,7 @@ func (s *Stack) DeleteHost(id string) error {
 			}
 
 			if !(hostTmp.LastState == hoststate.STOPPED || hostTmp.LastState == hoststate.TERMINATED) {
-				return fmt.Errorf("not in stopped or terminated state (current state: %s)", hostTmp.LastState.String())
+				return scerr.Errorf(fmt.Sprintf("not in stopped or terminated state (current state: %s)", hostTmp.LastState.String()), nil)
 			}
 			return nil
 		},
@@ -1382,7 +1382,7 @@ func (s *Stack) DeleteHost(id string) error {
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return fmt.Errorf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout())
+			return scerr.Errorf(fmt.Sprintf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout()), retryErr)
 		}
 		return retryErr
 	}
@@ -1441,7 +1441,7 @@ func (s *Stack) StopHost(id string) error {
 			}
 
 			if !(hostTmp.LastState == hoststate.STOPPED || hostTmp.LastState == hoststate.TERMINATED) {
-				return fmt.Errorf("not in stopped or terminated state (current state: %s)", hostTmp.LastState.String())
+				return scerr.Errorf(fmt.Sprintf("not in stopped or terminated state (current state: %s)", hostTmp.LastState.String()), nil)
 			}
 			return nil
 		},
@@ -1450,7 +1450,7 @@ func (s *Stack) StopHost(id string) error {
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return fmt.Errorf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout())
+			return scerr.Errorf(fmt.Sprintf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout()), retryErr)
 		}
 		return retryErr
 	}
@@ -1474,7 +1474,7 @@ func (s *Stack) StartHost(id string) error {
 			}
 
 			if hostTmp.LastState != hoststate.STARTED {
-				return fmt.Errorf("not in started state (current state: %s)", hostTmp.LastState.String())
+				return scerr.Errorf(fmt.Sprintf("not in started state (current state: %s)", hostTmp.LastState.String()), nil)
 			}
 			return nil
 		},
@@ -1483,7 +1483,7 @@ func (s *Stack) StartHost(id string) error {
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return fmt.Errorf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout())
+			return scerr.Errorf(fmt.Sprintf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout()), retryErr)
 		}
 		return retryErr
 	}
@@ -1507,7 +1507,7 @@ func (s *Stack) RebootHost(id string) error {
 			}
 
 			if hostTmp.LastState != hoststate.STARTED {
-				return fmt.Errorf("not in started state (current state: %s)", hostTmp.LastState.String())
+				return scerr.Errorf(fmt.Sprintf("not in started state (current state: %s)", hostTmp.LastState.String()), nil)
 			}
 			return nil
 		},
@@ -1516,7 +1516,7 @@ func (s *Stack) RebootHost(id string) error {
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return fmt.Errorf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout())
+			return scerr.Errorf(fmt.Sprintf("timeout waiting to get host '%s' information after %v", id, temporal.GetHostCleanupTimeout()), retryErr)
 		}
 		return retryErr
 	}

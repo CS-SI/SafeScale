@@ -151,23 +151,34 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 	timer := time.After(timeout)
 	host := resources.NewHost()
 	host.ID = hostID
-	for {
-		host, err = svc.InspectHost(host)
-		if err != nil {
-			return err
-		}
-		if host.LastState == state {
-			return nil
-		}
-		if host.LastState == hoststate.ERROR {
-			return scerr.NotAvailableError("host in error state")
-		}
-		select {
-		case <-timer:
-			return scerr.TimeoutError("Wait host state timeout", timeout, nil)
-		default:
+
+	c := make(chan error)
+
+	go func() {
+		defer close(c)
+		for {
+			host, err = svc.InspectHost(host)
+			if err != nil {
+				continue
+			}
+			if host.LastState == state {
+				c <- nil
+				break
+			}
+			if host.LastState == hoststate.ERROR {
+				c <- scerr.NotAvailableError("host in error state")
+				break
+			}
+
 			time.Sleep(1 * time.Second)
 		}
+	}()
+
+	select {
+	case <-timer:
+		return scerr.TimeoutError("Wait host state timeout", timeout, nil)
+	case err := <-c:
+		return err
 	}
 }
 

@@ -184,7 +184,7 @@ func (s *StackEbrc) findDiskByID(id string) (*govcd.Disk, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Disk with id [%s] not found", id)
+	return nil, scerr.Errorf(fmt.Sprintf("Disk with id [%s] not found", id), nil)
 }
 
 func (s *StackEbrc) findDiskByName(id string) (*govcd.Disk, error) {
@@ -206,7 +206,7 @@ func (s *StackEbrc) findDiskByName(id string) (*govcd.Disk, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Disk with name [%s] not found", id)
+	return nil, scerr.Errorf(fmt.Sprintf("Disk with name [%s] not found", id), nil)
 }
 
 func (s *StackEbrc) findEdgeGatewayNames() ([]string, error) {
@@ -242,7 +242,7 @@ func (s *StackEbrc) getPublicIPs() (types.IPRanges, error) {
 		return types.IPRanges{}, err
 	}
 	if len(names) == 0 {
-		return types.IPRanges{}, fmt.Errorf("No edge gateway found")
+		return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("No edge gateway found"), nil)
 	}
 
 	eg, err := vdc.FindEdgeGateway(names[0])
@@ -257,7 +257,7 @@ func (s *StackEbrc) getPublicIPs() (types.IPRanges, error) {
 		}
 	}
 
-	return types.IPRanges{}, fmt.Errorf("No public IPs found")
+	return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("No public IPs found"), nil)
 }
 
 func ipv4MaskString(m []byte) string {
@@ -287,7 +287,7 @@ func toIPRange(cidr string) (types.IPRanges, error) {
 	ipRange := make([]*types.IPRange, 0, 1)
 
 	if first == nil || last == nil {
-		return types.IPRanges{}, fmt.Errorf("error processing network mask")
+		return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("error processing network mask"), nil)
 	}
 
 	ipr := types.IPRange{
@@ -358,7 +358,7 @@ func toValidIPRange(cidr string) (types.IPRanges, error) {
 	ipRange := make([]*types.IPRange, 0, 1)
 
 	if first == nil || last == nil {
-		return types.IPRanges{}, fmt.Errorf("error processing network mask")
+		return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("error processing network mask"), nil)
 	}
 
 	ipr := types.IPRange{
@@ -424,7 +424,7 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 	}
 	for _, ref := range refs {
 		if req.Name == ref.Name {
-			return nil, fmt.Errorf("network '%s' already exists", req.Name)
+			return nil, scerr.Errorf(fmt.Sprintf("network '%s' already exists", req.Name), nil)
 		}
 	}
 
@@ -445,19 +445,17 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 	if edgeGatewayName != "" {
 		edgeGateway, err = vdc.FindEdgeGateway(edgeGatewayName)
 		if err != nil {
-			return nil, fmt.Errorf("unable to recover gateway: %s", err)
+			return nil, scerr.Errorf(fmt.Sprintf("unable to recover gateway: %s", err), err)
 		}
 	}
 
 	// Checks if CIDR is valid...
 	_, networkDesc, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error())
+		return nil, scerr.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), nil)
 	}
 
 	stringMask := ipv4MaskString(networkDesc.Mask)
-
-	// FIXME On it
 
 	gwIP, _ := getGateway(req.CIDR)
 
@@ -621,7 +619,6 @@ func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
 	if res.Results != nil {
 		for _, li := range res.Results.Link {
 			if li.Name == ref {
-				// FIXME On it
 				newnet := &resources.Network{
 					ID:         li.ID,
 					Name:       li.Name,
@@ -682,7 +679,6 @@ func (s *StackEbrc) ListNetworks() ([]*resources.Network, error) {
 
 	var nets []*resources.Network
 	for _, ref := range refs {
-		// FIXME On it
 		newnet := &resources.Network{
 			ID:         ref.ID,
 			Name:       ref.Name,
@@ -751,7 +747,7 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest) (host *resources
 		case scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+			return nil, userData, scerr.Errorf(fmt.Sprintf("Error creating gateway : %s", openstack.ProviderErrorToString(err)), err)
 		}
 	}
 

@@ -2,6 +2,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"reflect"
 	"strings"
 )
@@ -24,7 +25,7 @@ func GetUnexpectedGophercloudErrorCode(err error) (int64, error) {
 	xValue := reflect.ValueOf(err)
 
 	if xValue.Kind() != reflect.Struct {
-		return 0, fmt.Errorf("not a gophercloud.ErrUnexpectedResponseCode")
+		return 0, scerr.Errorf(fmt.Sprintf("not a gophercloud.ErrUnexpectedResponseCode"), nil)
 	}
 
 	_, there := xType.FieldByName("ErrUnexpectedResponseCode")
@@ -38,5 +39,5 @@ func GetUnexpectedGophercloudErrorCode(err error) (int64, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("not a gophercloud.ErrUnexpectedResponseCode")
+	return 0, scerr.Errorf(fmt.Sprintf("not a gophercloud.ErrUnexpectedResponseCode"), nil)
 }

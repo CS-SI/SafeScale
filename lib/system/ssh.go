@@ -634,7 +634,7 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 			}
 		}
 	} else {
-		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
+		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
 		if _, ok := err.(*exec.ExitError); !ok {
 			if !collectOutputs {
 				derr := pipeBridgeCtrl.Stop()

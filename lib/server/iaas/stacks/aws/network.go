@@ -111,7 +111,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 				}
 
 				if aws.StringValue(vpcTmp.Vpcs[0].State) != "available" {
-					return fmt.Errorf("not ready")
+					return scerr.Errorf(fmt.Sprintf("not ready"), nil)
 				}
 
 				return nil
@@ -202,7 +202,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	}
 
 	if len(subnetsResult) == 0 {
-		return nil, fmt.Errorf("unable to create any subnet")
+		return nil, scerr.Errorf(fmt.Sprintf("unable to create any subnet"), nil)
 	}
 
 	var subnetIds []*string
@@ -235,7 +235,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 					}
 
 					if aws.StringValue(snTmp.Subnets[0].State) != "available" {
-						return fmt.Errorf("not ready")
+						return scerr.Errorf(fmt.Sprintf("not ready"), nil)
 					}
 
 					return nil
@@ -579,7 +579,7 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 	//
 	//    * 80 : stopped
 	if state == nil {
-		return hoststate.ERROR, fmt.Errorf("unexpected host state")
+		return hoststate.ERROR, scerr.Errorf(fmt.Sprintf("unexpected host state"), nil)
 	}
 	if *state.Code == 0 {
 		return hoststate.STARTING, nil
@@ -599,7 +599,7 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 	if *state.Code == 80 {
 		return hoststate.STOPPED, nil
 	}
-	return hoststate.ERROR, fmt.Errorf("unexpected host state")
+	return hoststate.ERROR, scerr.Errorf(fmt.Sprintf("unexpected host state"), nil)
 }
 
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (_ *resources.Host, _ *userdata.Content, err error) {
@@ -632,7 +632,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (_ *resources.Host, 
 		case *scerr.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, fmt.Errorf("error creating gateway : %s", err)
+			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating gateway : %s", err), err)
 		}
 	}
 

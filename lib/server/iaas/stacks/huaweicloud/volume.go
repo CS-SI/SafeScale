@@ -88,7 +88,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
 	volume, err := s.GetVolume(request.Name)
 	if volume != nil && err == nil {
-		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
+		return nil, scerr.Errorf(fmt.Sprintf("volume '%s' already exists", request.Name), err)
 	}
 
 	az, err := s.SelectedAvailabilityZone()
@@ -103,7 +103,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 	vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("error creating volume : %s", openstack.ProviderErrorToString(err))
+		return nil, scerr.Errorf(fmt.Sprintf("error creating volume : %s", openstack.ProviderErrorToString(err)), err)
 	}
 	v := resources.Volume{
 		ID:    vol.ID,

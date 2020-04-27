@@ -95,7 +95,7 @@ type Content struct {
 	BuildSubnetworks bool
 	// Dashboard bool // Add kubernetes dashboard
 
-	// FIXME Add here the template timeouts...
+	// Template parameters
 	TemplateOperationTimeout     string
 	TemplateLongOperationTimeout string
 	TemplatePullImagesTimeout    string
@@ -114,7 +114,7 @@ func NewContent() *Content {
 	}
 }
 
-func (ud Content) OK() bool { // FIXME Complete function
+func (ud Content) OK() bool {
 	result := true
 	result = result && ud.BashLibrary != ""
 	result = result && ud.HostName != ""

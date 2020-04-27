@@ -18,6 +18,7 @@ package aws
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"reflect"
 )
 
@@ -73,5 +74,5 @@ func GetOperationStatus(op interface{}, name string, fieldType reflect.Type) (re
 		}
 	}
 
-	return reflect.Value{}, fmt.Errorf("not found")
+	return reflect.Value{}, scerr.Errorf(fmt.Sprintf("not found"), nil)
 }

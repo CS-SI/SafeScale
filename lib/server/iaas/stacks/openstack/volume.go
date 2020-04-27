@@ -127,7 +127,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			break
 		}
 		if vol == nil {
-			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
+			err = scerr.Errorf(fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil)
 			break
 		}
 		v = resources.Volume{
@@ -149,7 +149,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			break
 		}
 		if vol == nil {
-			err = fmt.Errorf("volume creation seems to have succeeded, but returned nil value is unexpected")
+			err = scerr.Errorf(fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil)
 			break
 		}
 		v = resources.Volume{
@@ -160,7 +160,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			State: toVolumeState(vol.Status),
 		}
 	default:
-		err = fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
+		err = scerr.Errorf(fmt.Sprintf("unmanaged service 'volume' version '%s'", s.versions["volume"]), nil)
 	}
 	if err != nil {
 		return nil, scerr.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
@@ -257,7 +257,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault400:
-					return fmt.Errorf("volume not in state 'available'")
+					return scerr.Errorf(fmt.Sprintf("volume not in state 'available'"), err)
 				default:
 					return err
 				}
