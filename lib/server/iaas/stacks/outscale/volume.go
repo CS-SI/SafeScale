@@ -41,10 +41,12 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		}
 	}
 	createVolumeRequest := osc.CreateVolumeRequest{
-		Size:          int32(request.Size),
-		VolumeType:    s.volumeType(request.Speed),
-		SubregionName: s.Options.Compute.Subregion,
+		DryRun:        false,
 		Iops:          int32(IOPS),
+		Size:          int32(request.Size),
+		SnapshotId:    "",
+		SubregionName: s.Options.Compute.Subregion,
+		VolumeType:    s.volumeType(request.Speed),
 	}
 	res, _, err := s.client.VolumeApi.CreateVolume(s.auth, &osc.CreateVolumeOpts{
 		CreateVolumeRequest: optional.NewInterface(createVolumeRequest),
@@ -113,10 +115,8 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) erro
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		vol, err := s.GetVolume(volumeID)
 		if err != nil {
-			println("aborted")
 			return scerr.AbortedError("", err)
 		}
-		println(vol.State.String())
 		if vol.State != state {
 			return fmt.Errorf("wrong state")
 		}

@@ -164,7 +164,7 @@ func (s *Stack) parseTemplateID(id string) (*resources.HostTemplate, error) {
 		GPUNumber: gpus,
 		GPUType:   gpuType,
 		RAMSize:   float32(ram),
-		DiskSize:  16000,
+		DiskSize:  0,
 		Name:      id,
 		ID:        id,
 	}, nil
@@ -172,7 +172,6 @@ func (s *Stack) parseTemplateID(id string) (*resources.HostTemplate, error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-// TODO manage performance instance
 func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -192,7 +191,7 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 				}
 				name := gpuTemplateName(0, cpu, ram, perf, 0, "")
 				templates = append(templates, resources.HostTemplate{
-					DiskSize: 16000,
+					DiskSize: 0,
 					Name:     name,
 					Cores:    cpu,
 					RAMSize:  float32(ram),
@@ -220,7 +219,7 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 					//
 					name := gpuTemplateName(3, cpu, ram, perf, gpu, "nvidia-k2")
 					templates = append(templates, resources.HostTemplate{
-						DiskSize:  16000,
+						DiskSize:  0,
 						Name:      name,
 						Cores:     cpu,
 						RAMSize:   float32(ram),
@@ -248,7 +247,7 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 					//
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p6")
 					templates = append(templates, resources.HostTemplate{
-						DiskSize:  16000,
+						DiskSize:  0,
 						Name:      name,
 						Cores:     cpu,
 						RAMSize:   float32(ram),
@@ -275,7 +274,7 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 					//
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p100")
 					templates = append(templates, resources.HostTemplate{
-						DiskSize:  16000,
+						DiskSize:  0,
 						Name:      name,
 						Cores:     cpu,
 						RAMSize:   float32(ram),
@@ -359,7 +358,13 @@ func (s *Stack) getOrCreatePassword(request resources.HostRequest) (string, erro
 }
 
 func (s *Stack) prepareUserData(request resources.HostRequest, ud *userdata.Content) error {
-	err := ud.Prepare(*s.configurationOptions, request, request.Networks[0].CIDR, "")
+	cidr := func() string{
+		if len(request.Networks) == 0{
+			return ""
+		}
+		return request.Networks[0].CIDR
+	}()
+	err := ud.Prepare(*s.configurationOptions, request, cidr, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		logrus.Debugf(utils.Capitalize(msg))
@@ -535,10 +540,45 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 	if tpl.GPUNumber <= 0 {
 		return nil
 	}
-	for gpu := 1; gpu < tpl.GPUNumber; gpu++ {
-		//TODO complete when v1 ready
+	var flexibleGpus []osc.FlexibleGpu
+	var createErr error
+	for gpu := 0; gpu < tpl.GPUNumber; gpu++ {
+		resCreate,_, err := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &osc.CreateFlexibleGpuOpts{
+			CreateFlexibleGpuRequest: optional.NewInterface(osc.CreateFlexibleGpuRequest{
+				DeleteOnVmDeletion: true,
+				Generation:         "",
+				ModelName:          tpl.GPUType,
+				SubregionName:      s.Options.Compute.Subregion,
+			}),
+		})
+		if err != nil{
+			createErr= err
+			break
+		}
+		flexibleGpus = append(flexibleGpus, resCreate.FlexibleGpu)
+		_, _, err = s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &osc.LinkFlexibleGpuOpts{
+			LinkFlexibleGpuRequest: optional.NewInterface(osc.LinkFlexibleGpuRequest{
+				DryRun:        false,
+				FlexibleGpuId: resCreate.FlexibleGpu.FlexibleGpuId,
+				VmId:          vmID,
+			}),
+		})
+		if err != nil{
+			createErr = err
+			break
+		}
 	}
-	return nil
+	if createErr != nil{
+		for _, gpu := range flexibleGpus {
+			_, _, _ = s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &osc.DeleteFlexibleGpuOpts{
+				DeleteFlexibleGpuRequest: optional.NewInterface(osc.DeleteFlexibleGpuRequest{
+					DryRun:        false,
+					FlexibleGpuId: gpu.FlexibleGpuId,
+				}),
+			})
+		}
+	}
+	return createErr
 }
 
 func (s *Stack) addVolume(request *resources.HostRequest, vmID string) error {
@@ -549,9 +589,23 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) error {
 		Name:  fmt.Sprintf("vol-%s", request.HostName),
 		Size:  request.DiskSize,
 		Speed: s.Options.Compute.DefaultVolumeSpeed,
+
 	})
 	if err != nil {
 		return err
+	}
+	err = s.setResourceTags(v.ID, map[string] string{
+		"DeleteWithVM":"true",
+	})
+	if err != nil {
+		err2 := s.DeleteVolume(v.ID)
+		msg := func () string{
+			if err2==nil{
+				return ""
+			}
+			return err2.Error()
+		}
+		return scerr.Wrap(err, msg())
 	}
 	_, err = s.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
 		HostID:   vmID,
@@ -682,8 +736,13 @@ func (s *Stack) setHostProperties(host *resources.Host, networks []*resources.Ne
 }
 
 func (s *Stack) initHostProperties(request *resources.HostRequest, host *resources.Host) error {
-	defaultNet := request.Networks[0]
-	isGateway := request.DefaultGateway == nil && defaultNet.Name != resources.SingleHostNetworkName
+	defaultNet := func () *resources.Network {
+		if len(request.Networks) == 0{
+			return nil
+		}
+		return request.Networks[0]
+	}()
+	isGateway := request.DefaultGateway == nil && defaultNet != nil && defaultNet.Name != resources.SingleHostNetworkName
 	defaultGatewayID := func() string {
 		if request.DefaultGateway != nil {
 			return request.DefaultGateway.ID
@@ -703,7 +762,12 @@ func (s *Stack) initHostProperties(request *resources.HostRequest, host *resourc
 
 	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-		hostNetworkV1.DefaultNetworkID = defaultNet.ID
+		hostNetworkV1.DefaultNetworkID = func() string{
+			if defaultNet == nil{
+				return ""
+			}
+			return defaultNet.ID
+		} ()
 		hostNetworkV1.DefaultGatewayID = defaultGatewayID
 		hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
 		hostNetworkV1.IsGateway = isGateway
@@ -753,6 +817,7 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 	return ip, nil
 }
 
+
 // CreateHost creates an host that fulfils the request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
 	if s == nil {
@@ -778,15 +843,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, err
 	}
 
-	defautNet := request.Networks[0]
-	subnet, err := s.getSubnet(defautNet.ID)
+	subnetID,  err:= s.getSubnetID(request)
 	if err != nil {
 		return nil, userData, err
 	}
-	if subnet == nil {
-		return nil, userData, resources.ResourceInvalidRequestError("request.Networks", "Invalid network, no subnet found")
-	}
-	subnetID := subnet.SubnetId
 
 	err = s.prepareUserData(request, userData)
 	if err != nil {
@@ -864,6 +924,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, s.deleteHostOnError(err, &vm)
 	}
 
+	err = s.addGPUs(&request, vm.VmId)
+	if err != nil {
+		return nil, userData, s.deleteHostOnError(err, &vm)
+	}
 	err = s.setResourceTags(vm.VmId, map[string]string{
 		"name": request.ResourceName,
 	})
@@ -884,6 +948,21 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	nics = append(nics, defaultNic)
 	err = s.setHostProperties(host, request.Networks, &vm, nics)
 	return host, userData, err
+}
+
+func (s *Stack) getSubnetID(request resources.HostRequest) (string, error) {
+	if len(request.Networks) == 0{
+		return "",nil
+	}
+	defautNet := request.Networks[0]
+	subnet, err := s.getSubnet(defautNet.ID)
+	if err != nil {
+		return "", err
+	}
+	if subnet == nil {
+		return "",  resources.ResourceInvalidRequestError("request.Networks", "Invalid network, no subnet found")
+	}
+	return subnet.SubnetId, nil
 }
 
 func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
@@ -934,6 +1013,10 @@ func (s *Stack) DeleteHost(id string) error {
 	if err != nil {
 		logrus.Errorf("Unable to read public IPs of vm %s", id)
 	}
+	volumes, err := s.ListVolumeAttachments(id)
+	if err != nil{
+		volumes = []resources.VolumeAttachment{}
+	}
 	err = s.deleteHost(id)
 	if err != nil {
 		return err
@@ -954,6 +1037,27 @@ func (s *Stack) DeleteHost(id string) error {
 			logrus.Errorf("Unable to delete public IP %s of vm %s", ip.PublicIpId, id)
 		}
 	}
+
+	for _, v := range volumes{
+		tags, err := s.getResourceTags(v.VolumeID)
+		if err != nil{
+			continue
+		}
+		del := func () string{
+			if del, ok := tags["DeleteWithVM"]; ok{
+				return del
+			}
+			return "false"
+		}()
+		if del == "true"{
+			err = s.DeleteVolume(v.VolumeID)
+			if err != nil { //continue to delete even if error
+				logrus.Errorf("Unable to delete volume %s of vm %s",v.VolumeID, id)
+			}
+		}
+
+	}
+
 	return lastErr
 
 }
@@ -1012,34 +1116,21 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	hosts, err := s.ListHosts()
+	res, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
+		optional.NewInterface(osc.ReadVmsRequest{
+			DryRun:  false,
+			Filters: osc.FiltersVm{
+				Tags:[]string{fmt.Sprintf("name=%s", name)},
+			},
+		}),
+	})
 	if err != nil {
 		return nil, err
 	}
-	for _, h := range hosts {
-		if h.Name == name {
-			return s.InspectHost(h.ID)
-		}
+	if len(res.Vms) == 0{
+		return nil, scerr.NotFoundError(fmt.Sprintf("No host named %s", name))
 	}
-	return nil, scerr.NotFoundError(fmt.Sprintf("No host named %s", name))
-	//TODO try in with v1
-	// res, err := s.client.POST_ReadVms(osc.ReadVmsRequest{
-	// 	Filters: osc.FiltersVm{
-	// 		SubregionNames: []string{s.Options.Compute.Subregion},
-	// 		Tags:           []string{fmt.Sprintf("name=%s", name)},
-	// 	},
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if res == nil || res.OK == nil || len(res.OK.Vms) > 1 {
-	// 	return nil, scerr.InconsistentError("Inconsistent provider response")
-	// }
-	// if len(res.OK.Vms) == 0 {
-	// 	return nil, nil
-	// }
-	// return s.InspectHost(res.OK.Vms[0].VmId)
-
+	return s.InspectHost(res.Vms[0].VmId)
 }
 
 // GetHostState returns the current state of the host identified by id

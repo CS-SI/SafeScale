@@ -18,6 +18,9 @@ package outscale_test
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 
@@ -159,6 +162,86 @@ func Test_Containers(t *testing.T) {
 	}
 	require.Nil(t, err)
 	tt.Containers(t)
+}
+
+func Test_NetworksWithDelete(t *testing.T){
+	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
+	require.Nil(t, err)
+	net, err := tt.Service.CreateNetwork(resources.NetworkRequest{
+		Name:       "my-net",
+		IPVersion:  ipversion.IPv4,
+		CIDR:       "192.168.23.0/24",
+		DNSServers: nil,
+		HA:         false,
+	})
+	assert.NoError(t, err)
+	err = tt.Service.DeleteNetwork(net.ID)
+	assert.NoError(t, err)
+}
+
+func TestVMWithGPU(t *testing.T){
+	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
+	require.Nil(t, err)
+
+	img, err := tt.Service.SearchImage("Ubuntu 18.04")
+	assert.NoError(t, err)
+	tpls, err := tt.Service.SelectTemplatesBySize(resources.SizingRequirements{
+		MinCores:    1,
+		MaxCores:    1,
+		MinRAMSize:  1,
+		MaxRAMSize:  1,
+		MinDiskSize: 0,
+		MinGPU:      1,
+		MinFreq:     2.5,
+		Replaceable: false,
+	}, false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tpls)
+	tpl := func() *resources.HostTemplate{
+		for _, tpl := range tpls{
+			if tpl.GPUType == "nvidia-k2"{
+				return tpl
+			}
+		}
+		return nil
+	}()
+	assert.NotNil(t, tpl)
+	net, err := tt.Service.CreateNetwork(resources.NetworkRequest{
+		Name:       "public-net",
+		IPVersion:  ipversion.IPv4,
+		CIDR:       "192.168.23.0/24",
+		DNSServers: nil,
+		HA:         false,
+	})
+	assert.NoError(t, err)
+	defer func() {
+		_ = tt.Service.DeleteNetwork(net.ID)
+	}()
+	h, _, err := tt.Service.CreateHost(resources.HostRequest{
+		ResourceName:   "hostWithGPU",
+		HostName:       "host",
+		Networks:       []*resources.Network{net},
+		DefaultRouteIP: "",
+		DefaultGateway: nil,
+		PublicIP:       true,
+		TemplateID:     tpl.ID,
+		ImageID:        img.ID,
+		KeyPair:        nil,
+		Password:       "",
+		DiskSize:       50,
+		Spot:           false,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, h)
+	err = tt.Service.DeleteHost(h.ID)
+	assert.NoError(t, err)
+
 }
 
 //func Test_Test(t *testing.T) {
