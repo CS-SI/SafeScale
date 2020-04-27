@@ -312,7 +312,7 @@ EOF
     echo "Looking for network..."
     check_for_network || {
         echo "PROVISIONING_ERROR: failed network cfg 0"
-        fail 196
+        fail 197
     }
 
     configure_dhclient
@@ -322,7 +322,7 @@ EOF
     echo "Looking for network..."
     check_for_network || {
         echo "PROVISIONING_ERROR: failed network cfg 1"
-        fail 196
+        fail 198
     }
 
     systemctl restart networking
@@ -330,10 +330,10 @@ EOF
     echo "Looking for network..."
     check_for_network || {
         echo "PROVISIONING_ERROR: failed network cfg 2"
-        fail 196
+        fail 199
     }
 
-    reset_fw || fail 197
+    reset_fw || fail 200
 
     echo done
 }
@@ -456,7 +456,7 @@ EOF
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 0"
-            fail 196
+            fail 201
         }
     fi
 
@@ -466,7 +466,7 @@ EOF
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 1"
-            fail 196
+            fail 202
         }
     fi
 
@@ -476,7 +476,7 @@ EOF
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 2"
-            fail 196
+            fail 203
         }
     fi
 
@@ -486,11 +486,11 @@ EOF
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 3"
-            fail 196
+            fail 204
         }
     fi
 
-    reset_fw || fail 199
+    reset_fw || fail 205
 
     echo done
 }
@@ -569,7 +569,7 @@ EOF
 
     echo "exclude=NetworkManager" >>/etc/yum.conf
 
-    reset_fw || fail 200
+    reset_fw || fail 206
 
     echo done
 }
@@ -579,6 +579,7 @@ check_for_ip() {
     [ -z "$ip" ] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
     return 0
 }
+export -f check_for_ip
 
 # Checks network is set correctly
 # - DNS and routes (by pinging a FQDN)
@@ -598,10 +599,10 @@ check_for_network() {
     [ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
 
     [ ! -z "$PU_IF" ] && {
-        check_for_ip $PU_IF || return 1
+        sfRetry 3m 10 check_for_ip $PU_IF || return 1
     }
     for i in $PR_IFs; do
-        check_for_ip $i || return 1
+        sfRetry 3m 10 check_for_ip $i || return 1
     done
     return 0
 }
@@ -639,8 +640,8 @@ EOF
     # Allows default services on public zone
     firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
 
-    sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 196
-    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
+    sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 207
+    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 208
     systemctl restart sshd
 
     echo done
@@ -746,7 +747,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils
-            sfApt install -q -y systemd pciutils || fail 210
+            sfApt install -q -y systemd pciutils || fail 209
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
             ;;
@@ -760,9 +761,9 @@ EOF
             sfApt update
             # Force update of systemd, pciutils and netplan
             if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-                sfApt install -y systemd pciutils netplan.io || fail 211
+                sfApt install -y systemd pciutils netplan.io || fail 210
             else
-                sfApt install -y systemd pciutils || fail 212
+                sfApt install -y systemd pciutils || fail 211
             fi
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
@@ -776,7 +777,7 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -q -y systemd pciutils yum-utils || fail 213
+            yum install -q -y systemd pciutils yum-utils || fail 212
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -790,14 +791,14 @@ EOF
 install_packages() {
      case $LINUX_KIND in
         ubuntu|debian)
-            sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
+            sfApt install -y -qq jq zip time zip &>/dev/null || fail 213
             ;;
         redhat|centos)
-            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
+            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 214
             ;;
         *)
             echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 216
+            fail 215
             ;;
      esac
 }
@@ -860,7 +861,7 @@ configure_network
 
 install_packages
 
-update_kernel_settings || fail 217
+update_kernel_settings || fail 216
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
 
