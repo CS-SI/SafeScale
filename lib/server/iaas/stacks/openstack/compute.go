@@ -1217,52 +1217,57 @@ func (s *Stack) DeleteHost(id string) error {
 	}
 
 	// Try to remove host for 3 minutes
+	resourcePresent := true
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
-			resourcePresent := true
 			// 1st, send delete host order
-			err := servers.Delete(s.ComputeClient, id).ExtractErr()
-			if err != nil {
-				switch err.(type) {
-				case gophercloud.ErrDefault404:
-					// Resource not found, consider deletion successful
-					logrus.Debugf("Host '%s' not found, deletion considered successful", id)
-					return nil
-				default:
-					return scerr.NewError("failed to submit host '%s' deletion: %s", id, ProviderErrorToString(err))
+			if resourcePresent {
+				innerErr := servers.Delete(s.ComputeClient, id).ExtractErr()
+				if innerErr != nil {
+					switch innerErr.(type) {
+					case gophercloud.ErrDefault404:
+						// Resource not found, consider deletion successful
+						logrus.Debugf("Host '%s' not found, deletion considered successful", id)
+						resourcePresent = false
+						return nil
+					default:
+						return scerr.NewError("failed to submit host '%s' deletion: %s", id, ProviderErrorToString(innerErr))
+					}
 				}
 			}
 			// 2nd, check host status every 5 seconds until check failed.
 			// If check succeeds but state is Error, retry the deletion.
 			// If check fails and error isn't 'resource not found', retry
-			innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
-				func() error {
-					host, err := servers.Get(s.ComputeClient, id).Extract()
-					if err == nil {
-						if toHostState(host.Status) == hoststate.ERROR {
+			if resourcePresent {
+				innerErr := retry.WhileUnsuccessfulDelay5Seconds(
+					func() error {
+						host, err := servers.Get(s.ComputeClient, id).Extract()
+						if err == nil {
+							if toHostState(host.Status) == hoststate.ERROR {
+								return nil
+							}
+							return scerr.NotAvailableError("host '%s' state is '%s'", host.Name, host.Status)
+						}
+
+						switch err.(type) { // nolint
+						case gophercloud.ErrDefault404:
+							resourcePresent = false
 							return nil
 						}
-						return scerr.NotAvailableError("host '%s' state is '%s'", host.Name, host.Status)
+						return err
+					},
+					temporal.GetContextTimeout(),
+				)
+				if innerErr != nil {
+					if _, ok := innerErr.(retry.ErrTimeout); ok {
+						// retry deletion...
+						return abstract.ResourceTimeoutError("host", id, temporal.GetContextTimeout())
 					}
-
-					switch err.(type) { // nolint
-					case gophercloud.ErrDefault404:
-						resourcePresent = false
-						return nil
-					}
-					return err
-				},
-				temporal.GetContextTimeout(),
-			)
-			if innerRetryErr != nil {
-				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
-					// retry deletion...
-					return abstract.ResourceTimeoutError("host", id, temporal.GetContextTimeout())
+					return innerErr
 				}
-				return innerRetryErr
 			}
 			if !resourcePresent {
-				logrus.Debugf("Host '%s' not found, deletion considered successful after a few retries", id)
+				// logrus.Debugf("Host '%s' not found, deletion considered successful after a few retries", id)
 				return nil
 			}
 			return scerr.NotAvailableError("host '%s' in state 'ERROR', retrying to delete", id)
@@ -1272,6 +1277,9 @@ func (s *Stack) DeleteHost(id string) error {
 	)
 	if outerRetryErr != nil {
 		return scerr.Wrap(outerRetryErr, "error deleting host: retry error")
+	}
+	if !resourcePresent {
+		return abstract.ResourceNotFoundError("host", id)
 	}
 	return nil
 }
