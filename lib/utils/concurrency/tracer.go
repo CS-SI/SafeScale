@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync/atomic"
 
@@ -143,6 +144,11 @@ func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
 		logrus.Tracef(t.TraceMessage(format, a...))
 	}
 	return t
+}
+
+// TraceCallStack logs the call stack as a trace (displayed only if tracing is enabled)
+func (t *Tracer) TraceCallStack() *Tracer {
+	return t.Trace("%s", string(debug.Stack()))
 }
 
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
