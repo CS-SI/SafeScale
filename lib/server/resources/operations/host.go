@@ -115,7 +115,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	if err != nil {
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := err.(retry.ErrTimeout); ok {
-			err = scerr.NotFoundError("timeout trying to read metadata of host '%s'", ref)
+			err = scerr.NotFoundError("metadata of host '%s' not found", ref)
 		}
 		return nullHost(), err
 	}
@@ -228,6 +228,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) error {
 	})
 }
 
+// IsNull tests if instance is nil or empty
 func (rh *host) IsNull() bool {
 	return rh == nil || rh.core.IsNull()
 }
@@ -327,7 +328,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return nil, scerr.Wrap(err, "failed to check if it already exists")
 		}
 	} else {
-		return nil, scerr.DuplicateError("already exists")
+		return nil, scerr.DuplicateError("'%s' already exists", hostReq.ResourceName)
 	}
 
 	// Check if host exists but is not managed by SafeScale
@@ -337,7 +338,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return nil, scerr.Wrap(err, "failed to check if host resource name '%s' is already used", hostReq.ResourceName)
 		}
 	} else {
-		return nil, scerr.DuplicateError("already exists (but not managed by SafeScale)", hostReq.ResourceName)
+		return nil, scerr.DuplicateError("'%s' already exists (but not managed by SafeScale)", hostReq.ResourceName)
 	}
 
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
@@ -449,6 +450,16 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return nil, err
 	}
 
+	defer func() {
+		if err != nil && !hostReq.KeepOnFailure {
+			derr := rh.core.Delete(task)
+			if derr != nil {
+				logrus.Errorf("cleaning up after failure, failed to delete host '%s' metadata: %v", ahf.Core.Name, derr)
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	// Updates properties in metadata
 	err = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		innerErr := props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) error {
@@ -463,16 +474,6 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		if innerErr != nil {
 			return innerErr
 		}
-
-		// Starting from here, delete host metadata if exiting with error
-		defer func() {
-			if innerErr != nil && !hostReq.KeepOnFailure {
-				derr := rh.core.Delete(task)
-				if derr != nil {
-					logrus.Errorf("cleaning up after failure, failed to remove host metadata")
-				}
-			}
-		}()
 
 		// Sets host extension DescriptionV1
 		innerErr = props.Alter(task, hostproperty.DescriptionV1, func(clonable data.Clonable) error {
@@ -635,6 +636,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	return userdataContent, nil
 }
 
+// runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (rh *host) runInstallPhase(task concurrency.Task, phase userdata.Phase, userdataContent *userdata.Content) error {
 	// execute userdata 'final' (phase4) script to final install/configure of the host (no need to reboot)
 	content, err := userdataContent.Generate(phase)
@@ -948,7 +950,7 @@ func (rh *host) Delete(task concurrency.Task) error {
 					if _, ok := err.(scerr.ErrNotFound); !ok {
 						return scerr.Wrap(err, "cannot delete host")
 					}
-					logrus.Warn("host resource not found on provider side, host metadata will be removed for consistency")
+					// logrus.Warn("host resource not found on provider side, host metadata will be removed for consistency")
 					waitForDeletion = false
 				}
 				return nil
