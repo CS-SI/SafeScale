@@ -1525,5 +1525,5 @@ func (s *Stack) RebootHost(id string) error {
 }
 
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	panic("ResizeHost: implement me") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
 }

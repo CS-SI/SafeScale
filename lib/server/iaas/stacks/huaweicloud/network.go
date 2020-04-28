@@ -177,12 +177,12 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 // ListVPCs lists all the VPC created
 func (s *Stack) ListVPCs() ([]VPC, error) {
 	var vpcList []VPC
-	return vpcList, scerr.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet")
+	return vpcList, scerr.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME Technical debt
 }
 
 // DeleteVPC deletes a Network (ie a VPC in Huawei Cloud) identified by 'id'
 func (s *Stack) DeleteVPC(id string) error {
-	return scerr.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet")
+	return scerr.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet") // FIXME Technical debt
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine

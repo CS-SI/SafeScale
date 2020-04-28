@@ -192,7 +192,7 @@ func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentReq
 	defer logrus.Debugf("<<< stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 
 	if s == nil {
-		panic("Calling stacks.ebrc::CreateVolumeAttachment() from nil pointer!")
+		return "", fmt.Errorf("Calling stacks.ebrc::CreateVolumeAttachment() from nil pointer!")
 	}
 
 	vm, err := s.findVMByID(request.HostID)
@@ -224,7 +224,7 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 	defer logrus.Debugf("<<< stacks.ebrc::GetVolumeAttachment(%s)", id)
 
 	if s == nil {
-		panic("Calling stacks.ebrc::GetVolumeAttachment() from nil pointer!")
+		return nil, fmt.Errorf("Calling stacks.ebrc::GetVolumeAttachment() from nil pointer!")
 	}
 
 	vats, err := s.ListVolumeAttachments(serverID)
@@ -247,7 +247,7 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 	defer logrus.Debugf("<<< stacks.ebrc::DeleteVolumeAttachment(%s)", id)
 
 	if s == nil {
-		panic("Calling stacks.ebrc::DeleteVolumeAttachment() from nil pointer!")
+		return fmt.Errorf("Calling stacks.ebrc::DeleteVolumeAttachment() from nil pointer!")
 	}
 
 	vm, err := s.findVMByID(serverID)
