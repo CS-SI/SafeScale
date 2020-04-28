@@ -38,8 +38,6 @@ exec 1<>/opt/safescale/var/log/user_data.phase2.log
 exec 2>&1
 set -x
 
-# Tricks BashLibrary's waitUserData to believe the current phase (3) is already done
->/opt/safescale/var/state/user_data.phase3.done
 # Includes the BashLibrary
 {{ .BashLibrary }}
 
@@ -59,7 +57,8 @@ install_keepalived() {
     esac
 
     NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
-    read -a IF_PR ignore <<<${SF_VARDIR}/state/private_nics
+    read IF_PR ignore <<<$(cat ${SF_VARDIR}/state/private_nics)
+    read IF_PU ignore <<<$(cat ${SF_VARDIR}/state/public_nics)
 
     cat >/etc/keepalived/keepalived.conf <<-EOF
 vrrp_instance vrrp_group_gws_internal {
@@ -87,13 +86,13 @@ vrrp_instance vrrp_group_gws_internal {
     }
 {{ end }}
     virtual_ipaddress {
-        {{ .PrivateVIP }}/${NETMASK}
+        {{ .DefaultRouteIP }}/${NETMASK}
     }
 }
 
 # vrrp_instance vrrp_group_gws_external {
 #     state BACKUP
-#     interface ${PU_IF}
+#     interface ${IF_PU}
 #     virtual_router_id 2
 #     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
 #     nopreempt
@@ -103,7 +102,7 @@ vrrp_instance vrrp_group_gws_internal {
 #         auth_pass password
 #     }
 #     virtual_ipaddress {
-#         {{ .PublicVIP }}/${NETMASK}
+#         {{ .EndpointIP }}/${NETMASK}
 #     }
 # }
 EOF
