@@ -800,7 +800,7 @@ func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP

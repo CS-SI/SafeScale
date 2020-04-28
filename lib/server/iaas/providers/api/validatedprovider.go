@@ -5,6 +5,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,19 +17,19 @@ func (w ValidatedProvider) CreateVIP(first string, second string) (*resources.Vi
 }
 
 func (w ValidatedProvider) AddPublicIPToVIP(*resources.VirtualIP) error {
-	panic("implement me") // FIXME Technical debt
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
 }
 
 func (w ValidatedProvider) BindHostToVIP(*resources.VirtualIP, string) error {
-	panic("implement me") // FIXME Technical debt
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
 }
 
 func (w ValidatedProvider) UnbindHostFromVIP(*resources.VirtualIP, string) error {
-	panic("implement me") // FIXME Technical debt
+	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
 }
 
 func (w ValidatedProvider) DeleteVIP(*resources.VirtualIP) error {
-	panic("implement me") // FIXME Technical debt
+	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
 }
 
 func (w ValidatedProvider) GetCapabilities() providers.Capabilities {

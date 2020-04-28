@@ -206,6 +206,22 @@ type causer interface {
 	Cause() error
 }
 
+func ImplementsCauser(inErr error) bool {
+	if _, ok := inErr.(causer); ok {
+		return true
+	}
+
+	return false
+}
+
+func ImplementsConsequencer(inErr error) bool {
+	if _, ok := inErr.(consequencer); ok {
+		return true
+	}
+
+	return false
+}
+
 // Cause returns the cause of an error if it implements the causer interface
 func Cause(err error) (resp error) {
 	resp = err
