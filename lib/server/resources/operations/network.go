@@ -97,7 +97,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := err.(retry.ErrTimeout); ok {
 			logrus.Debugf("timeout reading metadata of network '%s'", ref)
-			err = scerr.NotFoundError("network '%s' not found: %s", ref, err.Error())
+			err = scerr.NotFoundError("network '%s' not found: %s", ref, scerr.Cause(err).Error())
 		}
 		return nullNetwork(), err
 	}
@@ -439,7 +439,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		}
 
 		// an.GatewayID = primaryGateway.SafeGetID()
-		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetID()
+		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.SafeGetPrivateIP(task)
 		primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.SafeGetPublicIP(task)
 		primaryUserdata.IsPrimaryGateway = true
 		if an.VIP != nil {
@@ -451,7 +451,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		}
 		if secondaryGateway != nil {
 			// an.SecondaryGatewayID = secondaryGateway.SafeGetID()
-			primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetID()
+			primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.SafeGetPrivateIP(task)
 			secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
 			secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
 			primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.SafeGetPublicIP(task)
@@ -531,17 +531,25 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 func (objn *network) deleteGateway(task concurrency.Task, gw resources.Host) (err error) {
 	name := gw.SafeGetName()
 	err = objn.SafeGetService().DeleteHost(gw.SafeGetID())
-	if err == nil {
-		err = gw.(*host).core.Delete(task)
-	}
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
-			logrus.Errorf("Failed to delete gateway '%s', resource not found: %v", name, err)
+		case scerr.ErrNotFound: // host resource not found, considered as a success.
+			break
 		case scerr.ErrTimeout:
-			logrus.Errorf("Failed to delete gateway '%s', timeout: %v", name, err)
+			logrus.Errorf("Failed to delete host '%s', timeout: %v", name, err)
 		default:
-			logrus.Errorf("Failed to delete gateway '%s': %v", name, err)
+			logrus.Errorf("Failed to delete host '%s': %v", name, err)
+		}
+	}
+	err = gw.(*host).core.Delete(task)
+	if err != nil {
+		switch err.(type) {
+		case scerr.ErrNotFound: // host metadata not found, considered as a success.
+			return nil
+		case scerr.ErrTimeout:
+			logrus.Errorf("Failed to delete gateway '%s' metadata, timeout: %v", name, err)
+		default:
+			logrus.Errorf("Failed to delete gateway '%s' metadata: %v", name, err)
 		}
 	}
 	return err
@@ -700,7 +708,11 @@ func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resource
 
 	defer scerr.OnPanic(&err)
 
-	tracer := concurrency.NewTracer(nil, true, "").Entering()
+	primaryStr := "primary"
+	if !primary {
+		primaryStr = "secondary"
+	}
+	tracer := concurrency.NewTracer(nil, true, "(%s)", primaryStr).Entering()
 	defer tracer.OnExitTrace()
 	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 	defer scerr.OnPanic(&err)
@@ -722,7 +734,7 @@ func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resource
 		return nil, err
 	}
 	if gatewayID == "" {
-		return nil, scerr.NotFoundError("no gateway ID found in network properties")
+		return nil, scerr.NotFoundError("no %s gateway ID found in network properties", primaryStr)
 	}
 	return LoadHost(task, objn.SafeGetService(), gatewayID)
 }
@@ -806,12 +818,10 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				if rh != nil {
 					logrus.Debugf("Deleting gateway '%s'...", rh.SafeGetName())
 					innerErr = objn.deleteGateway(task, rh)
-					if innerErr != nil { // allow no gateway, but log it
-						if _, ok := err.(scerr.ErrNotFound); ok {
-							logrus.Errorf("Failed to delete primary gateway: %s", innerErr.Error())
-						} else {
-							return innerErr
-						}
+					if _, ok := innerErr.(scerr.ErrNotFound); ok { // allow no gateway, but log it
+						logrus.Errorf("Failed to delete primary gateway: %s", innerErr.Error())
+					} else if innerErr != nil {
+						return innerErr
 					}
 				}
 			} else {
