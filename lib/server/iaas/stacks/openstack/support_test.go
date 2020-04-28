@@ -30,9 +30,7 @@ func TestGophercloudErrorCodes(t *testing.T) {
 }
 
 func TestEmptyGophercloudErrorCodes(t *testing.T) {
-	var srcErr error
-
-	srcErr = gophercloud.ErrDefault409{}
+	srcErr := gophercloud.ErrDefault409{}
 	code, err := GetUnexpectedGophercloudErrorCode(srcErr)
 	if err != nil {
 		t.FailNow()
@@ -43,9 +41,7 @@ func TestEmptyGophercloudErrorCodes(t *testing.T) {
 }
 
 func TestNotGophercloudErrorCodes(t *testing.T) {
-	var srcErr error
-
-	srcErr = fmt.Errorf("something else")
+	srcErr := fmt.Errorf("something else")
 	code, err := GetUnexpectedGophercloudErrorCode(srcErr)
 	if err == nil {
 		t.FailNow()
