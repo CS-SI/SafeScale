@@ -89,10 +89,10 @@ type Content struct {
 	Tags map[Phase]map[string][]string
 	// IsPrimaryGateway tells if the host is a primary gateway
 	IsPrimaryGateway bool
-	// PrivateVIP contains the private IP of the VIP instance if it exists
-	PublicVIP string // VPL: change to EndpointIP
-	// PrivateVIP contains the private IP of the VIP instance if it exists
-	PrivateVIP string // VPL: change to DefaultRouteIP
+	// // PrivateVIP contains the private IP of the VIP instance if it exists
+	// PublicVIP string // VPL: change to EndpointIP
+	// // PrivateVIP contains the private IP of the VIP instance if it exists
+	// PrivateVIP string // VPL: change to DefaultRouteIP
 
 	ProviderName     string
 	BuildSubnetworks bool
