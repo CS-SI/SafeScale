@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package scerr
+package glitch
 
 import (
 	"fmt"

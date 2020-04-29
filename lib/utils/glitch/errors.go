@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package scerr
+package glitch
 
 import (
 	"encoding/json"
@@ -853,7 +853,7 @@ type ErrList struct {
 }
 
 // ErrListError creates a ErrList
-func ErrListError(errors []error) error {
+func ErrListError(errors []scerr.Error) Error {
 	if len(errors) == 0 {
 		return nil
 	}
@@ -1135,7 +1135,7 @@ const (
 
 // OnExitLogErrorWithLevel returns a function that will log error with the log level wanted
 // Intended to be used with defer for example.
-func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) {
+func OnExitLogErrorWithLevel(in string, err *Error, level logrus.Level) {
 	logLevelFn, ok := commonlog.LogLevelFnMap[level]
 	if !ok {
 		logLevelFn = logrus.Error
@@ -1154,7 +1154,7 @@ func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) {
 		for {
 			if pc, _, line, ok := runtime.Caller(toSkip); ok {
 				if f := runtime.FuncForPC(pc); f != nil {
-					if strings.Contains(f.Name(), "scerr.OnExitLogError") {
+					if strings.Contains(f.Name(), "glitch.OnExitLogError") {
 						toSkip++
 						continue
 					}
@@ -1176,18 +1176,18 @@ func OnExitLogErrorWithLevel(in string, err *error, level logrus.Level) {
 
 // OnExitLogError returns a function that will log error with level logrus.ErrorLevel.
 // Intended to be used with defer for example
-func OnExitLogError(in string, err *error) {
+func OnExitLogError(in string, err *Error) {
 	OnExitLogErrorWithLevel(in, err, logrus.ErrorLevel)
 }
 
 // OnExitTraceError returns a function that will log error with level logrus.TraceLevel.
 // Intended to be used with defer for example.
-func OnExitTraceError(in string, err *error) {
+func OnExitTraceError(in string, err *Error) {
 	OnExitLogErrorWithLevel(in, err, logrus.TraceLevel)
 }
 
 // OnPanic returns a function intended to capture panic error and fill the error pointer with a ErrRuntimePanic.
-func OnPanic(err *error) {
+func OnPanic(err *Error) {
 	if x := recover(); x != nil {
 		*err = RuntimePanicError(fmt.Sprintf("runtime panic occurred: %+v", x))
 	}

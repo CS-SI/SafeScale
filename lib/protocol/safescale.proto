@@ -526,12 +526,6 @@ enum ClusterFlavor {
     CF_K8S = 2;
 }
 
-enum ClusterResizeAction {
-    CRA_UNKNOWN = 0;
-    CRA_EXPAND = 1;
-    CRA_SHRINK = 2;
-}
-
 message ClusterListResponse {
     repeated ClusterResponse clusters = 1;
 }
@@ -555,8 +549,7 @@ message ClusterResizeRequest {
     int32 count = 2;
     string node_sizing = 3;
     string image_id = 4;
-    ClusterResizeAction action = 5;
-    bool dry_run = 6;
+    bool dry_run = 5;
 }
 
 message ClusterDeleteRequest  {
@@ -582,7 +575,7 @@ message ClusterNodeListResponse {
 }
 
 message ClusterNodeRequest {
-    string cluster_name = 1;
+    string name = 1;
     Reference host = 2;     // on deletion, if not set, requests to delete last added node
 }
 
@@ -601,7 +594,7 @@ service ClusterService{
     rpc DeleteNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
     rpc StopNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
     rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
-    rpc StateNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+    rpc StateNode(ClusterNodeRequest) returns (ClusterStateResponse){}
     rpc ListMasters(Reference) returns (ClusterNodeListResponse){}
     rpc InspectMaster(ClusterNodeRequest) returns (Host){}
 }
