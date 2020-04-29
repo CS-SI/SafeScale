@@ -104,7 +104,7 @@ func work() {
 
 	logrus.Infoln("Registering services")
 	protocol.RegisterBucketServiceServer(s, &listeners.BucketListener{})
-	// pb.RegisterDataServiceServer(s, &listeners.DataListener{})
+	protocol.RegisterClusterServiceServer(s, &listeners.ClusterListener{})
 	protocol.RegisterHostServiceServer(s, &listeners.HostListener{})
 	protocol.RegisterImageServiceServer(s, &listeners.ImageListener{})
 	protocol.RegisterJobServiceServer(s, &listeners.JobManagerListener{})

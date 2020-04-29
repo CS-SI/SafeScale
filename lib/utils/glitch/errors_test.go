@@ -1,4 +1,4 @@
-package scerr
+package glitch
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ func TestNotImplementedError(t *testing.T) {
 		t.Fatalf("unexpected nil error")
 	}
 	whatContent := what.Error()
-	if !strings.Contains(whatContent, "scerr.lazyDevs") {
+	if !strings.Contains(whatContent, "glitch.lazyDevs") {
 		t.Errorf("Expected 'utils.lazyDevs' in error content but found: %s", whatContent)
 	}
 }
