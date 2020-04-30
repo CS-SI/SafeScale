@@ -41,7 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -58,11 +58,11 @@ func (c *cluster) SafeGetTargetType() featuretargettype.Enum {
 // satisfies feature.Targetable interface
 func (c *cluster) SafeGetInstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
 	if c == nil {
-		logrus.Error(scerr.InvalidInstanceError().Error())
+		logrus.Error(fail.InvalidInstanceReport().Error())
 		return nil
 	}
 	if task == nil {
-		logrus.Errorf(scerr.InvalidParameterError("task", "cannot be nil").Error())
+		logrus.Errorf(fail.InvalidParameterReport("task", "cannot be nil").Error())
 		return nil
 	}
 
@@ -93,10 +93,10 @@ func (c *cluster) SafeGetInstalledFeatures(task concurrency.Task) []string {
 // ComplementFeatureParameters configures parameters that are implicitely defined, based on target
 func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) error {
 	if c == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	var err error
@@ -142,7 +142,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 			var ok bool
 			controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlPlane)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.ClusterControlPlane' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.ClusterControlPlane' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			return nil
 		})
@@ -204,19 +204,19 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 
 // ListInstalledFeatures returns a slice of installed features
 func (c *cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, error) {
-	return nil, scerr.NotImplementedError("ListInstalledFeatures() is not implemented yet")
+	return nil, fail.NotImplementedReport("ListInstalledFeatures() is not implemented yet")
 }
 
 // AddFeature installs a feature on the cluster
 func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, error) {
 	if c == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
 	}
 
 	feat, err := NewFeature(task, name)
@@ -229,13 +229,13 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 // CheckFeature tells if a feature is installed on the cluster
 func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, error) {
 	if c == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
 	}
 
 	feat, err := NewFeature(task, name)
@@ -249,13 +249,13 @@ func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 // RemoveFeature uninstalls a feature from the cluster
 func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, error) {
 	if c == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
 	}
 
 	feat, err := NewFeature(task, name)
@@ -273,10 +273,10 @@ func (c *cluster) ExecuteScript(
 ) (errCode int, stdOut string, stdErr string, err error) {
 	tracer := concurrency.NewTracer(nil, true, "("+host.SafeGetName()+")").Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if c == nil {
-		return 0, "", "", scerr.InvalidInstanceError()
+		return 0, "", "", fail.InvalidInstanceReport()
 	}
 
 	// Configures reserved_BashLibrary template var
@@ -319,10 +319,10 @@ func (c *cluster) ExecuteScript(
 func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (err error) {
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if c.makers.GetTemplateBox == nil {
-		return scerr.InvalidParameterError("c.makers.GetTemplateBox", "cannot be nil")
+		return fail.InvalidParameterReport("c.makers.GetTemplateBox", "cannot be nil")
 	}
 
 	netCfg, err := c.GetNetworkConfig(task)
@@ -380,13 +380,13 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		if path == "" {
 			path, err = exec.LookPath("safescale")
 			if err != nil {
-				return scerr.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
+				return fail.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
 			}
 		}
 
 		retcode, stdout, stderr, err := host.Push(task, path, "/opt/safescale/bin/safescale", "root:root", "0755", temporal.GetExecutionTimeout())
 		if err != nil {
-			return scerr.Wrap(err, "failed to upload 'safescale' binary")
+			return fail.Wrap(err, "failed to upload 'safescale' binary")
 		}
 		if retcode != 0 {
 			output := stdout
@@ -395,7 +395,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			} else if stderr != "" {
 				output = stderr
 			}
-			return scerr.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
+			return fail.NewReport("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
 		}
 
 		// Uploads safescaled binary
@@ -406,12 +406,12 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		if path == "" {
 			path, err = exec.LookPath("safescaled")
 			if err != nil {
-				return scerr.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
+				return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
 			}
 		}
 		retcode, stdout, stderr, err = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout())
 		if err != nil {
-			return scerr.Wrap(err, "failed to submit content of 'safescaled' binary to host '%s'", host.SafeGetName())
+			return fail.Wrap(err, "failed to submit content of 'safescaled' binary to host '%s'", host.SafeGetName())
 		}
 		if retcode != 0 {
 			output := stdout
@@ -420,7 +420,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			} else if stderr != "" {
 				output = stderr
 			}
-			return scerr.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
+			return fail.NewReport("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
 		}
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 		suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX")
@@ -429,7 +429,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
 			retcode, stdout, stderr, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 			if err != nil {
-				return scerr.Wrap(err, "failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s'", host.SafeGetName())
+				return fail.Wrap(err, "failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s'", host.SafeGetName())
 			}
 			if retcode != 0 {
 				output := stdout
@@ -439,7 +439,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 					output = stderr
 				}
 				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", host.SafeGetName(), output)
-				return scerr.NewError(strprocess.Capitalize(msg))
+				return fail.NewReport(strprocess.Capitalize(msg))
 			}
 		}
 	}
@@ -469,7 +469,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		return err
 	}
 	if retcode != 0 {
-		return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, fmt.Sprintf("[%s] system requirements installation failed", hostLabel))
+		return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, fmt.Sprintf("[%s] system requirements installation failed", hostLabel))
 	}
 
 	logrus.Debugf("[%s] system requirements installation successful.", hostLabel)
@@ -478,7 +478,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 
 // Installs reverseproxy
 func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
-	defer scerr.OnPanic(&err)
+	defer fail.OnPanic(&err)
 
 	identity, err := c.GetIdentity(task)
 	if err != nil {
@@ -488,14 +488,14 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			_, disabled = featuresV1.Disabled["reverseproxy"]
 			return nil
@@ -516,7 +516,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return scerr.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.SafeGetName(), msg)
+			return fail.NewReport("[cluster %s] failed to add '%s': %s", clusterName, feat.SafeGetName(), msg)
 		}
 		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.SafeGetName())
 	}
@@ -525,7 +525,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (err error) {
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
 func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
-	defer scerr.OnPanic(&err)
+	defer fail.OnPanic(&err)
 
 	identity, err := c.GetIdentity(task)
 	if err != nil {
@@ -535,14 +535,14 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			_, disabled = featuresV1.Disabled["remotedesktop"]
 			return nil
@@ -567,7 +567,7 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return scerr.NewError("[cluster %s] failed to add 'remotedesktop' failed: %s", clusterName, msg)
+			return fail.NewReport("[cluster %s] failed to add 'remotedesktop' failed: %s", clusterName, msg)
 		}
 		logrus.Debugf("[cluster %s] feature 'remotedesktop' added successfully", clusterName)
 	}
@@ -577,23 +577,23 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (err error) {
 // install proxycache-client feature if not disabled
 func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.Host, hostLabel string) (err error) {
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterReport("host", "cannot be nil")
 	}
 	if hostLabel == "" {
-		return scerr.InvalidParameterError("hostLabel", "cannot be empty string")
+		return fail.InvalidParameterReport("hostLabel", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			_, disabled = featuresV1.Disabled["proxycache"]
 			return nil
@@ -610,7 +610,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return scerr.NewError("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
+			return fail.NewReport("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
 		}
 	}
 	return nil
@@ -619,23 +619,23 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 // install proxycache-server feature if not disabled
 func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.Host, hostLabel string) (err error) {
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterReport("host", "cannot be nil")
 	}
 	if hostLabel == "" {
-		return scerr.InvalidParameterError("hostLabel", "cannot be empty string")
+		return fail.InvalidParameterReport("hostLabel", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	disabled := false
 	err = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			_, disabled = featuresV1.Disabled["proxycache"]
 			return nil
@@ -655,7 +655,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return scerr.NewError("[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
+			return fail.NewReport("[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
 		}
 	}
 	return nil
@@ -664,15 +664,15 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 // intallDocker installs docker and docker-compose
 func (c *cluster) installDocker(task concurrency.Task, host resources.Host, hostLabel string) (err error) {
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterReport("host", "cannot be nil")
 	}
 	if hostLabel == "" {
-		return scerr.InvalidParameterError("hostLabel", "cannot be empty string")
+		return fail.InvalidParameterReport("hostLabel", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
 	feat, err := NewFeature(task, "docker")
@@ -686,7 +686,7 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
 		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
-		return scerr.NewError("failed to add feature 'docker' on host '%s': %s", host.SafeGetName(), msg)
+		return fail.NewReport("failed to add feature 'docker' on host '%s': %s", host.SafeGetName(), msg)
 	}
 	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil

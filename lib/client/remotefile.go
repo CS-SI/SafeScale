@@ -23,7 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -38,10 +38,10 @@ type RemoteFileItem struct {
 // Upload transfers the local file to the hostname
 func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 	if rfc.Local == "" {
-		return scerr.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
+		return fail.InvalidInstanceContentReport("rfc.Local", "cannot be empty string")
 	}
 	if rfc.Remote == "" {
-		return scerr.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
+		return fail.InvalidInstanceContentReport("rfc.Remote", "cannot be empty string")
 
 	}
 	SSHClient := New().SSH
@@ -80,7 +80,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 // Upload transfers the local file to the hostname
 func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, hostname string) error {
 	if rfc.Remote == "" {
-		return scerr.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
+		return fail.InvalidInstanceContentReport("rfc.Remote", "cannot be empty string")
 
 	}
 	SSHClient := New().SSH

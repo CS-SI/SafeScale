@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	rice "github.com/GeertJohan/go.rice"
 )
@@ -47,7 +47,7 @@ type bucket struct {
 // NewBucket intanciantes bucket struct
 func NewBucket(svc iaas.Service) (resources.Bucket, error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 	b := &bucket{
 		svc: svc,
@@ -58,15 +58,15 @@ func NewBucket(svc iaas.Service) (resources.Bucket, error) {
 // LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage Bucket
 func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	anon, err := NewBucket(svc)
 	if err != nil {
@@ -79,7 +79,7 @@ func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, err error) {
 		if err.Error() == "not found" {
 			return nil, abstract.ResourceNotFoundError("bucket", name)
 		}
-		return nil, scerr.NewError(err, nil, "failed to read bucket information")
+		return nil, fail.NewReport(err, nil, "failed to read bucket information")
 	}
 	b.Name = name
 	b.ID = name
@@ -125,18 +125,18 @@ func (b *bucket) SafeGetMountPoint() string {
 // Create a bucket
 func (b *bucket) Create(task concurrency.Task, name string) (err error) {
 	if b == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
+		return fail.InvalidParameterReport("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	bucket, err := b.svc.InspectBucket(name)
 	if err != nil {
@@ -161,7 +161,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (err error) {
 func (b *bucket) Delete(task concurrency.Task) (err error) {
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	return b.svc.DeleteBucket(b.SafeGetName())
 }
@@ -170,12 +170,12 @@ func (b *bucket) Delete(task concurrency.Task) (err error) {
 func (b *bucket) Mount(task concurrency.Task, hostName, path string) (err error) {
 	tracer := concurrency.NewTracer(task, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// Get Host data
 	host, err := LoadHost(task, b.svc, hostName)
 	if err != nil {
-		return scerr.Wrap(err, "failed to mount bucket '%s' on host '%s'", b.SafeGetName(), hostName)
+		return fail.Wrap(err, "failed to mount bucket '%s' on host '%s'", b.SafeGetName(), hostName)
 	}
 
 	// Create mount point
@@ -230,11 +230,11 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (err error)
 func (b *bucket) Unmount(task concurrency.Task, hostName string) (err error) {
 	tracer := concurrency.NewTracer(task, true, "('%s')", hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "failed to unmount bucket '%s' from host '%s'", b.SafeGetName(), hostName)
+			err = fail.Wrap(err, "failed to unmount bucket '%s' from host '%s'", b.SafeGetName(), hostName)
 		}
 	}()
 
@@ -273,7 +273,7 @@ func (b *bucket) exec(task concurrency.Task, host resources.Host, script string,
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-	defer scerr.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &err)
+	defer fail.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &err)
 
 	box, err := rice.FindBox("../operations/scripts")
 	if err != nil {

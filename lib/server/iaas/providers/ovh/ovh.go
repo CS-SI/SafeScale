@@ -34,7 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 type gpuCfg struct {
@@ -186,7 +186,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, scerr.InvalidRequestError("invalid region '%s'", region)
+			return nil, fail.InvalidRequestReport("invalid region '%s'", region)
 		}
 	}
 
@@ -209,7 +209,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, scerr.InvalidRequestError("invalid availability zone '%s', valid zones are %v", zone, validZones)
+			return nil, fail.InvalidRequestReport("invalid availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 
@@ -364,13 +364,13 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 // BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	if p == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterReport("vip", "cannot be nil")
 	}
 	if hostID == "" {
-		return scerr.InvalidParameterError("host", "cannot be empty string")
+		return fail.InvalidParameterReport("host", "cannot be empty string")
 	}
 
 	return nil
@@ -379,13 +379,13 @@ func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 // UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	if p == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterReport("vip", "cannot be nil")
 	}
 	if hostID == "" {
-		return scerr.InvalidParameterError("host", "cannot be empty string")
+		return fail.InvalidParameterReport("host", "cannot be empty string")
 	}
 
 	return nil

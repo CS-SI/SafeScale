@@ -19,12 +19,12 @@ package converters
 import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func BucketMountPointFromResourceToProtocol(in resources.Bucket) (*protocol.BucketMountingPoint, error) {
 	if in.IsNull() {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 
 	out := &protocol.BucketMountingPoint{
@@ -38,10 +38,10 @@ func BucketMountPointFromResourceToProtocol(in resources.Bucket) (*protocol.Buck
 // func VolumeFromResourceToProtocol(task concurrency.Task, in resources.Volume) (*protocol.VolumeInspectResponse, error) {
 // 	empty := &protocol.VolumeIspectResponse{}
 // 	if in.IsNull() {
-// 		return empty, scerr.InvalidParameterError("in", "cannot be null value")
+// 		return empty, fail.InvalidParameterReport("in", "cannot be null value")
 // 	}
 // 	if task == nil {
-// 		return empty, scerr.InvalidParameterError("task", "cannot be nil")
+// 		return empty, fail.InvalidParameterReport("task", "cannot be nil")
 // 	}
 
 // 	va, err := in.GetAttachments(task)
@@ -49,7 +49,7 @@ func BucketMountPointFromResourceToProtocol(in resources.Bucket) (*protocol.Buck
 // 		return empty, err
 // 	}
 // 	if len(va.Hosts) == 0 {
-// 		return empty, scerr.InconsistentError("failed to find hosts that have mounted the volume")
+// 		return empty, fail.InconsistentReport("failed to find hosts that have mounted the volume")
 // 	}
 // 	var hostID string
 // 	for hostID, _ := range va.Hosts {
@@ -68,7 +68,7 @@ func BucketMountPointFromResourceToProtocol(in resources.Bucket) (*protocol.Buck
 // 	// ... then identify HostVolume struct associated to volume...
 // 	hostVolume, ok := hostVolumes.VolumeByID[in.SafeGetID()]
 // 	if !ok {
-// 		return empty, scerr.InconsistentError("failed to find device where volume '%s' is attached on host '%s'", in.SafeGetName(), h.SafeGetName())
+// 		return empty, fail.InconsistentReport("failed to find device where volume '%s' is attached on host '%s'", in.SafeGetName(), h.SafeGetName())
 // 	}
 // 	// ... then get mounts on the host...
 // 	hostMounts, err := h.GetMounts(task)
@@ -78,7 +78,7 @@ func BucketMountPointFromResourceToProtocol(in resources.Bucket) (*protocol.Buck
 // 	// ... and identify the HostMount struct corresponding to the mounted volume
 // 	hostMount, ok := hostMounts.LocalMountsByDevice[hostVolume.Device]
 // 	if !ok {
-// 		return empty, scerr.InconsistentError("failed to find where volume '%s' is mounted on host '%s'", in.SafeGetName(), h.SafeGetName())
+// 		return empty, fail.InconsistentReport("failed to find where volume '%s' is mounted on host '%s'", in.SafeGetName(), h.SafeGetName())
 // 	}
 
 // 	// For now, volume is attachable only to one host...

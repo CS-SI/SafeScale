@@ -19,7 +19,7 @@ package nfs
 import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Client defines the structure of a Client object
@@ -31,7 +31,7 @@ type Client struct {
 // NewNFSClient creates a new NFS client instance
 func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 	if sshconfig == nil {
-		return nil, scerr.InvalidParameterError("sshconfig", "cannot be nil")
+		return nil, fail.InvalidParameterReport("sshconfig", "cannot be nil")
 	}
 
 	client := &Client{
@@ -43,7 +43,7 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 // Install installs NFS client on remote host
 func (c *Client) Install(task concurrency.Task) error {
 	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
-	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to install NFS client")
+	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to install NFS client")
 }
 
 // Mount defines a mount of a remote share and mount it
@@ -54,7 +54,7 @@ func (c *Client) Mount(task concurrency.Task, export string, mountPoint string, 
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
 	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_share_mount.sh", data)
-	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
+	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to mount remote NFS share")
 }
 
 // Unmount a nfs share from NFS server
@@ -63,5 +63,5 @@ func (c *Client) Unmount(task concurrency.Task, export string) error {
 		"Export": export,
 	}
 	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
-	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to unmount remote NFS share")
+	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to unmount remote NFS share")
 }

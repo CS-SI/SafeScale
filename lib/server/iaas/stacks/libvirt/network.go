@@ -34,15 +34,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func infoFromCidr(cidr string) (string, string, string, string, error) {
 	IP, IPNet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return "", "", "", "", scerr.Wrap(err, "failed to parse cidr")
+		return "", "", "", "", fail.Wrap(err, "failed to parse cidr")
 	} else if IPNet.Mask[3] >= 63 {
-		return "", "", "", "", scerr.NewError("please use a wider network range")
+		return "", "", "", "", fail.NewReport("please use a wider network range")
 	}
 
 	mask := fmt.Sprintf("%d.%d.%d.%d", IPNet.Mask[0], IPNet.Mask[1], IPNet.Mask[2], IPNet.Mask[3])
@@ -62,7 +62,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 			if errCode == 43 {
 				return nil, abstract.ResourceNotFoundError("network", ref)
 			}
-			return nil, scerr.Wrap(err, "failed to fetch network from ref")
+			return nil, fail.Wrap(err, "failed to fetch network from ref")
 		}
 	}
 
@@ -72,12 +72,12 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Network, error) {
 	libvirtNetworkXML, err := libvirtNetwork.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed get network's xml description")
+		return nil, fail.Wrap(err, "failed get network's xml description")
 	}
 	networkDescription := &libvirtxml.Network{}
 	err = xml.Unmarshal([]byte(libvirtNetworkXML), networkDescription)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed get unmarshal networks's xml description")
+		return nil, fail.Wrap(err, "failed get unmarshal networks's xml description")
 	}
 
 	var ipVersion ipversion.Enum
@@ -97,7 +97,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Ne
 			value, err := strconv.Atoi(netmaskBloc[i])
 			ipBloc[i], err = strconv.Atoi(ipBlocstring[i])
 			if err != nil {
-				return nil, scerr.NewError("failed to convert x.x.x.x nemask to [0-32] netmask")
+				return nil, fail.NewReport("failed to convert x.x.x.x nemask to [0-32] netmask")
 			}
 			nbBits := 0
 			if value != 0 {
@@ -138,22 +138,22 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 
 	if ipVersion != ipversion.IPv4 {
 		// TODO implement IPV6 networks
-		return nil, scerr.NotImplementedError("only ipv4 networks are implemented")
+		return nil, fail.NotImplementedReport("only ipv4 networks are implemented")
 	}
 	if len(dns) != 0 {
 		// TODO implement DNS for networks
-		return nil, scerr.NotImplementedError("DNS not implemented yet in networks creation")
+		return nil, fail.NotImplementedReport("DNS not implemented yet in networks creation")
 	}
 
 	libvirtNetwork, err := getNetworkFromRef(name, s.LibvirtService)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.NotFound); !ok {
 			return nil, err
 		}
 	}
 
 	if libvirtNetwork != nil {
-		return nil, scerr.DuplicateError("network '%s' already exists", name)
+		return nil, fail.DuplicateReport("network '%s' already exists", name)
 	}
 
 	ip, netmask, dhcpStart, dhcpEnd, err := infoFromCidr(cidr)
@@ -173,7 +173,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 
 	libvirtNetwork, err = s.LibvirtService.NetworkDefineXML(requestXML)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to create network")
+		return nil, fail.Wrap(err, "failed to create network")
 	}
 	defer func(*libvirt.Network) {
 		if err != nil {
@@ -188,16 +188,16 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 
 	err = libvirtNetwork.SetAutostart(true)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to enable network autostart")
+		return nil, fail.Wrap(err, "failed to enable network autostart")
 	}
 	err = libvirtNetwork.Create()
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to start network")
+		return nil, fail.Wrap(err, "failed to start network")
 	}
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to convert a libvirt network into a network")
+		return nil, fail.Wrap(err, "failed to convert a libvirt network into a network")
 	}
 
 	return network, nil
@@ -214,18 +214,18 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 	}
 	active, err := libvirtNetwork.IsActive()
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to check if the network is active")
+		return nil, fail.Wrap(err, "failed to check if the network is active")
 	}
 	if !active {
 		err = libvirtNetwork.Create()
 		if err != nil {
-			return nil, scerr.Wrap(err, "failed to start network")
+			return nil, fail.Wrap(err, "failed to start network")
 		}
 	}
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to convert a libvirt network into a network")
+		return nil, fail.Wrap(err, "failed to convert a libvirt network into a network")
 	}
 
 	return network, nil
@@ -246,12 +246,12 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 
 	libvirtNetworks, err := s.LibvirtService.ListAllNetworks(3)
 	if err != nil {
-		return nil, scerr.Wrap(err, "error listing networks")
+		return nil, fail.Wrap(err, "error listing networks")
 	}
 	for _, libvirtNetwork := range libvirtNetworks {
 		network, err := getNetworkFromLibvirtNetwork(&libvirtNetwork)
 		if err != nil {
-			return nil, scerr.Wrap(err, "failed to get network from libvirtNetwork")
+			return nil, fail.Wrap(err, "failed to get network from libvirtNetwork")
 		}
 
 		networks = append(networks, network)
@@ -272,18 +272,18 @@ func (s *Stack) DeleteNetwork(ref string) error {
 
 	isActive, err := libvirtNetwork.IsActive()
 	if err != nil {
-		return scerr.Wrap(err, "failed to check if the network is active")
+		return fail.Wrap(err, "failed to check if the network is active")
 	}
 	if isActive {
 		err = libvirtNetwork.Destroy()
 		if err != nil {
-			return scerr.Wrap(err, "failed to destroy network")
+			return fail.Wrap(err, "failed to destroy network")
 		}
 	}
 
 	err = libvirtNetwork.Undefine()
 	if err != nil {
-		return scerr.Wrap(err, "failed to undefine network")
+		return fail.Wrap(err, "failed to undefine network")
 	}
 
 	return nil
@@ -292,7 +292,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 // // CreateGateway creates a public Gateway for a private network
 // func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *abstract.HostTemplate, *userdata.Content, error) {
 // 	if s == nil {
-// 		return nil, nil, nil, scerr.InvalidInstanceError()
+// 		return nil, nil, nil, fail.InvalidInstanceReport()
 // 	}
 //
 // 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
@@ -310,7 +310,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 // 	if gwName == "" {
 // 		name, err := networkLibvirt.Name()
 // 		if err != nil {
-// 			return nil, nil, scerr.Wrap(err, "failed to get network name")
+// 			return nil, nil, fail.Wrap(err, "failed to get network name")
 // 		}
 // 		gwName = "gw-" + name
 // 	}
@@ -326,7 +326,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 //
 // 	host, userData, err := s.CreateHost(hostReq)
 // 	if err != nil {
-// 		return nil, nil, scerr.Wrap(err, "failed to create gateway host")
+// 		return nil, nil, fail.Wrap(err, "failed to create gateway host")
 // 	}
 //
 // 	return host, userData, nil
@@ -342,25 +342,25 @@ func (s *Stack) DeleteNetwork(ref string) error {
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedReport("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedReport("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, host *abstract.Host) (string, string, error) {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedReport("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, host *abstract.Host) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedReport("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedReport("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

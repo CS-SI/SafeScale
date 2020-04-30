@@ -4,13 +4,13 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
 
 // LazyRemove is identical to os.Remove, but doesn't raise an error, and
 // log.Warn every error except "file not found" which is ignored
-func LazyRemove(path string) error {
+func LazyRemove(path string) fail.Report {
 	err := os.Remove(path)
 	if err != nil {
 		switch err.(type) {
@@ -18,7 +18,7 @@ func LazyRemove(path string) error {
 			// File not found, that's ok because we wanted to remove it...
 		default:
 			logrus.Errorf("LazyRemove(): err is type '%s'", reflect.TypeOf(err).String())
-			return scerr.Wrap(err, "failed to remove file '%s'", path)
+			return fail.Wrap(err, "failed to remove file '%s'", path)
 		}
 	}
 	return nil

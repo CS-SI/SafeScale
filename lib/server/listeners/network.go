@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
@@ -47,18 +47,18 @@ type NetworkListener struct{}
 func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefinition) (_ *protocol.Network, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot create network").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot create network").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -70,7 +70,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 
 	networkName := in.GetName()
 	if networkName == "" {
-		return nil, scerr.InvalidRequestError("network name cannot be empty string")
+		return nil, fail.InvalidRequestReport("network name cannot be empty string")
 	}
 
 	job, err := PrepareJob(ctx, "", fmt.Sprintf("network create '%s'", networkName))
@@ -82,7 +82,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var (
 		sizing    *abstract.HostSizingRequirements
@@ -123,22 +123,22 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	return network.ToProtocol(task)
 }
 
-// List existing networks
+// ErrorList existing networks
 func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequest) (_ *protocol.NetworkList, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot list networks").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot list networks").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -156,7 +156,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewNetworkHandler(job)
 	networks, err := handler.List(in.GetAll())
@@ -177,18 +177,18 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot inspect network").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot inspect network").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -200,7 +200,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, scerr.InvalidRequestError("neither name nor id given as reference")
+		return nil, fail.InvalidRequestReport("neither name nor id given as reference")
 	}
 
 	job, err := PrepareJob(ctx, "", "network inspect")
@@ -212,7 +212,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	network, err := networkfactory.Load(task, job.SafeGetService(), ref)
 	if err != nil {
@@ -225,19 +225,19 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot delete network").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot delete network").ToGRPCStatus()
 		}
 	}()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -249,7 +249,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, scerr.InvalidRequestError("cannot delete network: neither name nor id given as reference")
+		return empty, fail.InvalidRequestReport("cannot delete network: neither name nor id given as reference")
 	}
 
 	job, err := PrepareJob(ctx, "", "delete network")
@@ -260,7 +260,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewNetworkHandler(job)
 	_, err = job.SafeGetTask().Run(

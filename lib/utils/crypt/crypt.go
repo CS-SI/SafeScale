@@ -24,7 +24,7 @@ import (
 	"crypto/rand"
 	"io"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Key ...
@@ -43,7 +43,7 @@ func NewEncryptionKey(text []byte) (*Key, error) {
 	if len(text) == 0 {
 		_, err := io.ReadFull(rand.Reader, key[:])
 		if err != nil {
-			return nil, scerr.Wrap(err, "cannot read enough random bytes (you should consider to stop using this computer)")
+			return nil, fail.Wrap(err, "cannot read enough random bytes (you should consider to stop using this computer)")
 		}
 	} else {
 		n := nBytes
@@ -98,7 +98,7 @@ func Decrypt(ciphertext []byte, key *Key) ([]byte, error) {
 	}
 
 	if len(ciphertext) < gcm.NonceSize() {
-		return nil, scerr.InvalidParameterError("ciphertext", "malformed (corrupted?)")
+		return nil, fail.InvalidParameterReport("ciphertext", "malformed (corrupted?)")
 	}
 
 	return gcm.Open(nil,

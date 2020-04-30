@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
 
@@ -67,7 +67,7 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	iw.mutex.Unlock()
 
 	if !found {
-		return scerr.NotFoundError("nothing registered with the name %s", name)
+		return fail.NotFoundReport("nothing registered with the name %s", name)
 	}
 	logrus.Infof("Deregistered: %s", name)
 	return nil
@@ -78,7 +78,7 @@ func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 	if vmInfoWaiter.listner == nil {
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			return nil, scerr.Wrap(err, "failed to open a tcp connection")
+			return nil, fail.Wrap(err, "failed to open a tcp connection")
 		}
 		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
 		vmInfoWaiter.listner = &listener
@@ -94,7 +94,7 @@ func infoHandler() {
 	for {
 		conn, err := (*vmInfoWaiter.listner).Accept()
 		if err != nil {
-			panic(fmt.Sprintf("Info handler, Error accepting: %s", err.Error()))
+			panic(fmt.Sprintf("Info handler, Report accepting: %s", err.Error()))
 		}
 
 		go func(net.Conn) {
@@ -108,7 +108,7 @@ func infoHandler() {
 
 			nbChars, err := conn.Read(buffer)
 			if err != nil {
-				panic(fmt.Sprintf("Info handler, Error reading: %s", err.Error()))
+				panic(fmt.Sprintf("Info handler, Report reading: %s", err.Error()))
 			}
 
 			message := string(buffer[0:nbChars])
@@ -129,7 +129,7 @@ func infoHandler() {
 			channel <- info
 			err = vmInfoWaiter.deregister(hostName)
 			if err != nil {
-				panic(fmt.Sprintf("Info handler, Error deregistering: %s", err.Error()))
+				panic(fmt.Sprintf("Info handler, Report deregistering: %s", err.Error()))
 			}
 		}(conn)
 	}

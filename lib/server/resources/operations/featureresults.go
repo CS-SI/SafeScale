@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // type unitResult struct {
@@ -38,13 +38,13 @@ import (
 // 	return ur.completed
 // }
 
-// func (ur unitResult) Error() error {
+// func (ur unitResult) Report() error {
 // 	return ur.err
 // }
 
 // func (ur unitResult) ErrorMessage() string {
 // 	if ur.err != nil {
-// 		return ur.err.Error()
+// 		return ur.err.Report()
 // 	}
 // 	return ""
 // }
@@ -118,7 +118,7 @@ func (r results) Add(key string, urs resources.UnitResults) error {
 		r = results{}
 	}
 	if urs == nil {
-		return scerr.InvalidParameterError("urs", "cannot be nil")
+		return fail.InvalidParameterReport("urs", "cannot be nil")
 	}
 
 	r[key] = urs
@@ -131,7 +131,7 @@ func (r results) AddUnit(key, unitName string, ur resources.UnitResult) error {
 		r = results{}
 	}
 	if ur == nil {
-		return scerr.InvalidParameterError("ur", "cannot be nil")
+		return fail.InvalidParameterReport("ur", "cannot be nil")
 	}
 	if _, ok := r[key]; !ok {
 		r[key] = &unitResults{}

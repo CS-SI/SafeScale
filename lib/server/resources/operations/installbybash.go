@@ -23,7 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // bashInstaller is an installer using script to add and remove a feature
@@ -36,16 +36,16 @@ func (i *bashInstaller) GetName() string {
 // Check checks if the feature is installed, using the check script in Specs
 func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
 	if f == nil {
-		return nil, scerr.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterReport("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterReport("t", "cannot be nil")
 	}
 
 	yamlKey := "feature.install.bash.check"
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
 	worker, err := newWorker(f, t, installmethod.Bash, installaction.Check, nil)
@@ -65,17 +65,17 @@ func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v dat
 // 'values' contains the values associated with parameters as defined in specification file
 func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
 	if f == nil {
-		return nil, scerr.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterReport("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterReport("t", "cannot be nil")
 	}
 
 	// Determining if install script is defined in specification file
 	if !f.SafeGetSpecs().IsSet("feature.install.bash.add") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.add' found`
-		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
+		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
 	}
 
 	worker, err := newWorker(f, t, installmethod.Bash, installaction.Add, nil)
@@ -98,16 +98,16 @@ func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 // Remove uninstalls the feature
 func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
 	if f == nil {
-		return nil, scerr.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterReport("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterReport("t", "cannot be nil")
 	}
 
 	if !f.SafeGetSpecs().IsSet("feature.install.bash.remove") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.remove' found`
-		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
+		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
 	}
 
 	worker, err := newWorker(f, t, installmethod.Bash, installaction.Remove, nil)

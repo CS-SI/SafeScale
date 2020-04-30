@@ -25,10 +25,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-var gError = scerr.NewError("libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)")
+var gError = fail.NewReport("libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)")
 
 // Stack is the implementation of the local driver regarding to the api.ClientAPI
 type Stack struct {

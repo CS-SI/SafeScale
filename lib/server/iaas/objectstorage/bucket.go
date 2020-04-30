@@ -25,7 +25,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // bucket describes a Bucket
@@ -74,7 +74,7 @@ func (b *bucket) InspectObject(objectName string) (Object, error) {
 		return nil, err
 	}
 	if o.item == nil {
-		return nil, scerr.NotFoundError("not found")
+		return nil, fail.NotFoundReport("not found")
 	}
 	return o, nil
 }
@@ -82,7 +82,7 @@ func (b *bucket) InspectObject(objectName string) (Object, error) {
 // ListObjects list objects of a Bucket
 func (b *bucket) List(path, prefix string) ([]string, error) {
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%s, %s)", path, prefix).Entering().OnExitTrace()
@@ -112,7 +112,7 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 // Browse walks through the objects in the Bucket and executes callback on each Object found
 func (b *bucket) Browse(path, prefix string, callback func(Object) error) error {
 	if b == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().OnExitTrace()
@@ -137,7 +137,7 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 // Clear empties a bucket
 func (b *bucket) Clear(path, prefix string) error {
 	if b == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().OnExitTrace()
@@ -165,10 +165,10 @@ func (b *bucket) Clear(path, prefix string) error {
 // DeleteObject deletes an object from a bucket
 func (b *bucket) DeleteObject(objectName string) error {
 	if b == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if objectName == "" {
-		return scerr.InvalidParameterError("objectName", "cannot be empty string")
+		return fail.InvalidParameterReport("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().OnExitTrace()
@@ -183,7 +183,7 @@ func (b *bucket) DeleteObject(objectName string) error {
 // ReadObject ...
 func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (Object, error) {
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().OnExitTrace()
@@ -202,7 +202,7 @@ func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to 
 // WriteObject ...
 func (b *bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata ObjectMetadata) (Object, error) {
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().OnExitTrace()
@@ -231,7 +231,7 @@ func (b *bucket) WriteMultiPartObject(
 ) (Object, error) {
 
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().OnExitTrace()
@@ -254,7 +254,7 @@ func (b *bucket) WriteMultiPartObject(
 // GetName returns the name of the Bucket
 func (b *bucket) GetName() (string, error) {
 	if b == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceReport()
 	}
 	return b.Name, nil
 }
@@ -269,7 +269,7 @@ func (b *bucket) SafeGetName() string {
 // 'path' corresponds to stow prefix, and 'prefix' allows to filter what to count
 func (b *bucket) GetCount(path, prefix string) (int64, error) {
 	if b == nil {
-		return 0, scerr.InvalidInstanceError()
+		return 0, fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().OnExitTrace()
@@ -297,7 +297,7 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 // GetSize returns the total size of the Objects inside the Bucket
 func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
 	if b == nil {
-		return 0, "", scerr.InvalidInstanceError()
+		return 0, "", fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().OnExitTrace()

@@ -35,7 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Content is the structure to apply to userdata.sh template
@@ -142,7 +142,7 @@ func (ud *Content) Prepare(
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return scerr.Wrap(err, "failed to generate password")
+			return fail.Wrap(err, "failed to generate password")
 		}
 		request.Password = password
 	}
@@ -249,7 +249,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, error) {
 	anon, ok := userdataPhaseTemplates[phase]
 	userdataPhaseTemplatesLock.RUnlock()
 	if !ok {
-		return nil, scerr.NotImplementedError("phase '%s' not managed", phase)
+		return nil, fail.NotImplementedReport("phase '%s' not managed", phase)
 	}
 	var tmpl *template.Template
 	if anon != nil {
@@ -264,11 +264,11 @@ func (ud *Content) Generate(phase Phase) ([]byte, error) {
 		}
 		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
 		if err != nil {
-			return nil, scerr.Wrap(err, "error loading script template for phase 'init'")
+			return nil, fail.Wrap(err, "error loading script template for phase 'init'")
 		}
 		tmpl, err = template.New("userdata." + string(phase)).Parse(tmplString)
 		if err != nil {
-			return nil, scerr.Wrap(err, "error parsing script template for phase 'init'")
+			return nil, fail.Wrap(err, "error parsing script template for phase 'init'")
 		}
 		userdataPhaseTemplates[phase] = new(atomic.Value)
 		userdataPhaseTemplates[phase].Store(tmpl)

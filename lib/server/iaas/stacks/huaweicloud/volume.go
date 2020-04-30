@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // // DeleteVolume deletes the volume identified by id
@@ -87,7 +87,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
 	volume, err := s.GetVolume(request.Name)
 	if volume != nil && err == nil {
-		return nil, scerr.DuplicateError("volume '%s' already exists", request.Name)
+		return nil, fail.DuplicateReport("volume '%s' already exists", request.Name)
 	}
 
 	az, err := s.SelectedAvailabilityZone()
@@ -102,7 +102,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 	}
 	vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
 	if err != nil {
-		return nil, scerr.NewError("error creating volume: %s", openstack.ProviderErrorToString(err))
+		return nil, fail.NewReport("error creating volume: %s", openstack.ProviderErrorToString(err))
 	}
 	v := abstract.Volume{
 		ID:    vol.ID,
@@ -115,7 +115,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 }
 
 // GetVolume returns the volume identified by id
-// If volume not found, returns (nil, nil) - TODO: returns utils.ErrNotFound
+// If volume not found, returns (nil, nil) - TODO: returns utils.NotFound
 func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
 	r := volumes.Get(s.Stack.VolumeClient, id)
 	volume, err := r.Extract()
@@ -123,7 +123,7 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, abstract.ResourceNotFoundError("volume", id)
 		}
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(err)))
+		return nil, fail.Wrap(err, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}
 
 	av := abstract.Volume{
@@ -142,7 +142,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	err := volumes.List(s.Stack.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
 		if err != nil {
-			logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
+			logrus.Errorf("Report listing volumes: volume extraction: %+v", err)
 			return false, err
 		}
 		for _, vol := range list {
@@ -159,7 +159,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	})
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)))
+			return nil, fail.Wrap(err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)))
 		}
 		logrus.Warnf("Complete volume list empty")
 	}

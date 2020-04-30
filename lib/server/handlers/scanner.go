@@ -41,7 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -147,15 +147,15 @@ func NewScannerHandler(job server.Job) ScannerHandler {
 // Scan scans the tenant and update the database
 func (handler *scannerHandler) Scan() (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	svc := handler.job.SafeGetService()
 
@@ -164,7 +164,7 @@ func (handler *scannerHandler) Scan() (err error) {
 	// for _, tenant := range theProviders {
 	// 	isScannable, err := isTenantScannable(tenant.(map[string]interface{}))
 	// 	if err != nil {
-	// 		panic(fmt.Sprint(err.Error()))
+	// 		panic(fmt.Sprint(err.Report()))
 	// 	}
 	// 	if isScannable {
 	// 		tenantName, found := tenant.(map[string]interface{})["name"].(string)
@@ -179,7 +179,7 @@ func (handler *scannerHandler) Scan() (err error) {
 		return err
 	}
 	if err := handler.collect(); err != nil {
-		return scerr.Wrap(err, "failed to save scanned info for tenant '%s'", svc.SafeGetName())
+		return fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.SafeGetName())
 	}
 	return nil
 }
@@ -213,7 +213,7 @@ func (handler *scannerHandler) analyze() (err error) {
 	netName := "net-safescale" // FIXME: Hardcoded string
 	network, err := networkfactory.Load(task, svc, netName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.NotFound); !ok {
 			return err
 		}
 		network, err := networkfactory.New(svc)
@@ -233,9 +233,9 @@ func (handler *scannerHandler) analyze() (err error) {
 		defer func() {
 			derr := network.Delete(task)
 			if derr != nil {
-				logrus.Warnf("Error deleting network '%s'", network.SafeGetID())
+				logrus.Warnf("Report deleting network '%s'", network.SafeGetID())
 			}
-			err = scerr.AddConsequence(err, derr)
+			err = fail.AddConsequence(err, derr)
 		}()
 	}
 
@@ -279,7 +279,7 @@ func (handler *scannerHandler) analyze() (err error) {
 				var ok bool
 				an, ok = clonable.(*abstract.Network)
 				if !ok {
-					return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 				return nil
 			})
@@ -303,26 +303,26 @@ func (handler *scannerHandler) analyze() (err error) {
 			}
 			_, err = host.Create(task, req, def)
 			if err != nil {
-				return scerr.Wrap(err, "template [%s] host '%s': error creation", template.Name, hostName)
+				return fail.Wrap(err, "template [%s] host '%s': error creation", template.Name, hostName)
 			}
 
 			defer func() {
 				logrus.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.SafeGetID())
 				derr := host.Delete(task)
 				if derr != nil {
-					logrus.Warnf("Error deleting host '%s'", hostName)
+					logrus.Warnf("Report deleting host '%s'", hostName)
 				}
 			}()
 
 			// sshSvc := handlers.NewSSHHandler(job)
 			// ssh, err := sshSvc.GetConfig(host.SafeGetID())
 			// if err != nil {
-			// 	logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v", template.Name, hostName, err.Error())
+			// 	logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v", template.Name, hostName, err.Report())
 			// 	return err
 			// }
 			// _, nerr := ssh.WaitServerReady(job.SafeGetTask(), "ready", time.Duration(6+concurrency-1)*time.Minute)
 			// if nerr != nil {
-			// 	logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
+			// 	logrus.Warnf("template [%s]: Report waiting for server ready: %v", template.Name, nerr)
 			// 	return nerr
 			// }
 
@@ -338,11 +338,11 @@ func (handler *scannerHandler) analyze() (err error) {
 			// }
 			_, cout, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
 			if err != nil {
-				return scerr.Wrap(err, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
+				return fail.Wrap(err, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 			}
 			daCPU, err := createCPUInfo(cout)
 			if err != nil {
-				return scerr.Wrap(err, "template [%s]: Problem building cpu info", template.Name)
+				return fail.Wrap(err, "template [%s]: Problem building cpu info", template.Name)
 			}
 
 			daCPU.TemplateName = template.Name
@@ -360,7 +360,7 @@ func (handler *scannerHandler) analyze() (err error) {
 
 			nerr := ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0666)
 			if nerr != nil {
-				logrus.Warnf("tenant '%s', template '%s' : Error writing file: %v", tenantName, template.Name, nerr)
+				logrus.Warnf("tenant '%s', template '%s' : Report writing file: %v", tenantName, template.Name, nerr)
 				return nerr
 			}
 			logrus.Infof("tenant '%s', template '%s': Stored in file: %s", tenantName, template.Name, "$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json")
@@ -380,7 +380,7 @@ func (handler *scannerHandler) analyze() (err error) {
 			defer func() { <-sem }()
 			lerr := hostAnalysis(inner)
 			if lerr != nil {
-				logrus.Warnf("Error running scanner: %+v", lerr)
+				logrus.Warnf("Report running scanner: %+v", lerr)
 			}
 		}(localTarget)
 	}
@@ -467,25 +467,25 @@ func createCPUInfo(output string) (_ *CPUInfo, err error) {
 
 	tokens := strings.Split(str, "î")
 	if len(tokens) < 9 {
-		return nil, scerr.SyntaxError("parsing error: '%s'", str)
+		return nil, fail.SyntaxReport("parsing error: '%s'", str)
 	}
 	info := CPUInfo{}
 	info.NumberOfCPU, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return nil, scerr.SyntaxError("parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
+		return nil, fail.SyntaxReport("parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
 	}
 	info.NumberOfCore, err = strconv.Atoi(tokens[1])
 	if err != nil {
-		return nil, scerr.SyntaxError("parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
+		return nil, fail.SyntaxReport("parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
 	}
 	info.NumberOfSocket, err = strconv.Atoi(tokens[2])
 	if err != nil {
-		return nil, scerr.SyntaxError("parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
+		return nil, fail.SyntaxReport("parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
 	}
 	info.NumberOfCore *= info.NumberOfSocket
 	info.CPUFrequency, err = strconv.ParseFloat(tokens[3], 64)
 	if err != nil {
-		return nil, scerr.SyntaxError("parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
+		return nil, fail.SyntaxReport("parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
 	}
 	info.CPUFrequency = math.Floor(info.CPUFrequency*100) / 100000
 
@@ -494,7 +494,7 @@ func createCPUInfo(output string) (_ *CPUInfo, err error) {
 	info.CPUModel = tokens[6]
 	info.RAMSize, err = strconv.ParseFloat(tokens[7], 64)
 	if err != nil {
-		return nil, scerr.SyntaxError("parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
+		return nil, fail.SyntaxReport("parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
 	}
 
 	memInGb := info.RAMSize / 1024 / 1024
@@ -559,7 +559,7 @@ func (handler *scannerHandler) collect() (err error) {
 	}
 	region, ok := authOpts.Get("Region")
 	if !ok {
-		return scerr.InvalidRequestError("'Region' not set in tenant 'compute' section")
+		return fail.InvalidRequestReport("'Region' not set in tenant 'compute' section")
 	}
 
 	folder := fmt.Sprintf("images/%s/%s", svc.SafeGetName(), region)
@@ -605,7 +605,7 @@ func (handler *scannerHandler) collect() (err error) {
 		if !file.IsDir() {
 			err := os.Remove(theFile)
 			if err != nil {
-				logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
+				logrus.Infof("Report Supressing %s : %s", file.Name(), err.Error())
 			}
 		}
 	}

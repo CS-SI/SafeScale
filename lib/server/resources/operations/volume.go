@@ -38,8 +38,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -64,7 +64,7 @@ func nullVolume() *volume {
 // NewVolume creates an instance of Volume
 func NewVolume(svc iaas.Service) (_ resources.Volume, err error) {
 	if svc == nil {
-		return nullVolume(), scerr.InvalidParameterError("svc", "can't be nil")
+		return nullVolume(), fail.InvalidParameterReport("svc", "can't be nil")
 	}
 
 	core, err := NewCore(svc, "volume", volumesFolderName, &abstract.Volume{})
@@ -77,13 +77,13 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, err error) {
 // LoadVolume loads the metadata of a network
 func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, error) {
 	if task == nil {
-		return nullVolume(), scerr.InvalidParameterError("task", "cannot be nil")
+		return nullVolume(), fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nullVolume(), scerr.InvalidParameterError("svc", "cannot be nil")
+		return nullVolume(), fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nullVolume(), scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nullVolume(), fail.InvalidParameterReport("ref", "cannot be empty string")
 	}
 
 	volume, err := NewVolume(svc)
@@ -97,10 +97,10 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 		10*time.Second,
 	)
 	if err != nil {
-		// If retry timed out, log it and return error ErrNotFound
+		// If retry timed out, log it and return error NotFound
 		if _, ok := err.(retry.ErrTimeout); ok {
 			logrus.Debugf("timeout reading metadata of volume '%s'", ref)
-			err = scerr.NotFoundError("failed to load metadata of volume '%s': timeout", ref)
+			err = fail.NotFoundReport("failed to load metadata of volume '%s': timeout", ref)
 		}
 		return nullVolume(), err
 	}
@@ -115,17 +115,17 @@ func (objv *volume) IsNull() bool {
 // GetSpeed ...
 func (objv *volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, error) {
 	if objv.IsNull() {
-		return 0, scerr.InvalidInstanceError()
+		return 0, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return 0, scerr.InvalidParameterError("task", "cannot be nil")
+		return 0, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	var speed volumespeed.Enum
 	err := objv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
-			return scerr.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentReport("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		speed = av.Speed
 		return nil
@@ -146,17 +146,17 @@ func (objv *volume) SafeGetSpeed(task concurrency.Task) volumespeed.Enum {
 // GetSize ...
 func (objv *volume) GetSize(task concurrency.Task) (int, error) {
 	if objv.IsNull() {
-		return 0, scerr.InvalidInstanceError()
+		return 0, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return 0, scerr.InvalidParameterError("task", "cannot be nil")
+		return 0, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	var size int
 	err := objv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
-			return scerr.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentReport("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		size = av.Size
 		return nil
@@ -177,10 +177,10 @@ func (objv *volume) SafeGetSize(task concurrency.Task) int {
 // GetAttachments ...
 func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, error) {
 	if objv.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	var vaV1 *propertiesv1.VolumeAttachments
@@ -189,7 +189,7 @@ func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeA
 			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			return nil
 		})
@@ -203,13 +203,13 @@ func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeA
 // Browse walks through volume folder and executes a callback for each entry
 func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume) error) error {
 	if objv.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if callback == nil {
-		return scerr.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterReport("callback", "cannot be nil")
 	}
 
 	return objv.core.BrowseFolder(task, func(buf []byte) error {
@@ -225,17 +225,17 @@ func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume
 // Delete deletes volume and its metadata
 func (objv *volume) Delete(task concurrency.Task) (err error) {
 	if objv.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "can't be nil")
+		return fail.InvalidParameterReport("task", "can't be nil")
 	}
 
 	err = objv.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 		innerErr := props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' received", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.VolumeAttachments' expected, '%s' received", reflect.TypeOf(clonable).String())
 			}
 			nbAttach := uint(len(volumeAttachmentsV1.Hosts))
 			if nbAttach > 0 {
@@ -243,7 +243,7 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 				for _, v := range volumeAttachmentsV1.Hosts {
 					list = append(list, v)
 				}
-				return scerr.NotAvailableError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
+				return fail.NotAvailableReport("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
 			}
 			return nil
 		})
@@ -254,8 +254,8 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 		svc := objv.SafeGetService()
 		innerErr = svc.DeleteVolume(objv.SafeGetID())
 		if innerErr != nil {
-			if _, ok := innerErr.(scerr.ErrNotFound); !ok {
-				return scerr.Wrap(innerErr, "cannot delete volume")
+			if _, ok := innerErr.(fail.NotFound); !ok {
+				return fail.Wrap(innerErr, "cannot delete volume")
 			}
 			logrus.Warnf("Unable to find the volume on provider side, cleaning up metadata")
 		}
@@ -270,7 +270,7 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 	// 	logrus.Warnf("Volume deletion cancelled by user")
 	// 	volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
 	// 	if err != nil {
-	// 		return scerr.NewError("failed to stop volume deletion")
+	// 		return fail.NewReport("failed to stop volume deletion")
 	// 	}
 	// 	buf, err := volumeBis.Serialize()
 	// 	if err != nil {
@@ -286,16 +286,16 @@ func (objv *volume) Delete(task concurrency.Task) (err error) {
 // Create a volume
 func (objv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (err error) {
 	if objv.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "can't be nil")
+		return fail.InvalidParameterReport("task", "can't be nil")
 	}
 	if req.Name == "" {
-		return scerr.InvalidParameterError("req.Name", "cannot be empty string")
+		return fail.InvalidParameterReport("req.Name", "cannot be empty string")
 	}
 	if req.Size <= 0 {
-		return scerr.InvalidParameterError("req.Size", "must be an integer > 0")
+		return fail.InvalidParameterReport("req.Size", "must be an integer > 0")
 	}
 
 	svc := objv.SafeGetService()
@@ -329,19 +329,19 @@ func (objv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (e
 // Attach a volume to an host
 func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, format string, doNotFormat bool) (err error) {
 	if objv.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterReport("host", "cannot be nil")
 	}
 	if path == "" {
-		return scerr.InvalidParameterError("path", "cannot be empty string")
+		return fail.InvalidParameterReport("path", "cannot be empty string")
 	}
 	if format == "" {
-		return scerr.InvalidParameterError("format", "cannot be empty string")
+		return fail.InvalidParameterReport("format", "cannot be empty string")
 	}
 
 	var (
@@ -364,7 +364,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			mountPoint = path
@@ -376,7 +376,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 			if len(volumeAttachedV1.Hosts) > 0 {
 				for id := range volumeAttachedV1.Hosts {
 					if id != targetID {
-						return scerr.NotAvailableError("volume '%s' is already attached", volumeName)
+						return fail.NotAvailableReport("volume '%s' is already attached", volumeName)
 					}
 					break
 				}
@@ -393,23 +393,23 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			return props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 				if !ok {
-					return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
 				// Check if the volume is already mounted elsewhere
 				if device, found := hostVolumesV1.DevicesByID[volumeID]; found {
 					mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]]
 					if !ok {
-						return scerr.InconsistentError("metadata inconsistency for volume '%s' attached to host '%s'", volumeName, targetName)
+						return fail.InconsistentReport("metadata inconsistency for volume '%s' attached to host '%s'", volumeName, targetName)
 					}
 					path := mount.Path
 					if path != mountPoint {
-						return scerr.InvalidRequestError("volume '%s' is already attached in '%s:%s'", volumeName, targetName, path)
+						return fail.InvalidRequestReport("volume '%s' is already attached in '%s:%s'", volumeName, targetName, path)
 					}
 					return nil
 				}
@@ -417,12 +417,12 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 				// Check if there is no other device mounted in the path (or in subpath)
 				for _, i := range hostMountsV1.LocalMountsByPath {
 					if strings.Index(i.Path, mountPoint) == 0 {
-						return scerr.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
+						return fail.InvalidRequestReport(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
 					}
 				}
 				for _, i := range hostMountsV1.RemoteMountsByPath {
 					if strings.Index(i.Path, mountPoint) == 0 {
-						return scerr.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
+						return fail.InvalidRequestReport(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
 					}
 				}
 				return nil
@@ -454,7 +454,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 			derr := svc.DeleteVolumeAttachment(targetID, vaID)
 			if derr != nil {
 				logrus.Errorf("failed to detach volume '%s' from host '%s': %v", volumeName, targetName, derr)
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -470,7 +470,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 			// Isolate the new device
 			newDisk = newDiskSet.Difference(oldDiskSet)
 			if newDisk.Cardinality() == 0 {
-				return scerr.NotAvailableError("disk not yet attached, retrying")
+				return fail.NotAvailableReport("disk not yet attached, retrying")
 			}
 			return nil
 		},
@@ -480,7 +480,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			return retryErr
 		}
-		return scerr.Wrap(retryErr, fmt.Sprintf("failed to confirm the disk attachment after %s", 2*time.Minute))
+		return fail.Wrap(retryErr, fmt.Sprintf("failed to confirm the disk attachment after %s", 2*time.Minute))
 	}
 
 	// -- updates target properties --
@@ -488,7 +488,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		innerErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			// Recovers real device name from the system
 			deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
@@ -514,7 +514,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 					if derr != nil {
 						logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volumeName, targetName, derr)
 					}
-					err = scerr.AddConsequence(err, derr)
+					err = fail.AddConsequence(err, derr)
 				}
 			}()
 
@@ -535,7 +535,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			// Updates host properties
 			hostMountsV1.LocalMountsByPath[mountPoint] = &propertiesv1.HostLocalMount{
@@ -562,7 +562,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 				innerErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 					if !ok {
-						return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentReport("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					delete(hostVolumesV1.VolumesByID, volumeID)
 					delete(hostVolumesV1.VolumesByName, volumeName)
@@ -576,7 +576,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 				return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 					hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 					if !ok {
-						return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					delete(hostMountsV1.LocalMountsByDevice, volumeUUID)
 					delete(hostMountsV1.LocalMountsByPath, mountPoint)
@@ -593,7 +593,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			// Updates volume properties
 			volumeAttachedV1.Hosts[targetID] = targetName
@@ -633,16 +633,16 @@ func (objv *volume) listAttachedDevices(task concurrency.Task, host resources.Ho
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					return scerr.NotAvailableError("failed to reach SSH service of host '%s', retrying", hostName)
+					return fail.NotAvailableReport("failed to reach SSH service of host '%s', retrying", hostName)
 				}
-				return scerr.NewError(stderr)
+				return fail.NewReport(stderr)
 			}
 			return nil
 		},
 		2*time.Minute,
 	)
 	if retryErr != nil {
-		return nil, scerr.Wrap(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", 2*time.Minute))
+		return nil, fail.Wrap(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", 2*time.Minute))
 	}
 	disks := strings.Split(stdout, "\n")
 	set := mapset.NewThreadUnsafeSet()
@@ -655,13 +655,13 @@ func (objv *volume) listAttachedDevices(task concurrency.Task, host resources.Ho
 // Detach detach the volume identified by ref, ref can be the name or the id
 func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err error) {
 	if objv.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterReport("host", "cannot be nil")
 	}
 
 	// const CANNOT = "cannot detach volume"
@@ -675,7 +675,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 	err = objv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 		volume, ok := clonable.(*abstract.Volume)
 		if !ok {
-			return scerr.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentReport("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		volumeID = volume.ID
 		volumeName = volume.Name
@@ -695,26 +695,26 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 		return props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			// Check the volume is effectively attached
 			attachment, found := hostVolumesV1.VolumesByID[volumeID]
 			if !found {
-				return scerr.NotFoundError("cannot detach volume '%s': not attached to host '%s'", volumeName, targetName)
+				return fail.NotFoundReport("cannot detach volume '%s': not attached to host '%s'", volumeName, targetName)
 			}
 
 			// Obtain mounts information
 			return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 				if !ok {
-					return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 				device := attachment.Device
 				mountPath = hostMountsV1.LocalMountsByDevice[device]
 				mount := hostMountsV1.LocalMountsByPath[mountPath]
 				if mount == nil {
-					return scerr.InconsistentError("metadata inconsistency: no mount corresponding to volume attachment")
+					return fail.InconsistentReport("metadata inconsistency: no mount corresponding to volume attachment")
 				}
 
 				// Check if volume has other mount(s) inside it
@@ -723,13 +723,13 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 						continue
 					}
 					if strings.Index(p, mount.Path) == 0 {
-						return scerr.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
+						return fail.InvalidRequestReport("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
 							volumeName, targetName, mount.Path, targetName, p)
 					}
 				}
 				for p := range hostMountsV1.RemoteMountsByPath {
 					if strings.Index(p, mount.Path) == 0 {
-						return scerr.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
+						return fail.InvalidRequestReport("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
 							volumeName, targetName, mount.Path, targetName, p)
 					}
 				}
@@ -738,12 +738,12 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
-						return scerr.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
 					for _, v := range hostSharesV1.ByID {
 						if strings.Index(v.Path, mount.Path) == 0 {
-							return scerr.InvalidRequestError("cannot detach volume '%s' from '%s:%s', '%s:%s' is shared",
+							return fail.InvalidRequestReport("cannot detach volume '%s' from '%s:%s', '%s:%s' is shared",
 								volumeName, targetName, mount.Path, targetName, v.Path)
 						}
 					}
@@ -791,7 +791,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 		return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			delete(volumeAttachedV1.Hosts, targetID)
 			return nil
@@ -814,10 +814,10 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (err erro
 // ToProtocol converts the volume to protocol message VolumeInspectResponse
 func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, error) {
 	if objv.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	out := &protocol.VolumeInspectResponse{
@@ -841,16 +841,16 @@ func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRe
 		vols := rh.SafeGetVolumes(task)
 		device, ok := vols.DevicesByID[objv.SafeGetID()]
 		if !ok {
-			return nil, scerr.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+			return nil, fail.InconsistentReport("failed to find a device corresponding to the attached volume '%s' on host '%s'", objv.SafeGetName(), k)
 		}
 		mnts := rh.SafeGetMounts(task)
 		path, ok := mnts.LocalMountsByDevice[device]
 		if !ok {
-			return nil, scerr.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+			return nil, fail.InconsistentReport("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
 		}
 		m, ok := mnts.LocalMountsByPath[path]
 		if !ok {
-			return nil, scerr.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+			return nil, fail.InconsistentReport("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
 		}
 		a := &protocol.VolumeAttachmentResponse{
 			Host: &protocol.Reference{

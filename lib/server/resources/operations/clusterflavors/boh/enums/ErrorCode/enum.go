@@ -19,7 +19,7 @@ package ErrorCode
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Enum ...
@@ -65,7 +65,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = StringMap[lowered]; !ok {
-		return e, scerr.NotFoundError("failed to find a Flavor matching with '%s'", v)
+		return e, fail.NotFoundReport("failed to find a Flavor matching with '%s'", v)
 	}
 	return e, nil
 

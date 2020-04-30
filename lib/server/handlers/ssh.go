@@ -36,9 +36,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -72,10 +72,10 @@ func NewSSHHandler(job server.Job) SSHHandler {
 // GetConfig creates SSHConfig to connect to an host
 func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.SSHConfig, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 
 	task := handler.job.SafeGetTask()
@@ -88,8 +88,8 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	host, err := hostfactory.Load(task, svc, hostRef)
 	if err != nil {
@@ -123,14 +123,14 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 	err = host.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
-			return scerr.InconsistentError("")
+			return fail.InconsistentReport("")
 		}
 		sshConfig.PrivateKey = ahc.PrivateKey
 
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if hostNetworkV1.DefaultNetworkID != "" {
 				rn, inErr := networkfactory.Load(task, svc, hostNetworkV1.DefaultNetworkID)
@@ -142,14 +142,14 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 
 				gw, pgwErr := rn.GetGateway(task, true)
 				if pgwErr != nil {
-					if _, ok := pgwErr.(scerr.ErrNotFound); !ok {
+					if _, ok := pgwErr.(fail.NotFound); !ok {
 						return pgwErr
 					}
 				} else {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 						gwahc, ok = clonable.(*abstract.HostCore)
 						if !ok {
-							return scerr.InconsistentError("'*abstract.Host' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							return fail.InconsistentReport("'*abstract.Host' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 						return nil
 					})
@@ -172,14 +172,14 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 
 				gw, sgwErr := rn.GetGateway(task, false)
 				if sgwErr != nil {
-					if _, ok := sgwErr.(scerr.ErrNotFound); !ok || sshConfig.GatewayConfig == nil {
+					if _, ok := sgwErr.(fail.NotFound); !ok || sshConfig.GatewayConfig == nil {
 						return sgwErr
 					}
 				} else {
 					inErr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 						gwahc, ok = clonable.(*abstract.HostCore)
 						if !ok {
-							return scerr.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							return fail.InconsistentReport("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 						return nil
 					})
@@ -212,19 +212,19 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
 func (handler *sshHandler) WaitServerReady(hostParam interface{}, timeout time.Duration) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if hostParam == nil {
-		return scerr.InvalidParameterError("hostParam", "cannot be nil!")
+		return fail.InvalidParameterReport("hostParam", "cannot be nil!")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	ssh, err := handler.GetConfig(hostParam)
 	if err != nil {
@@ -237,22 +237,22 @@ func (handler *sshHandler) WaitServerReady(hostParam interface{}, timeout time.D
 // Run tries to execute command 'cmd' on the host
 func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
-		return -1, "", "", scerr.InvalidInstanceError()
+		return -1, "", "", fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return -1, "", "", scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return -1, "", "", fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if hostRef == "" {
-		return -1, "", "", scerr.InvalidParameterError("hostRef", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterReport("hostRef", "cannot be empty string")
 	}
 	if cmd == "" {
-		return -1, "", "", scerr.InvalidParameterError("cmd", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterReport("cmd", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	host, err := hostfactory.Load(task, handler.job.SafeGetService(), hostRef)
@@ -300,12 +300,12 @@ func extracthostName(in string) (string, error) {
 		return "", nil
 	}
 	if len(parts) > 2 {
-		return "", scerr.InvalidRequestError("too many parts in path")
+		return "", fail.InvalidRequestReport("too many parts in path")
 	}
 	hostName := strings.TrimSpace(parts[0])
 	for _, protocol := range []string{"file", "http", "https", "ftp"} {
 		if strings.ToLower(hostName) == protocol {
-			return "", scerr.SyntaxError("no protocol expected. Only host name")
+			return "", fail.SyntaxReport("no protocol expected. Only host name")
 		}
 	}
 
@@ -318,7 +318,7 @@ func extractPath(in string) (string, error) {
 		return in, nil
 	}
 	if len(parts) > 2 {
-		return "", scerr.InvalidRequestError("too many parts in path")
+		return "", fail.InvalidRequestReport("too many parts in path")
 	}
 	_, err := extracthostName(in)
 	if err != nil {
@@ -331,22 +331,22 @@ func extractPath(in string) (string, error) {
 // Copy copies file/directory from/to remote host
 func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
-		return -1, "", "", scerr.InvalidInstanceError()
+		return -1, "", "", fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return -1, "", "", scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return -1, "", "", fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if from == "" {
-		return -1, "", "", scerr.InvalidParameterError("from", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterReport("from", "cannot be empty string")
 	}
 	if to == "" {
-		return -1, "", "", scerr.InvalidParameterError("to", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterReport("to", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	hostName := ""
 	var upload bool
@@ -363,10 +363,10 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	// Host checks
 	if hostFrom != "" && hostTo != "" {
-		return 0, "", "", scerr.NotImplementedError("copy between 2 hosts is not supported yet")
+		return 0, "", "", fail.NotImplementedReport("copy between 2 hosts is not supported yet")
 	}
 	if hostFrom == "" && hostTo == "" {
-		return 0, "", "", scerr.InvalidRequestError("no host name specified neither in from nor to")
+		return 0, "", "", fail.InvalidRequestReport("no host name specified neither in from nor to")
 	}
 
 	fromPath, err := extractPath(from)

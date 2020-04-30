@@ -32,9 +32,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -47,10 +47,10 @@ type ssh struct {
 // Run executes the command
 func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	if s == nil {
-		return -1, "", "", scerr.InvalidInstanceError()
+		return -1, "", "", fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return -1, "", "", scerr.InvalidParameterError("task", "cannot be nil")
+		return -1, "", "", fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	var (
@@ -93,7 +93,7 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if innerErr != nil {
-				if _, ok := innerErr.(scerr.ErrTimeout); ok {
+				if _, ok := innerErr.(fail.Timeout); ok {
 					return innerErr
 				}
 				retcode = -1
@@ -101,7 +101,7 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 {
-				return scerr.NewError("failed to connect")
+				return fail.NewReport("failed to connect")
 			}
 			return nil
 		},
@@ -370,12 +370,12 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 			_, err = strconv.Atoi(portStr)
 			if err != nil {
 				logrus.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
-				return scerr.Wrap(err, "unable to close tunnel")
+				return fail.Wrap(err, "unable to close tunnel")
 			}
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
 				logrus.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return scerr.Wrap(err, "unable to close tunnel")
+				return fail.Wrap(err, "unable to close tunnel")
 			}
 		}
 	}

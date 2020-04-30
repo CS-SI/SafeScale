@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate rice embed-go
@@ -45,31 +45,31 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 		var err error
 		templateBox, err = rice.FindBox("../operations/features")
 		if err != nil {
-			return "", nil, scerr.Wrap(err, "failed to open embedded feature specification folder")
+			return "", nil, fail.Wrap(err, "failed to open embedded feature specification folder")
 		}
 	}
 	name += featureFileExt
 	tmplString, err := templateBox.String(name)
 	if err != nil {
-		return "", nil, scerr.Wrap(err, "failed to read embedded feature speficication file '%s'", name)
+		return "", nil, fail.Wrap(err, "failed to read embedded feature speficication file '%s'", name)
 	}
 
 	v := viper.New()
 	v.SetConfigType("yaml")
 	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
 	if err != nil {
-		return "", nil, scerr.Wrap(err, "syntax error in feature specification file '%s'", name)
+		return "", nil, fail.Wrap(err, "syntax error in feature specification file '%s'", name)
 	}
 
 	// Validating content...
 	if !v.IsSet("feature") {
-		return "", nil, scerr.SyntaxError("feature specification file '%s' must begin with 'feature:'", name)
+		return "", nil, fail.SyntaxReport("feature specification file '%s' must begin with 'feature:'", name)
 	}
 	if !v.IsSet("feature.install") {
-		return "", nil, scerr.SyntaxError("syntax error in feature specification file '%s': missing 'install'", name)
+		return "", nil, fail.SyntaxReport("syntax error in feature specification file '%s': missing 'install'", name)
 	}
 	if len(v.GetStringMap("feature.install")) == 0 {
-		return "", nil, scerr.SyntaxError("syntax error in feature specification file '%s': 'install' defines no method", name)
+		return "", nil, fail.SyntaxReport("syntax error in feature specification file '%s': 'install' defines no method", name)
 	}
 	return name, v, nil
 }
@@ -94,7 +94,7 @@ func dockerFeature() *feature {
 // 	name := "docker-compose"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error()
+// 		panic(err.Report()
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -199,7 +199,7 @@ func kubernetesFeature() *feature {
 // 	name := "nexus3"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -214,7 +214,7 @@ func kubernetesFeature() *feature {
 // 	name := "elasticsearch"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -229,7 +229,7 @@ func kubernetesFeature() *feature {
 // 	name := "logstash"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -289,7 +289,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "mpich-ospkg"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -304,7 +304,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "mpich-build"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -319,7 +319,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "ohpc-slurm-master"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -334,7 +334,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "ohpc-slurm-node"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -379,7 +379,7 @@ func proxycacheClientFeature() *feature {
 // 	name := "apache-ignite"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -394,7 +394,7 @@ func proxycacheClientFeature() *feature {
 // 	name := "metricbeat"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -409,7 +409,7 @@ func proxycacheClientFeature() *feature {
 // 	name := "filebeat"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -469,7 +469,7 @@ func keycloak4platformFeature() *feature {
 // 	name := "kibana"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -484,7 +484,7 @@ func keycloak4platformFeature() *feature {
 // 	name := "elassandra"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -529,7 +529,7 @@ func monitoring4platformFeature() *feature {
 // 	name := "geoserver"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Error())
+// 		panic(err.Report())
 // 	}
 // 	return &feature{
 // 		displayName: name,

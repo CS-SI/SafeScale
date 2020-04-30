@@ -32,8 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -97,7 +97,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Execute(&buffer, data); err != nil {
-		return 255, "", "", scerr.Wrap(err, "failed to execute template")
+		return 255, "", "", fail.Wrap(err, "failed to execute template")
 	}
 	content := buffer.String()
 
@@ -114,24 +114,24 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	// Copy script to remote host with retries if needed
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
-		return 255, "", "", scerr.Wrap(err, "failed to create temporary file")
+		return 255, "", "", fail.Wrap(err, "failed to create temporary file")
 	}
 	filename := utils.TempFolder + "/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			retcode, stdout, stderr, err := sshconfig.Copy(task, filename, f.Name(), true)
 			if err != nil {
-				return scerr.Wrap(err, "ssh operation failed")
+				return fail.Wrap(err, "ssh operation failed")
 			}
 			if retcode != 0 {
-				return scerr.NewError("script copy failed: %s, %s", stdout, stderr)
+				return fail.NewReport("script copy failed: %s, %s", stdout, stderr)
 			}
 			return nil
 		},
 		temporal.GetHostTimeout(),
 	)
 	if retryErr != nil {
-		return 255, "", "", scerr.Wrap(err, "failed to copy script to remote host")
+		return 255, "", "", fail.Wrap(err, "failed to copy script to remote host")
 	}
 
 	k, uperr := sshconfig.SudoCommand(task, "which scp")
@@ -147,7 +147,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 
 	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
-		logrus.Warnf("Error deleting file: %v", nerr)
+		logrus.Warnf("Report deleting file: %v", nerr)
 	}
 
 	// Execute script on remote host with retries if needed

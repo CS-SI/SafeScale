@@ -19,16 +19,16 @@ package operations
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host, error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "cannot be nil")
+		return nil, fail.InvalidParameterReport("host", "cannot be nil")
 	}
 
 	network, err := host.GetDefaultNetwork(task)
@@ -49,7 +49,7 @@ func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host
 	}
 
 	if err != nil {
-		return nil, scerr.NotAvailableError("no gateway available")
+		return nil, fail.NotAvailableReport("no gateway available")
 	}
 	return gw, nil
 }

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
 )
@@ -250,7 +250,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	begin := time.Now()
 	waited, _, err := overlord.WaitFor(time.Duration(10) * 10 * time.Millisecond)
 	if err != nil {
-		if _, ok := err.(scerr.ErrTimeout); !ok {
+		if _, ok := err.(fail.Timeout); !ok {
 			t.Errorf("Unexpected group wait, wrong error type: %s", err)
 		}
 	}

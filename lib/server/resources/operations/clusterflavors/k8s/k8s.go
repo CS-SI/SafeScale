@@ -33,7 +33,7 @@ import (
 	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate rice embed-go
@@ -111,15 +111,15 @@ func configureCluster(task concurrency.Task, c resources.Cluster) error {
 
 	// feat, err := featurefactory.New(task, c.Service(), "kubernetes")
 	// if err != nil {
-	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error()
+	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Report()
 	// }
 	// results, err := feat.Add(c, data.Map{}, resources.FeatureSettings{})
 	results, err := c.AddFeature(task, "kubernetes", data.Map{}, resources.FeatureSettings{})
 	if err != nil {
-		return scerr.Wrap(err, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
+		return fail.Wrap(err, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
 	if !results.Successful() {
-		err = scerr.NewError(fmt.Errorf(results.AllErrorMessages()), nil, "failed to add feature 'kubernetes' to cluster '%s'", clusterName)
+		err = fail.NewReport(fmt.Errorf(results.AllErrorMessages()), nil, "failed to add feature 'kubernetes' to cluster '%s'", clusterName)
 		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
 		return err
 	}
@@ -177,13 +177,13 @@ func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (st
 		// get file contents as string
 		tmplString, err := box.String("k8s_install_requirements.sh")
 		if err != nil {
-			return "", scerr.Wrap(err, "error loading script template")
+			return "", fail.Wrap(err, "error loading script template")
 		}
 
 		// parse then execute the template
 		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
 		if err != nil {
-			return "", scerr.Wrap(err, "error parsing script template")
+			return "", fail.Wrap(err, "error parsing script template")
 		}
 		dataBuffer := bytes.NewBufferString("")
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
@@ -194,7 +194,7 @@ func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (st
 			"SSHPrivateKey": identity.Keypair.PrivateKey,
 		})
 		if err != nil {
-			return "", scerr.Wrap(err, "error realizing script template")
+			return "", fail.Wrap(err, "error realizing script template")
 		}
 		globalSystemRequirementsContent.Store(dataBuffer.String())
 		anon = globalSystemRequirementsContent.Load()

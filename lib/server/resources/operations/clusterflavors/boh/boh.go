@@ -34,7 +34,7 @@ import (
 	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
@@ -153,13 +153,13 @@ func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (st
 		// get file contents as string
 		tmplString, err := b.String("boh_install_requirements.sh")
 		if err != nil {
-			return "", scerr.Wrap(err, "error loading script template: %s")
+			return "", fail.Wrap(err, "error loading script template: %s")
 		}
 
 		// parse then execute the template
 		tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
 		if err != nil {
-			return "", scerr.Wrap(err, "error parsing script template")
+			return "", fail.Wrap(err, "error parsing script template")
 		}
 		dataBuffer := bytes.NewBufferString("")
 		identity, err := c.GetIdentity(task)
@@ -174,7 +174,7 @@ func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (st
 		}
 		err = tmplPrepared.Execute(dataBuffer, data)
 		if err != nil {
-			return "", scerr.Wrap(err, "error realizing script template")
+			return "", fail.Wrap(err, "error realizing script template")
 		}
 		globalSystemRequirementsContent.Store(dataBuffer.String())
 		anon = globalSystemRequirementsContent.Load()

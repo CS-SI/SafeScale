@@ -21,7 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // VolumeRequest represents a volume request
@@ -75,7 +75,7 @@ func (v *Volume) OK() bool {
 // Serialize serializes Host instance into bytes (output json code)
 func (v *Volume) Serialize() ([]byte, error) {
 	if v == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	return json.Marshal(v)
 }
@@ -83,10 +83,10 @@ func (v *Volume) Serialize() ([]byte, error) {
 // Deserialize reads json code and restores an Host
 func (v *Volume) Deserialize(buf []byte) (err error) {
 	if v == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
-	defer scerr.OnPanic(&err) // json.Unmarshal may panic
+	defer fail.OnPanic(&err) // json.Unmarshal may panic
 	return json.Unmarshal(buf, v)
 }
 

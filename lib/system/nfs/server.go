@@ -19,7 +19,7 @@ package nfs
 import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Server structure
@@ -30,7 +30,7 @@ type Server struct {
 // NewServer instantiates a new nfs.Server struct
 func NewServer(sshconfig *system.SSHConfig) (srv *Server, err error) {
 	if sshconfig == nil {
-		return nil, scerr.InvalidParameterError("sshconfig", "cannot be nil")
+		return nil, fail.InvalidParameterReport("sshconfig", "cannot be nil")
 	}
 
 	server := Server{
@@ -47,14 +47,14 @@ func (s *Server) GetHost() string {
 // Install installs and configure NFS service on the remote host
 func (s *Server) Install(task concurrency.Task) error {
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
-	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to install nfs server")
+	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to install nfs server")
 }
 
 // AddShare configures a local path to be exported by NFS
 func (s *Server) AddShare(task concurrency.Task, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) error {
 	share, err := NewShare(s, path, options)
 	if err != nil {
-		return scerr.Wrap(err, "failed to create the share")
+		return fail.Wrap(err, "failed to create the share")
 	}
 
 	// acl := ExportACL{
@@ -100,7 +100,7 @@ func (s *Server) RemoveShare(task concurrency.Task, path string) error {
 		"Path": path,
 	}
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
-	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
+	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to unexport a shared directory")
 }
 
 // MountBlockDevice mounts a block device in the remote system
@@ -112,7 +112,7 @@ func (s *Server) MountBlockDevice(task concurrency.Task, deviceName, mountPoint,
 		"DoNotFormat": doNotFormat,
 	}
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_mount.sh", data)
-	err = scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to mount block device")
+	err = fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to mount block device")
 	return stdout, err
 }
 
@@ -122,5 +122,5 @@ func (s *Server) UnmountBlockDevice(task concurrency.Task, volumeUUID string) er
 		"UUID": volumeUUID,
 	}
 	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_unmount.sh", data)
-	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to umount block device")
+	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to umount block device")
 }

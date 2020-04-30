@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // TaskGroupResult is a map of the TaskResult of each task
@@ -34,9 +34,9 @@ type TaskGroupResult map[string]TaskResult
 
 // TaskGroupGuard is the task group interface defining method to wait the taskgroup
 type TaskGroupGuard interface {
-	TryWaitGroup() (bool, map[string]TaskResult, error)
-	WaitGroup() (map[string]TaskResult, error)
-	WaitGroupFor(time.Duration) (bool, map[string]TaskResult, error)
+	TryWaitGroup() (bool, map[string]TaskResult, fail.Report)
+	WaitGroup() (map[string]TaskResult, fail.Report)
+	WaitGroupFor(time.Duration) (bool, map[string]TaskResult, fail.Report)
 }
 
 //go:generate moq -out taskgroup_moq_test.go . TaskGroup
@@ -46,7 +46,7 @@ type TaskGroup interface {
 	TaskCore
 	TaskGroupGuard
 
-	Stats() (map[TaskStatus][]string, error)
+	Stats() (map[TaskStatus][]string, fail.Report)
 }
 
 // task is a structure allowing to identify (indirectly) goroutines
@@ -61,21 +61,21 @@ type taskGroup struct {
 }
 
 // NewTaskGroup ...
-func NewTaskGroup(parentTask Task) (*taskGroup, error) { // nolint
+func NewTaskGroup(parentTask Task) (*taskGroup, fail.Report) { // nolint
 	return newTaskGroup(context.TODO(), parentTask)
 }
 
 // NewTaskGroup ...
-func NewTaskGroupWithParent(parentTask Task) (*taskGroup, error) { // nolint
+func NewTaskGroupWithParent(parentTask Task) (*taskGroup, fail.Report) { // nolint
 	return newTaskGroup(context.TODO(), parentTask)
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context, parentTask Task) (*taskGroup, error) { // nolint
+func NewTaskGroupWithContext(ctx context.Context, parentTask Task) (*taskGroup, fail.Report) { // nolint
 	return newTaskGroup(ctx, parentTask)
 }
 
-func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err error) {
+func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail.Report) {
 	var t Task
 
 	if parentTask == nil {
@@ -98,9 +98,9 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err erro
 }
 
 // GetID returns an unique id for the task
-func (tg *taskGroup) GetID() (string, error) {
+func (tg *taskGroup) GetID() (string, fail.Report) {
 	if tg == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceReport()
 	}
 
 	return tg.task.GetID()
@@ -108,9 +108,9 @@ func (tg *taskGroup) GetID() (string, error) {
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{taskgroup <id>}".
-func (tg *taskGroup) GetSignature() (string, error) {
+func (tg *taskGroup) GetSignature() (string, fail.Report) {
 	if tg == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceReport()
 	}
 	tid, err := tg.GetID()
 	if err != nil {
@@ -125,18 +125,18 @@ func (tg *taskGroup) GetSignature() (string, error) {
 }
 
 // GetStatus returns the current task status
-func (tg *taskGroup) GetStatus() (TaskStatus, error) {
+func (tg *taskGroup) GetStatus() (TaskStatus, fail.Report) {
 	if tg == nil {
-		return TaskStatus(0), scerr.InvalidInstanceError()
+		return TaskStatus(0), fail.InvalidInstanceReport()
 	}
 
 	return tg.task.GetStatus()
 }
 
 // GetContext returns the current task status
-func (tg *taskGroup) GetContext() (context.Context, error) {
+func (tg *taskGroup) GetContext() (context.Context, fail.Report) {
 	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	return tg.task.GetContext()
@@ -144,9 +144,9 @@ func (tg *taskGroup) GetContext() (context.Context, error) {
 
 // SetID allows to specify task ID. The uniqueness of the ID through all the tasks
 // becomes the responsibility of the developer...
-func (tg *taskGroup) SetID(id string) error {
+func (tg *taskGroup) SetID(id string) fail.Report {
 	if tg == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	tg.groupLock.Lock()
@@ -155,9 +155,9 @@ func (tg *taskGroup) SetID(id string) error {
 	return tg.task.SetID(id)
 }
 
-func (tg *taskGroup) StartInSubtask(action TaskAction, params TaskParameters) (Task, error) {
+func (tg *taskGroup) StartInSubtask(action TaskAction, params TaskParameters) (Task, fail.Report) {
 	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	return tg.Start(action, params)
@@ -165,9 +165,9 @@ func (tg *taskGroup) StartInSubtask(action TaskAction, params TaskParameters) (T
 
 // Start runs in goroutine the function with parameters
 // Each sub-Task created has its ID forced to TaskGroup ID + "-<index>".
-func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, error) {
+func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, fail.Report) {
 	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	tg.groupLock.Lock()
@@ -204,17 +204,17 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 	return tg, nil
 }
 
-func (tg *taskGroup) Wait() (TaskResult, error) {
+func (tg *taskGroup) Wait() (TaskResult, fail.Report) {
 	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	return tg.WaitGroup()
 }
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
-func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
+func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Report) {
 	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	tg.groupLock.Lock()
@@ -251,10 +251,10 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 				errors = append(errors, lerr)
 			}
 		}
-		return nil, scerr.AbortedError(scerr.ErrListError(errors), "taskgroup was already aborted")
+		return nil, fail.AbortedReport(fail.ErrorListReport(errors), "taskgroup was already aborted")
 	}
 	if taskStatus != RUNNING && taskStatus != READY {
-		return nil, scerr.ForbiddenError("cannot wait task group '%s': not running", tid)
+		return nil, fail.ForbiddenReport("cannot wait task group '%s': not running", tid)
 	}
 
 	for _, s := range tg.subtasks {
@@ -281,7 +281,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 
 	tg.task.result = results
 	if len(errors) > 0 {
-		tg.task.err = scerr.NewError(strings.Join(errors, "\n"))
+		tg.task.err = fail.NewReport(strings.Join(errors, "\n"))
 	} else {
 		tg.task.err = nil
 	}
@@ -291,18 +291,18 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, error) {
 	return results, tg.task.err
 }
 
-func (tg *taskGroup) TryWait() (bool, TaskResult, error) {
+func (tg *taskGroup) TryWait() (bool, TaskResult, fail.Report) {
 	if tg == nil {
-		return false, nil, scerr.InvalidInstanceError()
+		return false, nil, fail.InvalidInstanceReport()
 	}
 
 	return tg.TryWaitGroup()
 }
 
 // TryWait tries to wait on a task; if done returns the error and true, if not returns nil and false
-func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
+func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Report) {
 	if tg == nil {
-		return false, nil, scerr.InvalidInstanceError()
+		return false, nil, fail.InvalidInstanceReport()
 	}
 
 	tg.groupLock.Lock()
@@ -320,7 +320,7 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
 		return false, nil, err
 	}
 	if taskStatus != RUNNING {
-		return false, nil, scerr.NewError("cannot wait task group '%s': not running", tid)
+		return false, nil, fail.NewReport("cannot wait task group '%s': not running", tid)
 	}
 	for _, s := range tg.subtasks {
 		ok, _, _ := s.TryWait()
@@ -334,9 +334,9 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, error) {
 	return true, results, err
 }
 
-func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
+func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fail.Report) {
 	if tg == nil {
-		return false, nil, scerr.InvalidInstanceError()
+		return false, nil, fail.InvalidInstanceReport()
 	}
 
 	return tg.WaitGroupFor(duration)
@@ -344,9 +344,9 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 
 // WaitFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
-func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]TaskResult, error) {
+func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]TaskResult, fail.Report) {
 	if tg == nil {
-		return false, nil, scerr.InvalidInstanceError()
+		return false, nil, fail.InvalidInstanceReport()
 	}
 
 	tg.groupLock.Lock()
@@ -364,7 +364,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 		return false, nil, err
 	}
 	if taskStatus != RUNNING {
-		return false, nil, scerr.InvalidRequestError("cannot wait task '%s': not running", tid)
+		return false, nil, fail.InvalidRequestReport("cannot wait task '%s': not running", tid)
 	}
 
 	c := make(chan struct{})
@@ -376,16 +376,16 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 
 	select {
 	case <-time.After(duration):
-		return false, nil, scerr.TimeoutError(nil, duration, fmt.Sprintf("timeout waiting for task group '%s'", tid))
+		return false, nil, fail.TimeoutReport(nil, duration, fmt.Sprintf("timeout waiting for task group '%s'", tid))
 	case <-c:
 		return true, results, err
 	}
 }
 
 // Abort aborts the task execution
-func (tg *taskGroup) Abort() error {
+func (tg *taskGroup) Abort() fail.Report {
 	if tg == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	tg.groupLock.Lock()
@@ -405,13 +405,13 @@ func (tg *taskGroup) Abort() error {
 		errors = append(errors, err)
 	}
 
-	return scerr.ErrListError(errors)
+	return fail.ErrorListReport(errors)
 }
 
 // New creates a subtask from current task
-func (tg *taskGroup) New() (Task, error) {
+func (tg *taskGroup) New() (Task, fail.Report) {
 	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	tg.groupLock.Lock()
@@ -420,9 +420,9 @@ func (tg *taskGroup) New() (Task, error) {
 	return newTask(context.TODO(), tg.task)
 }
 
-func (tg *taskGroup) Stats() (map[TaskStatus][]string, error) {
+func (tg *taskGroup) Stats() (map[TaskStatus][]string, fail.Report) {
 	if tg == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	tg.subtasksLock.RLock()

@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 const (
@@ -170,7 +170,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, scerr.InvalidRequestError("invalid Region '%s'", region)
+			return nil, fail.InvalidRequestReport("invalid Region '%s'", region)
 		}
 	}
 
@@ -193,7 +193,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, scerr.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
+			return nil, fail.InvalidRequestReport("invalid Availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 

@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var networks = map[string]*net.IPNet{}
@@ -42,7 +42,7 @@ func CIDRToIPv4Range(cidr string) (string, string, error) {
 // CIDRToUInt32Range converts CIDR to IPv4 range
 func CIDRToUInt32Range(cidr string) (uint32, uint32, error) {
 	if cidr == "" {
-		return 0, 0, scerr.InvalidParameterError("cidr", "cannot be empty string")
+		return 0, 0, fail.InvalidParameterReport("cidr", "cannot be empty string")
 	}
 
 	var (
@@ -142,12 +142,12 @@ func NthIncludedSubnet(base net.IPNet, maskAddition uint8, nth uint) (net.IPNet,
 	newPrefixLen := parentLen + int(maskAddition)
 
 	if newPrefixLen > addrLen {
-		return net.IPNet{}, scerr.OverflowError(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
+		return net.IPNet{}, fail.OverflowReport(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
 	}
 
 	maxNetNum := uint64(1<<uint64(maskAddition)) - 1
 	if uint64(1) > maxNetNum {
-		return net.IPNet{}, scerr.OverflowError(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
+		return net.IPNet{}, fail.OverflowReport(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
 	}
 
 	ipAsNumber := IPv4ToUInt32(ip)

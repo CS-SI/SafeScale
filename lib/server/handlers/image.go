@@ -21,7 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageHandler
@@ -47,28 +47,28 @@ func NewImageHandler(job server.Job) ImageHandler {
 	return &imageHandler{job: job}
 }
 
-// List returns the image list
+// ErrorList returns the image list
 func (handler *imageHandler) List(all bool) (images []abstract.Image, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	return handler.job.SafeGetService().ListImages(all)
 }
 
 // Select selects the image that best fits osname
 func (handler *imageHandler) Select(osname string) (image *abstract.Image, err error) {
-	return nil, scerr.NotImplementedError("ImageHandler.Select() not yet implemented")
+	return nil, fail.NotImplementedReport("ImageHandler.Select() not yet implemented")
 }
 
 // Filter filters the images that do not fit osname
 func (handler *imageHandler) Filter(osname string) (image []abstract.Image, err error) {
-	return nil, scerr.NotImplementedError("ImageHandler.Filter() not yet implemented")
+	return nil, fail.NotImplementedReport("ImageHandler.Filter() not yet implemented")
 }

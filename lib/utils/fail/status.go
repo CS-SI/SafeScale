@@ -1,4 +1,4 @@
-package glitch
+package fail
 
 import "fmt"
 

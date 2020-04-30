@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -45,18 +45,18 @@ type SSHListener struct{}
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot run by ssh").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot run by ssh").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -71,7 +71,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 		hostRef = in.GetHost().GetId()
 	}
 	if hostRef == "" {
-		return nil, scerr.InvalidParameterError("in.Host", "host reference is missing")
+		return nil, fail.InvalidParameterReport("in.Host", "host reference is missing")
 	}
 
 	command := in.GetCommand()
@@ -85,7 +85,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	host, err := hostfactory.Load(job.SafeGetTask(), job.SafeGetService(), hostRef)
 	if err != nil {
@@ -108,18 +108,18 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot copy by ssh").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot copy by ssh").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -139,7 +139,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	dest := in.Destination
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	var (
 		pull                bool
@@ -163,13 +163,13 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	parts = strings.Split(dest, ":")
 	if len(parts) > 1 {
 		if pull {
-			return nil, scerr.InvalidRequestError("file copy from one remote host to another one is not supported")
+			return nil, fail.InvalidRequestReport("file copy from one remote host to another one is not supported")
 		}
 		hostRef = parts[0]
 		hostPath = strings.Join(parts[1:], ":")
 	} else {
 		if !pull {
-			return nil, scerr.InvalidRequestError("failed to find a remote host in the request")
+			return nil, fail.InvalidRequestReport("failed to find a remote host in the request")
 		}
 		localPath = dest
 	}
@@ -187,7 +187,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		return nil, err
 	}
 	if retcode != 0 {
-		return nil, scerr.NewError(fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
+		return nil, fail.NewReport(fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
 	}
 
 	return &protocol.SshResponse{

@@ -25,7 +25,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Stack is the implementation for huaweicloud cloud stack
@@ -47,7 +47,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		return nil, scerr.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("auth.IdentityEndpoint", "cannot be empty string")
 	}
 
 	authOptions := auth
@@ -64,7 +64,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	// Identity API
 	identity, err := gcos.NewIdentityV3(stack.Driver, gophercloud.EndpointOpts{})
 	if err != nil {
-		return nil, scerr.NewError(openstack.ProviderErrorToString(err))
+		return nil, fail.NewReport(openstack.ProviderErrorToString(err))
 	}
 
 	// Recover Project ID of region
@@ -74,16 +74,16 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	}
 	allPages, err := projects.List(identity, listOpts).AllPages()
 	if err != nil {
-		return nil, scerr.NewError("failed to query project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, fail.NewReport("failed to query project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
 	}
 	allProjects, err := projects.ExtractProjects(allPages)
 	if err != nil {
-		return nil, scerr.NewError("failed to load project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, fail.NewReport("failed to load project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
 	}
 	if len(allProjects) > 0 {
 		authOptions.ProjectID = allProjects[0].ID
 	} else {
-		return nil, scerr.NewError("failed to found project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, fail.NewReport("failed to found project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
 	}
 
 	s := Stack{
@@ -120,7 +120,7 @@ func (s *Stack) initVPC() error {
 		CIDR: s.authOpts.VPCCIDR,
 	})
 	if err != nil {
-		return scerr.NewError("failed to initialize VPC '%s': %s", s.authOpts.VPCName, openstack.ProviderErrorToString(err))
+		return fail.NewReport("failed to initialize VPC '%s': %s", s.authOpts.VPCName, openstack.ProviderErrorToString(err))
 	}
 	s.vpc = vpc
 	return nil
@@ -132,7 +132,7 @@ func (s *Stack) findVPCID() (*string, error) {
 	found := false
 	routers, err := s.Stack.ListRouters()
 	if err != nil {
-		return nil, scerr.NewError("error listing routers: %s", openstack.ProviderErrorToString(err))
+		return nil, fail.NewReport("error listing routers: %s", openstack.ProviderErrorToString(err))
 	}
 	for _, r := range routers {
 		if r.Name == s.authOpts.VPCName {

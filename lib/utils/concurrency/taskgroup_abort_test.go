@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/stretchr/testify/require"
 )
 
@@ -157,9 +157,9 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 
 	_, err = overlord.WaitGroup()
 	if err != nil {
-		if eab, ok := err.(scerr.ErrAborted); ok {
+		if eab, ok := err.(fail.Aborted); ok {
 			cause := eab.Cause()
-			if causes, ok := cause.(scerr.ErrList); ok {
+			if causes, ok := cause.(fail.ErrorList); ok {
 				errList := causes.ToErrors()
 				errFound := false
 				for _, err := range errList {
@@ -222,9 +222,9 @@ func TestBadTaskActionCitizen(t *testing.T) {
 
 	_, err = overlord.WaitGroup()
 	if err != nil {
-		if eab, ok := err.(scerr.ErrAborted); ok {
+		if eab, ok := err.(fail.Aborted); ok {
 			cause := eab.Cause()
-			if causes, ok := cause.(scerr.ErrList); ok {
+			if causes, ok := cause.(fail.ErrorList); ok {
 				errList := causes.ToErrors()
 				errFound := false
 				for _, err := range errList {

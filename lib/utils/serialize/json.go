@@ -24,7 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
@@ -55,9 +55,9 @@ type JSONProperties struct {
 }
 
 // NewJSONProperties creates a new JSonProperties instance
-func NewJSONProperties(module string) (*JSONProperties, error) {
+func NewJSONProperties(module string) (*JSONProperties, fail.Report) {
 	if module == "" {
-		return nil, scerr.InvalidParameterError("module", "can't be empty string")
+		return nil, fail.InvalidParameterReport("module", "can't be empty string")
 	}
 	return &JSONProperties{
 		Properties: data.Map{},
@@ -98,24 +98,24 @@ func (x *JSONProperties) Count() int {
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector func(clonable data.Clonable) error) error {
+func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector func(clonable data.Clonable) fail.Report) fail.Report {
 	if x == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if x.Properties == nil {
-		return scerr.InvalidInstanceContentError("x.properties", "can't be nil")
+		return fail.InvalidInstanceContentReport("x.properties", "can't be nil")
 	}
 	if x.module == "" {
-		return scerr.InvalidInstanceContentError("x.module", "can't be empty string")
+		return fail.InvalidInstanceContentReport("x.module", "can't be empty string")
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if key == "" {
-		return scerr.InvalidParameterError("key", "cannot be empty string")
+		return fail.InvalidParameterReport("key", "cannot be empty string")
 	}
 	if inspector == nil {
-		return scerr.InvalidParameterError("inspector", "cannot be nil")
+		return fail.InvalidParameterReport("inspector", "cannot be nil")
 	}
 
 	var (
@@ -144,24 +144,24 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 // Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
 // If no extension exists corresponding to the key, an empty one is created (in other words, this call
 // can't fail because a key doesn't exist).
-func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(data.Clonable) error) error {
+func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(data.Clonable) fail.Report) fail.Report {
 	if x == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if x.Properties == nil {
-		return scerr.InvalidInstanceContentError("x.properties", "cannot be nil")
+		return fail.InvalidInstanceContentReport("x.properties", "cannot be nil")
 	}
 	if x.module == "" {
-		return scerr.InvalidInstanceContentError("x.module", "cannot be empty string")
+		return fail.InvalidInstanceContentReport("x.module", "cannot be empty string")
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if key == "" {
-		return scerr.InvalidParameterError("key", "cannot be empty string")
+		return fail.InvalidParameterReport("key", "cannot be empty string")
 	}
 	if alterer == nil {
-		return scerr.InvalidParameterError("alterer", "cannot be nil")
+		return fail.InvalidParameterReport("alterer", "cannot be nil")
 	}
 
 	var (
@@ -193,12 +193,12 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
-func (x *JSONProperties) SetModule(module string) error {
+func (x *JSONProperties) SetModule(module string) fail.Report {
 	if x == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if module == "" {
-		return scerr.InvalidParameterError("key", "can't be empty string")
+		return fail.InvalidParameterReport("key", "can't be empty string")
 	}
 
 	x.Lock()
@@ -212,15 +212,15 @@ func (x *JSONProperties) SetModule(module string) error {
 
 // Serialize ...
 // satisfies interface data.Serializable
-func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, error) {
+func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Report) {
 	if x == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if x.Properties == nil {
-		return nil, scerr.InvalidParameterError("x.properties", "can't be nil")
+		return nil, fail.InvalidParameterReport("x.properties", "can't be nil")
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	x.RLock()
@@ -234,30 +234,39 @@ func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, error) {
 		}
 		mapped[k] = string(ser)
 	}
-	return json.Marshal(mapped)
+	r, jserr := json.Marshal(mapped)
+	if jserr != nil {
+		return nil, fail.NewReport(jserr.Error())
+	}
+	return r, nil
 }
 
 // Deserialize ...
 // satisfies interface data.Serializable
-func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (err error) {
+func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (oerr fail.Report) {
 	if x == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
-	defer scerr.OnPanic(&err) // json.Unmarshal may panic
+	var panicErr error
+	defer func() {
+		if panicErr != nil {
+			oerr = fail.ErrorToReport(panicErr)
+		}
+	}()
+	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
 
 	x.Lock()
 	defer x.Unlock()
 
 	// Decode JSON data
 	var unjsoned = map[string]string{}
-	err = json.Unmarshal(buf, &unjsoned)
-	if err != nil {
-		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", err.Error())
-		return err
+	if jserr := json.Unmarshal(buf, &unjsoned); jserr != nil {
+		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", jserr.Error())
+		return fail.NewReport(jserr.Error())
 	}
 
 	var (
@@ -275,7 +284,7 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (err err
 			x.Properties[k] = item
 			prop = item
 		}
-		err = prop.Shielded.Deserialize(task, []byte(v))
+		err := prop.Shielded.Deserialize(task, []byte(v))
 		if err != nil {
 			return err
 		}

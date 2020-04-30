@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -153,7 +153,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "1":
 			hostT = "1"
 		default:
-			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", hostT, targetHosts)
+			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", hostT, targetHosts)
 		}
 	}
 
@@ -180,7 +180,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			masterT = "*"
 		default:
-			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", masterT, targetMasters)
+			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", masterT, targetMasters)
 		}
 	}
 
@@ -205,7 +205,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			nodeT = "*"
 		default:
-			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", nodeT, targetNodes)
+			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", nodeT, targetNodes)
 		}
 	}
 
@@ -232,12 +232,12 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			gwT = "*"
 		default:
-			return "", "", "", "", scerr.SyntaxError("invalid value '%s' for target '%s'", gwT, targetGateways)
+			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", gwT, targetGateways)
 		}
 	}
 
 	if hostT == "0" && masterT == "0" && nodeT == "0" && gwT == "0" {
-		return "", "", "", "", scerr.SyntaxError("no targets identified")
+		return "", "", "", "", fail.SyntaxReport("no targets identified")
 	}
 	return hostT, masterT, nodeT, gwT, nil
 }
@@ -271,7 +271,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, true, "").Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 	nHosts := uint(len(hosts))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, strprocess.Plural(nHosts)),
@@ -391,24 +391,24 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	)
 	if params != nil {
 		if p, ok = params.(data.Map); !ok {
-			return nil, scerr.InvalidParameterError("params", "must be a 'data.Map'")
+			return nil, fail.InvalidParameterReport("params", "must be a 'data.Map'")
 		}
 	}
 
 	// Get parameters
 	host, ok := p["host"].(resources.Host)
 	if !ok {
-		return nil, scerr.InvalidParameterError("params['host']", "must be a 'resources.Host'")
+		return nil, fail.InvalidParameterReport("params['host']", "must be a 'resources.Host'")
 	}
 	variables, ok := p["variables"].(data.Map)
 	if !ok {
-		return nil, scerr.InvalidParameterError("params['variables'", "must be a 'data.Map'")
+		return nil, fail.InvalidParameterReport("params['variables'", "must be a 'data.Map'")
 	}
 
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
-		return stepResult{err: scerr.Wrap(err, "failed to finalize installer script for step '%s'", is.Name)}, nil
+		return stepResult{err: fail.Wrap(err, "failed to finalize installer script for step '%s'", is.Name)}, nil
 	}
 
 	// If options file is defined, upload it to the remote host
@@ -460,7 +460,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	err = nil
 	ok = retcode == 0
 	if !ok {
-		err = scerr.ReturnedValuesFromShellToError(retcode, outrun, "", err, "failure")
+		err = fail.ReturnedValuesFromShellToError(retcode, outrun, "", err, "failure")
 	}
 	return stepResult{success: ok, completed: true, err: err, output: outrun}, nil
 }
@@ -488,16 +488,16 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 // 	if len(collected) > 0 {
 // 		if err != nil {
-// 			return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
+// 			return fail.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
 // 		}
-// 		return scerr.NewError("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
+// 		return fail.NewReport("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
 // 	}
 
 // 	if err != nil {
-// 		return scerr.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
+// 		return fail.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
 // 	}
 // 	if retcode != 0 {
-// 		return scerr.NewError("%s: failed with error code %s", msg, richErrc)
+// 		return fail.NewReport("%s: failed with error code %s", msg, richErrc)
 // 	}
 
 // 	return nil
@@ -511,7 +511,7 @@ func realizeVariables(variables data.Map) (data.Map, error) {
 		if variable, ok := v.(string); ok {
 			varTemplate, err := template.New("realize_var").Parse(variable)
 			if err != nil {
-				return nil, scerr.SyntaxError("error parsing variable '%s': %s", k, err.Error())
+				return nil, fail.SyntaxReport("error parsing variable '%s': %s", k, err.Error())
 			}
 			buffer := bytes.NewBufferString("")
 			err = varTemplate.Execute(buffer, variables)
@@ -528,12 +528,12 @@ func realizeVariables(variables data.Map) (data.Map, error) {
 func replaceVariablesInString(text string, v data.Map) (string, error) {
 	tmpl, err := template.New("text").Parse(text)
 	if err != nil {
-		return "", scerr.SyntaxError("failed to parse: %s", err.Error())
+		return "", fail.SyntaxReport("failed to parse: %s", err.Error())
 	}
 	dataBuffer := bytes.NewBufferString("")
 	err = tmpl.Execute(dataBuffer, v)
 	if err != nil {
-		return "", scerr.Wrap(err, "failed to replace variables")
+		return "", fail.Wrap(err, "failed to replace variables")
 	}
 	return dataBuffer.String(), nil
 }

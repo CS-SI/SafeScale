@@ -43,7 +43,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas Service
@@ -161,10 +161,10 @@ func (svc *service) SafeGetMetadataBucket() objectstorage.Bucket {
 // GetMetadataKey returns the key used to crypt data in metadata bucket
 func (svc *service) GetMetadataKey() (*crypt.Key, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if svc.metadataKey == nil {
-		return nil, scerr.NotFoundError("no crypt key defined for metadata content")
+		return nil, fail.NotFoundReport("no crypt key defined for metadata content")
 	}
 	return svc.metadataKey, nil
 }
@@ -172,24 +172,24 @@ func (svc *service) GetMetadataKey() (*crypt.Key, error) {
 // ChangeProvider allows to change provider interface of service object (mainly for test purposes)
 func (svc *service) ChangeProvider(provider providers.Provider) error {
 	if svc.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if provider == nil {
-		return scerr.InvalidParameterError("provider", "cannot be nil")
+		return fail.InvalidParameterReport("provider", "cannot be nil")
 	}
 	svc.Provider = provider
 	return nil
 }
 
 // WaitHostState waits an host achieve state
-// If host in error state, returns utils.ErrNotAvailable
-// If timeout is reached, returns utils.ErrTimeout
+// If host in error state, returns utils.NotAvailable
+// If timeout is reached, returns utils.Timeout
 func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) error {
 	if svc.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if hostID == "" {
-		return scerr.InvalidParameterError("hostID", "cannot be empty string")
+		return fail.InvalidParameterReport("hostID", "cannot be empty string")
 	}
 	var err error
 
@@ -205,11 +205,11 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 			return nil
 		}
 		if host.Core.LastState == hoststate.ERROR {
-			return scerr.NotAvailableError("host in error state")
+			return fail.NotAvailableReport("host in error state")
 		}
 		select {
 		case <-timer:
-			return scerr.TimeoutError(nil, timeout, "Wait volume state timeout")
+			return fail.TimeoutReport(nil, timeout, "Wait volume state timeout")
 		default:
 			time.Sleep(1 * time.Second)
 		}
@@ -217,13 +217,13 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 }
 
 // WaitVolumeState waits an host achieve state
-// If timeout is reached, returns utils.ErrTimeout
+// If timeout is reached, returns utils.Timeout
 func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if volumeID == "" {
-		return nil, scerr.InvalidParameterError("volumeID", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("volumeID", "cannot be empty string")
 	}
 
 	cout := make(chan int)
@@ -235,7 +235,7 @@ func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, tim
 		select {
 		case res := <-cout:
 			if res == 0 {
-				return nil, scerr.NewError("error getting host state")
+				return nil, fail.NewReport("error getting host state")
 			}
 			if res == 1 {
 				return <-vc, nil
@@ -245,7 +245,7 @@ func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, scerr.TimeoutError(nil, timeout, "Wait host state timeout")
+			return nil, fail.TimeoutReport(nil, timeout, "Wait host state timeout")
 		}
 	}
 }
@@ -273,7 +273,7 @@ func pollVolume(svc *service, volumeID string, state volumestate.Enum, cout chan
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (svc *service) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	allTemplates, err := svc.Provider.ListTemplates(all)
@@ -289,7 +289,7 @@ func (svc *service) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 // SelectTemplateByName returns the template by its name
 func (svc *service) SelectTemplateByName(name string) (*abstract.HostTemplate, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	allTemplates, err := svc.Provider.ListTemplates(true)
@@ -301,7 +301,7 @@ func (svc *service) SelectTemplateByName(name string) (*abstract.HostTemplate, e
 			return &i, nil
 		}
 	}
-	return nil, scerr.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
+	return nil, fail.NotFoundReport(fmt.Sprintf("template named '%s' not found", name))
 }
 
 func (svc *service) reduceTemplates(tpls []abstract.HostTemplate) []abstract.HostTemplate {
@@ -333,7 +333,7 @@ func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
 // returned list is ordered by size fitting
 func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements, force bool) (selectedTpls []*abstract.HostTemplate, err error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "").Entering()
@@ -360,7 +360,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 				} else {
 					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 				}
-				return nil, scerr.NewError(noHostError)
+				return nil, fail.NewReport(noHostError)
 			}
 		} else {
 			authOpts, err := svc.GetAuthenticationOptions()
@@ -369,7 +369,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 			}
 			region, ok := authOpts.Get("Region")
 			if !ok {
-				return nil, scerr.SyntaxError("region value unset")
+				return nil, fail.SyntaxReport("region value unset")
 			}
 			folder := fmt.Sprintf("images/%s/%s", svc.SafeGetName(), region)
 
@@ -385,14 +385,14 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 					}
 					logrus.Error(noHostError)
-					return nil, scerr.NewError(noHostError)
+					return nil, fail.NewReport(noHostError)
 				}
 			} else {
 				var images []abstract.StoredCPUInfo
 				for _, f := range imageList {
 					imageFound := abstract.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-						return nil, scerr.Wrap(err, "error unmarsalling image '%s'")
+						return nil, fail.Wrap(err, "error unmarsalling image '%s'")
 					}
 
 					// if the user asked explicitly no gpu
@@ -419,7 +419,7 @@ func (svc *service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinCPUFreq)
 					}
 					logrus.Error(noHostError)
-					return nil, scerr.NewError(noHostError)
+					return nil, fail.NewReport(noHostError)
 				}
 
 				for _, image := range images {
@@ -508,7 +508,7 @@ func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 // FilterImages search an images corresponding to OS Name
 func (svc *service) FilterImages(filter string) ([]abstract.Image, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	imgs, err := svc.ListImages(false)
@@ -574,7 +574,7 @@ func filterImagesByRegex(re *regexp.Regexp) imagefilters.Predicate {
 // ListImages reduces the list of needed
 func (svc *service) ListImages(all bool) ([]abstract.Image, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	imgs, err := svc.Provider.ListImages(all)
@@ -587,7 +587,7 @@ func (svc *service) ListImages(all bool) ([]abstract.Image, error) {
 // SearchImage search an image corresponding to OS Name
 func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	imgs, err := svc.ListImages(false)
@@ -612,7 +612,7 @@ func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
 	// fmt.Println(fields, len(fields))
 	// fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
-		return nil, scerr.NotFoundError("unable to find an image matching '%s'", osname)
+		return nil, fail.NotFoundReport("unable to find an image matching '%s'", osname)
 	}
 
 	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
@@ -622,7 +622,7 @@ func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
 // CreateHostWithKeyPair creates an host
 func (svc *service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, error) {
 	if svc.IsNull() {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, fail.InvalidInstanceReport()
 	}
 
 	_, err := svc.GetHostByName(request.ResourceName)
@@ -664,7 +664,7 @@ func (svc *service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstra
 // ListHostsByName list hosts by name
 func (svc *service) ListHostsByName(details bool) (map[string]*abstract.HostFull, error) {
 	if svc.IsNull() {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	hosts, err := svc.ListHosts(details)
@@ -683,9 +683,9 @@ func (svc *service) ListHostsByName(details bool) (map[string]*abstract.HostFull
 // WARNING: !!! this will make SafeScale unable to handle the resources !!!
 func (svc *service) TenantCleanup(force bool) error {
 	if svc.IsNull() {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
-	return scerr.NotImplementedError("service.TenantCleanup() not yet implemented")
+	return fail.NotImplementedReport("service.TenantCleanup() not yet implemented")
 }
 
 func runeIndexes(s string, r rune) []int {
@@ -791,19 +791,19 @@ func SimilarityScore(ref string, s string) float64 {
 // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
 func InitializeBucket(svc *service, location objectstorage.Location) error {
 	if svc.IsNull() {
-		return scerr.InvalidParameterError("svc", "cannot be null value")
+		return fail.InvalidParameterReport("svc", "cannot be null value")
 	}
 	if location == nil {
-		return scerr.InvalidParameterError("location", "cannot be nil")
+		return fail.InvalidParameterReport("location", "cannot be nil")
 	}
 
 	cfg, err := svc.Provider.GetConfigurationOptions()
 	if err != nil {
-		return scerr.Wrap(err, "failed to get client options: %s")
+		return fail.Wrap(err, "failed to get client options: %s")
 	}
 	anon, found := cfg.Get("MetadataBucket")
 	if !found || anon.(string) == "" {
-		return scerr.SyntaxError("failed to get value of option 'MetadataBucket'")
+		return fail.SyntaxReport("failed to get value of option 'MetadataBucket'")
 	}
 	_, err = location.CreateBucket(anon.(string))
 	if err != nil {

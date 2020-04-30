@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
 
@@ -128,7 +128,7 @@ func (n *Network) OK() bool {
 // Serialize serializes Host instance into bytes (output json code)
 func (n *Network) Serialize() ([]byte, error) {
 	if n == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	return json.Marshal(n)
 }
@@ -136,9 +136,9 @@ func (n *Network) Serialize() ([]byte, error) {
 // Deserialize reads json code and reinstantiates an Host
 func (n *Network) Deserialize(buf []byte) (err error) {
 	if n == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
-	defer scerr.OnPanic(&err) // json.Unmarshal may panic
+	defer fail.OnPanic(&err) // json.Unmarshal may panic
 	return json.Unmarshal(buf, n)
 }
 

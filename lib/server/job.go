@@ -28,7 +28,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Job is the interface of a daemon job
@@ -56,15 +56,15 @@ type job struct {
 }
 
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (Job, error) {
+func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (Job, fail.Report) {
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 	if cancel == nil {
-		return nil, scerr.InvalidParameterError("cancel", "cannot be nil")
+		return nil, fail.InvalidParameterReport("cancel", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 
 	var (
@@ -79,17 +79,17 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		logrus.Warn("context does not contain a grpc uuid, generating one")
 		uuid, err := uuidpkg.NewV4()
 		if err != nil {
-			return nil, scerr.Wrap(err, "failed to generate uuid for job")
+			return nil, fail.Wrap(err, "failed to generate uuid for job")
 		}
 		id = uuid.String()
 	} else {
 		u := md.Get("uuid")
 		if len(u) == 0 {
-			return nil, scerr.InvalidParameterError("ctx", "does not contain a grpc uuid")
+			return nil, fail.InvalidParameterReport("ctx", "does not contain a grpc uuid")
 		}
 
 		if id = u[0]; id == "" {
-			return nil, scerr.InvalidParameterError("ctx", "does not contain a valid grpc uuid")
+			return nil, fail.InvalidParameterReport("ctx", "does not contain a valid grpc uuid")
 		}
 	}
 
@@ -144,12 +144,12 @@ func (j *job) SafeGetDuration() time.Duration {
 }
 
 // Abort tells the job it has to abort operations
-func (j *job) Abort() error {
+func (j *job) Abort() fail.Report {
 	if j == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if j.cancel == nil {
-		return scerr.InvalidInstanceContentError("j.cancel", "cannot be nil")
+		return fail.InvalidInstanceContentReport("j.cancel", "cannot be nil")
 	}
 	j.cancel()
 	j.cancel = nil
@@ -193,20 +193,20 @@ func register(job Job) error {
 // deregister ...
 func deregister(job Job) error {
 	if job == nil {
-		return scerr.InvalidParameterError("job", "cannot be nil")
+		return fail.InvalidParameterReport("job", "cannot be nil")
 	}
 	return deregisterUUID(job.SafeGetID())
 }
 
 func deregisterUUID(uuid string) error {
 	if uuid == "" {
-		return scerr.InvalidParameterError("uuid", "cannot be empty string")
+		return fail.InvalidParameterReport("uuid", "cannot be empty string")
 	}
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
 	if _, ok := jobMap[uuid]; !ok {
-		return scerr.NotFoundError(fmt.Sprintf("no job identified by '%s' found", uuid))
+		return fail.NotFoundReport(fmt.Sprintf("no job identified by '%s' found", uuid))
 	}
 	delete(jobMap, uuid)
 	return nil
@@ -215,16 +215,16 @@ func deregisterUUID(uuid string) error {
 // AbortJobByID asks the job identified by 'id' to abort
 func AbortJobByID(id string) error {
 	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
+		return fail.InvalidParameterReport("id", "cannot be empty string")
 	}
 	if job, ok := jobMap[id]; ok {
 		err := job.Abort()
 		if err != nil {
-			return scerr.Wrap(err, fmt.Sprintf("failed to stop job '%s'", id))
+			return fail.Wrap(err, fmt.Sprintf("failed to stop job '%s'", id))
 		}
 		return nil
 	}
-	return scerr.NotFoundError(fmt.Sprintf("no job identified by '%s' found", id))
+	return fail.NotFoundReport(fmt.Sprintf("no job identified by '%s' found", id))
 }
 
 // ListJobs ...

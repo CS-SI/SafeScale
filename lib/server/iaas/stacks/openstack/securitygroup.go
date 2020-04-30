@@ -22,7 +22,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // GetSecurityGroup returns the default security group
@@ -47,7 +47,7 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
 		return nil, err
 	}
 	if len(sgList) > 1 {
-		return nil, scerr.OverflowError(nil, 1, "several security groups named '%s' found", name)
+		return nil, fail.OverflowReport(nil, 1, "several security groups named '%s' found", name)
 	}
 
 	return &sgList[0], nil
@@ -56,7 +56,7 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
 func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 	sg, err := s.GetSecurityGroup(s.DefaultSecurityGroupName)
 	if err != nil {
-		return nil, scerr.NewError("error listing routers: %s", ProviderErrorToString(err))
+		return nil, fail.NewReport("error listing routers: %s", ProviderErrorToString(err))
 	}
 
 	return sg, nil

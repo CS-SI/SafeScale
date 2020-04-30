@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -62,10 +62,10 @@ type KongController struct {
 // NewKongController ...
 func NewKongController(svc iaas.Service, network resources.Network, addressPrimaryGateway bool) (*KongController, error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 	if network == nil {
-		return nil, scerr.InvalidParameterError("network", "cannot be nil")
+		return nil, fail.InvalidParameterReport("network", "cannot be nil")
 	}
 
 	// Check if 'edgeproxy4network' feature is installed on host
@@ -89,10 +89,10 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 		setErr := kongProxyCheckedCache.SetBy(network.SafeGetName(), func() (interface{}, error) {
 			results, err := rp.Check(addressedGateway, data.Map{}, resources.FeatureSettings{})
 			if err != nil {
-				return false, scerr.Wrap(err, "failed to check if feature 'edgeproxy4network' is installed on gateway '%s'", addressedGateway.SafeGetName())
+				return false, fail.Wrap(err, "failed to check if feature 'edgeproxy4network' is installed on gateway '%s'", addressedGateway.SafeGetName())
 			}
 			if !results.Successful() {
-				return false, scerr.NotFoundError("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.SafeGetName())
+				return false, fail.NotFoundReport("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.SafeGetName())
 			}
 
 			return true, nil
@@ -103,7 +103,7 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 		present = true
 	}
 	if !present {
-		return nil, scerr.NotFoundError("'edgeproxy4network' feature is not installed on gateway '%s'", addressedGateway.SafeGetName())
+		return nil, fail.NotFoundReport("'edgeproxy4network' feature is not installed on gateway '%s'", addressedGateway.SafeGetName())
 	}
 
 	ctrl := &KongController{
@@ -128,7 +128,7 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Map) (string, error) {
 	ruleType, ok := rule["type"].(string)
 	if !ok {
-		return "", scerr.InvalidParameterError("rule['type']", "is not a string")
+		return "", fail.InvalidParameterReport("rule['type']", "is not a string")
 	}
 
 	ruleName, err := k.realizeRuleData(strings.Trim(rule["name"].(string), "\n"), *values)
@@ -150,7 +150,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	err = k.network.Inspect(voidtask, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return scerr.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		if an.VIP != nil {
 			// VPL: for now, no public IP on VIP, so uses the IP of the first Gateway
@@ -177,7 +177,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		unjsoned := map[string]interface{}{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
-			return ruleName, scerr.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
+			return ruleName, fail.SyntaxReport("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		if _, ok := unjsoned["source-control"]; ok {
 			sourceControl = unjsoned["source-control"].(map[string]interface{})
@@ -192,7 +192,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		url := "services/" + ruleName
 		response, _, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
-			return ruleName, scerr.Wrap(err, "failed to apply proxy rule '%s'", ruleName)
+			return ruleName, fail.Wrap(err, "failed to apply proxy rule '%s'", ruleName)
 		}
 		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
@@ -201,7 +201,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		unjsoned := map[string]interface{}{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
-			return ruleName, scerr.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
+			return ruleName, fail.SyntaxReport("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		if _, ok := unjsoned["source-control"]; ok {
 			sourceControl = unjsoned["source-control"].(map[string]interface{})
@@ -216,7 +216,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		url := "routes/" + ruleName
 		response, _, err := k.put(ruleName, url, content, values, true)
 		if err != nil {
-			return ruleName, scerr.Wrap(err, "failed to apply proxy rule '%s'", ruleName)
+			return ruleName, fail.Wrap(err, "failed to apply proxy rule '%s'", ruleName)
 		}
 		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ruleName, url, ruleType, response["id"].(string), sourceControl, values)
@@ -226,7 +226,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		unjsoned := data.Map{}
 		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
-			return ruleName, scerr.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
+			return ruleName, fail.SyntaxReport("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		options := data.Map{}
 		target := data.Map{}
@@ -254,20 +254,20 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		url := "upstreams/" + ruleName + "/targets"
 		_, _, err = k.post(ruleName, url, content, values, false)
 		if err != nil {
-			return ruleName, scerr.Wrap(err, "failed to apply proxy rule '%s'", ruleName)
+			return ruleName, fail.Wrap(err, "failed to apply proxy rule '%s'", ruleName)
 		}
 		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, nil
 
 	default:
-		return ruleName, scerr.SyntaxError("syntax error in rule '%s': '%s' isn't a valid type", ruleName, ruleType)
+		return ruleName, fail.SyntaxReport("syntax error in rule '%s': '%s' isn't a valid type", ruleName, ruleType)
 	}
 }
 
 func (k *KongController) realizeRuleData(content string, v data.Map) (string, error) {
 	contentTmpl, err := template.New("proxy_content").Parse(content)
 	if err != nil {
-		return "", scerr.Wrap(err, "error preparing rule")
+		return "", fail.Wrap(err, "error preparing rule")
 	}
 	dataBuffer := bytes.NewBufferString("")
 	err = contentTmpl.Execute(dataBuffer, v)
@@ -284,7 +284,7 @@ func (k *KongController) createUpstream(name string, options data.Map, v *data.M
 		return err
 	}
 	if msg, ok := response["message"]; ok {
-		return scerr.NewError("failed to create upstream: %s", msg)
+		return fail.NewReport("failed to create upstream: %s", msg)
 	}
 	return nil
 }
@@ -305,7 +305,7 @@ func (k *KongController) addSourceControl(
 	url += "/plugins"
 	result, _, err := k.get(ruleName, url)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.NotFound); !ok {
 			return err
 		}
 	}
@@ -313,7 +313,7 @@ func (k *KongController) addSourceControl(
 		for _, i := range kongdata {
 			plugin, ok := i.(map[string]interface{})
 			if !ok {
-				return scerr.InvalidParameterError("result['data']", "is an invalid map[string]")
+				return fail.InvalidParameterReport("result['data']", "is an invalid map[string]")
 			}
 			if plugin["name"] == "ip-restriction" {
 				ref = plugin["id"].(string)
@@ -337,7 +337,7 @@ func (k *KongController) addSourceControl(
 		_, _, err = k.patch(ref, "plugins/", string(jsoned), v, false)
 	}
 	if err != nil {
-		err = scerr.Wrap(err, "failed to apply setting 'source-control' of proxy rule '%s'", ruleName)
+		err = fail.Wrap(err, "failed to apply setting 'source-control' of proxy rule '%s'", ruleName)
 		logrus.Debugf(strprocess.Capitalize(err.Error()))
 		return err
 	}
@@ -364,7 +364,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 		return nil, "", err
 	}
 	if retcode != 0 {
-		return nil, "", scerr.NewError("get '%s' failed: retcode=%d", name, retcode)
+		return nil, "", fail.NewReport("get '%s' failed: retcode=%d", name, retcode)
 	}
 
 	response, httpcode, err := k.parseResult(stdout)
@@ -387,7 +387,7 @@ func (k *KongController) post(name, url, data string, v *data.Map, propagate boo
 	}
 	if retcode != 0 {
 		logrus.Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
-		return nil, "", scerr.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
+		return nil, "", fail.NewReport("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 	response, httpcode, err := k.parseResult(stdout)
 	if err != nil {
@@ -415,7 +415,7 @@ func (k *KongController) put(name, url, data string, v *data.Map, propagate bool
 	}
 	if retcode != 0 {
 		logrus.Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
-		return nil, "", scerr.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
+		return nil, "", fail.NewReport("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
 	response, httpcode, err := k.parseResult(stdout)
@@ -443,7 +443,7 @@ func (k *KongController) patch(name, url, data string, v *data.Map, propagate bo
 	}
 	if retcode != 0 {
 		logrus.Debugf("update of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
-		return nil, "", scerr.NewError("update of rule '%s' failed: retcode=%d", name, retcode)
+		return nil, "", fail.NewReport("update of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
 	response, httpcode, err := k.parseResult(stdout)
@@ -476,18 +476,18 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 		return response, httpcode, nil
 	case "404":
 		if msg, ok := response["message"]; ok {
-			return nil, httpcode, scerr.NotFoundError(msg.(string))
+			return nil, httpcode, fail.NotFoundReport(msg.(string))
 		}
-		return nil, output[1], scerr.NotFoundError("")
+		return nil, output[1], fail.NotFoundReport("")
 	case "409":
 		if msg, ok := response["message"]; ok {
-			return nil, httpcode, scerr.DuplicateError(msg.(string))
+			return nil, httpcode, fail.DuplicateReport(msg.(string))
 		}
-		return nil, httpcode, scerr.DuplicateError("")
+		return nil, httpcode, fail.DuplicateReport("")
 	default:
 		if msg, ok := response["message"]; ok {
-			return response, httpcode, scerr.NewError("post failed: HTTP error code=%s: %s", httpcode, msg.(string))
+			return response, httpcode, fail.NewReport("post failed: HTTP error code=%s: %s", httpcode, msg.(string))
 		}
-		return response, httpcode, scerr.NewError("post failed with HTTP error code '%s'", httpcode)
+		return response, httpcode, fail.NewReport("post failed with HTTP error code '%s'", httpcode)
 	}
 }

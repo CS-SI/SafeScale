@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Enum represents the type of a method
@@ -80,7 +80,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return e, scerr.NotFoundError("failed to find a Method.Enum corresponding to '%s'", v)
+		return e, fail.NotFoundReport("failed to find a Method.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 
