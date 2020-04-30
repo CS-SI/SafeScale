@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -43,7 +44,17 @@ func (c *bucket) List(timeout time.Duration) (_ *pb.BucketList, err error) {
 		return nil, err
 	}
 
-	bl, err := service.List(ctx, &googleprotobuf.Empty{})
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
+	bl, err := service.List(ctxTo, &googleprotobuf.Empty{})
 
 	return bl, err
 }
@@ -59,7 +70,17 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 		return err
 	}
 
-	_, err = service.Create(ctx, &pb.Bucket{Name: name})
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
+	_, err = service.Create(ctxTo, &pb.Bucket{Name: name})
 
 	return err
 }
@@ -90,6 +111,16 @@ func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 		return err
 	}
 
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
@@ -98,7 +129,7 @@ func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Destroy(ctx, &pb.Bucket{Name: aname})
+		_, err := service.Destroy(ctxTo, &pb.Bucket{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
@@ -134,6 +165,16 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 		return err
 	}
 
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
@@ -142,9 +183,10 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Bucket{Name: aname})
+		_, err := service.Delete(ctxTo, &pb.Bucket{Name: aname})
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
 			mutex.Unlock()
 		}
@@ -178,7 +220,17 @@ func (c *bucket) Inspect(name string, timeout time.Duration) (*pb.BucketMounting
 		return nil, err
 	}
 
-	rv, err := service.Inspect(ctx, &pb.Bucket{Name: name})
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
+	rv, err := service.Inspect(ctxTo, &pb.Bucket{Name: name})
 
 	return rv, err
 }
@@ -193,7 +245,17 @@ func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dur
 		return err
 	}
 
-	_, err = service.Mount(ctx, &pb.BucketMountingPoint{
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
+	_, err = service.Mount(ctxTo, &pb.BucketMountingPoint{
 		Bucket: bucketName,
 		Host: &pb.Reference{
 			Name: hostName,
@@ -214,7 +276,17 @@ func (c *bucket) Unmount(bucketName, hostName string, timeout time.Duration) err
 		return err
 	}
 
-	_, err = service.Unmount(ctx, &pb.BucketMountingPoint{
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
+	_, err = service.Unmount(ctxTo, &pb.BucketMountingPoint{
 		Bucket: bucketName,
 		Host:   &pb.Reference{Name: hostName},
 	})
