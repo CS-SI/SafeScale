@@ -39,7 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -139,7 +139,7 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	if !f.SafeGetSpecs().IsSet(w.rootKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, scerr.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), w.rootKey)
+		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), w.rootKey)
 	}
 
 	return &w, nil
@@ -351,7 +351,7 @@ func (w *worker) identifyAvailableGateway() (resources.Host, error) {
 		}
 
 		if err != nil {
-			return nil, scerr.NotAvailableError("no gateway available")
+			return nil, fail.NotAvailableReport("no gateway available")
 		}
 
 		w.availableGateway = gw
@@ -440,7 +440,7 @@ func (w *worker) identifyAllGateways() ([]resources.Host, error) {
 		}
 	}
 	if len(list) == 0 {
-		return nil, scerr.NotAvailableError("no gateways currently available")
+		return nil, fail.NotAvailableReport("no gateways currently available")
 	}
 	w.allGateways = list
 	return list, nil
@@ -456,14 +456,14 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 	// 'pace' tells the order of execution
 	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
 	if pace == "" {
-		return nil, scerr.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
+		return nil, fail.SyntaxReport("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
 	}
 
 	// 'steps' describes the steps of the action
 	stepsKey := w.rootKey + "." + yamlStepsKeyword
 	steps := w.feature.specs.GetStringMap(stepsKey)
 	if len(steps) == 0 {
-		return nil, scerr.InvalidRequestError("nothing to do")
+		return nil, fail.InvalidRequestReport("nothing to do")
 	}
 	order := strings.Split(pace, ",")
 
@@ -483,7 +483,7 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-			return outcomes, scerr.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey)
+			return outcomes, fail.SyntaxReport(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey)
 		}
 		params := data.Map{
 			"stepName":  k,
@@ -512,13 +512,13 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 // taskLaunchStep starts the step
 func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, err error) {
 	if w == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if params == nil {
-		return nil, scerr.InvalidParameterError("params", "can't be nil")
+		return nil, fail.InvalidParameterReport("params", "can't be nil")
 	}
 	if w.feature == nil {
-		return nil, scerr.InvalidInstanceContentError("w.feature", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("w.feature", "cannot be nil")
 	}
 
 	var (
@@ -531,40 +531,40 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	p := params.(data.Map)
 
 	if anon, ok = p["stepName"]; !ok {
-		return nil, scerr.InvalidParameterError("params[stepName]", "is missing")
+		return nil, fail.InvalidParameterReport("params[stepName]", "is missing")
 	}
 	if stepName, ok = anon.(string); !ok {
-		return nil, scerr.InvalidParameterError("param[stepName]", "must be a string")
+		return nil, fail.InvalidParameterReport("param[stepName]", "must be a string")
 	}
 	if stepName == "" {
-		return nil, scerr.InvalidParameterError("param[stepName]", "cannot be an empty string")
+		return nil, fail.InvalidParameterReport("param[stepName]", "cannot be an empty string")
 	}
 	if anon, ok = p["stepKey"]; !ok {
-		return nil, scerr.InvalidParameterError("params[stepKey]", "is missing")
+		return nil, fail.InvalidParameterReport("params[stepKey]", "is missing")
 	}
 	if stepKey, ok = anon.(string); !ok {
-		return nil, scerr.InvalidParameterError("param[stepKey]", "must be a string")
+		return nil, fail.InvalidParameterReport("param[stepKey]", "must be a string")
 	}
 	if stepKey == "" {
-		return nil, scerr.InvalidParameterError("param[stepKey]", "cannot be an empty string")
+		return nil, fail.InvalidParameterReport("param[stepKey]", "cannot be an empty string")
 	}
 	if anon, ok = p["stepMap"]; !ok {
-		return nil, scerr.InvalidParameterError("params[stepMap]", "is missing")
+		return nil, fail.InvalidParameterReport("params[stepMap]", "is missing")
 	}
 	if stepMap, ok = anon.(map[string]interface{}); !ok {
-		return nil, scerr.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
+		return nil, fail.InvalidParameterReport("params[stepMap]", "must be a map[string]interface{}")
 	}
 	if anon, ok = p["variables"]; !ok {
-		return nil, scerr.InvalidParameterError("params[variables]", "is missing")
+		return nil, fail.InvalidParameterReport("params[variables]", "is missing")
 	}
 	if vars, ok = anon.(data.Map); !ok {
-		return nil, scerr.InvalidParameterError("params[variables]", "must be a data.Map")
+		return nil, fail.InvalidParameterReport("params[variables]", "must be a data.Map")
 	}
 	if vars == nil {
-		return nil, scerr.InvalidParameterError("params[variables]", "cannot be nil")
+		return nil, fail.InvalidParameterReport("params[variables]", "cannot be nil")
 	}
 
-	defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)
+	defer fail.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
 		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
@@ -598,7 +598,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		} else {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, scerr.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlTargetsKeyword)
+			return nil, fail.SyntaxReport(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlTargetsKeyword)
 		}
 
 		hostsList, err = w.identifyHosts(stepT)
@@ -629,7 +629,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, scerr.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlRunKeyword)
+		return nil, fail.SyntaxReport(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlRunKeyword)
 	}
 
 	// If there is an options file (for now specific to DCOS), upload it to the remote host
@@ -728,7 +728,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
 			logrus.Warnf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.Uncompleted())
-			return &r, scerr.NewError(r.ErrorMessages())
+			return &r, fail.NewReport(r.ErrorMessages())
 		}
 		// not successful but completed, if action is check means the feature is not install, it's an information not a failure
 		if strings.Contains(w.action.String(), "Check") {
@@ -736,7 +736,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 
 		// For any other situations, raise error and break
-		return &r, scerr.NewError(r.ErrorMessages())
+		return &r, fail.NewReport(r.ErrorMessages())
 	}
 
 	return &r, nil
@@ -763,7 +763,7 @@ func (w *worker) validateContextForCluster() error {
 		}
 	}
 	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.SafeGetName(), clusterFlavor.String())
-	return scerr.NotAvailableError(msg)
+	return fail.NotAvailableReport(msg)
 }
 
 // validateContextForHost ...
@@ -782,7 +782,7 @@ func (w *worker) validateContextForHost() error {
 	}
 	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.SafeGetName())
 	// logrus.Println(msg)
-	return scerr.NotAvailableError(msg)
+	return fail.NotAvailableReport(msg)
 }
 
 func (w *worker) validateClusterSizing() error {
@@ -799,7 +799,7 @@ func (w *worker) validateClusterSizing() error {
 	if anon, ok := sizing["masters"]; ok {
 		request, ok := anon.(string)
 		if !ok {
-			return scerr.SyntaxError("invalid masters key")
+			return fail.SyntaxReport("invalid masters key")
 		}
 		count, _, _, err := w.parseClusterSizingRequest(request)
 		if err != nil {
@@ -811,13 +811,13 @@ func (w *worker) validateClusterSizing() error {
 		}
 		curMasters := len(masters)
 		if curMasters < count {
-			return scerr.NotAvailableError("cluster does not meet the minimum number of masters (%d < %d)", curMasters, count)
+			return fail.NotAvailableReport("cluster does not meet the minimum number of masters (%d < %d)", curMasters, count)
 		}
 	}
 	if anon, ok := sizing["nodes"]; ok {
 		request, ok := anon.(string)
 		if !ok {
-			return scerr.SyntaxError("invalid nodes key")
+			return fail.SyntaxReport("invalid nodes key")
 		}
 		count, _, _, err := w.parseClusterSizingRequest(request)
 		if err != nil {
@@ -829,7 +829,7 @@ func (w *worker) validateClusterSizing() error {
 		}
 		curNodes := len(list)
 		if curNodes < count {
-			return scerr.NotAvailableError("cluster does not meet the minimum number of nodes (%d < %d)", curNodes, count)
+			return fail.NotAvailableReport("cluster does not meet the minimum number of nodes (%d < %d)", curNodes, count)
 		}
 	}
 
@@ -839,7 +839,7 @@ func (w *worker) validateClusterSizing() error {
 // parseClusterSizingRequest returns count, cpu and ram components of request
 func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, error) {
 
-	return 0, 0, 0.0, scerr.NotImplementedError("parseClusterSizingRequest() not yet implemented")
+	return 0, 0, 0.0, fail.NotImplementedReport("parseClusterSizingRequest() not yet implemented")
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
@@ -850,11 +850,11 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 
 	if w.cluster == nil {
-		return scerr.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
+		return fail.InvalidParameterReport("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
 	if w.feature.task == nil {
-		return scerr.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
+		return fail.InvalidParameterReport("w.feature.task", "nil task in setReverseProxy, cannot be nil")
 	}
 
 	svc := w.cluster.SafeGetService()
@@ -869,13 +869,13 @@ func (w *worker) setReverseProxy() (err error) {
 
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
-		return scerr.Wrap(err, "failed to apply reverse proxy rules")
+		return fail.Wrap(err, "failed to apply reverse proxy rules")
 	}
 	var secondaryKongController *KongController
 	if network.HasVirtualIP(w.feature.task) {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
-			return scerr.Wrap(err, "failed to apply reverse proxy rules")
+			return fail.Wrap(err, "failed to apply reverse proxy rules")
 		}
 	}
 
@@ -889,7 +889,7 @@ func (w *worker) setReverseProxy() (err error) {
 		targets := stepTargets{}
 		rule, ok := r.(map[interface{}]interface{})
 		if !ok {
-			return scerr.InvalidParameterError("r", "is not a rule (map)")
+			return fail.InvalidParameterReport("r", "is not a rule (map)")
 		}
 		anon, ok := rule["targets"].(map[interface{}]interface{})
 		if !ok {
@@ -914,7 +914,7 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 		hosts, err := w.identifyHosts(targets)
 		if err != nil {
-			return scerr.Wrap(err, "failed to apply proxy rules: %s")
+			return fail.Wrap(err, "failed to apply proxy rules: %s")
 		}
 
 		for _, h := range hosts {
@@ -928,7 +928,7 @@ func (w *worker) setReverseProxy() (err error) {
 				"vars": &primaryGatewayVariables,
 			})
 			if err != nil {
-				return scerr.Wrap(err, "failed to apply proxy rules")
+				return fail.Wrap(err, "failed to apply proxy rules")
 			}
 
 			var errS error
@@ -963,19 +963,19 @@ func (w *worker) setReverseProxy() (err error) {
 func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, err error) {
 	ctrl, ok := params.(data.Map)["ctrl"].(*KongController)
 	if !ok {
-		return nil, scerr.InvalidParameterError("ctrl", "is not a *KongController")
+		return nil, fail.InvalidParameterReport("ctrl", "is not a *KongController")
 	}
 	rule, ok := params.(data.Map)["rule"].(map[interface{}]interface{})
 	if !ok {
-		return nil, scerr.InvalidParameterError("rule", "is not a map")
+		return nil, fail.InvalidParameterReport("rule", "is not a map")
 	}
 	vars, ok := params.(data.Map)["vars"].(*data.Map)
 	if !ok {
-		return nil, scerr.InvalidParameterError("vars", "is not a '*data.Map'")
+		return nil, fail.InvalidParameterReport("vars", "is not a '*data.Map'")
 	}
 	hostName, ok := (*vars)["Hostname"].(string)
 	if !ok {
-		return nil, scerr.InvalidParameterError("Hostname", "is not a string")
+		return nil, fail.InvalidParameterReport("Hostname", "is not a string")
 	}
 
 	ruleName, err := ctrl.Apply(rule, vars)
@@ -987,7 +987,7 @@ func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameter
 		}
 		msg += " for host '" + hostName
 		logrus.Error(msg + "': " + err.Error())
-		return nil, scerr.Wrap(err, msg)
+		return nil, fail.Wrap(err, msg)
 	}
 	logrus.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 	return nil, nil
@@ -1091,7 +1091,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
 		result, err := template.New("normalize_script").Parse(tmpl)
 		if err != nil {
-			return "", scerr.SyntaxError("error parsing bash template: %s", err.Error())
+			return "", fail.SyntaxReport("error parsing bash template: %s", err.Error())
 		}
 		featureScriptTemplate.Store(result)
 		anon = featureScriptTemplate.Load()

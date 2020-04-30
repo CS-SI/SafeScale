@@ -40,7 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -102,14 +102,14 @@ func extractClusterArgument(c *cli.Context) error {
 var clusterListCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "List available clusters",
+	Usage:   "ErrorList available clusters",
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 
 		list, err := client.New().Cluster.List(temporal.DefaultExecutionTimeout)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
 		}
 
@@ -483,7 +483,7 @@ var clusterCreateCommand = &cli.Command{
 		// 	DisabledDefaultFeatures: disableFeatures,
 		// })
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 		}
@@ -540,7 +540,7 @@ var clusterDeleteCommand = &cli.Command{
 
 		err = client.New().Cluster.Delete(clusterName, temporal.GetLongOperationTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -563,7 +563,7 @@ var clusterStopCommand = &cli.Command{
 
 		err = client.New().Cluster.Stop(clusterName, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -585,7 +585,7 @@ var clusterStartCommand = &cli.Command{
 		clusterRef := c.Args().First()
 		err = client.New().Cluster.Start(clusterRef, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of cluster", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -607,7 +607,7 @@ var clusterStateCommand = &cli.Command{
 
 		state, err := client.New().Cluster.GetState(clusterName, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -678,7 +678,7 @@ var clusterExpandCommand = &cli.Command{
 		}
 		hosts, err := client.New().Cluster.Expand(req, temporal.GetLongOperationTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(hosts)
@@ -723,7 +723,7 @@ var clusterShrinkCommand = &cli.Command{
 		// VPL: to move inside safescaled
 		// present, err := clusterInstance.CountNodes(concurrency.RootTask()
 		// if err != nil {
-		// 	err = scerr.FromGRPCStatus(err)
+		// 	err = fail.FromGRPCStatus(err)
 		// 	return clitools.FailureResponse(err)
 		// }
 		// if count > present {
@@ -745,7 +745,7 @@ var clusterShrinkCommand = &cli.Command{
 		}
 		_, err = client.New().Cluster.Shrink(req, temporal.GetLongOperationTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -1022,7 +1022,7 @@ var clusterListFeaturesCommand = &cli.Command{
 		}
 		features, err := clusterInstance.ListInstalledFeatures(task)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		return clitools.SuccessResponse(features)
@@ -1072,7 +1072,7 @@ var clusterAddFeatureCommand = &cli.Command{
 		settings.SkipProxy = c.Bool("skip-proxy")
 		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, settings, 0)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -1116,7 +1116,7 @@ var clusterCheckFeatureCommand = &cli.Command{
 		settings := protocol.FeatureSettings{}
 		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, settings, 0)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -1165,7 +1165,7 @@ var clusterRemoveFeatureCommand = &cli.Command{
 
 		err = client.New().Cluster.RemoveFeature(clusterName, featureName, values, settings, 0)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error removing feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
@@ -1216,7 +1216,7 @@ var clusterNodeListCommand = &cli.Command{
 		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
-				err = scerr.FromGRPCStatus(err)
+				err = fail.FromGRPCStatus(err)
 				msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 				// fmt.Println(msg)
 				logrus.Warnln(msg)
@@ -1255,7 +1255,7 @@ var clusterNodeInspectCommand = &cli.Command{
 
 		host, err := client.New().Host.Inspect(hostName, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(host)
@@ -1307,7 +1307,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 		}
 		err = clusterInstance.Delete(task)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -1412,7 +1412,7 @@ var clusterMasterListCommand = &cli.Command{
 		for _, i := range list {
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
-				err = scerr.FromGRPCStatus(err)
+				err = fail.FromGRPCStatus(err)
 				msg := fmt.Sprintf("failed to get data for master '%s': %s. Ignoring.", i, err.Error())
 				fmt.Println(msg)
 				logrus.Warnln(msg)

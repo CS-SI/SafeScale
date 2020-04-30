@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // safescale image list --all=false
@@ -34,22 +34,22 @@ import (
 // ImageListener image service server grpc
 type ImageListener struct{}
 
-// List available images
+// ErrorList available images
 func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot list image").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot list image").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -67,7 +67,7 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewImageHandler(job)
 	images, err := handler.List(in.GetAll())

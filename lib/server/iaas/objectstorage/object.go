@@ -34,7 +34,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // object implementation of Object interface
@@ -86,7 +86,7 @@ func (o *object) Stored() bool {
 // Reload reloads the data of the Object from the Object Storage
 func (o *object) Reload() error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
@@ -112,10 +112,10 @@ func (o *object) reloadFromItem(item stow.Item) error {
 // Read reads the content of the object from Object Storage and writes it in 'target'
 func (o *object) Read(target io.Writer, from, to int64) error {
 	if target == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if from > to {
-		return scerr.InvalidParameterError("from", "cannot be greater than 'to'")
+		return fail.InvalidParameterReport("from", "cannot be greater than 'to'")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().OnExitTrace()
@@ -131,10 +131,10 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 
 	size, err := o.GetSize()
 	if err != nil {
-		return scerr.Wrap(err, "failed to get bucket size")
+		return fail.Wrap(err, "failed to get bucket size")
 	}
 	if size < 0 {
-		return scerr.NewError("unknown size of object")
+		return fail.NewReport("unknown size of object")
 	}
 
 	length = size
@@ -152,7 +152,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 	defer func() {
 		clerr := source.Close()
 		if clerr != nil {
-			logrus.Error("Error closing item")
+			logrus.Error("Report closing item")
 		}
 	}()
 
@@ -185,13 +185,13 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 // Write the source to the object in Object Storage
 func (o *object) Write(source io.Reader, sourceSize int64) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if source == nil {
-		return scerr.InvalidParameterError("source", "cannot be nil")
+		return fail.InvalidParameterReport("source", "cannot be nil")
 	}
 	if o.bucket == nil {
-		return scerr.InvalidParameterError("o.bucket", "cannot be nil")
+		return fail.InvalidParameterReport("o.bucket", "cannot be nil")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().OnExitTrace()
@@ -207,7 +207,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if source == nil { // If source is nil, do nothing and don't trigger an error
 		return nil
@@ -250,14 +250,14 @@ func writeChunk(
 	if err == io.EOF {
 		msg := fmt.Sprintf("failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 		logrus.Errorf(msg)
-		return scerr.NewError(msg)
+		return fail.NewReport(msg)
 	}
 	r := bytes.NewReader(buf)
 	objectNamePart := objectName + strconv.Itoa(chunkIndex)
 	metadata["Split"] = objectName
 	_, err = container.Put(objectNamePart, r, int64(nBytesRead), metadata)
 	if err != nil {
-		return scerr.Wrap(err, "failed to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
+		return fail.Wrap(err, "failed to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 	}
 	logrus.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
 	return err
@@ -266,7 +266,7 @@ func writeChunk(
 // Delete deletes the object from Object Storage
 func (o *object) Delete() error {
 	if o.item == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
@@ -282,7 +282,7 @@ func (o *object) Delete() error {
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
 func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
@@ -296,7 +296,7 @@ func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
 // AddMetadata adds missing entries in object metadata
 func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
@@ -313,7 +313,7 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
 func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
 
@@ -324,14 +324,14 @@ func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
 // GetLastUpdate returns the date of last update
 func (o *object) GetLastUpdate() (time.Time, error) {
 	if o == nil {
-		return time.Time{}, scerr.InvalidInstanceError()
+		return time.Time{}, fail.InvalidInstanceReport()
 	}
 	if o.item == nil {
-		return time.Time{}, scerr.InvalidInstanceContentError("o.item", "cannot be nil")
+		return time.Time{}, fail.InvalidInstanceContentReport("o.item", "cannot be nil")
 	}
 	t, err := o.item.LastMod()
 	if err != nil {
-		return time.Time{}, scerr.NewError(err, nil, "")
+		return time.Time{}, fail.NewReport(err, nil, "")
 	}
 	return t, nil
 }
@@ -346,7 +346,7 @@ func (o *object) SafeGetLastUpdate() time.Time {
 // GetMetadata returns the metadata of the object in Object Storage
 func (o *object) GetMetadata() (ObjectMetadata, error) {
 	if o == nil {
-		return ObjectMetadata{}, scerr.InvalidInstanceError()
+		return ObjectMetadata{}, fail.InvalidInstanceReport()
 	}
 	return o.Metadata.Clone(), nil
 }
@@ -361,10 +361,10 @@ func (o *object) SafeGetMetadata() ObjectMetadata {
 // GetSize returns the size of the content of the object
 func (o *object) GetSize() (int64, error) {
 	if o == nil {
-		return -1, scerr.InvalidInstanceError()
+		return -1, fail.InvalidInstanceReport()
 	}
 	if o.item == nil {
-		return -1, scerr.InvalidInstanceContentError("o.item", "cannot be nil")
+		return -1, fail.InvalidInstanceContentReport("o.item", "cannot be nil")
 	}
 	size, err := o.item.Size()
 	if err != nil {
@@ -382,10 +382,10 @@ func (o *object) SafeGetSize() int64 {
 // GetETag returns the value of the ETag (+/- md5sum of the content...)
 func (o *object) GetETag() (string, error) {
 	if o == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceReport()
 	}
 	if o.item == nil {
-		return "", scerr.InvalidInstanceContentError("o.item", "cannot be nil")
+		return "", fail.InvalidInstanceContentReport("o.item", "cannot be nil")
 	}
 	etag, err := o.item.ETag()
 	if err != nil {
@@ -404,10 +404,10 @@ func (o *object) SafeGetETag() string {
 // GetID ...
 func (o *object) GetID() (string, error) {
 	if o == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceReport()
 	}
 	if o.item == nil {
-		return "", scerr.InvalidInstanceContentError("o.item", "cannot be nil")
+		return "", fail.InvalidInstanceContentReport("o.item", "cannot be nil")
 	}
 	return o.item.ID(), nil
 }
@@ -422,7 +422,7 @@ func (o *object) SafeGetID() string {
 // GetName returns the name of the object
 func (o *object) GetName() (string, error) {
 	if o == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceReport()
 	}
 	return o.Name, nil
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // provider is the provider implementation of the Gcp provider
@@ -46,12 +46,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
-		return &provider{}, scerr.SyntaxError("section 'identity' not found in tenants.toml")
+		return &provider{}, fail.SyntaxReport("section 'identity' not found in tenants.toml")
 	}
 
 	computeCfg, ok := params["compute"].(map[string]interface{})
 	if !ok {
-		return &provider{}, scerr.SyntaxError("section 'compute' not found in tenants.toml")
+		return &provider{}, fail.SyntaxReport("section 'compute' not found in tenants.toml")
 	}
 
 	networkName := "safescale"

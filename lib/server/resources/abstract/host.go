@@ -22,7 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // KeyPair represents a SSH key pair
@@ -207,18 +207,37 @@ func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
 }
 
 // Serialize serializes Host instance into bytes (output json code)
-func (hc *HostCore) Serialize() ([]byte, error) {
-	return json.Marshal(hc)
+func (hc *HostCore) Serialize() ([]byte, fail.Report) {
+	if hc == nil {
+		return nil, fail.InvalidInstanceReport()
+	}
+
+	r, jserr := json.Marshal(hc)
+	if jserr != nil {
+		return nil, fail.NewReport(jserr.Error())
+	}
+	return r, nil
 }
 
 // Deserialize reads json code and reinstantiates an Host
-func (hc *HostCore) Deserialize(buf []byte) (err error) {
+func (hc *HostCore) Deserialize(buf []byte) (oerr fail.Report) {
 	if hc == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
-	defer scerr.OnPanic(&err) // json.Unmarshal may panic
-	return json.Unmarshal(buf, hc)
+	var panicErr error
+	defer func() {
+		if panicErr != nil {
+			oerr = fail.ErrorToReport(panicErr) // If panic occured, transforms err to a fail.Report if needed
+		}
+	}()
+	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
+
+	jserr := json.Unmarshal(buf, hc)
+	if jserr != nil {
+		return fail.NewReport(jserr.Error())
+	}
+	return nil
 }
 
 // SafeGetName returns the name of the host

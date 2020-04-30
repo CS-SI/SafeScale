@@ -21,7 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateHandler
@@ -44,18 +44,18 @@ func NewTemplateHandler(job server.Job) TemplateHandler {
 	return &templateHandler{job: job}
 }
 
-// List returns the template list
+// ErrorList returns the template list
 func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	tlist, err = handler.job.SafeGetService().ListTemplates(all)
 	return tlist, err

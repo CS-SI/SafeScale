@@ -23,7 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -47,12 +47,12 @@ var BucketCmd = &cli.Command{
 var bucketList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "List buckets",
+	Usage:   "ErrorList buckets",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", bucketCmdName, c.Command.Name, c.Args())
 		resp, err := client.New().Bucket.List(0)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of buckets", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
@@ -73,7 +73,7 @@ var bucketCreate = &cli.Command{
 
 		err := client.New().Bucket.Create(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -98,7 +98,7 @@ var bucketDelete = &cli.Command{
 
 		err := client.New().Bucket.Delete(bucketList, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -119,7 +119,7 @@ var bucketInspect = &cli.Command{
 
 		resp, err := client.New().Bucket.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
@@ -146,7 +146,7 @@ var bucketMount = &cli.Command{
 
 		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "mount of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
@@ -167,7 +167,7 @@ var bucketUnmount = &cli.Command{
 
 		err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)

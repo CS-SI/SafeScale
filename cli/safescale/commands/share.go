@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -120,7 +120,7 @@ var shareCreate = &cli.Command{
 		}
 		err := client.New().Share.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "creation of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -154,7 +154,7 @@ var shareDelete = &cli.Command{
 			defer wg.Done()
 			err := client.New().Share.Delete(aname, temporal.GetExecutionTimeout())
 			if err != nil {
-				err = scerr.FromGRPCStatus(err)
+				err = fail.FromGRPCStatus(err)
 				msgs := errMessage.Load().(string)
 				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, strprocess.Capitalize(err.Error()))
 				errMessage.Store(msgs)
@@ -178,12 +178,12 @@ var shareDelete = &cli.Command{
 var shareList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "List all created shared",
+	Usage:   "ErrorList all created shared",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		list, err := client.New().Share.List(0)
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "list of shares", false).Error()))
 		}
 		return clitools.SuccessResponse(list.ShareList)
@@ -224,7 +224,7 @@ var shareMount = &cli.Command{
 		}
 		err := client.New().Share.Mount(def, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "mount of nas", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -251,7 +251,7 @@ var shareUnmount = &cli.Command{
 		}
 		err := client.New().Share.Unmount(def, temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "unmount of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
@@ -261,7 +261,7 @@ var shareUnmount = &cli.Command{
 var shareInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
-	Usage:     "List the share information and clients connected to it",
+	Usage:     "ErrorList the share information and clients connected to it",
 	ArgsUsage: "<Share_name>",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
@@ -272,7 +272,7 @@ var shareInspect = &cli.Command{
 
 		list, err := client.New().Share.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "inspection of share", false).Error()))
 		}
 		return clitools.SuccessResponse(list)

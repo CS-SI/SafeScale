@@ -50,8 +50,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -109,12 +109,12 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 // ListImages lists available OS images
 func (s *Stack) ListImages() (images []abstract.Image, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return nil, fail.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 	defer func() {
 		if err := jsonFile.Close(); err != nil {
@@ -124,17 +124,17 @@ func (s *Stack) ListImages() (images []abstract.Image, err error) {
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to read '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return nil, fail.Wrap(err, "failed to read '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
-		return nil, scerr.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return nil, fail.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return nil, scerr.InvalidParameterError("result['images']]", "is not an array")
+		return nil, fail.InvalidParameterReport("result['images']]", "is not an array")
 	}
 	images = []abstract.Image{}
 	for _, imageJSON := range imagesJSON {
@@ -151,15 +151,15 @@ func (s *Stack) ListImages() (images []abstract.Image, err error) {
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("id", "cannot be empty string")
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to open %s", s.LibvirtConfig.ImagesJSONPath)
+		return nil, fail.Wrap(err, "failed to open %s", s.LibvirtConfig.ImagesJSONPath)
 	}
 	defer func() {
 		if err := jsonFile.Close(); err != nil {
@@ -169,17 +169,17 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to read %s", s.LibvirtConfig.ImagesJSONPath)
+		return nil, fail.Wrap(err, "failed to read %s", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
-		return nil, scerr.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return nil, fail.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return nil, scerr.InvalidParameterError("result['images']]", "is not an array")
+		return nil, fail.InvalidParameterReport("result['images']]", "is not an array")
 	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, ok := imageJSON.(map[string]interface{})["imageID"]; ok && imageID == id {
@@ -196,7 +196,7 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 		}
 	}
 
-	return nil, scerr.NotFoundError("image with id=%s not found", id)
+	return nil, fail.NotFoundReport("image with id=%s not found", id)
 }
 
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
@@ -204,12 +204,12 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to open '%s'", s.LibvirtConfig.TemplatesJSONPath)
+		return nil, fail.Wrap(err, "failed to open '%s'", s.LibvirtConfig.TemplatesJSONPath)
 	}
 	defer func() {
 		if err := jsonFile.Close(); err != nil {
@@ -219,17 +219,17 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, err error) {
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to read '%s'", s.LibvirtConfig.TemplatesJSONPath)
+		return nil, fail.Wrap(err, "failed to read '%s'", s.LibvirtConfig.TemplatesJSONPath)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
-		return nil, scerr.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.TemplatesJSONPath)
+		return nil, fail.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.TemplatesJSONPath)
 	}
 
 	templatesJSON, ok := result["templates"].([]interface{})
 	if !ok {
-		return nil, scerr.InvalidParameterError("result['templates']]", "is not an array")
+		return nil, fail.InvalidParameterReport("result['templates']]", "is not an array")
 	}
 	templates = []abstract.HostTemplate{}
 	for _, templateJSON := range templatesJSON {
@@ -251,12 +251,12 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, err error) {
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to open '%s'", s.LibvirtConfig.TemplatesJSONPath)
+		return nil, fail.Wrap(err, "failed to open '%s'", s.LibvirtConfig.TemplatesJSONPath)
 	}
 	defer func() {
 		if err := jsonFile.Close(); err != nil {
@@ -266,17 +266,17 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err err
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to read '%s'", s.LibvirtConfig.TemplatesJSONPath)
+		return nil, fail.Wrap(err, "failed to read '%s'", s.LibvirtConfig.TemplatesJSONPath)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
-		return nil, scerr.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.TemplatesJSONPath)
+		return nil, fail.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.TemplatesJSONPath)
 	}
 
 	templatesJSON, ok := result["templates"].([]interface{})
 	if !ok {
-		return nil, scerr.InvalidParameterError("result['templates']", "is not an array")
+		return nil, fail.InvalidParameterReport("result['templates']", "is not an array")
 	}
 	for _, templateJSON := range templatesJSON {
 		if templateID, _ := templateJSON.(map[string]interface{})["templateID"]; templateID == id {
@@ -292,7 +292,7 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err err
 		}
 	}
 
-	return nil, scerr.NotFoundError("template with id '%s' not found", id)
+	return nil, fail.NotFoundReport("template with id '%s' not found", id)
 }
 
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
@@ -300,7 +300,7 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err err
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	// privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
@@ -321,7 +321,7 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 
 	kp, err := crypt.GenerateRSAKeyPair(name)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to generate uuid key")
+		return nil, fail.Wrap(err, "failed to generate uuid key")
 	}
 	kp.ID, err = uuid.NewV4()
 	if err != nil {
@@ -332,17 +332,17 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
-	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME Technical debt
+	return nil, fail.NotImplementedReport("GetKeyPair() not implemented yet") // FIXME Technical debt
 }
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
-	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
+	return nil, fail.NotImplementedReport("ListKeyPairs() not implemented yet") // FIXME Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME Technical debt
+	return fail.NotImplementedReport("DeleteKeyPair() not implemented yet") // FIXME Technical debt
 }
 
 //-------------HOST MANAGEMENT------------------------------------------------------------------------------------------
@@ -359,10 +359,10 @@ func downloadImage(path string, downloadInfo map[string]interface{}) error {
 		cmd := exec.Command("bash", "-c", command)
 		err := cmd.Run()
 		if err != nil {
-			return scerr.Wrap(err, "command failed: '%s'\n", command)
+			return fail.Wrap(err, "command failed: '%s'\n", command)
 		}
 	default:
-		return scerr.NotImplementedError(fmt.Sprintf("download method %s not implemented", downloadInfo["method"].(string)))
+		return fail.NotImplementedReport(fmt.Sprintf("download method %s not implemented", downloadInfo["method"].(string)))
 	}
 	return nil
 }
@@ -371,7 +371,7 @@ func downloadImage(path string, downloadInfo map[string]interface{}) error {
 func getImagePathFromID(s *Stack, id string) (path string, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
-		return "", scerr.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return "", fail.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 	defer func() {
 		if err := jsonFile.Close(); err != nil {
@@ -381,60 +381,60 @@ func getImagePathFromID(s *Stack, id string) (path string, err error) {
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		return "", scerr.Wrap(err, "failed to read '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return "", fail.Wrap(err, "failed to read '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
-		return "", scerr.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return "", fail.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return "", scerr.InvalidParameterError("result['images']", "must be an array")
+		return "", fail.InvalidParameterReport("result['images']", "must be an array")
 	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
 			path, ok := imageJSON.(map[string]interface{})["imagePath"].(string)
 			if !ok {
-				return "", scerr.InvalidParameterError("imagePath", "must be an non-empty string")
+				return "", fail.InvalidParameterReport("imagePath", "must be an non-empty string")
 			}
 			// check parent directory first
 			parentDir := filepath.Dir(path)
 			if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 				if err != nil {
-					return "", scerr.NewError("failed to download image: directory '%s' doesn't exist", parentDir)
+					return "", fail.NewReport("failed to download image: directory '%s' doesn't exist", parentDir)
 				}
 			}
 			// download if image file isn't there
 			if _, err := os.Stat(path); os.IsNotExist(err) {
 				downloadPath, ok := imageJSON.(map[string]interface{})["download"]
 				if !ok {
-					return "", scerr.SyntaxError("invalid json")
+					return "", fail.SyntaxReport("invalid json")
 				}
 				mapDownload, ok := downloadPath.(map[string]interface{})
 				if !ok {
-					return "", scerr.SyntaxError("invalid json")
+					return "", fail.SyntaxReport("invalid json")
 				}
 				err := downloadImage(path, mapDownload)
 				if err != nil {
-					return "", scerr.Wrap(err, "failed to download image:")
+					return "", fail.Wrap(err, "failed to download image:")
 				}
 			} else if err != nil {
-				return "", scerr.Wrap(err, "unable to check if the file '%s' exists", filepath.Base(path))
+				return "", fail.Wrap(err, "unable to check if the file '%s' exists", filepath.Base(path))
 			}
 			return path, nil
 		}
 	}
 
-	return "", scerr.NotFoundError("image with id '%s' not found", id)
+	return "", fail.NotFoundReport("image with id '%s' not found", id)
 }
 
 // getDiskFromID retrieve the disk with root partition of an image from this image ID
 func getDiskFromID(s *Stack, id string) (disk string, err error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
-		return "", scerr.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return "", fail.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 	defer func() {
 		if err := jsonFile.Close(); err != nil {
@@ -444,17 +444,17 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		return "", scerr.Wrap(err, "failed to read '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return "", fail.Wrap(err, "failed to read '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
-		return "", scerr.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
+		return "", fail.Wrap(err, "failed to unmarshal jsonFile '%s'", s.LibvirtConfig.ImagesJSONPath)
 	}
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return "", scerr.InvalidParameterError("result['images']]", "is not an array")
+		return "", fail.InvalidParameterReport("result['images']]", "is not an array")
 	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
@@ -462,22 +462,22 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 		}
 	}
 
-	return "", scerr.NotFoundError("image with id '%s' not found", id)
+	return "", fail.NotFoundReport("image with id '%s' not found", id)
 }
 
 func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) ([]*libvirtxml.StorageVolume, error) {
 	var volumeDescriptions []*libvirtxml.StorageVolume
 	var domainVolumePaths []string
 
-	//List paths of domain disks
+	//ErrorList paths of domain disks
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed get xml description of domain")
+		return nil, fail.Wrap(err, "failed get xml description of domain")
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed unmarshall the domain description")
+		return nil, fail.Wrap(err, "failed unmarshall the domain description")
 	}
 	domainDisks := domainDescription.Devices.Disks
 
@@ -488,7 +488,7 @@ func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connec
 	//Check which volumes match these paths
 	pools, err := libvirtService.ListAllStoragePools(2)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to list pools")
+		return nil, fail.Wrap(err, "failed to list pools")
 	}
 	for _, pool := range pools {
 		volumes, err := pool.ListAllStorageVolumes(0)
@@ -503,7 +503,7 @@ func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connec
 			volumeDescription := &libvirtxml.StorageVolume{}
 			err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
 			if err != nil {
-				return nil, scerr.Wrap(err, "failed to unmarshall the volume description")
+				return nil, fail.Wrap(err, "failed to unmarshall the volume description")
 			}
 
 			for _, domainVolumePath := range domainVolumePaths {
@@ -548,13 +548,13 @@ func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Conne
 
 	info, err := domain.GetInfo()
 	if err != nil {
-		return nil, scerr.Wrap("failed to get infos from the domain")
+		return nil, fail.Wrap("failed to get infos from the domain")
 	}
 
 	diskSize := 0
 	volumes, err := getVolumesFromDomain(domain, libvirtService)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to get volumes from the domain")
+		return nil, fail.Wrap(err, "failed to get volumes from the domain")
 	}
 	for _, volume := range volumes {
 		diskSize += int(volume.Capacity.Value / 1024 / 1024 / 1024)
@@ -576,14 +576,14 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed get xml description of the domain")
+		return nil, fail.Wrap(err, "failed get xml description of the domain")
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 
 	networks, err := s.LibvirtService.ListAllNetworks(3)
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to list all networks")
+		return nil, fail.Wrap(err, "failed to list all networks")
 	}
 
 	for _, iface := range domainDescription.Devices.Interfaces {
@@ -593,18 +593,18 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 					for _, network := range networks {
 						name, err := network.Name()
 						if err != nil {
-							return scerr.Wrap(err, "failed to get network name")
+							return fail.Wrap(err, "failed to get network name")
 						}
 						if name == iface.Source.Network.Network {
 							dhcpLeases, err := network.GetDHCPLeases()
 							if err != nil {
-								return scerr.Wrap(err, "failed to get network dhcpLeases")
+								return fail.Wrap(err, "failed to get network dhcpLeases")
 							}
 							for _, dhcpLease := range dhcpLeases {
 								if dhcpLease.Mac == iface.MAC.Address {
 									net, err := s.GetNetwork(iface.Source.Network.Network)
 									if err != nil {
-										return scerr.NotFoundError("unknown Network %s", iface.Source.Network.Network)
+										return fail.NotFoundReport("unknown Network %s", iface.Source.Network.Network)
 									}
 									if len(strings.Split(dhcpLease.IPaddr, ".")) == 4 {
 										if name == "default" {
@@ -621,7 +621,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 											hostNetwork.IPv6Addresses[net.ID] = dhcpLease.IPaddr
 										}
 									} else {
-										return scerr.NewError("unknown adressType")
+										return fail.NewReport("unknown adressType")
 									}
 									hostNetwork.NetworksByID[net.ID] = net.Name
 									hostNetwork.NetworksByName[net.Name] = net.ID
@@ -630,7 +630,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 							}
 						}
 					}
-					return scerr.NotFoundError("no local IP matching inteface '%s' found", iface.Alias)
+					return fail.NotFoundReport("no local IP matching inteface '%s' found", iface.Alias)
 				},
 				temporal.GetHostTimeout(),
 			)
@@ -644,19 +644,19 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 
 // getHostFromDomain build a abstract.Host struct representing a Domain
 func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, err error) {
-	defer scerr.OnPanic(&err)
+	defer fail.OnPanic(&err)
 
 	id, err := domain.GetUUIDString()
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to fetch id from domain")
+		return nil, fail.Wrap(err, "failed to fetch id from domain")
 	}
 	name, err := domain.Name()
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to fetch name from domain")
+		return nil, fail.Wrap(err, "failed to fetch name from domain")
 	}
 	state, _, err := domain.State()
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to fetch state from domain")
+		return nil, fail.Wrap(err, "failed to fetch state from domain")
 	}
 
 	host := abstract.NewHost()
@@ -671,39 +671,39 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, err
 		innerErr := props.Alter(hostproperty.DescriptionV1, func(clonable data.Clonable) error {
 			hostDescriptionV1, err := getDescriptionV1FromDomain(domain, s.LibvirtService)
 			if err != nil {
-				return scerr.Wrap(err, "failed to get domain description")
+				return fail.Wrap(err, "failed to get domain description")
 			}
 			clonable.(*propertiesv1.HostDescription).Replace(hostDescriptionV1)
 			return nil
 		})
 
 		if innerErr != nil {
-			return nil, scerr.Wrap(err, "failed to update hostproperty.DescriptionV1")
+			return nil, fail.Wrap(err, "failed to update hostproperty.DescriptionV1")
 		}
 
 		innerErr = props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
 			hostSizingV1, err := getSizingV1FromDomain(domain, s.LibvirtService)
 			if err != nil {
-				return scerr.Wrap(err, "failed to get domain sizing")
+				return fail.Wrap(err, "failed to get domain sizing")
 			}
 			clonable.(*propertiesv1.HostSizing).Replace(hostSizingV1)
 			return nil
 		})
 		if innerErr != nil {
-			return nil, scerr.Wrap(err, "failed to update hostproperty.SizingV1")
+			return nil, fail.Wrap(err, "failed to update hostproperty.SizingV1")
 		}
 
 		return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
 			hostNetworkV1, err := s.getNetworkV1FromDomain(domain)
 			if err != nil {
-				return scerr.Wrap(err, "failed to get domain network")
+				return fail.Wrap(err, "failed to get domain network")
 			}
 			clonable.(*propertiesv1.HostNetwork).Replace(hostNetworkV1)
 			return nil
 		})
 	})
 	if err != nil {
-		return nil, scerr.Wrap(err, "failed to update hostproperty.NetworkV1")
+		return nil, fail.Wrap(err, "failed to update hostproperty.NetworkV1")
 	}
 
 	return host, nil
@@ -717,18 +717,18 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.Host, *libvirt.Do
 		if err != nil {
 			re, err2 := regexp.Compile("[0-9]+")
 			if err2 != nil {
-				return nil, nil, scerr.Wrap(err, "failed to fetch domain from ref")
+				return nil, nil, fail.Wrap(err, "failed to fetch domain from ref")
 			}
 			errCode, _ := strconv.Atoi(re.FindString(err.Error()))
 			if errCode == 42 {
 				return nil, nil, abstract.ResourceNotFoundError("host", ref)
 			}
-			return nil, nil, scerr.Wrap(err, "failed to fetch domain from ref")
+			return nil, nil, fail.Wrap(err, "failed to fetch domain from ref")
 		}
 	}
 	host, err := s.getHostFromDomain(domain)
 	if err != nil {
-		return nil, nil, scerr.Wrap(err, "failed to get host from domain")
+		return nil, nil, fail.Wrap(err, "failed to get host from domain")
 	}
 
 	return host, domain, nil
@@ -736,13 +736,13 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.Host, *libvirt.Do
 
 func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err error) {
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterReport("host", "cannot be nil")
 	}
 	if newHost == nil {
-		return scerr.InvalidParameterError("newHost", "cannot be nil")
+		return fail.InvalidParameterReport("newHost", "cannot be nil")
 	}
 
-	defer scerr.OnPanic(&err)
+	defer fail.OnPanic(&err)
 
 	host.ID = newHost.ID
 	if host.Name == "" {
@@ -759,7 +759,7 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err
 				return nil
 			})
 			if readlockErr != nil {
-				return scerr.Wrap(err, "failed to update hostproperty.NetworkV1")
+				return fail.Wrap(err, "failed to update hostproperty.NetworkV1")
 			}
 			hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
 			hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
@@ -779,7 +779,7 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err
 				return nil
 			})
 			if readLockErr != nil {
-				return scerr.Wrap(readLockErr, "failed to update hostproperty.SizingV1")
+				return fail.Wrap(readLockErr, "failed to update hostproperty.SizingV1")
 			}
 			hostSizingV1 := clonable.(*propertiesv1.HostSizing)
 			hostSizingV1.AllocatedSize.Cores = newHostSizingV1.AllocatedSize.Cores
@@ -798,7 +798,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 	cmd.Stdout = cmdOutput
 	err = cmd.Run()
 	if err != nil {
-		return scerr.NewError("command failed: '%s'\n%s", command, err.Error())
+		return fail.NewReport("command failed: '%s'\n%s", command, err.Error())
 	}
 
 	target := strings.TrimSpace(cmdOutput.String())
@@ -814,10 +814,10 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, _ *abstract.HostTemplate, userData *userdata.Content, err error) {
 	if s == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, fail.InvalidInstanceReport()
 	}
 
-	defer scerr.OnPanic(&err)
+	defer fail.OnPanic(&err)
 
 	resourceName := request.ResourceName
 	hostName := request.HostName
@@ -832,26 +832,26 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	//----Check Inputs----
 	if resourceName == "" {
-		return nil, nil, nil, scerr.InvalidParameterError("request.ResourceName", "cannit be empty string")
+		return nil, nil, nil, fail.InvalidParameterReport("request.ResourceName", "cannit be empty string")
 	}
 	if hostName == "" {
 		hostName = resourceName
 	}
 	if networks == nil || len(networks) == 0 {
-		return nil, nil, userData, scerr.InvalidParameterError("request.Networks", "cannot be nil or an empty slice")
+		return nil, nil, userData, fail.InvalidParameterReport("request.Networks", "cannot be nil or an empty slice")
 	}
 	if defaultGateway == nil && !publicIP {
-		return nil, nil, userData, scerr.InvalidRequestError("the host '%s' must have a gateway or be public", resourceName)
+		return nil, nil, userData, fail.InvalidRequestReport("the host '%s' must have a gateway or be public", resourceName)
 	}
 	if templateID == "" {
-		return nil, nil, userData, scerr.InvalidParameterError("request.templateID", "cannot be empty string")
+		return nil, nil, userData, fail.InvalidParameterReport("request.templateID", "cannot be empty string")
 	}
 	if imageID == "" {
-		return nil, nil, userData, scerr.InvalidParameterError("request.ImageID", "cannot be empty string")
+		return nil, nil, userData, fail.InvalidParameterReport("request.ImageID", "cannot be empty string")
 	}
 	host, _, err = s.getHostAndDomainFromRef(resourceName)
 	if err == nil && host != nil {
-		return nil, nil, userData, scerr.DuplicateError("the host '%s' already exists", resourceName)
+		return nil, nil, userData, fail.DuplicateReport("the host '%s' already exists", resourceName)
 	}
 
 	//----Initialize----
@@ -859,34 +859,34 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		var err error
 		keyPair, err = s.CreateKeyPair(fmt.Sprintf("key_%s", resourceName))
 		if err != nil {
-			return nil, nil, userData, scerr.Wrap(err, "keypair creation failed")
+			return nil, nil, userData, fail.Wrap(err, "keypair creation failed")
 		}
 		request.KeyPair = keyPair
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, userData, scerr.Wrap(err, "failed to generate password")
+			return nil, userData, fail.Wrap(err, "failed to generate password")
 		}
 		request.Password = password
 	}
 
 	template, err = s.GetTemplate(templateID)
 	if err != nil {
-		return nil, nil, userData, scerr.Wrap(err, "failed to get template infos")
+		return nil, nil, userData, fail.Wrap(err, "failed to get template infos")
 	}
 	imagePath, err := getImagePathFromID(s, imageID)
 	if err != nil {
-		return nil, nil, userData, scerr.Wrap(err, "failed to get image path")
+		return nil, nil, userData, fail.Wrap(err, "failed to get image path")
 	}
 	imageDisk, err := getDiskFromID(s, imageID)
 	if err != nil {
-		return nil, nil, userData, scerr.Wrap(err, "failed to get disk from id")
+		return nil, nil, userData, fail.Wrap(err, "failed to get disk from id")
 	}
 
 	err = userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
-		return nil, nil, userData, scerr.Wrap(err, "failed to prepare user data content")
+		return nil, nil, userData, fail.Wrap(err, "failed to prepare user data content")
 	}
 
 	//----Commands----
@@ -904,7 +904,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			networkDefault, err := s.GetNetwork("default")
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrNotFound:
+				case fail.NotFound:
 					networkDefault, err = s.CreateNetwork(
 						abstract.NetworkRequest{
 							Name:      "default",
@@ -913,10 +913,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 						},
 					)
 					if err != nil {
-						return nil, nil, userData, scerr.Wrap(err, "failed to create network 'default'")
+						return nil, nil, userData, fail.Wrap(err, "failed to create network 'default'")
 					}
 				default:
-					return nil, nil, userData, scerr.Wrap(err, "failed to get network 'default'")
+					return nil, nil, userData, fail.Wrap(err, "failed to get network 'default'")
 				}
 			}
 
@@ -927,14 +927,14 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		cmd.Stdout = cmdOutput
 		err = cmd.Run()
 		if err != nil {
-			return nil, nil, nil, scerr.NewError("command failed: '%s'\n%s", command, err.Error())
+			return nil, nil, nil, fail.NewReport("command failed: '%s'\n%s", command, err.Error())
 		}
 		ip := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 
 		if bridgedVMs {
 			infoWaiter, err := GetInfoWaiter()
 			if err != nil {
-				return nil, nil, userData, scerr.Wrap(err, "failed to get info waiter")
+				return nil, nil, userData, fail.Wrap(err, "failed to get info waiter")
 			}
 
 			userData.AddInTag(string(userdata.PHASE2_NETWORK_AND_SECURITY), "insert_tag", fmt.Sprintf(`
@@ -947,7 +947,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			cmd.Stdout = cmdOutput
 			err = cmd.Run()
 			if err != nil {
-				return nil, nil, userData, scerr.Wrap(err, "command failed: '%s'\n", command)
+				return nil, nil, userData, fail.Wrap(err, "command failed: '%s'\n", command)
 			}
 			lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 			networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
@@ -965,13 +965,13 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	userdataFileName := s.LibvirtConfig.LibvirtStorage + "/" + resourceName + "_userdata.sh"
 	err = ioutil.WriteFile(userdataFileName, userDataPhase1, 0644)
 	if err != nil {
-		return nil, nil, userData, scerr.Wrap(err, "failed to write userData in %s_userdata.sh file", resourceName)
+		return nil, nil, userData, fail.Wrap(err, "failed to write userData in %s_userdata.sh file", resourceName)
 	}
 
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
 	err = verifyVirtResizeCanAccessKernel()
 	if err != nil {
-		return nil, nil, userData, scerr.NewError("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+		return nil, nil, userData, fail.NewReport("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
 	}
 
 	var commands []string
@@ -1000,7 +1000,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		err = cmd.Run()
 		if err != nil {
 			logrus.Errorf("Commands failed: [%s] with error [%s], stdOutput [%s] and stdError [%s]", command, err.Error(), cmdOutput.String(), cmdError.String())
-			return nil, nil, userData, scerr.NewError("command failed: '%s'\n%s", command, err.Error())
+			return nil, nil, userData, fail.NewReport("command failed: '%s'\n%s", command, err.Error())
 		}
 	}
 
@@ -1009,7 +1009,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		if err != nil {
 			if derr := s.DeleteHost(resourceName); derr != nil {
 				fmt.Printf("failed to Delete the host %s: %s", resourceName, err.Error())
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -1018,12 +1018,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	domain, err := s.LibvirtService.LookupDomainByName(resourceName)
 	if err != nil {
-		return nil, nil, userData, scerr.Wrap(err, "cannot find domain '%s'", resourceName)
+		return nil, nil, userData, fail.Wrap(err, "cannot find domain '%s'", resourceName)
 	}
 
 	hostCore, err := s.getHostFromDomain(domain)
 	if err != nil {
-		return nil, nil, userData, scerr.Wrap(err, "failed to get host '%s' from domain", resourceName)
+		return nil, nil, userData, fail.Wrap(err, "failed to get host '%s' from domain", resourceName)
 	}
 
 	hostCore.PrivateKey = keyPair.PrivateKey
@@ -1046,7 +1046,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 		gateway, err := s.InspectHost(request.DefaultGateway)
 		if err != nil {
-			return nil, nil, nil, scerr.Wrap(err, "failed to get gateway host")
+			return nil, nil, nil, fail.Wrap(err, "failed to get gateway host")
 		}
 
 		hnV1.DefaultGatewayPrivateIP = gateway.PrivateIP()
@@ -1062,7 +1062,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 // GetHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
 func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	ahc, hostRef, err := stacks.ValidateHostParam(hostParam)
@@ -1078,7 +1078,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 	host = abstract.NewHostFull()
 	host.Core = ahc
 	if err = s.complementHost(host, newHost); err != nil {
-		return nil, scerr.Wrap(err, "failed to complement the host")
+		return nil, fail.Wrap(err, "failed to complement the host")
 	}
 
 	if !host.OK() {
@@ -1091,7 +1091,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 // GetHostByName returns the host identified by ref (name or id)
 func (s *Stack) GetHostByName(name string) (*abstract.HostCore, error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	host, err := s.InspectHost(name)
@@ -1104,7 +1104,7 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, error) {
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
 	if s == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1114,27 +1114,27 @@ func (s *Stack) DeleteHost(id string) error {
 
 	volumes, err := getVolumesFromDomain(domain, s.LibvirtService)
 	if err != nil {
-		return scerr.Wrap(err, "failed to get the volumes from the domain")
+		return fail.Wrap(err, "failed to get the volumes from the domain")
 	}
 
 	isActive, err := domain.IsActive()
 	if err != nil {
-		return scerr.Wrap(err, "failed to know if the domain is active")
+		return fail.Wrap(err, "failed to know if the domain is active")
 	}
 	if !isActive {
 		err := s.StartHost(id)
 		if err != nil {
-			return scerr.Wrap(err, "failed to start the domain")
+			return fail.Wrap(err, "failed to start the domain")
 		}
 	}
 
 	err = domain.Destroy()
 	if err != nil {
-		return scerr.Wrap(err, "failed to destroy the domain")
+		return fail.Wrap(err, "failed to destroy the domain")
 	}
 	err = domain.Undefine()
 	if err != nil {
-		return scerr.Wrap(err, "failed to undefine the domain")
+		return fail.Wrap(err, "failed to undefine the domain")
 	}
 
 	for _, volume := range volumes {
@@ -1143,12 +1143,12 @@ func (s *Stack) DeleteHost(id string) error {
 		volumeName := strings.Split(pathSplitted[len(pathSplitted)-1], ".")[0]
 		domainName, err := domain.Name()
 		if err != nil {
-			return scerr.Wrap(err, "failed to get domain name")
+			return fail.Wrap(err, "failed to get domain name")
 		}
 		if domainName == volumeName {
 			err = s.DeleteVolume(volume.Name)
 			if err != nil {
-				return scerr.Wrap(err, "failed to delete volume %s : %s", volumeName)
+				return fail.Wrap(err, "failed to delete volume %s : %s", volumeName)
 			}
 		}
 	}
@@ -1158,24 +1158,24 @@ func (s *Stack) DeleteHost(id string) error {
 
 // ResizeHost change the template used by an host
 func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.HostFull, error) {
-	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedReport("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*abstract.Host, error) {
 	var hosts []*abstract.Host
 	if s == nil {
-		return hosts, scerr.InvalidInstanceError()
+		return hosts, fail.InvalidInstanceReport()
 	}
 
 	domains, err := s.LibvirtService.ListAllDomains(16383)
 	if err != nil {
-		return nil, scerr.Wrap(err, "error listing domains")
+		return nil, fail.Wrap(err, "error listing domains")
 	}
 	for _, domain := range domains {
 		host, err := s.getHostFromDomain(&domain)
 		if err != nil {
-			return nil, scerr.Wrap(err, "failed to get host from domain")
+			return nil, fail.Wrap(err, "failed to get host from domain")
 		}
 
 		hosts = append(hosts, host)
@@ -1187,17 +1187,17 @@ func (s *Stack) ListHosts() ([]*abstract.Host, error) {
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
 	if s == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
 	if err != nil {
-		return scerr.Wrap(err, "getHostAndDomainFromRef failed")
+		return fail.Wrap(err, "getHostAndDomainFromRef failed")
 	}
 
 	err = domain.Shutdown()
 	if err != nil {
-		return scerr.Wrap(err, "failed to shutdown the host")
+		return fail.Wrap(err, "failed to shutdown the host")
 	}
 
 	return nil
@@ -1206,17 +1206,17 @@ func (s *Stack) StopHost(id string) error {
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
 	if s == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
 	if err != nil {
-		return scerr.Wrap(err, "getHostAndDomainFromRef")
+		return fail.Wrap(err, "getHostAndDomainFromRef")
 	}
 
 	err = domain.Create()
 	if err != nil {
-		return scerr.Wrap(err, "failed to launch the host")
+		return fail.Wrap(err, "failed to launch the host")
 	}
 
 	return nil
@@ -1225,17 +1225,17 @@ func (s *Stack) StartHost(id string) error {
 // RebootHost reboot the host identified by id
 func (s *Stack) RebootHost(id string) error {
 	if s == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
 	if err != nil {
-		return scerr.Wrap(err, "getHostAndDomainFromRef failed")
+		return fail.Wrap(err, "getHostAndDomainFromRef failed")
 	}
 
 	err = domain.Reboot(0)
 	if err != nil {
-		return scerr.Wrap(err, "failed to reboot the host")
+		return fail.Wrap(err, "failed to reboot the host")
 	}
 
 	return nil
@@ -1244,7 +1244,7 @@ func (s *Stack) RebootHost(id string) error {
 // GetHostState returns the host identified by id
 func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	if s == nil {
-		return hoststate.ERROR, scerr.InvalidInstanceError()
+		return hoststate.ERROR, fail.InvalidInstanceReport()
 	}
 
 	host, err := s.InspectHost(hostParam)
@@ -1259,14 +1259,14 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	return map[string]bool{"local": true}, nil
 }
 
 func (s *Stack) ListRegions() ([]string, error) {
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	return []string{"local"}, nil

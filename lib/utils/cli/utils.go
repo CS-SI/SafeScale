@@ -20,7 +20,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // ExtractRetCode extracts info from the error
@@ -32,11 +32,11 @@ func ExtractRetCode(err error) (string, int, error) {
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
 			retCode = status.ExitStatus()
 		} else {
-			return msg, retCode, scerr.InvalidParameterError("err", "must be a *exec.ExitError and err.Sys() must be a 'syscall.WaitStatus'")
+			return msg, retCode, fail.InvalidParameterReport("err", "must be a *exec.ExitError and err.Sys() must be a 'syscall.WaitStatus'")
 		}
 		// Retrieve error message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}
-	return msg, retCode, scerr.InvalidParameterError("err", "is not an 'ExitError'")
+	return msg, retCode, fail.InvalidParameterReport("err", "is not an 'ExitError'")
 }

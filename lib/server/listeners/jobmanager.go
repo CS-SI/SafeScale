@@ -27,13 +27,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (server.Job, error) {
+func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (server.Job, fail.Report) {
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	var tenant *Tenant
@@ -46,7 +46,7 @@ func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (
 	} else {
 		tenant = GetCurrentTenant()
 		if tenant == nil {
-			return nil, scerr.NotFoundError("no tenant set")
+			return nil, fail.NotFoundReport("no tenant set")
 		}
 	}
 	newctx, cancel := context.WithCancel(ctx)
@@ -62,34 +62,31 @@ func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (
 type JobManagerListener struct{}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err error) {
+func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err fail.Report) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot stop job").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot stop job").ToGRPCStatus()
 		}
 	}()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, fail.InvalidInstanceReport()
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if ok, err := govalidator.ValidateStruct(in); err == nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	uuid := in.Uuid
 	if in.Uuid == "" {
-		return empty, scerr.InvalidRequestError("cannot stop job: job id not set")
+		return empty, fail.InvalidRequestReport("cannot stop job: job id not set")
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
@@ -100,7 +97,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", uuid).Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
@@ -109,7 +106,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	// if err := srvutils.JobRegister(ctx, cancelFunc, "Stop job "+uuid); err == nil {
 	// 	defer srvutils.JobDeregister(ctx)
 	// } /* else {
-	// 	return empty, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	// 	return empty, fail.InvalidInstanceContentReport("ctx", "has no uuid").ToGRPCStatus()
 	// }*/
 
 	// tenant := GetCurrentTenant()
@@ -126,19 +123,19 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	return empty, server.AbortJobByID(uuid)
 }
 
-// List running process
+// ErrorList running process
 func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot list jobs").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot list jobs").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -155,14 +152,14 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 
 	tracer := concurrency.NewTracer(task, true, "").Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
 	// // LATER: handle jobregister error
-	// if err := srvutils.JobRegister(ctx, cancelFunc, "List Processes"); err == nil {
+	// if err := srvutils.JobRegister(ctx, cancelFunc, "ErrorList Processes"); err == nil {
 	// 	defer srvutils.JobDeregister(ctx)
 	// } /* else {
-	// 	return nil, scerr.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
+	// 	return nil, fail.InvalidInstanceContentReport("ctx", "has no uuid").ToGRPCStatus()
 	// }*/
 
 	// tenant := GetCurrentTenant()
@@ -178,7 +175,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	for uuid, info := range jobMap {
 		status, _ := task.GetStatus()
 		if status == concurrency.ABORTED {
-			return nil, scerr.AbortedError(nil)
+			return nil, fail.AbortedReport(nil)
 		}
 		pbProcessList = append(pbProcessList, &protocol.JobDefinition{Uuid: uuid, Info: info})
 	}

@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
@@ -66,19 +66,19 @@ func getCurrentTenant() *Tenant {
 // TenantListener server is used to implement SafeScale.safescale.
 type TenantListener struct{}
 
-// List registered tenants
+// ErrorList registered tenants
 func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot list tenants").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot list tenants").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -96,7 +96,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	tenants, err := iaas.GetTenantNames()
 	if err != nil {
@@ -118,15 +118,15 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantName, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot get tenant").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot get tenant").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -144,11 +144,11 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	getCurrentTenant()
 	if currentTenant == nil {
-		return nil, scerr.NotFoundError("no tenant set")
+		return nil, fail.NotFoundReport("no tenant set")
 	}
 	return &protocol.TenantName{Name: currentTenant.name}, nil
 }
@@ -157,19 +157,19 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot set tenant").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot set tenant").ToGRPCStatus()
 		}
 	}()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, fail.InvalidInstanceReport()
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -189,7 +189,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
@@ -207,19 +207,19 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot cleanup tenant").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot cleanup tenant").ToGRPCStatus()
 		}
 	}()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, fail.InvalidInstanceReport()
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return empty, scerr.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterReport("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -239,7 +239,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
@@ -258,16 +258,16 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (empty *googleprotobuf.Empty, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "failed to scan tenant").ToGRPCStatus()
+			err = fail.Wrap(err, "failed to scan tenant").ToGRPCStatus()
 		}
 	}()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, scerr.InvalidInstanceError()
+		return empty, fail.InvalidInstanceReport()
 	}
 	if ctx == nil {
-		return empty, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	job, err := PrepareJob(ctx, "", "host start")
@@ -278,13 +278,13 @@ func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (em
 
 	getCurrentTenant()
 	if currentTenant == nil {
-		return nil, scerr.NotFoundError("no tenant set")
+		return nil, fail.NotFoundReport("no tenant set")
 	}
 
 	name := currentTenant.name
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewScannerHandler(job)
 	if err != nil {

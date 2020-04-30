@@ -22,7 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -41,17 +41,17 @@ var ImageCmd = &cli.Command{
 var imageList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "List available images",
+	Usage:   "ErrorList available images",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "all",
-			Usage: "List all available images in tenant (without any filter)",
+			Usage: "ErrorList all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", imageCmdName, c.Command.Name, c.Args())
 		images, err := client.New().Image.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
-			err = scerr.FromGRPCStatus(err)
+			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))
 		}
 		return clitools.SuccessResponse(images.GetImages())

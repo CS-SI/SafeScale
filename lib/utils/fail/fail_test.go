@@ -1,4 +1,4 @@
-package glitch
+package fail
 
 import (
 	"fmt"
@@ -14,16 +14,16 @@ import (
 )
 
 func lazyDevs() error {
-	return NotImplementedError("no time for this")
+	return NotImplementedReport("no time for this")
 }
 
-func TestNotImplementedError(t *testing.T) {
+func TestNotImplementedReport(t *testing.T) {
 	what := lazyDevs()
 	if what == nil {
 		t.Fatalf("unexpected nil error")
 	}
 	whatContent := what.Error()
-	if !strings.Contains(whatContent, "glitch.lazyDevs") {
+	if !strings.Contains(whatContent, "fail.lazyDevs") {
 		t.Errorf("Expected 'utils.lazyDevs' in error content but found: %s", whatContent)
 	}
 }
@@ -112,23 +112,23 @@ func TestLogErrorWithPanic(t *testing.T) {
 }
 
 func lazyDevsWithCaveat() error {
-	return NotImplementedErrorWithReason("LazyDevsWithCaveat() not implemented yet!", "API not ready").WithField("provider", "Juawei")
+	return NotImplementedReportWithReason("LazyDevsWithCaveat() not implemented yet!", "API not ready").WithField("provider", "Juawei")
 }
 
 func lazyDevsPlainAndSimple() error {
-	return NotImplementedError("").WithField("provider", "Juawei")
+	return NotImplementedReport("").WithField("provider", "Juawei")
 }
 
 func moreLazyErrors() error {
-	return NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
+	return NotFoundReport("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
 }
 
 func getNotFoundErrorWithFields() error {
-	return NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
+	return NotFoundReport("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
 }
 
 func getNotFoundErrorWithFieldsAndConsequences() error {
-	nfe := NotFoundError("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
+	nfe := NotFoundReport("We lost something !!").WithField("node", "master-x").WithField("provider", "OWH")
 	return AddConsequence(nfe, fmt.Errorf("something else ... "))
 }
 
@@ -193,29 +193,29 @@ func TestIsError(t *testing.T) {
 }
 
 func getNotFoundError() error {
-	return NotFoundError("not there !!!")
+	return NotFoundReport("not there !!!")
 }
 
 func TestKeepErrorType(t *testing.T) {
 	mzb := getNotFoundError()
-	if cae, ok := mzb.(ErrNotFound); !ok {
-		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
+	if cae, ok := mzb.(NotFound); !ok {
+		t.Errorf("Report type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 
 	mzb = getNotFoundErrorWithFields()
-	if cae, ok := mzb.(ErrNotFound); !ok {
-		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
+	if cae, ok := mzb.(NotFound); !ok {
+		t.Errorf("Report type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 
 	mzb = getNotFoundErrorWithFieldsAndConsequences()
-	if cae, ok := mzb.(ErrNotFound); !ok {
-		t.Errorf("Error type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
+	if cae, ok := mzb.(NotFound); !ok {
+		t.Errorf("Report type was lost in translation !!: %T, %s", cae, reflect.TypeOf(mzb).String())
 	}
 }
 
 func getNotFoundErrorWithLog() (err error) {
 	defer OnExitLogError("", &err)
-	return NotFoundError("not there !!!")
+	return NotFoundReport("not there !!!")
 }
 
 func TestExitLogError(t *testing.T) {
@@ -326,7 +326,7 @@ func TestOnExitAndLogWithWarning(t *testing.T) {
 	}
 }
 
-func TestUncathegorizedError(t *testing.T) {
+func TestUncategorizedError(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -334,7 +334,7 @@ func TestUncathegorizedError(t *testing.T) {
 	logrus.SetOutput(w)
 
 	err := func() error {
-		return InconsistentError("")
+		return InconsistentReport("")
 	}()
 	if err == nil {
 		t.Fail()
@@ -355,7 +355,7 @@ func TestUncathegorizedError(t *testing.T) {
 	}
 }
 
-func TestNotUncathegorizedError(t *testing.T) {
+func TestNotUncategorizedError(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -363,7 +363,7 @@ func TestNotUncathegorizedError(t *testing.T) {
 	logrus.SetOutput(w)
 
 	err := func() error {
-		return InconsistentError("something")
+		return InconsistentReport("something")
 	}()
 	if err == nil {
 		t.Fail()

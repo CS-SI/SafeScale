@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // folder describes a metadata folder
@@ -43,7 +43,7 @@ type folderDecoderCallback func([]byte) error
 // newFolder creates a new Metadata Folder object, ready to help access the metadata inside it
 func newFolder(svc iaas.Service, path string) (*folder, error) {
 	if svc == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 
 	f := &folder{
@@ -53,7 +53,7 @@ func newFolder(svc iaas.Service, path string) (*folder, error) {
 
 	cryptKey, err := svc.GetMetadataKey()
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.NotFound); !ok {
 			return nil, err
 		}
 	} else {
@@ -110,14 +110,14 @@ func (f *folder) Search(path string, name string) error {
 			return nil
 		}
 	}
-	return scerr.NotFoundError("failed to find '%s'", fullPath)
+	return fail.NotFoundReport("failed to find '%s'", fullPath)
 }
 
 // Delete removes metadata passed as parameter
 func (f *folder) Delete(path string, name string) error {
 	err := f.service.SafeGetMetadataBucket().DeleteObject(f.absolutePath(path, name))
 	if err != nil {
-		return scerr.Wrap(err, "failed to remove metadata in Object Storage")
+		return fail.Wrap(err, "failed to remove metadata in Object Storage")
 	}
 	return nil
 }
@@ -130,27 +130,27 @@ func (f *folder) Delete(path string, name string) error {
 func (f *folder) Read(path string, name string, callback func([]byte) error) error {
 	err := f.Search(path, name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.NotFound); ok {
 			return err
 		}
-		return scerr.Wrap(err, "failed to search in Metadata Storage")
+		return fail.Wrap(err, "failed to search in Metadata Storage")
 	}
 
 	var buffer bytes.Buffer
 	_, err = f.service.SafeGetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
-		return scerr.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, err)
+		return fail.NotFoundReport("failed to read '%s/%s' in Metadata Storage: %v", path, name, err)
 	}
 	data := buffer.Bytes()
 	if f.crypt {
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			return scerr.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
+			return fail.NotFoundReport("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
 	err = callback(data)
 	if err != nil {
-		return scerr.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, err)
+		return fail.NotFoundReport("failed to decode metadata '%s/%s': %v", path, name, err)
 	}
 	return nil
 }
@@ -158,10 +158,10 @@ func (f *folder) Read(path string, name string, callback func([]byte) error) err
 // Write writes the content in Object Storage
 func (f *folder) Write(path string, name string, content []byte) error {
 	if f == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
+		return fail.InvalidParameterReport("name", "cannot be empty string")
 	}
 
 	var (
@@ -187,7 +187,7 @@ func (f *folder) Write(path string, name string, content []byte) error {
 func (f *folder) Browse(path string, callback folderDecoderCallback) error {
 	list, err := f.service.SafeGetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
 	if err != nil {
-		logrus.Errorf("Error browsing metadata: listing objects: %+v", err)
+		logrus.Errorf("Report browsing metadata: listing objects: %+v", err)
 		return err
 	}
 
@@ -195,7 +195,7 @@ func (f *folder) Browse(path string, callback folderDecoderCallback) error {
 		var buffer bytes.Buffer
 		_, err = f.service.SafeGetMetadataBucket().ReadObject(i, &buffer, 0, 0)
 		if err != nil {
-			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", err)
+			logrus.Errorf("Report browsing metadata: reading from buffer: %+v", err)
 			return err
 		}
 		data := buffer.Bytes()
@@ -207,7 +207,7 @@ func (f *folder) Browse(path string, callback folderDecoderCallback) error {
 		}
 		err = callback(data)
 		if err != nil {
-			logrus.Errorf("Error browsing metadata: running callback: %+v", err)
+			logrus.Errorf("Report browsing metadata: running callback: %+v", err)
 			return err
 		}
 	}

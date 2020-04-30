@@ -23,13 +23,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// List returns a list of available hosts
-func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, error) {
+// ErrorList returns a list of available hosts
+func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, fail.Report) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 
 	// FIXME: get code from HostListener
@@ -43,7 +43,7 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 		return nil, err
 	}
 	hosts := abstract.HostList{}
-	err = objh.Browse(task, func(hc *abstract.HostCore) error {
+	err = objh.Browse(task, func(hc *abstract.HostCore) fail.Report {
 		hf := converters.HostCoreToHostFull(*hc)
 		hosts = append(hosts, hf)
 		return nil
@@ -52,9 +52,9 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 }
 
 // New creates an instance of resources.Host
-func New(svc iaas.Service) (_ resources.Host, err error) {
+func New(svc iaas.Service) (_ resources.Host, err fail.Report) {
 	if svc == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	host, err := operations.NewHost(svc)
 	if err != nil {
@@ -64,15 +64,15 @@ func New(svc iaas.Service) (_ resources.Host, err error) {
 }
 
 // Load loads the metadata of host and returns an instance of resources.Host
-func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, err error) {
+func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, err fail.Report) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
 	}
 
 	// FIXME: tracer...

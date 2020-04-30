@@ -26,7 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
 
@@ -78,7 +78,7 @@ func NFSExportOptionsFromStringToProtocol(in string) *protocol.NFSExportOptions 
 }
 
 // HostSizingFromStringToAbstract converts host sizing requirements from string to *abstract.HostSizingRequirements
-func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizingRequirements, int, error) {
+func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizingRequirements, int, fail.Report) {
 	tokens, err := parseSizingString(in)
 	if err != nil {
 		return nil, 0, err
@@ -93,13 +93,13 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		if min != "" {
 			out.MinCores, err = strconv.Atoi(min)
 			if err != nil {
-				return nil, 0, scerr.SyntaxError("invalid min value '%s' for 'cpu'", min)
+				return nil, 0, fail.SyntaxReport("invalid min value '%s' for 'cpu'", min)
 			}
 		}
 		if max != "" {
 			out.MaxCores, err = strconv.Atoi(max)
 			if err != nil {
-				return nil, 0, scerr.SyntaxError("invalid max value '%s' for 'cpu'", max)
+				return nil, 0, fail.SyntaxReport("invalid max value '%s' for 'cpu'", max)
 			}
 		}
 	}
@@ -111,7 +111,7 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		}
 		count, err = strconv.Atoi(c)
 		if err != nil {
-			return nil, 0, scerr.SyntaxError("invalid value '%s' for 'count'", c)
+			return nil, 0, fail.SyntaxReport("invalid value '%s' for 'count'", c)
 		}
 	}
 	if t, ok := tokens["cpufreq"]; ok {
@@ -122,7 +122,7 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		if min != "" {
 			c, err := strconv.ParseFloat(min, 64)
 			if err != nil {
-				return nil, 0, scerr.SyntaxError("invalid value '%s' for 'cpufreq'", min)
+				return nil, 0, fail.SyntaxReport("invalid value '%s' for 'cpufreq'", min)
 			}
 			out.MinCPUFreq = float32(c)
 		}
@@ -135,7 +135,7 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		if min != "" {
 			out.MinGPU, err = strconv.Atoi(min)
 			if err != nil {
-				return nil, 0, scerr.SyntaxError("invalid value '%s' for 'gpu'", min)
+				return nil, 0, fail.SyntaxReport("invalid value '%s' for 'gpu'", min)
 			}
 		}
 	} else {
@@ -149,14 +149,14 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		if min != "" {
 			c, err := strconv.ParseFloat(min, 64)
 			if err != nil {
-				return nil, 0, scerr.SyntaxError("invalid min value '%s' for 'ram'", min)
+				return nil, 0, fail.SyntaxReport("invalid min value '%s' for 'ram'", min)
 			}
 			out.MinRAMSize = float32(c)
 		}
 		if max != "" {
 			c, err := strconv.ParseFloat(max, 64)
 			if err != nil {
-				return nil, 0, scerr.SyntaxError("invalid max value '%s' for 'ram'", max)
+				return nil, 0, fail.SyntaxReport("invalid max value '%s' for 'ram'", max)
 			}
 			out.MaxRAMSize = float32(c)
 		}
@@ -169,7 +169,7 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		if min != "" {
 			out.MinDiskSize, err = strconv.Atoi(min)
 			if err != nil {
-				return nil, 0, scerr.SyntaxError("invalid value '%s' for 'disk'", min)
+				return nil, 0, fail.SyntaxReport("invalid value '%s' for 'disk'", min)
 			}
 		}
 	}
@@ -193,7 +193,7 @@ func newSizingToken() *sizingToken {
 // Push sets an item of the token based on its current content
 func (t *sizingToken) Push(item string) error {
 	if t.IsFull() {
-		return scerr.NotAvailableError("token is full")
+		return fail.NotAvailableReport("token is full")
 	}
 
 	item = strings.ToLower(item)
@@ -212,7 +212,7 @@ func (t *sizingToken) GetKeyword() (string, error) {
 	if t.pos > 0 {
 		return t.members[0], nil
 	}
-	return "", scerr.InvalidRequestError("keyword is not set in token")
+	return "", fail.InvalidRequestReport("keyword is not set in token")
 }
 
 // GetOperator returns the operator member of the token (pos == 1)
@@ -220,7 +220,7 @@ func (t *sizingToken) GetOperator() (string, error) {
 	if t.pos > 1 {
 		return t.members[1], nil
 	}
-	return "", scerr.InvalidRequestError("operator is not set in token")
+	return "", fail.InvalidRequestReport("operator is not set in token")
 }
 
 // GetValue returns the value member of the token (pos == 2)
@@ -228,7 +228,7 @@ func (t *sizingToken) GetValue() (string, error) {
 	if t.pos > 2 {
 		return t.members[2], nil
 	}
-	return "", scerr.InvalidRequestError("value is not set in token")
+	return "", fail.InvalidRequestReport("value is not set in token")
 }
 
 // String returns a string representing the token
@@ -239,7 +239,7 @@ func (t *sizingToken) String() string {
 // Validate validates value in relation with operator, and returns min and max values if validated
 func (t *sizingToken) Validate() (string, string, error) {
 	if !t.IsFull() {
-		return "", "", scerr.InvalidRequestError("token is not complete")
+		return "", "", fail.InvalidRequestReport("token is not complete")
 	}
 
 	keyword := t.members[0]
@@ -248,7 +248,7 @@ func (t *sizingToken) Validate() (string, string, error) {
 	switch operator {
 	case "~":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' can only use '='")
+			return "", "", fail.InvalidRequestReport("'count' can only use '='")
 		}
 
 		// "~" means "[<value>-<value*2>]"
@@ -256,7 +256,7 @@ func (t *sizingToken) Validate() (string, string, error) {
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", fail.InvalidRequestReport(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 			return fmt.Sprintf("%.01f", valf), fmt.Sprintf("%.01f", 2*valf), nil
 		}
@@ -267,17 +267,17 @@ func (t *sizingToken) Validate() (string, string, error) {
 				value = value[1 : len(value)-1]
 				splitted := strings.Split(value, "-")
 				if len(splitted) != 2 {
-					return "", "", scerr.InvalidRequestError("value '%s' of '%s' token isn't a valid interval", value, keyword)
+					return "", "", fail.InvalidRequestReport("value '%s' of '%s' token isn't a valid interval", value, keyword)
 				}
 				min := splitted[0]
 				_, err := strconv.ParseFloat(min, 64)
 				if err != nil {
-					return "", "", scerr.InvalidRequestError("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error())
+					return "", "", fail.InvalidRequestReport("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error())
 				}
 				max := splitted[1]
 				_, err = strconv.ParseFloat(max, 64)
 				if err != nil {
-					return "", "", scerr.InvalidRequestError("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error())
+					return "", "", fail.InvalidRequestReport("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error())
 				}
 				return min, max, nil
 			}
@@ -288,7 +288,7 @@ func (t *sizingToken) Validate() (string, string, error) {
 				_, err = strconv.ParseFloat(value, 64)
 			}
 			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", fail.InvalidRequestReport(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 		}
 		return value, value, nil
@@ -297,14 +297,14 @@ func (t *sizingToken) Validate() (string, string, error) {
 		fallthrough
 	case "<":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' can only use '='")
+			return "", "", fail.InvalidRequestReport("'count' can only use '='")
 		}
 
 		vali, err := strconv.Atoi(value)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", fail.InvalidRequestReport(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 			return "", fmt.Sprintf("%.01f", valf-0.1), nil
 		}
@@ -314,14 +314,14 @@ func (t *sizingToken) Validate() (string, string, error) {
 		fallthrough
 	case "<=":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' can only use '='")
+			return "", "", fail.InvalidRequestReport("'count' can only use '='")
 		}
 
 		_, err := strconv.Atoi(value)
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", fail.InvalidRequestReport(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 		}
 		return "", value, nil
@@ -330,14 +330,14 @@ func (t *sizingToken) Validate() (string, string, error) {
 		fallthrough
 	case ">":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' can only use '='")
+			return "", "", fail.InvalidRequestReport("'count' can only use '='")
 		}
 
 		vali, err := strconv.Atoi(value)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", fail.InvalidRequestReport(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 			return fmt.Sprintf("%.01f", valf+0.1), "", nil
 		}
@@ -347,24 +347,24 @@ func (t *sizingToken) Validate() (string, string, error) {
 		fallthrough
 	case ">=":
 		if keyword == "count" {
-			return "", "", scerr.InvalidRequestError("'count' can only use '='")
+			return "", "", fail.InvalidRequestReport("'count' can only use '='")
 		}
 
 		_, err := strconv.Atoi(value)
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				return "", "", scerr.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+				return "", "", fail.InvalidRequestReport(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
 		}
 		return value, "", nil
 	}
 
-	return "", "", scerr.InvalidRequestError(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
+	return "", "", fail.InvalidRequestReport(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
 }
 
 // parseSizingString transforms a string to a list of tokens
-func parseSizingString(request string) (map[string]*sizingToken, error) {
+func parseSizingString(request string) (map[string]*sizingToken, fail.Report) {
 	var (
 		s       scanner.Scanner
 		tokens  = map[string]*sizingToken{}
@@ -382,7 +382,7 @@ func parseSizingString(request string) (map[string]*sizingToken, error) {
 				continue
 			}
 			p := s.Pos()
-			return nil, scerr.SyntaxError("misplace separator ',' at line %d, column %d", p.Line, p.Column)
+			return nil, fail.SyntaxReport("misplace separator ',' at line %d, column %d", p.Line, p.Column)
 
 		case "[": // Manages value in the form [a-b]
 			for tok = s.Scan(); tok != scanner.EOF; tok = s.Scan() {
@@ -406,7 +406,7 @@ func parseSizingString(request string) (map[string]*sizingToken, error) {
 		err := mytoken.Push(t)
 		if err != nil {
 			p := s.Pos()
-			return nil, scerr.SyntaxError("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+			return nil, fail.SyntaxReport("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
 		}
 
 		// handles the cases >= or <=
@@ -418,7 +418,7 @@ func parseSizingString(request string) (map[string]*sizingToken, error) {
 					err = mytoken.Push(s.TokenText())
 					if err != nil {
 						p := s.Pos()
-						return nil, scerr.NewError("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+						return nil, fail.NewReport("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
 					}
 				}
 			}

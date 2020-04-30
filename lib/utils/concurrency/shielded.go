@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Shielded allows to store data with controlled access to it
@@ -45,18 +45,18 @@ func (d *Shielded) Clone() *Shielded {
 }
 
 // Inspect is used to lock a clonable for read
-func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) error) (err error) {
+func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fail.Report) (err fail.Report) {
 	if d == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if inspector == nil {
-		return scerr.InvalidParameterError("inspector", "cannot be nil")
+		return fail.InvalidParameterReport("inspector", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
+		return fail.InvalidParameterReport("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
 	err = d.lock.RLock(task)
@@ -77,18 +77,18 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 }
 
 // Alter allows to update a cloneable using a write lock
-func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) (err error) {
+func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Report) (err fail.Report) {
 	if d == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if alterer == nil {
-		return scerr.InvalidParameterError("alterer", "cannot be nil")
+		return fail.InvalidParameterReport("alterer", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
+		return fail.InvalidParameterReport("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
 	err = d.lock.Lock(task)
@@ -116,19 +116,19 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) (err erro
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (d *Shielded) Serialize(task Task) ([]byte, error) {
+func (d *Shielded) Serialize(task Task) ([]byte, fail.Report) {
 	if d == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterReport("task", "cannot be nil")
 	}
 
 	var jsoned []byte
-	err := d.Inspect(task, func(clonable data.Clonable) error {
+	err := d.Inspect(task, func(clonable data.Clonable) fail.Report {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
-		return innerErr
+		return fail.NewReport(innerErr.Error())
 	})
 	if err != nil {
 		return nil, err
@@ -138,18 +138,19 @@ func (d *Shielded) Serialize(task Task) ([]byte, error) {
 
 // Deserialize transforms serialization data to valid content of Shielded instance
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (d *Shielded) Deserialize(task Task, buf []byte) error {
+func (d *Shielded) Deserialize(task Task, buf []byte) fail.Report {
 	if d == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterReport("task", "cannot be nil")
 	}
 	if len(buf) == 0 {
-		return scerr.InvalidParameterError("buf", "cannot be empty []byte")
+		return fail.InvalidParameterReport("buf", "cannot be empty []byte")
 	}
 
-	return d.Alter(task, func(clonable data.Clonable) error {
-		return json.Unmarshal(buf, clonable)
+	return d.Alter(task, func(clonable data.Clonable) fail.Report {
+		innerErr := json.Unmarshal(buf, clonable)
+		return fail.NewReport(innerErr.Error())
 	})
 }

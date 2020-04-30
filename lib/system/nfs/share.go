@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // ExportOptions ...
@@ -59,10 +59,10 @@ type Share struct {
 // NewShare creates a share struct corresponding to the export of path on server
 func NewShare(server *Server, path, options string) (*Share, error) {
 	if path == "" {
-		return nil, scerr.InvalidParameterError("path", "cannot be empty")
+		return nil, fail.InvalidParameterReport("path", "cannot be empty")
 	}
 	if !filepath.IsAbs(path) {
-		return nil, scerr.InvalidParameterError("path", "must be absolute")
+		return nil, fail.InvalidParameterReport("path", "must be absolute")
 	}
 	share := Share{
 		Server: server,
@@ -144,5 +144,5 @@ func (s *Share) Add(task concurrency.Task) error {
 	}
 
 	retcode, stdout, stderr, err := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
-	return scerr.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
+	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to export a shared directory")
 }

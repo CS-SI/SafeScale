@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // AbsPathify ...
@@ -96,11 +96,11 @@ func ExtractRetCode(err error) (string, int, error) {
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
 			retCode = status.ExitStatus()
 		} else {
-			return msg, retCode, scerr.NewError("ExitError.Sys is not a 'syscall.WaitStatus'")
+			return msg, retCode, fail.NewReport("ExitError.Sys is not a 'syscall.WaitStatus'")
 		}
 		// Retrieve error Message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}
-	return msg, retCode, scerr.NewError("error is not an 'ExitError'")
+	return msg, retCode, fail.NewReport("error is not an 'ExitError'")
 }

@@ -38,8 +38,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -71,19 +71,19 @@ func NewVolumeHandler(job server.Job) VolumeHandler {
 	return &volumeHandler{job: job}
 }
 
-// List returns the network list
+// ErrorList returns the network list
 func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	objv, err := volumefactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -106,25 +106,25 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, err er
 // Delete deletes volume referenced by ref
 func (handler *volumeHandler) Delete(ref string) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return scerr.InvalidParameterError("ref", "cannot be empty string")
+		return fail.InvalidParameterReport("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	objv, err := volumefactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case fail.NotFound:
 			return abstract.ResourceNotFoundError("volume", ref)
 		default:
 			logrus.Debugf("failed to delete volume: %+v", err)
@@ -136,7 +136,7 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
-				return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			nbAttach := uint(len(volumeAttachmentsV1.Hosts))
 			if nbAttach > 0 {
@@ -144,7 +144,7 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 				for _, v := range volumeAttachmentsV1.Hosts {
 					list = append(list, v)
 				}
-				return scerr.InvalidRequestError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
+				return fail.InvalidRequestReport("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
 			}
 			return nil
 		})
@@ -165,24 +165,24 @@ func (handler *volumeHandler) Delete(ref string) (err error) {
 func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err error) {
 
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty!")
+		return nil, fail.InvalidParameterReport("ref", "cannot be empty!")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	objv, err := volumefactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.NotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
 		}
 		return nil, err
@@ -195,26 +195,26 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err 
 	// 	return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 	// 		volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 	// 		if !ok {
-	// 			return scerr.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 			return fail.InconsistentReport("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 		}
 	// 		if len(volumeAttachedV1.Hosts) > 0 {
 	// 			for id := range volumeAttachedV1.Hosts {
 	// 				host, inErr := hostfactory.Load(task, handler.job.SafeGetService(), id)
 	// 				if inErr != nil {
-	// 					logrus.Debug(inErr.Error())
+	// 					logrus.Debug(inErr.Report())
 	// 					continue
 	// 				}
 	// 				inErr = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
 	// 					return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) error {
 	// 						hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 	// 						if !ok {
-	// 							return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 							return fail.InconsistentReport("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 						}
 	// 						if volumeAttachment, found := hostVolumesV1.VolumesByID[volumeID]; found {
 	// 							return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) error {
 	// 								hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 	// 								if !ok {
-	// 									return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 									return fail.InconsistentReport("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 								}
 	// 								if mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[volumeAttachment.Device]]; ok {
 	// 									mounts[host.SafeGetName()] = mount
@@ -228,7 +228,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err 
 	// 					})
 	// 				})
 	// 				if inErr != nil {
-	// 					logrus.Debug(inErr.Error())
+	// 					logrus.Debug(inErr.Report())
 	// 					continue
 	// 				}
 	// 			}
@@ -245,19 +245,19 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, err 
 // Create a volume
 func (handler *volumeHandler) Create(name string, size int, speed volumespeed.Enum) (objv resources.Volume, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
+		return nil, fail.InvalidParameterReport("name", "cannot be empty!")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	objv, err = volumefactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -278,29 +278,29 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 // Attach a volume to an host
 func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, doNotFormat bool) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if volumeRef == "" {
-		return scerr.InvalidParameterError("volumeRef", "cannot be empty string")
+		return fail.InvalidParameterReport("volumeRef", "cannot be empty string")
 	}
 	if hostRef == "" {
-		return scerr.InvalidParameterError("hostRef", "cannot be empty string")
+		return fail.InvalidParameterReport("hostRef", "cannot be empty string")
 	}
 	if path == "" {
-		return scerr.InvalidParameterError("path", "cannot be empty string")
+		return fail.InvalidParameterReport("path", "cannot be empty string")
 	}
 	if format == "" {
-		return scerr.InvalidParameterError("format", "cannot be empty string")
+		return fail.InvalidParameterReport("format", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
 	defer tracer.WithStopwatch().Entering().OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	// Get volume data
 	objv, err := handler.Inspect(volumeRef)
@@ -350,22 +350,22 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 				return props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 					if !ok {
-						return scerr.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentReport("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 						hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 						if !ok {
-							return scerr.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 						// Check if the volume is already mounted elsewhere
 						if device, found := hostVolumesV1.DevicesByID[objv.SafeGetID()]; found {
 							mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]]
 							if !ok {
-								return scerr.InconsistentError("metadata inconsistency for volume '%s' attached to host '%s'", volumeName, hostName)
+								return fail.InconsistentReport("metadata inconsistency for volume '%s' attached to host '%s'", volumeName, hostName)
 							}
 							path := mount.Path
 							if path != mountPoint {
-								return scerr.DuplicateError("volume '%s' is already attached in '%s:%s'", volumeName, hostName, path)
+								return fail.DuplicateReport("volume '%s' is already attached in '%s:%s'", volumeName, hostName, path)
 							}
 							return nil
 						}
@@ -373,12 +373,12 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 						// Check if there is no other device mounted in the path (or in subpath)
 						for _, i := range hostMountsV1.LocalMountsByPath {
 							if strings.Index(i.Path, mountPoint) == 0 {
-								return scerr.InvalidRequestError("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, hostName, mountPoint, hostName, i.Path)
+								return fail.InvalidRequestReport("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, hostName, mountPoint, hostName, i.Path)
 							}
 						}
 						for _, i := range hostMountsV1.RemoteMountsByPath {
 							if strings.Index(i.Path, mountPoint) == 0 {
-								return scerr.InvalidRequestError("cannot attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, hostName, mountPoint, hostName, i.Path)
+								return fail.InvalidRequestReport("cannot attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, hostName, mountPoint, hostName, i.Path)
 							}
 						}
 
@@ -396,7 +396,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 						})
 						if err != nil {
 							switch err.(type) {
-							case scerr.ErrNotFound, scerr.ErrInvalidRequest, scerr.ErrTimeout:
+							case fail.NotFound, fail.InvalidRequest, fail.Timeout:
 								return err
 							default:
 								return err
@@ -408,14 +408,14 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 								derr := handler.job.SafeGetService().DeleteVolumeAttachment(hostID, vaID)
 								if derr != nil {
 									switch derr.(type) {
-									case scerr.ErrNotFound:
+									case fail.NotFound:
 										logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volumeName, hostName, derr)
-									case scerr.ErrTimeout:
+									case fail.Timeout:
 										logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volumeName, hostName, derr)
 									default:
 										logrus.Errorf("Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volumeName, hostName, derr)
 									}
-									err = scerr.AddConsequence(err, derr)
+									err = fail.AddConsequence(err, derr)
 								}
 							}
 						}()
@@ -435,14 +435,14 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 								// Isolate the new device
 								newDisk = newDiskSet.Difference(oldDiskSet)
 								if newDisk.Cardinality() == 0 {
-									return scerr.NotFoundError("disk not yet attached, retrying")
+									return fail.NotFoundReport("disk not yet attached, retrying")
 								}
 								return nil
 							},
 							temporal.GetContextTimeout(),
 						)
 						if retryErr != nil {
-							return scerr.NotFoundError("failed to confirm the disk attachment after %s", temporal.GetContextTimeout())
+							return fail.NotFoundReport("failed to confirm the disk attachment after %s", temporal.GetContextTimeout())
 						}
 
 						// Recovers real device name from the system
@@ -479,7 +479,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 								derr := server.UnmountBlockDevice(task, volumeUUID)
 								if derr != nil {
 									logrus.Errorf("failed to unmount volume '%s' from host '%s': %v", volumeName, hostName, derr)
-									err = scerr.AddConsequence(err, derr)
+									err = fail.AddConsequence(err, derr)
 								}
 							}
 						}()
@@ -508,16 +508,16 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 
 func (handler *volumeHandler) listAttachedDevices(host resources.Host) (set mapset.Set, err error) { // FIXME Make sure ctx is propagated
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "cannot be nil")
+		return nil, fail.InvalidParameterReport("host", "cannot be nil")
 	}
 	task := handler.job.SafeGetTask()
-	defer scerr.OnExitLogError(concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "").TraceMessage(""), &err)
+	defer fail.OnExitLogError(concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "").TraceMessage(""), &err)
 
 	var (
 		retcode        int
@@ -532,16 +532,16 @@ func (handler *volumeHandler) listAttachedDevices(host resources.Host) (set maps
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					return scerr.NotAvailableError("failed to reach SSH service of host '%s', retrying", host.SafeGetName())
+					return fail.NotAvailableReport("failed to reach SSH service of host '%s', retrying", host.SafeGetName())
 				}
-				return scerr.NewError(stderr)
+				return fail.NewReport(stderr)
 			}
 			return nil
 		},
 		temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
-		return nil, scerr.Wrap(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", temporal.GetContextTimeout()))
+		return nil, fail.Wrap(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", temporal.GetContextTimeout()))
 	}
 	disks := strings.Split(stdout, "\n")
 	set = mapset.NewThreadUnsafeSet()
@@ -554,28 +554,28 @@ func (handler *volumeHandler) listAttachedDevices(host resources.Host) (set maps
 // Detach detach the volume identified by ref, ref can be the name or the id
 func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if volumeRef == "" {
-		return scerr.InvalidParameterError("volumeRef", "cannot be empty string")
+		return fail.InvalidParameterReport("volumeRef", "cannot be empty string")
 	}
 	if hostRef == "" {
-		return scerr.InvalidParameterError("hostRef", "cannot be empty string")
+		return fail.InvalidParameterReport("hostRef", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	// Load volume data
 	objv, err := volumefactory.Load(task, handler.job.SafeGetService(), volumeRef)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.NotFound); !ok {
 			return err
 		}
 		return abstract.ResourceNotFoundError("volume", volumeRef)
@@ -598,26 +598,26 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 		return props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
-				return scerr.InconsistentError("'*props.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentReport("'*props.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			// Check the volume is effectively attached
 			attachment, found := hostVolumesV1.VolumesByID[volumeID]
 			if !found {
-				return scerr.NotFoundError("cannot detach volume '%s': not attached to host '%s'", volumeName, host.SafeGetName())
+				return fail.NotFoundReport("cannot detach volume '%s': not attached to host '%s'", volumeName, host.SafeGetName())
 			}
 
 			// Obtain mounts information
 			return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
 				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 				if !ok {
-					return scerr.InconsistentError("'*props.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentReport("'*props.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 				device := attachment.Device
 				mountPath = hostMountsV1.LocalMountsByDevice[device]
 				mount := hostMountsV1.LocalMountsByPath[mountPath]
 				if mount == nil {
-					return scerr.InconsistentError("metadata inconsistency: no mount corresponding to volume attachment")
+					return fail.InconsistentReport("metadata inconsistency: no mount corresponding to volume attachment")
 				}
 
 				// Check if volume has other mount(s) inside it
@@ -626,13 +626,13 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 						continue
 					}
 					if strings.Index(p, mount.Path) == 0 {
-						return scerr.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
+						return fail.InvalidRequestReport("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
 							volumeName, hostName, mount.Path, hostName, p)
 					}
 				}
 				for p := range hostMountsV1.RemoteMountsByPath {
 					if strings.Index(p, mount.Path) == 0 {
-						return scerr.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
+						return fail.InvalidRequestReport("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
 							volumeName, hostName, mount.Path, hostName, p)
 					}
 				}
@@ -641,11 +641,11 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
-						return scerr.InconsistentError("'*props.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentReport("'*props.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					for _, v := range hostSharesV1.ByID {
 						if strings.Index(v.Path, mount.Path) == 0 {
-							return scerr.InvalidRequestError("cannot detach volume '%s' from '%s:%s', '%s:%s' is shared",
+							return fail.InvalidRequestReport("cannot detach volume '%s' from '%s:%s', '%s:%s' is shared",
 								volumeName, hostName, mount.Path, hostName, v.Path)
 						}
 					}
@@ -687,7 +687,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (err error) {
 						return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) error {
 							volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 							if !ok {
-								return scerr.InconsistentError("'*props.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+								return fail.InconsistentReport("'*props.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 							}
 							delete(volumeAttachedV1.Hosts, hostID)
 							return nil

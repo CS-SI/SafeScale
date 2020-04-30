@@ -24,7 +24,7 @@ import (
 
 	"hash/fnv"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 const (
@@ -49,7 +49,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
 		name += "." + suffix
 		if len(name) > maxBucketNameLength {
-			return "", scerr.OverflowError(nil, maxBucketNameLength, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
+			return "", fail.OverflowReport(nil, maxBucketNameLength, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
 		}
 	}
 

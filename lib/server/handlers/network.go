@@ -24,7 +24,7 @@ import (
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers NetworkHandler
@@ -58,16 +58,16 @@ func (handler *networkHandler) Create(
 ) (network resources.Network, err error) {
 
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
 	}
 	if failover && gwname != "" {
-		return nil, scerr.InvalidParameterError("gwname", "cannot be set if failover is set")
+		return nil, fail.InvalidParameterReport("gwname", "cannot be set if failover is set")
 	}
 
 	task := handler.job.SafeGetTask()
@@ -77,8 +77,8 @@ func (handler *networkHandler) Create(
 		"('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	objn, err := networkfactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -98,20 +98,20 @@ func (handler *networkHandler) Create(
 	return objn, nil
 }
 
-// List returns the network list
+// ErrorList returns the network list
 func (handler *networkHandler) List(all bool) (netList []*abstract.Network, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	objn, err := networkfactory.New(handler.job.SafeGetService())
 	if err != nil {
@@ -128,20 +128,20 @@ func (handler *networkHandler) List(all bool) (netList []*abstract.Network, err 
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (handler *networkHandler) Inspect(ref string) (network resources.Network, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return nil, scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	return networkfactory.Load(task, handler.job.SafeGetService(), ref)
 }
@@ -149,20 +149,20 @@ func (handler *networkHandler) Inspect(ref string) (network resources.Network, e
 // Delete deletes network referenced by ref
 func (handler *networkHandler) Delete(ref string) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceReport()
 	}
 	if handler.job == nil {
-		return scerr.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return scerr.InvalidParameterError("ref", "cannot be empty string")
+		return fail.InvalidParameterReport("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer scerr.OnPanic(&err)
+	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnPanic(&err)
 
 	objn, err := networkfactory.Load(task, handler.job.SafeGetService(), ref)
 	if err != nil {

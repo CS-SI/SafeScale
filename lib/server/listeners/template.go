@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // safescale template list --all=false
@@ -34,19 +34,19 @@ import (
 // TemplateListener host service server grpc
 type TemplateListener struct{}
 
-// List available templates
+// ErrorList available templates
 func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (tl *protocol.TemplateList, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, "cannot list templates").ToGRPCStatus()
+			err = fail.Wrap(err, "cannot list templates").ToGRPCStatus()
 		}
 	}()
 
 	if s == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceReport()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -65,7 +65,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	all := in.GetAll()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
 
 	handler := handlers.NewTemplateHandler(job)
 	templates, err := handler.List(all)

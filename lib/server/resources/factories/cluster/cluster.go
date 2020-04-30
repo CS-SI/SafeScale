@@ -21,13 +21,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // New creates a new instance of resources.Cluster
 func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 	return operations.NewCluster(task, svc)
 }
@@ -35,10 +35,10 @@ func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err erro
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
 func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, err error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterReport("t", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
 	}
 
 	return operations.LoadCluster(task, svc, name)

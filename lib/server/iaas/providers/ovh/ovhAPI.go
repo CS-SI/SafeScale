@@ -21,7 +21,7 @@ import (
 
 	"github.com/ovh/go-ovh/ovh"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, error) {
@@ -32,15 +32,15 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 
 	alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
 	if alternateAPIApplicationKey == "" {
-		return nil, scerr.SyntaxError("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
+		return nil, fail.SyntaxReport("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
 	}
 	alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
 	if alternateAPIApplicationSecret == "" {
-		return nil, scerr.SyntaxError("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
+		return nil, fail.SyntaxReport("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
 	}
 	alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
 	if alternateAPIConsumerKey == "" {
-		return nil, scerr.SyntaxError("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
+		return nil, fail.SyntaxReport("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
 	}
 
 	client, err := ovh.NewClient(
@@ -60,13 +60,13 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 			return nil, err
 		}
 	case "PUT":
-		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedReport(fmt.Sprintf("%s not implemented yet", httpCode))
 	case "POST":
-		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedReport(fmt.Sprintf("%s not implemented yet", httpCode))
 	case "DELETE":
-		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedReport(fmt.Sprintf("%s not implemented yet", httpCode))
 	default:
-		return nil, scerr.NewError("unexpected HTTP code: %s", httpCode)
+		return nil, fail.NewReport("unexpected HTTP code: %s", httpCode)
 	}
 
 	return result, nil
