@@ -168,10 +168,15 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, er
 					}
 
 					vapptemplate, cerr := catalogitem.GetVAppTemplate()
+					if cerr != nil {
+						continue
+					}
+
 					ms, cerr := vapptemplate.GetMemorySize()
 					if cerr != nil {
 						continue
 					}
+
 					ds, cerr := vapptemplate.GetTemplateDiskSize()
 					if cerr != nil {
 						continue
@@ -562,6 +567,10 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	host.Password = request.Password
 
 	publicIPs, err := s.getPublicIPs()
+	if err != nil {
+		return nil, userData, err
+	}
+
 	selectedIP := publicIPs.IPRange[0].StartAddress
 
 	hostIsAGateway := false
@@ -665,7 +674,11 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
 	default:
-		panic("erbc.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
+		return nil, fmt.Errorf("erbc.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
+	}
+
+	if host == nil {
+		return nil, fmt.Errorf("host cannot be nil")
 	}
 
 	byName := true
@@ -675,11 +688,14 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 		hostRef = host.ID
 	}
 
-	vapp, err := vdc.FindVAppByName(hostRef)
-	if err != nil && byName {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting host by name"))
-	}
-	if !byName {
+	var vapp govcd.VApp
+
+	if byName {
+		vapp, err = vdc.FindVAppByName(hostRef)
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("Error getting host by name"))
+		}
+	} else {
 		vapp, err = vdc.FindVAppByID(hostRef)
 		if err != nil {
 			return nil, errors.Wrap(err, fmt.Sprintf("Error getting host by id"))

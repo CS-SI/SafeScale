@@ -72,8 +72,8 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err erro
 	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
 	defer sp.unlock()
 
-	if data := sp.jsonProperty.Data; data != nil {
-		clone := data.Clone()
+	if jsonData := sp.jsonProperty.Data; jsonData != nil {
+		clone := jsonData.Clone()
 		err := apply(clone)
 		if err != nil {
 			return err

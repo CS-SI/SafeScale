@@ -267,6 +267,16 @@ message VolumeDefinition{
     string name = 2;
     VolumeSpeed speed = 3;
     int32 size = 4;
+    bool InLVM = 5;
+    int32 VUSize = 6;
+}
+
+message VolumeSizeChange {
+    Reference VolumeName = 2;
+    Reference HostName = 3;
+    bool PositiveChange = 4;
+    uint32 ChangeSize = 5;
+    string ChangeSizeType = 6;
 }
 
 message Volume{
@@ -274,6 +284,10 @@ message Volume{
     string name = 2;
     VolumeSpeed speed = 3;
     int32 size = 4;
+    bool InLVM = 5;
+    bool Formatted = 6;
+    repeated Volume PVS = 7;
+    repeated Volume LVS = 8;
 }
 //message VolumeInfo{
 //    Volume volume = 1;
@@ -290,6 +304,10 @@ message VolumeInfo{
     string mount_path = 6;
     string format = 7;
     string device = 8;
+    bool InLVM = 9;
+    bool Formatted = 10;
+    repeated VolumeInfo PVS = 11;
+    repeated VolumeInfo LVS = 12;
 }
 
 message VolumeListRequest{
@@ -317,6 +335,8 @@ message VolumeDetachment{
 service VolumeService{
     rpc Create(VolumeDefinition) returns (Volume) {}
     rpc Attach(VolumeAttachment) returns (google.protobuf.Empty) {}
+    rpc Expand(VolumeSizeChange) returns (google.protobuf.Empty) {}
+    rpc Shrink(VolumeSizeChange) returns (google.protobuf.Empty) {}
     rpc Detach(VolumeDetachment) returns (google.protobuf.Empty){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc List(VolumeListRequest) returns (VolumeList) {}

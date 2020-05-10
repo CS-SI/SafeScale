@@ -19,7 +19,6 @@ package listeners
 import (
 	"context"
 	"fmt"
-
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -129,6 +128,54 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	return srvutils.ToPBVolume(vol), nil
 }
 
+// Extend extends a volume
+func (s *VolumeListener) Expand(ctx context.Context, in *pb.VolumeSizeChange) (*googleprotobuf.Empty, error) {
+	// FIXME Change expand logs
+	log.Debugf("Received expand command with %s, %d, %s", in.VolumeName.Name, in.ChangeSize, in.ChangeSizeType)
+
+	volumeName := in.GetVolumeName().GetName()
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		log.Info("Can't expand volumes: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't shrink volume: no tenant set")
+	}
+
+	hostName := in.GetHostName().GetName()
+	handler := VolumeHandler(tenant.Service)
+
+	err := handler.Expand(ctx, volumeName, hostName, in.ChangeSize, in.ChangeSizeType)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+
+	log.Println(fmt.Sprintf("Volume '%s' expanded", volumeName))
+	return &googleprotobuf.Empty{}, nil
+}
+
+// Shrink shrinks a volume
+func (s *VolumeListener) Shrink(ctx context.Context, in *pb.VolumeSizeChange) (*googleprotobuf.Empty, error) {
+	// FIXME Change shrink logs
+	log.Debugf("Received shrink command with %s, %d, %s", in.VolumeName.Name, in.ChangeSize, in.ChangeSizeType)
+
+	volumeName := in.GetVolumeName().GetName()
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		log.Info("Can't shrink volumes: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "can't shrink volume: no tenant set")
+	}
+
+	hostName := in.GetHostName().GetName()
+	handler := VolumeHandler(tenant.Service)
+
+	err := handler.Shrink(ctx, volumeName, hostName, in.ChangeSize, in.ChangeSizeType)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+
+	log.Println(fmt.Sprintf("Volume '%s' shrinked", volumeName))
+	return &googleprotobuf.Empty{}, nil
+}
+
 // Attach a volume to an host and create a mount point
 func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *googleprotobuf.Empty, err error) {
 	empty := &googleprotobuf.Empty{}
@@ -176,7 +223,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err = handler.Attach(ctx, volumeRef, hostRef, mountPath, filesystem, doNotFormat)
+	_, err = handler.Attach(ctx, volumeRef, hostRef, mountPath, filesystem, doNotFormat)
 	if err != nil {
 		return empty, status.Errorf(codes.Internal, err.Error())
 	}

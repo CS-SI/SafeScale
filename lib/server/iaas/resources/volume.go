@@ -24,24 +24,38 @@ import (
 
 // VolumeRequest represents a volume request
 type VolumeRequest struct {
-	Name  string           `json:"name,omitempty"`
-	Size  int              `json:"size,omitempty"`
-	Speed volumespeed.Enum `json:"speed,omitempty"`
+	Name   string           `json:"name,omitempty"`
+	Size   int              `json:"size,omitempty"`
+	Speed  volumespeed.Enum `json:"speed,omitempty"`
+	InLVM  bool             `json:"lvm,omitempty"`
+	SizeVU int              `json:"sizevu,omitempty"`
 }
 
 // Volume represents a block volume
 type Volume struct {
-	ID         string                    `json:"id,omitempty"`
-	Name       string                    `json:"name,omitempty"`
-	Size       int                       `json:"size,omitempty"`
-	Speed      volumespeed.Enum          `json:"speed,omitempty"`
-	State      volumestate.Enum          `json:"state,omitempty"`
+	ID     string           `json:"id,omitempty"`
+	Name   string           `json:"name,omitempty"`
+	Size   int              `json:"size,omitempty"`
+	Speed  volumespeed.Enum `json:"speed,omitempty"`
+	State  volumestate.Enum `json:"state,omitempty"`
+	SizeVU int              `json:"sizevu,omitempty"`
+
+	// FIXME SizeVU is a new parameter, is not initialized
+
+	ManagedByLVM bool `json:"managedbyLVM,omitempty"`
+	Formatted    bool `json:"formatted,omitempty"`
+
+	LVM []*Volume `json:"lvolumes,omitempty"`
+	PVM []*Volume `json:"pvolumes,omitempty"`
+
 	Properties *serialize.JSONProperties `json:"properties,omitempty"`
 }
 
 // NewVolume ...
 func NewVolume() *Volume {
 	return &Volume{
+		LVM:        []*Volume{},
+		PVM:        []*Volume{},
 		Properties: serialize.NewJSONProperties("resources.volume"),
 	}
 }
