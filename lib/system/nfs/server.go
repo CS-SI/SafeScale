@@ -126,3 +126,57 @@ func (s *Server) UnmountBlockDevice(volumeUUID string) error {
 	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "block_device_unmount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }
+
+// MountVGDevice mounts a LVM Virtual Group in the remote system
+func (s *Server) MountVGDevice(device, name, format string, doNotFormat bool, drives []string) (string, error) {
+	data := map[string]interface{}{
+		"Device":      device,
+		"Name":        name,
+		"FileSystem":  format,
+		"Drives":      drives,
+		"DoNotFormat": doNotFormat,
+	}
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "vg_device_mount.sh", data)
+	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
+	return stdout, err
+}
+
+// MountVGDevice mounts a LVM Virtual Group in the remote system
+func (s *Server) ExpandVGDevice(device, name, format string, doNotFormat bool, drives []string) (string, error) {
+	data := map[string]interface{}{
+		"Device":      device,
+		"Name":        name,
+		"FileSystem":  format,
+		"Drives":      drives,
+		"DoNotFormat": doNotFormat,
+	}
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "vg_device_grow.sh", data)
+	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
+	return stdout, err
+}
+
+// MountVGDevice shrinks a LVM Virtual Group in the remote system
+func (s *Server) ShrinkVGDevice(device, name, format string, doNotFormat bool, drives []string, vuSize int, targetSize int) (string, error) {
+	data := map[string]interface{}{
+		"Device":      device,
+		"Name":        name,
+		"FileSystem":  format,
+		"Drives":      drives,
+		"DoNotFormat": doNotFormat,
+		"VUSize":      vuSize,
+		"TargetSize":  targetSize,
+	}
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "vg_device_reduce.sh", data)
+	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
+	return stdout, err
+}
+
+// UnmountVGDevice unmounts a local block device on the remote system
+func (s *Server) UnmountVGDevice(device string, volumeName string) error {
+	data := map[string]interface{}{
+		"Device": device,
+		"Name":   volumeName,
+	}
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "vg_device_unmount.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
+}

@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
@@ -317,6 +318,53 @@ func (hv *HostVolumes) Content() data.Clonable {
 // satisfies interface data.Clonable
 func (hv *HostVolumes) Clone() data.Clonable {
 	return NewHostVolumes().Replace(hv)
+}
+
+// FIXME Improve this function...
+func (vols *HostVolumes) AddHostVolume(hostVolID string, hostVolName string, attachmentID string, volumeUUID string) {
+	if hostVolID == "" || hostVolName == "" || attachmentID == "" || volumeUUID == "" {
+		panic("Invalid input")
+	}
+
+	vols.VolumesByID[hostVolID] = &HostVolume{
+		AttachID: attachmentID,
+		Device:   volumeUUID,
+	}
+
+	vols.VolumesByName[hostVolName] = hostVolID
+	vols.VolumesByDevice[volumeUUID] = hostVolID
+	vols.DevicesByID[hostVolID] = volumeUUID
+}
+
+// FIXME Improve this function
+func (vols *HostVolumes) UpdateUUID(hostVolID string, volumeUUID string) error {
+	if hostVolID == "" || volumeUUID == "" {
+		panic("Invalid input")
+	}
+
+	volById, ok := vols.VolumesByID[hostVolID]
+	if !ok {
+		return fmt.Errorf("Volume with id [%s] not found", hostVolID)
+	}
+	previous := volById.Device
+	volById.Device = volumeUUID
+
+	delete(vols.VolumesByDevice, previous)
+	vols.VolumesByDevice[volumeUUID] = hostVolID
+	vols.DevicesByID[hostVolID] = volumeUUID
+
+	return nil
+}
+
+// Delete removes a volume and its attachments info
+func (vols *HostVolumes) Delete(volumeID string, volumeName string, device string) {
+	if volumeID == "" || volumeName == "" || device == "" {
+		panic("Invalid input")
+	}
+	delete(vols.VolumesByID, volumeID)
+	delete(vols.VolumesByName, volumeName)
+	delete(vols.VolumesByDevice, device)
+	delete(vols.DevicesByID, volumeID)
 }
 
 // Replace ...

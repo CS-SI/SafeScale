@@ -71,9 +71,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	}
 
 	for _, vpc := range out.Vpcs {
-		net := resources.Network{}
-		net.CIDR = aws.StringValue(vpc.CidrBlock)
-		net.ID = aws.StringValue(vpc.VpcId)
+		vpcnet := resources.Network{}
+		vpcnet.CIDR = aws.StringValue(vpc.CidrBlock)
+		vpcnet.ID = aws.StringValue(vpc.VpcId)
 		for _, tag := range vpc.Tags {
 			if aws.StringValue(tag.Key) == "Name" {
 				if aws.StringValue(tag.Value) == s.AwsConfig.NetworkName {
@@ -357,9 +357,9 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 		return nil, err
 	}
 
-	for _, net := range nets {
-		if net.ID == id {
-			return net, nil
+	for _, vpcnet := range nets {
+		if vpcnet.ID == id {
+			return vpcnet, nil
 		}
 	}
 
@@ -372,9 +372,9 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		return nil, err
 	}
 
-	for _, net := range nets {
-		if net.Name == name {
-			return net, nil
+	for _, vpcnet := range nets {
+		if vpcnet.Name == name {
+			return vpcnet, nil
 		}
 	}
 
@@ -388,17 +388,17 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	}
 	var nets []*resources.Network
 	for _, vpc := range out.Vpcs {
-		net := resources.Network{}
-		net.ID = aws.StringValue(vpc.VpcId)
-		net.CIDR = aws.StringValue(vpc.CidrBlock)
+		vpcnet := resources.Network{}
+		vpcnet.ID = aws.StringValue(vpc.VpcId)
+		vpcnet.CIDR = aws.StringValue(vpc.CidrBlock)
 		for _, tag := range vpc.Tags {
 			if aws.StringValue(tag.Key) == "Name" {
 				if aws.StringValue(tag.Value) != "" {
-					net.Name = aws.StringValue(tag.Value)
+					vpcnet.Name = aws.StringValue(tag.Value)
 				}
 			}
 		}
-		nets = append(nets, &net)
+		nets = append(nets, &vpcnet)
 	}
 
 	subns, err := s.EC2Service.DescribeSubnets(&ec2.DescribeSubnetsInput{})
@@ -407,19 +407,19 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	}
 
 	for _, subn := range subns.Subnets {
-		net := resources.Network{}
-		net.ID = aws.StringValue(subn.SubnetId)
-		net.CIDR = aws.StringValue(subn.CidrBlock)
-		net.Subnet = true
-		net.Parent = aws.StringValue(subn.VpcId)
+		vpcnet := resources.Network{}
+		vpcnet.ID = aws.StringValue(subn.SubnetId)
+		vpcnet.CIDR = aws.StringValue(subn.CidrBlock)
+		vpcnet.Subnet = true
+		vpcnet.Parent = aws.StringValue(subn.VpcId)
 		for _, tag := range subn.Tags {
 			if aws.StringValue(tag.Key) == "Name" {
 				if aws.StringValue(tag.Value) != "" {
-					net.Name = aws.StringValue(tag.Value)
+					vpcnet.Name = aws.StringValue(tag.Value)
 				}
 			}
 		}
-		nets = append(nets, &net)
+		nets = append(nets, &vpcnet)
 	}
 
 	return nets, nil
@@ -428,7 +428,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 func (s *Stack) DeleteNetwork(id string) error {
 	logrus.Warnf("Beginning deletion of network: %s", id)
 
-	net, err := s.GetNetwork(id)
+	vpcnet, err := s.GetNetwork(id)
 	if err != nil {
 		return err
 	}
@@ -444,7 +444,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 			{
 				Name: aws.String("instance-id"),
 				Values: []*string{
-					aws.String(net.GatewayID),
+					aws.String(vpcnet.GatewayID),
 				},
 			},
 		},
@@ -470,11 +470,11 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return err
 	}
 
-	logrus.Warn(spew.Sdump(net))
+	logrus.Warn(spew.Sdump(vpcnet))
 
 	for _, asnTmp := range snTmp.Subnets {
-		logrus.Warnf("Comparing %s to %s", aws.StringValue(asnTmp.VpcId), net.Parent)
-		if aws.StringValue(asnTmp.VpcId) == net.Parent {
+		logrus.Warnf("Comparing %s to %s", aws.StringValue(asnTmp.VpcId), vpcnet.Parent)
+		if aws.StringValue(asnTmp.VpcId) == vpcnet.Parent {
 			logrus.Warnf("Actually trying to delete subnetwork %s", aws.StringValue(asnTmp.SubnetId))
 			_, err = s.EC2Service.DeleteSubnet(&ec2.DeleteSubnetInput{
 				SubnetId: asnTmp.SubnetId,
@@ -494,7 +494,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	for _, agwTmp := range gwTmp.InternetGateways {
 		for _, att := range agwTmp.Attachments {
-			if aws.StringValue(att.VpcId) == net.Parent {
+			if aws.StringValue(att.VpcId) == vpcnet.Parent {
 				_, err = s.EC2Service.DetachInternetGateway(&ec2.DetachInternetGatewayInput{
 					InternetGatewayId: agwTmp.InternetGatewayId,
 					VpcId:             att.VpcId,
@@ -521,7 +521,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	}
 
 	for _, artTmp := range rtTmp.RouteTables {
-		if aws.StringValue(artTmp.VpcId) == net.Parent {
+		if aws.StringValue(artTmp.VpcId) == vpcnet.Parent {
 
 			hasMain := false
 			// Dissociate
@@ -554,7 +554,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	logrus.Warnf("Reached DeleteVpc call")
 
 	_, err = s.EC2Service.DeleteVpc(&ec2.DeleteVpcInput{
-		VpcId: aws.String(net.Parent),
+		VpcId: aws.String(vpcnet.Parent),
 	})
 	if err != nil {
 		return err
