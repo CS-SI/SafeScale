@@ -42,7 +42,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 		SubnetId:         subnetID,
 		SecurityGroupIds: []string{group.SecurityGroupId},
 	}
-	res,_, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
+	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
 		CreateNicRequest: optional.NewInterface(createNicRequest),
 	})
 
@@ -89,7 +89,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 			LinkNicVmIds: []string{hostID},
 		},
 	}
-	res,_, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
+	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
 		ReadNicsRequest: optional.NewInterface(readNicsRequest),
 	})
 	if err != nil {
@@ -97,12 +97,17 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 	}
 	//No nics linked to the VM
 	if len(res.Nics) == 0 {
-		return -1, err
+		return -1, scerr.NewErrCore("no nics linked to the VM", nil, nil)
 	}
 	var numbers sort.IntSlice
 	for _, nic := range res.Nics {
 		numbers = append(numbers, int(nic.LinkNic.DeviceNumber))
 	}
+
+	if numbers == nil {
+		return 0, scerr.NewErrCore("no nics linked to the VM", nil, nil)
+	}
+
 	sort.Sort(numbers)
 	for i := 1; i <= 7; i++ {
 		if idx := sort.SearchInts(numbers, i); idx < 0 || idx >= numbers.Len() {
@@ -199,7 +204,7 @@ func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	deleteNicRequest := osc.DeleteNicRequest{
 		NicId: vip.ID,
 	}
-	_,_, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
+	_, _, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
 		DeleteNicRequest: optional.NewInterface(deleteNicRequest),
 	})
 	if err != nil {
@@ -208,7 +213,7 @@ func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 	deletePublicIpRequest := osc.DeletePublicIpRequest{
 		PublicIp: vip.PublicIP,
 	}
-	_,_, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+	_, _, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
 		DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
 	})
 

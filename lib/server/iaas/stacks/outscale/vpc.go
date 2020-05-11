@@ -408,7 +408,10 @@ func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) 
 	})
 	if err != nil {
 		err2 := s.deleteDhcpOptions(net, false)
-		return scerr.Wrap(err, err2.Error())
+		if err2 != nil {
+			return scerr.Wrap(err, err2.Error())
+		}
+		return scerr.Wrap(err, "")
 	}
 	updateNetRequest := osc.UpdateNetRequest{
 		DhcpOptionsSetId: dhcpOptionID,
