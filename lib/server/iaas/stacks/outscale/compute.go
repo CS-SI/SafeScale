@@ -358,8 +358,8 @@ func (s *Stack) getOrCreatePassword(request resources.HostRequest) (string, erro
 }
 
 func (s *Stack) prepareUserData(request resources.HostRequest, ud *userdata.Content) error {
-	cidr := func() string{
-		if len(request.Networks) == 0{
+	cidr := func() string {
+		if len(request.Networks) == 0 {
 			return ""
 		}
 		return request.Networks[0].CIDR
@@ -543,7 +543,7 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 	var flexibleGpus []osc.FlexibleGpu
 	var createErr error
 	for gpu := 0; gpu < tpl.GPUNumber; gpu++ {
-		resCreate,_, err := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &osc.CreateFlexibleGpuOpts{
+		resCreate, _, err := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &osc.CreateFlexibleGpuOpts{
 			CreateFlexibleGpuRequest: optional.NewInterface(osc.CreateFlexibleGpuRequest{
 				DeleteOnVmDeletion: true,
 				Generation:         "",
@@ -551,8 +551,8 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 				SubregionName:      s.Options.Compute.Subregion,
 			}),
 		})
-		if err != nil{
-			createErr= err
+		if err != nil {
+			createErr = err
 			break
 		}
 		flexibleGpus = append(flexibleGpus, resCreate.FlexibleGpu)
@@ -563,12 +563,12 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 				VmId:          vmID,
 			}),
 		})
-		if err != nil{
+		if err != nil {
 			createErr = err
 			break
 		}
 	}
-	if createErr != nil{
+	if createErr != nil {
 		for _, gpu := range flexibleGpus {
 			_, _, _ = s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &osc.DeleteFlexibleGpuOpts{
 				DeleteFlexibleGpuRequest: optional.NewInterface(osc.DeleteFlexibleGpuRequest{
@@ -589,18 +589,17 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) error {
 		Name:  fmt.Sprintf("vol-%s", request.HostName),
 		Size:  request.DiskSize,
 		Speed: s.Options.Compute.DefaultVolumeSpeed,
-
 	})
 	if err != nil {
 		return err
 	}
-	err = s.setResourceTags(v.ID, map[string] string{
-		"DeleteWithVM":"true",
+	err = s.setResourceTags(v.ID, map[string]string{
+		"DeleteWithVM": "true",
 	})
 	if err != nil {
 		err2 := s.DeleteVolume(v.ID)
-		msg := func () string{
-			if err2==nil{
+		msg := func() string {
+			if err2 == nil {
 				return ""
 			}
 			return err2.Error()
@@ -613,8 +612,8 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) error {
 	})
 	if err != nil {
 		err2 := s.DeleteVolume(v.ID)
-		msg := func () string{
-			if err2==nil{
+		msg := func() string {
+			if err2 == nil {
 				return ""
 			}
 			return err2.Error()
@@ -736,8 +735,8 @@ func (s *Stack) setHostProperties(host *resources.Host, networks []*resources.Ne
 }
 
 func (s *Stack) initHostProperties(request *resources.HostRequest, host *resources.Host) error {
-	defaultNet := func () *resources.Network {
-		if len(request.Networks) == 0{
+	defaultNet := func() *resources.Network {
+		if len(request.Networks) == 0 {
 			return nil
 		}
 		return request.Networks[0]
@@ -762,12 +761,12 @@ func (s *Stack) initHostProperties(request *resources.HostRequest, host *resourc
 
 	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
 		hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-		hostNetworkV1.DefaultNetworkID = func() string{
-			if defaultNet == nil{
+		hostNetworkV1.DefaultNetworkID = func() string {
+			if defaultNet == nil {
 				return ""
 			}
 			return defaultNet.ID
-		} ()
+		}()
 		hostNetworkV1.DefaultGatewayID = defaultGatewayID
 		hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
 		hostNetworkV1.IsGateway = isGateway
@@ -817,7 +816,6 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 	return ip, nil
 }
 
-
 // CreateHost creates an host that fulfils the request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
 	if s == nil {
@@ -843,7 +841,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, err
 	}
 
-	subnetID,  err:= s.getSubnetID(request)
+	subnetID, err := s.getSubnetID(request)
 	if err != nil {
 		return nil, userData, err
 	}
@@ -951,8 +949,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 }
 
 func (s *Stack) getSubnetID(request resources.HostRequest) (string, error) {
-	if len(request.Networks) == 0{
-		return "",nil
+	if len(request.Networks) == 0 {
+		return "", nil
 	}
 	defautNet := request.Networks[0]
 	subnet, err := s.getSubnet(defautNet.ID)
@@ -960,7 +958,7 @@ func (s *Stack) getSubnetID(request resources.HostRequest) (string, error) {
 		return "", err
 	}
 	if subnet == nil {
-		return "",  resources.ResourceInvalidRequestError("request.Networks", "Invalid network, no subnet found")
+		return "", resources.ResourceInvalidRequestError("request.Networks", "Invalid network, no subnet found")
 	}
 	return subnet.SubnetId, nil
 }
@@ -1014,7 +1012,7 @@ func (s *Stack) DeleteHost(id string) error {
 		logrus.Errorf("Unable to read public IPs of vm %s", id)
 	}
 	volumes, err := s.ListVolumeAttachments(id)
-	if err != nil{
+	if err != nil {
 		volumes = []resources.VolumeAttachment{}
 	}
 	err = s.deleteHost(id)
@@ -1038,21 +1036,21 @@ func (s *Stack) DeleteHost(id string) error {
 		}
 	}
 
-	for _, v := range volumes{
+	for _, v := range volumes {
 		tags, err := s.getResourceTags(v.VolumeID)
-		if err != nil{
+		if err != nil {
 			continue
 		}
-		del := func () string{
-			if del, ok := tags["DeleteWithVM"]; ok{
+		del := func() string {
+			if del, ok := tags["DeleteWithVM"]; ok {
 				return del
 			}
 			return "false"
 		}()
-		if del == "true"{
+		if del == "true" {
 			err = s.DeleteVolume(v.VolumeID)
 			if err != nil { //continue to delete even if error
-				logrus.Errorf("Unable to delete volume %s of vm %s",v.VolumeID, id)
+				logrus.Errorf("Unable to delete volume %s of vm %s", v.VolumeID, id)
 			}
 		}
 
@@ -1117,17 +1115,17 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 	res, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
-		optional.NewInterface(osc.ReadVmsRequest{
-			DryRun:  false,
+		ReadVmsRequest: optional.NewInterface(osc.ReadVmsRequest{
+			DryRun: false,
 			Filters: osc.FiltersVm{
-				Tags:[]string{fmt.Sprintf("name=%s", name)},
+				Tags: []string{fmt.Sprintf("name=%s", name)},
 			},
 		}),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(res.Vms) == 0{
+	if len(res.Vms) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No host named %s", name))
 	}
 	return s.InspectHost(res.Vms[0].VmId)
@@ -1228,7 +1226,7 @@ func (s *Stack) RebootHost(id string) error {
 	rebootVmsRequest := osc.RebootVmsRequest{
 		VmIds: []string{id},
 	}
-	_,_, err := s.client.VmApi.RebootVms(s.auth, &osc.RebootVmsOpts{
+	_, _, err := s.client.VmApi.RebootVms(s.auth, &osc.RebootVmsOpts{
 		RebootVmsRequest: optional.NewInterface(rebootVmsRequest),
 	})
 	return err
@@ -1263,7 +1261,7 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 		VmType: t,
 		// VmType: request.,
 	}
-	_,_, err := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
+	_, _, err := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
 		UpdateVmRequest: optional.NewInterface(updateVmRequest),
 	})
 	if err != nil {
