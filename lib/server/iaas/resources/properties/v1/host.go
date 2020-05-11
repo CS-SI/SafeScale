@@ -344,7 +344,7 @@ func (vols *HostVolumes) UpdateUUID(hostVolID string, volumeUUID string) error {
 
 	volById, ok := vols.VolumesByID[hostVolID]
 	if !ok {
-		return fmt.Errorf("Volume with id [%s] not found", hostVolID)
+		return fmt.Errorf("volume with id [%s] not found", hostVolID)
 	}
 	previous := volById.Device
 	volById.Device = volumeUUID

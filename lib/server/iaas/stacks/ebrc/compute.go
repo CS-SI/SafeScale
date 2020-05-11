@@ -63,21 +63,21 @@ func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
 		return empty, errors.Wrap(err, fmt.Sprintf("Error listing images"))
 	}
 
-	catalog_name := ""
+	catalogName := ""
 	for _, item := range org.Org.Link {
 		// Retrieve the first catalog name for further usage
 		if item.Type == "application/vnd.vmware.vcloud.catalog+xml" {
-			catalog_name = item.Name
+			catalogName = item.Name
 		} else {
 			continue
 		}
 
-		if catalog_name != "" {
-			cat, err := org.FindCatalog(catalog_name)
+		if catalogName != "" {
+			cat, err := org.FindCatalog(catalogName)
 			if err != nil {
 				continue
 			}
-			if !all && !strings.Contains(catalog_name, "Linux") {
+			if !all && !strings.Contains(catalogName, "Linux") {
 				continue
 			}
 			for _, item := range cat.Catalog.CatalogItems {
@@ -143,21 +143,21 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, er
 		return empty, errors.Wrap(err, fmt.Sprintf("Error listing templates"))
 	}
 
-	catalog_name := ""
+	catalogName := ""
 	for _, item := range org.Org.Link {
 		// Retrieve the first catalog name for further usage
 		if item.Type == "application/vnd.vmware.vcloud.catalog+xml" {
-			catalog_name = item.Name
+			catalogName = item.Name
 		} else {
 			continue
 		}
 
-		if catalog_name != "" {
-			cat, err := org.FindCatalog(catalog_name)
+		if catalogName != "" {
+			cat, err := org.FindCatalog(catalogName)
 			if err != nil {
 				continue
 			}
-			if !all && !strings.Contains(catalog_name, "Linux") {
+			if !all && !strings.Contains(catalogName, "Linux") {
 				continue
 			}
 			for _, item := range cat.Catalog.CatalogItems {
@@ -307,22 +307,22 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 	// Recover catalog name
 	for _, item := range org.Org.Link {
-		catalog_name := ""
+		catalogName := ""
 		if item.Type == "application/vnd.vmware.vcloud.catalog+xml" {
-			catalog_name = item.Name
+			catalogName = item.Name
 		} else {
 			continue
 		}
 
-		if catalog_name != "" {
-			cat, err := org.FindCatalog(catalog_name)
+		if catalogName != "" {
+			cat, err := org.FindCatalog(catalogName)
 			if err != nil {
 				continue
 			}
 			for _, item := range cat.Catalog.CatalogItems {
 				for _, deepItem := range item.CatalogItem {
 					if deepItem.ID == request.ImageID {
-						catalogName = catalog_name
+						catalogName = catalogName
 						itemName = deepItem.Name
 					}
 				}
@@ -366,18 +366,18 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	}
 	nets := []*types.OrgVDCNetwork{net.OrgVDCNetwork}
 
-	storage_profile_reference := types.Reference{}
+	storageProfileReference := types.Reference{}
 
 	for _, sps := range vdc.Vdc.VdcStorageProfiles {
 		for _, sp := range sps.VdcStorageProfile {
-			storage_profile_reference, err = vdc.FindStorageProfileReference(sp.Name)
+			storageProfileReference, err = vdc.FindStorageProfileReference(sp.Name)
 			if err != nil {
 				return nil, userData, scerr.Errorf(fmt.Sprintf("error finding storage profile %s", sp.Name), err)
 			}
 		}
 	}
 
-	log.Printf("storage_profile %s", storage_profile_reference)
+	log.Printf("storage_profile %s", storageProfileReference)
 	// FIXME Remove this
 	// logrus.Warningf("Request [%s]", spew.Sdump(request))
 
@@ -386,7 +386,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	if err != nil {
 		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 			func() error {
-				task, err := vdc.ComposeVAppWithDHCP(nets, vapptemplate, storage_profile_reference, request.ResourceName, fmt.Sprintf("%s description", request.ResourceName), true)
+				task, err := vdc.ComposeVAppWithDHCP(nets, vapptemplate, storageProfileReference, request.ResourceName, fmt.Sprintf("%s description", request.ResourceName), true)
 				if err != nil {
 					logrus.Warning(err)
 					return err
@@ -674,7 +674,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
 	default:
-		return nil, fmt.Errorf("erbc.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
+		return nil, fmt.Errorf("erbc.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host")
 	}
 
 	if host == nil {

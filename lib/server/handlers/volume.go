@@ -1317,11 +1317,11 @@ func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName s
 	}
 
 	if !volume.ManagedByLVM {
-		return fmt.Errorf("Standard volumes cannot be shrinked")
+		return fmt.Errorf("standard volumes cannot be shrinked")
 	}
 
 	if len(volume.PVM) == 0 {
-		return fmt.Errorf("Physical volumes cannot be shrinked, only the group can be shrinked")
+		return fmt.Errorf("physical volumes cannot be shrinked, only the group can be shrinked")
 	}
 
 	vuSize := volume.Size / len(volume.PVM)
@@ -1334,7 +1334,7 @@ func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName s
 	}
 
 	if !validChange {
-		return fmt.Errorf("Unknown size parameter")
+		return fmt.Errorf("unknown size parameter")
 	}
 
 	numberOfVolumeUnitsAffected := uint32(0)
