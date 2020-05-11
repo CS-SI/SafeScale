@@ -203,6 +203,7 @@ func UseService(tenantName string) (newService Service, err error) {
 			found, err = metadataLocation.FindBucket(bucketName)
 			if err != nil {
 				return nil, fmt.Errorf("error accessing metadata location: %s", err.Error())
+				//
 			}
 			if found {
 				metadataBucket, err = metadataLocation.GetBucket(bucketName)
@@ -582,6 +583,9 @@ func loadConfig() error {
 		if name, ok := tenant["name"].(string); ok {
 			if provider, ok := tenant["client"].(string); ok {
 				allTenants[name] = provider
+			} else if provider, ok := tenant["provider"].(string); ok {
+				allTenants[name] = provider
+
 			} else {
 				return fmt.Errorf("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}

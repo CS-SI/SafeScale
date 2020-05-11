@@ -163,7 +163,7 @@ func (handler *NetworkHandler) Create(
 	caps := handler.service.GetCapabilities()
 	if failover && caps.PrivateVirtualIP {
 		logrus.Infof("Provider support private Virtual IP, honoring the failover setup for gateways.")
-	} else {
+	} else if failover && !caps.PrivateVirtualIP {
 		logrus.Warningf("Provider doesn't support private Virtual IP, cannot set up high availability of network default route.")
 		failover = false
 	}
@@ -285,6 +285,9 @@ func (handler *NetworkHandler) Create(
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = handler.service.DeleteKeyPair("kp_" + primaryGatewayName)
+	}()
 	primaryRequest.KeyPair = keypair
 	primaryTask, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
@@ -307,6 +310,9 @@ func (handler *NetworkHandler) Create(
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			_ = handler.service.DeleteKeyPair("kp_" + secondaryGatewayName)
+		}()
 		secondaryRequest.KeyPair = keypair
 		secondaryTask, err = concurrency.NewTaskWithContext(ctx)
 		if err != nil {
@@ -561,8 +567,8 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 		}
 	}
 
-	// Binds gateway to VIP
-	if request.Network.VIP != nil {
+	// Binds gateway to VIP if primary
+	if primary && request.Network.VIP != nil {
 		err = handler.service.BindHostToVIP(request.Network.VIP, gw.ID)
 		if err != nil {
 			return nil, err
@@ -617,6 +623,7 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	logrus.Infof("Waiting until gateway '%s' is available by SSH ...", gw.Name)
 	sshHandler := NewSSHHandler(handler.service)
 	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
+	logrus.Infof("%v", ssh)
 	if err != nil {
 		return nil, err
 	}
