@@ -177,6 +177,19 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		subnets = append(subnets, parentNet)
 	}
 
+	defer func() {
+		if err != nil {
+			for _, snet := range subnetsResult {
+				_, derr := s.EC2Service.DeleteSubnet(&ec2.DeleteSubnetInput{
+					SubnetId: snet.Subnet.SubnetId,
+				})
+				if derr != nil {
+					err = scerr.AddConsequence(err, derr)
+				}
+			}
+		}
+	}()
+
 	for _, snCidr := range subnets {
 		sn, err := s.EC2Service.CreateSubnet(&ec2.CreateSubnetInput{
 			CidrBlock:        aws.String(snCidr.String()),
@@ -188,17 +201,6 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		}
 
 		subnetsResult = append(subnetsResult, sn)
-
-		defer func() {
-			if err != nil {
-				_, derr := s.EC2Service.DeleteSubnet(&ec2.DeleteSubnetInput{
-					SubnetId: sn.Subnet.SubnetId,
-				})
-				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
-				}
-			}
-		}()
 	}
 
 	if len(subnetsResult) == 0 {

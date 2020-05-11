@@ -167,20 +167,26 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 				}
 			}()
 
-			for _, id := range cluster.ListMasterIDs(task) {
-				err = svc.BindHostToVIP(vip, id)
+			var ids []string
+
+			defer func() {
 				if err != nil {
-					return err
-				}
-				defer func(i string) {
-					if err != nil {
+					for _, i := range ids {
 						derr := svc.UnbindHostFromVIP(vip, i)
 						if derr != nil {
 							logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
 							err = scerr.AddConsequence(err, derr)
 						}
 					}
-				}(id)
+				}
+			}()
+
+			for _, id := range cluster.ListMasterIDs(task) {
+				err = svc.BindHostToVIP(vip, id)
+				if err != nil {
+					return err
+				}
+				ids = append(ids, id)
 			}
 
 			err = cluster.UpdateMetadata(task, func() error {
