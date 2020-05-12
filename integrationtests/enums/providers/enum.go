@@ -16,7 +16,7 @@
 
 package providers
 
-//Enum represents the provider of the tested driver
+// Enum represents the provider of the tested driver
 type Enum int
 
 const (

@@ -42,7 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-//-------------IMAGES---------------------------------------------------------------------------------------------------
+// -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
 func (s *Stack) ListImages() (images []resources.Image, err error) {
@@ -103,7 +103,7 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 	return nil, scerr.Errorf(fmt.Sprintf("image with id [%s] not found", id), nil)
 }
 
-//-------------TEMPLATES------------------------------------------------------------------------------------------------
+// -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
@@ -127,8 +127,8 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 				ht := resources.HostTemplate{
 					Cores:   int(matype.GuestCpus),
 					RAMSize: float32(matype.MemoryMb / 1024),
-					//VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
-					//DiskSize: int(matype.ImageSpaceGb),
+					// VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
+					// DiskSize: int(matype.ImageSpaceGb),
 					DiskSize: 0,
 					ID:       strconv.FormatUint(matype.Id, 10),
 					Name:     matype.Name,
@@ -147,7 +147,7 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 	return templates, nil
 }
 
-//GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
+// GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
 func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -170,7 +170,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return nil, scerr.Errorf(fmt.Sprintf("template with id [%s] not found", id), nil)
 }
 
-//-------------SSH KEYS-------------------------------------------------------------------------------------------------
+// -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates a key pair (no import)
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
@@ -1015,7 +1015,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	return host.LastState, nil
 }
 
-//-------------Provider Infos-------------------------------------------------------------------------------------------
+// -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {

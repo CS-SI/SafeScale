@@ -1,4 +1,4 @@
-//+build !libvirt
+// +build !libvirt
 
 /*
  * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr

@@ -42,7 +42,7 @@ const (
 // Network links Object Storage folder and Network resource
 type Network struct {
 	item *metadata.Item
-	//inside *metadata.Folder
+	// inside *metadata.Folder
 	name *string
 	id   *string
 }
@@ -94,7 +94,7 @@ func (m *Network) Carry(network *resources.Network) (*Network, error) {
 	m.item.Carry(network)
 	m.id = &network.ID
 	m.name = &network.Name
-	//m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
+	// m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
 	return m, nil
 }
 

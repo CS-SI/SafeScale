@@ -52,7 +52,7 @@ func Exponential(base time.Duration) *Officer {
 }
 
 // Fibonacci sleeps for duration * fib(tries)
-//TODO:See if we can use a context to prevent the full calculation for each try...
+// TODO:See if we can use a context to prevent the full calculation for each try...
 func Fibonacci(duration time.Duration) *Officer {
 	o := Officer{
 		Block: func(t Try) {

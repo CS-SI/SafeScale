@@ -44,8 +44,8 @@ func Run() {
 		cinstance, cerr := cluster.Create(concurrency.RootTask(), control.Request{
 			Name:       clusterName,
 			Complexity: complexity.Small,
-			//Complexity: complexity.Normal,
-			//Complexity: complexity.Large,
+			// Complexity: complexity.Normal,
+			// Complexity: complexity.Large,
 			CIDR:   "192.168.0.0/28",
 			Flavor: flavor.DCOS,
 		})

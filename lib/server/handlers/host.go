@@ -1112,7 +1112,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 			hostSizingV1 := clonable.(*propsv1.HostSizing)
 			return host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
 				hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-				//FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
+				// FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
 				var err3 error
 				sizing := resources.SizingRequirements{
 					MinCores:    hostSizingV1.AllocatedSize.Cores,

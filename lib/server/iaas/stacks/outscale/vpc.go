@@ -35,9 +35,9 @@ func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, error) {
 	return ok, nil
 }
 func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) error {
-	//Delete DHCP options
+	// Delete DHCP options
 	namedDHCPOptions, err := s.checkDHCPOptionsName(onet)
-	//prevent deleting default dhcp options
+	// prevent deleting default dhcp options
 	if checkName && !namedDHCPOptions {
 		return nil
 	}
@@ -52,10 +52,10 @@ func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) error {
 }
 
 func (s *Stack) deleteInternetService(onet *osc.Net) error {
-	//Unlink and delete internet service
+	// Unlink and delete internet service
 	resIS, _, err := s.client.InternetServiceApi.ReadInternetServices(s.auth, nil)
 
-	if err == nil && len(resIS.InternetServices) > 0 { //internet service found
+	if err == nil && len(resIS.InternetServices) > 0 { // internet service found
 		for _, ois := range resIS.InternetServices {
 			tags := unwrapTags(ois.Tags)
 			if _, ok := tags["name"]; ois.NetId != onet.NetId || !ok {
@@ -85,7 +85,7 @@ func (s *Stack) deleteInternetService(onet *osc.Net) error {
 			break
 		}
 
-	} else { //internet service not found
+	} else { // internet service not found
 		logrus.Warnf("no internet service linked to network %s: %v", onet.NetId, err)
 	}
 	return nil
@@ -127,7 +127,7 @@ func (s *Stack) updateRouteTable(onet *osc.Net, is *osc.InternetService) error {
 }
 
 func (s *Stack) createInternetService(req resources.NetworkRequest, onet *osc.Net) error {
-	//Create internet service to allow internet access from VMs attached to the network
+	// Create internet service to allow internet access from VMs attached to the network
 	isResp, _, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func (s *Stack) createInternetService(req resources.NetworkRequest, onet *osc.Ne
 	return s.updateRouteTable(onet, &isResp.InternetService)
 }
 
-//open all ports, ingress is controlled by the vm firewall
+// open all ports, ingress is controlled by the vm firewall
 func (s *Stack) createTCPPermissions() []osc.SecurityGroupRule {
 	rule := osc.SecurityGroupRule{
 		FromPortRange: 1,
@@ -163,7 +163,7 @@ func (s *Stack) createTCPPermissions() []osc.SecurityGroupRule {
 	return []osc.SecurityGroupRule{rule}
 }
 
-//open all ports, ingress is controlled by the vm firewall
+// open all ports, ingress is controlled by the vm firewall
 func (s *Stack) createUDPPermissions() []osc.SecurityGroupRule {
 	rule := osc.SecurityGroupRule{
 		FromPortRange: 1,
@@ -174,10 +174,10 @@ func (s *Stack) createUDPPermissions() []osc.SecurityGroupRule {
 	return []osc.SecurityGroupRule{rule}
 }
 
-//ingress is controlled by the vm firewall
+// ingress is controlled by the vm firewall
 func (s *Stack) createICMPPermissions() []osc.SecurityGroupRule {
 	var rules []osc.SecurityGroupRule
-	//Echo reply
+	// Echo reply
 	rules = append(rules, osc.SecurityGroupRule{
 		FromPortRange: -1,
 		ToPortRange:   -1,
@@ -293,7 +293,7 @@ func (s *Stack) createVpc(name, cidr string) (*osc.Net, error) {
 		DNSServers: s.configurationOptions.DNSList,
 		Name:       name,
 	}
-	//update default security group to allow external traffic
+	// update default security group to allow external traffic
 	securityGroup, err := s.getNetworkSecurityGroup(onet.NetId)
 	if err != nil {
 		return nil, s.deleteNetworkOnError(err, &onet)

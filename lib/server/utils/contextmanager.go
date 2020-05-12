@@ -31,7 +31,7 @@ var (
 	mutexContextManager sync.Mutex
 )
 
-//--------------------- CLIENT ---------------------------------
+// --------------------- CLIENT ---------------------------------
 
 // GetContext ...
 func GetContext(storeUUID bool) (context.Context, error) {
@@ -57,7 +57,7 @@ func GetTimeoutContext(timeout time.Duration) (context.Context, context.CancelFu
 	return ctx, cancel, nil
 }
 
-//GetUUID ...
+// GetUUID ...
 func GetUUID() string {
 	mutexContextManager.Lock()
 	defer mutexContextManager.Unlock()

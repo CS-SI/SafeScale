@@ -287,7 +287,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	}
 
 	if !all {
-		//flavor["osType"].(string) == "linux" ?
+		// flavor["osType"].(string) == "linux" ?
 		filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
 		allTemplates = filters.FilterTemplates(allTemplates, filter)
 	}

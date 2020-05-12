@@ -176,7 +176,7 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	//without GPU
+	// without GPU
 	cpus := intRange(1, 78, 1)
 	ramPerCore := intRange(1, 16, 1)
 	perfLevels := []int{1, 2, 3}
@@ -185,7 +185,7 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 		for _, ramCore := range ramPerCore {
 			for _, perf := range perfLevels {
 				ram := cpu * ramCore
-				//Outscale maximum memory size
+				// Outscale maximum memory size
 				if ram > 1039 {
 					break
 				}
@@ -204,15 +204,15 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 
 		}
 	}
-	//instances wit gpu https://wiki.outscale.net/pages/viewpage.action?pageId=49023126
-	//with nvidia-k2 GPU
+	// instances wit gpu https://wiki.outscale.net/pages/viewpage.action?pageId=49023126
+	// with nvidia-k2 GPU
 	gpus := intRange(1, 8, 2)
 	for _, gpu := range gpus {
 		for _, cpu := range cpus {
 			for _, ramCore := range ramPerCore {
 				for _, perf := range perfLevels {
 					ram := cpu * ramCore
-					//Outscale maximum memory size
+					// Outscale maximum memory size
 					if ram > 1039 {
 						break
 					}
@@ -234,13 +234,13 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 		}
 	}
 
-	//with nvidia-p6 gpu
+	// with nvidia-p6 gpu
 	for _, gpu := range gpus {
 		for _, cpu := range cpus {
 			for _, ramCore := range ramPerCore {
 				for _, perf := range perfLevels {
 					ram := cpu * ramCore
-					//Outscale maximum memory size
+					// Outscale maximum memory size
 					if ram > 1039 {
 						break
 					}
@@ -261,13 +261,13 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 		}
 	}
 
-	//with nvidia-p100 gpu
+	// with nvidia-p100 gpu
 	for _, gpu := range gpus {
 		for _, cpu := range cpus {
 			for _, ramCore := range ramPerCore {
 				for _, perf := range perfLevels {
 					ram := cpu * ramCore
-					//Outscale maximum memory size
+					// Outscale maximum memory size
 					if ram > 1039 {
 						break
 					}
@@ -391,16 +391,16 @@ func (s *Stack) createNIC(request *resources.HostRequest, net *resources.Network
 	if err != nil {
 		return nil, err
 	}
-	//primary := deviceNumber == 0
+	// primary := deviceNumber == 0
 	return &res.Nic, nil
 }
 
 func (s *Stack) createNICS(request *resources.HostRequest) ([]osc.Nic, error) {
 	var nics []osc.Nic
 	var err error
-	//first network is the default network
+	// first network is the default network
 	nics, err = s.tryCreateNICS(request, nics)
-	if err != nil { //if error delete created NICS
+	if err != nil { // if error delete created NICS
 		for _, ni := range nics {
 			err := s.deleteNic(&ni)
 			if err != nil {
@@ -475,7 +475,7 @@ func (s *Stack) hostState(id string) (hoststate.Enum, error) {
 	return hostState(vm.State), nil
 }
 
-//WaitForHostState wait for host to be in the specifed state
+// WaitForHostState wait for host to be in the specifed state
 func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		hostState, err := s.hostState(hostID)
@@ -892,7 +892,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	if err != nil {
 		return nil, userData, s.deleteHostOnError(err, &vm)
 	}
-	//Retrieve default Nic use to create public ip
+	// Retrieve default Nic use to create public ip
 	nics, err := s.getNICS(vm.VmId)
 	if err != nil {
 		return nil, userData, s.deleteHostOnError(err, &vm)
@@ -1030,7 +1030,7 @@ func (s *Stack) DeleteHost(id string) error {
 		_, _, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
 			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
 		})
-		if err != nil { //continue to delete even if error
+		if err != nil { // continue to delete even if error
 			lastErr = nil
 			logrus.Errorf("Unable to delete public IP %s of vm %s", ip.PublicIpId, id)
 		}
@@ -1049,7 +1049,7 @@ func (s *Stack) DeleteHost(id string) error {
 		}()
 		if del == "true" {
 			err = s.DeleteVolume(v.VolumeID)
-			if err != nil { //continue to delete even if error
+			if err != nil { // continue to delete even if error
 				logrus.Errorf("Unable to delete volume %s of vm %s", v.VolumeID, id)
 			}
 		}
@@ -1060,7 +1060,7 @@ func (s *Stack) DeleteHost(id string) error {
 
 }
 
-//InspectHost returns the host identified by id or updates content of a *resources.Host
+// InspectHost returns the host identified by id or updates content of a *resources.Host
 func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -1215,7 +1215,7 @@ func (s *Stack) StartHost(id string) error {
 	return err
 }
 
-//RebootHost Reboot host
+// RebootHost Reboot host
 func (s *Stack) RebootHost(id string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
@@ -1246,7 +1246,7 @@ func (s *Stack) perfFromFreq(freq float32) int {
 	return 1
 }
 
-//ResizeHost Resize host
+// ResizeHost Resize host
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()

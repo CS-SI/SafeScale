@@ -45,7 +45,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 )
 
-//-------------IMAGES---------------------------------------------------------------------------------------------------
+// -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
 func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
@@ -110,7 +110,7 @@ func (s *StackEbrc) GetImage(id string) (*resources.Image, error) {
 	return nil, nil
 }
 
-//-------------TEMPLATES------------------------------------------------------------------------------------------------
+// -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *StackEbrc) ListTemplates(all bool) ([]resources.HostTemplate, error) {
@@ -198,7 +198,7 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, er
 	return empty, nil
 }
 
-//GetTemplate overload OpenStackEbrc GetTemplate method to add GPU configuration
+// GetTemplate overload OpenStackEbrc GetTemplate method to add GPU configuration
 func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
 	logrus.Debugf(">>> stacks.ebrc::GetTemplate(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::GetTemplate(%s)", id)
@@ -225,7 +225,7 @@ func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return nil, nil
 }
 
-//-------------SSH KEYS-------------------------------------------------------------------------------------------------
+// -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
 func (s *StackEbrc) CreateKeyPair(name string) (*resources.KeyPair, error) {
@@ -322,7 +322,6 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 			for _, item := range cat.Catalog.CatalogItems {
 				for _, deepItem := range item.CatalogItem {
 					if deepItem.ID == request.ImageID {
-						catalogName = catalogName
 						itemName = deepItem.Name
 					}
 				}
@@ -458,7 +457,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		return nil, userData, scerr.Errorf(fmt.Sprintf("error changing vmname: %#v", err), err)
 	}
 
-	//----Initialize----
+	// ----Initialize----
 	if keyPair == nil {
 		var err error
 		keyPair, err = s.CreateKeyPair(fmt.Sprintf("key_%s", resourceName))
@@ -765,7 +764,7 @@ func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host
 	return nil
 }
 
-//stateConvert convert vcd state to a HostState.Enum
+// stateConvert convert vcd state to a HostState.Enum
 func stateConvert(stateVcd int) hoststate.Enum {
 	switch stateVcd {
 	case 4, 5:
@@ -992,7 +991,7 @@ func (s *StackEbrc) GetHostState(hostParam interface{}) (hoststate.Enum, error) 
 	return host.LastState, nil
 }
 
-//-------------Provider Infos-------------------------------------------------------------------------------------------
+// -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *StackEbrc) ListAvailabilityZones() (map[string]bool, error) {

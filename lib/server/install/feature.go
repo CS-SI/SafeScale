@@ -79,10 +79,10 @@ type Feature struct {
 	// Installers defines the installers available for the feature
 	installers map[method.Enum]Installer
 	// Dependencies lists other feature(s) (by name) needed by this one
-	//dependencies []string
+	// dependencies []string
 	// Management contains a string map of data that could be used to manage the feature (if it makes sense)
 	// This could be used to explain to Service object how to manage the feature, to react as a service
-	//Management map[string]interface{}
+	// Management map[string]interface{}
 	// specs is the Viper instance containing feature specification
 	specs *viper.Viper
 	task  concurrency.Task

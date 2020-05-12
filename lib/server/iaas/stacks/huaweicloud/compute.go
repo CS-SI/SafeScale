@@ -266,7 +266,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	userData = userdata.NewContent()
 
-	//msgFail := "failed to create Host resource: %s"
+	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {

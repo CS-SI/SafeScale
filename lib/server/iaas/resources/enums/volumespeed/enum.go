@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-//Package volumespeed defines an enum to represents Volume speed
+// Package volumespeed defines an enum to represents Volume speed
 package volumespeed
 
 //go:generate stringer -type=Enum
 
-//Enum represents the state of an host
+// Enum represents the state of an host
 type Enum int
 
 const (
-	//COLD speed volume
+	// COLD speed volume
 	COLD Enum = iota
-	//HDD speed volume.
+	// HDD speed volume.
 	HDD
-	//SSD speed volume
+	// SSD speed volume
 	SSD
 )

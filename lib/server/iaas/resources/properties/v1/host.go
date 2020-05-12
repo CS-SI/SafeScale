@@ -321,50 +321,50 @@ func (hv *HostVolumes) Clone() data.Clonable {
 }
 
 // FIXME Improve this function...
-func (vols *HostVolumes) AddHostVolume(hostVolID string, hostVolName string, attachmentID string, volumeUUID string) {
+func (hv *HostVolumes) AddHostVolume(hostVolID string, hostVolName string, attachmentID string, volumeUUID string) {
 	if hostVolID == "" || hostVolName == "" || attachmentID == "" || volumeUUID == "" {
 		panic("Invalid input")
 	}
 
-	vols.VolumesByID[hostVolID] = &HostVolume{
+	hv.VolumesByID[hostVolID] = &HostVolume{
 		AttachID: attachmentID,
 		Device:   volumeUUID,
 	}
 
-	vols.VolumesByName[hostVolName] = hostVolID
-	vols.VolumesByDevice[volumeUUID] = hostVolID
-	vols.DevicesByID[hostVolID] = volumeUUID
+	hv.VolumesByName[hostVolName] = hostVolID
+	hv.VolumesByDevice[volumeUUID] = hostVolID
+	hv.DevicesByID[hostVolID] = volumeUUID
 }
 
 // FIXME Improve this function
-func (vols *HostVolumes) UpdateUUID(hostVolID string, volumeUUID string) error {
+func (hv *HostVolumes) UpdateUUID(hostVolID string, volumeUUID string) error {
 	if hostVolID == "" || volumeUUID == "" {
 		panic("Invalid input")
 	}
 
-	volById, ok := vols.VolumesByID[hostVolID]
+	volById, ok := hv.VolumesByID[hostVolID]
 	if !ok {
 		return fmt.Errorf("volume with id [%s] not found", hostVolID)
 	}
 	previous := volById.Device
 	volById.Device = volumeUUID
 
-	delete(vols.VolumesByDevice, previous)
-	vols.VolumesByDevice[volumeUUID] = hostVolID
-	vols.DevicesByID[hostVolID] = volumeUUID
+	delete(hv.VolumesByDevice, previous)
+	hv.VolumesByDevice[volumeUUID] = hostVolID
+	hv.DevicesByID[hostVolID] = volumeUUID
 
 	return nil
 }
 
 // Delete removes a volume and its attachments info
-func (vols *HostVolumes) Delete(volumeID string, volumeName string, device string) {
+func (hv *HostVolumes) Delete(volumeID string, volumeName string, device string) {
 	if volumeID == "" || volumeName == "" || device == "" {
 		panic("Invalid input")
 	}
-	delete(vols.VolumesByID, volumeID)
-	delete(vols.VolumesByName, volumeName)
-	delete(vols.VolumesByDevice, device)
-	delete(vols.DevicesByID, volumeID)
+	delete(hv.VolumesByID, volumeID)
+	delete(hv.VolumesByName, volumeName)
+	delete(hv.VolumesByDevice, device)
+	delete(hv.DevicesByID, volumeID)
 }
 
 // Replace ...

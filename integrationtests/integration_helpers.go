@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-//HostInfo ...
+// HostInfo ...
 type HostInfo struct {
 	ID         string
 	Name       string
@@ -21,7 +21,7 @@ type HostInfo struct {
 	PrivateKey string
 }
 
-//IsSafescaledLaunched ...
+// IsSafescaledLaunched ...
 func IsSafescaledLaunched() (bool, error) {
 	cmd := "ps -ef | grep safescaled | grep -v grep"
 	out, err := exec.Command("bash", "-c", cmd).Output()
@@ -31,7 +31,7 @@ func IsSafescaledLaunched() (bool, error) {
 	return strings.Contains(string(out), "safescaled"), nil
 }
 
-//CanBeRun ...
+// CanBeRun ...
 func CanBeRun(command string) (bool, error) {
 	cmd := "which " + command
 	out, err := exec.Command("bash", "-c", cmd).Output()
@@ -41,7 +41,7 @@ func CanBeRun(command string) (bool, error) {
 	return strings.Contains(string(out), command), nil
 }
 
-//GetOutput ...
+// GetOutput ...
 func GetTaggedOutput(command string, tag string) (string, error) {
 	fmt.Printf("%sRunning [%s]\n", tag, command)
 	out, err := exec.Command("bash", "-c", command).CombinedOutput()
@@ -52,7 +52,7 @@ func GetTaggedOutput(command string, tag string) (string, error) {
 	return string(out), nil
 }
 
-//GetOutput ...
+// GetOutput ...
 func GetOutput(command string) (string, error) {
 	t := time.Now()
 	formatted := fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
@@ -68,7 +68,7 @@ func GetOutput(command string) (string, error) {
 	return string(out), nil
 }
 
-//RunOnlyInIntegrationTest ...
+// RunOnlyInIntegrationTest ...
 func RunOnlyInIntegrationTest(key string) error {
 	if tenantOverride := os.Getenv(key); tenantOverride == "" {
 		return fmt.Errorf("this only runs as an integration test")

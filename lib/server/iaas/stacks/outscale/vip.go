@@ -53,7 +53,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
 	nic := res.Nic
-	//ip, err := s.addPublicIP(&nic)
+	// ip, err := s.addPublicIP(&nic)
 	if len(res.Nic.PrivateIps) < 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
@@ -64,7 +64,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 	if err != nil {
 		return nil, err
 	}
-	//primary := deviceNumber == 0
+	// primary := deviceNumber == 0
 	return &resources.VirtualIP{
 		ID:        nic.NicId,
 		PrivateIP: nic.PrivateIps[0].PrivateIp,
@@ -95,7 +95,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	//No nics linked to the VM
+	// No nics linked to the VM
 	if len(res.Nics) == 0 {
 		return -1, scerr.NewErrCore("no nics linked to the VM", nil, nil)
 	}

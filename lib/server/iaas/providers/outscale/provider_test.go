@@ -164,7 +164,7 @@ func Test_Containers(t *testing.T) {
 	tt.Containers(t)
 }
 
-func Test_NetworksWithDelete(t *testing.T){
+func Test_NetworksWithDelete(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
@@ -182,7 +182,7 @@ func Test_NetworksWithDelete(t *testing.T){
 	assert.NoError(t, err)
 }
 
-func TestVMWithGPU(t *testing.T){
+func TestVMWithGPU(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
@@ -203,9 +203,9 @@ func TestVMWithGPU(t *testing.T){
 	}, false)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tpls)
-	tpl := func() *resources.HostTemplate{
-		for _, tpl := range tpls{
-			if tpl.GPUType == "nvidia-k2"{
+	tpl := func() *resources.HostTemplate {
+		for _, tpl := range tpls {
+			if tpl.GPUType == "nvidia-k2" {
 				return tpl
 			}
 		}
@@ -244,7 +244,7 @@ func TestVMWithGPU(t *testing.T){
 
 }
 
-//func Test_Test(t *testing.T) {
+// func Test_Test(t *testing.T) {
 //	tt, err := getTester()
 //	if err != nil {
 //		t.Skip(err)
@@ -254,9 +254,9 @@ func TestVMWithGPU(t *testing.T){
 //	for _, h := range hosts {
 //		fmt.Printf("%v", h)
 //	}
-//}
+// }
 //
-//func Test_Delete(t *testing.T) {
+// func Test_Delete(t *testing.T) {
 //	tt, err := getTester()
 //	if err != nil {
 //		t.Skip(err)
@@ -273,7 +273,7 @@ func TestVMWithGPU(t *testing.T){
 //		err = tt.Service.DeleteNetwork(n.ID)
 //		require.Nil(t, err)
 //	}
-//}
+// }
 
 // func Test_Objects(t *testing.T) {
 // 	tt, err := getTester()

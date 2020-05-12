@@ -212,7 +212,7 @@ var sshTunnel = cli.Command{
 
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
 
-		//c.GlobalInt("port") is the grpc port aka. 50051
+		// c.GlobalInt("port") is the grpc port aka. 50051
 		err := client.New().SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh tunnel", false).Error())))

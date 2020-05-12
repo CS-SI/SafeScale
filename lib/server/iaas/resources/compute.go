@@ -119,7 +119,7 @@ type HostDefinition struct {
 	GPUType   string  `json:"gpu_type,omitempty"`
 	CPUFreq   float32 `json:"cpu_freq,omitempty"`
 	ImageID   string  `json:"image_id,omitempty"`
-	//TODO: implement the handling of this field (will need to introduce provider capabilities to know if a specific provider allows this kind of host)
+	// TODO: implement the handling of this field (will need to introduce provider capabilities to know if a specific provider allows this kind of host)
 	Replaceable bool `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
 }
 

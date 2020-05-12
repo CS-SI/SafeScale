@@ -50,7 +50,7 @@ const (
 	ToolsInstall
 	PipInstall
 
-	//NextErrorCode is the next error code usable
+	// NextErrorCode is the next error code usable
 	NextErrorCode
 )
 

@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
-//OutscaleProvider safescale integration of outscale IaaS API
+// OutscaleProvider safescale integration of outscale IaaS API
 // see https://docs.outscale.com/api
 type provider struct {
 	outscale.Stack
@@ -141,7 +141,7 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 	return p, nil
 }
 
-//GetAuthenticationOptions returns authentication parameters
+// GetAuthenticationOptions returns authentication parameters
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	if p == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -160,7 +160,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	if p == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	//MetadataBucketName
+	// MetadataBucketName
 	cfg := providers.ConfigMap{}
 	//
 	cfg.Set("DNSList", p.Options.Compute.DNSList)
@@ -194,7 +194,7 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 	}
 }
 
-//TODO init when finished
+// TODO init when finished
 func init() {
 	iaas.Register("outscale", &provider{})
 }
