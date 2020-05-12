@@ -31,7 +31,7 @@ const (
 	SystemUpdate
 	ToolsInstall
 
-	//NextErrorCode is the next error code usable
+	// NextErrorCode is the next error code usable
 	NextErrorCode
 )
 

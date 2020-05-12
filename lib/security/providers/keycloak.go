@@ -13,7 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//KeyCloak class to manage KeyCloak admin API
+// KeyCloak class to manage KeyCloak admin API
 type KeyCloak struct {
 	BaseURL   string
 	Realm     string
@@ -21,7 +21,7 @@ type KeyCloak struct {
 	Password  string
 }
 
-//KeyCloakAdminToken KeyCloak administration token structure
+// KeyCloakAdminToken KeyCloak administration token structure
 type KeyCloakAdminToken struct {
 	AccessToken      string `json:"access_token,omitempty"`
 	ExpiresIn        uint   `json:"expires_in,omitempty"`
@@ -33,7 +33,7 @@ type KeyCloakAdminToken struct {
 	Scope            string `json:"scope,omitempty"`
 }
 
-//KeyCloackClient defines a KeyCloak client
+// KeyCloackClient defines a KeyCloak client
 type KeyCloackClient struct {
 	ClientID                  string   `json:"clientId,omitempty"`
 	Secret                    string   `json:"secret,omitempty"`
@@ -46,7 +46,7 @@ type KeyCloackClient struct {
 	RedirectURIs              []string `json:"redirectUris,omitempty"`
 }
 
-//GetAccessToken get keycloak admin api access token
+// GetAccessToken get keycloak admin api access token
 func (kc *KeyCloak) GetAccessToken() (string, error) {
 	tokens := []string{"auth/realms", kc.Realm, "protocol/openid-connect/token", "/"}
 	resource := strings.Join(tokens, "/")
@@ -89,7 +89,7 @@ func (kc *KeyCloak) GetAccessToken() (string, error) {
 	return token.AccessToken, nil
 }
 
-//CreateClientApplication create a client application
+// CreateClientApplication create a client application
 func (kc *KeyCloak) CreateClientApplication(clientID, clientSecret, clientName string) error {
 	token, err := kc.GetAccessToken()
 	if err != nil {
@@ -138,7 +138,7 @@ func (kc *KeyCloak) CreateClientApplication(clientID, clientSecret, clientName s
 
 }
 
-//KeyCloackUser defines a KeyCloak user
+// KeyCloackUser defines a KeyCloak user
 type KeyCloackUser struct {
 	ID                         string                   `json:"id,omitempty"`
 	Origin                     string                   `json:"origin,omitempty"`
@@ -172,7 +172,7 @@ func newKeyCloackUser(name, email string, attrs map[string]interface{}) map[stri
 	return user
 }
 
-//CreateUser create a user
+// CreateUser create a user
 func (kc *KeyCloak) CreateUser(name, email string, attrs map[string]interface{}) error {
 	token, err := kc.GetAccessToken()
 	if err != nil {

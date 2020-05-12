@@ -75,7 +75,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	//FIXME: validate parameters
+	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -1556,7 +1556,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				if err != nil {
 					// FIXME Think about this
 					logrus.Error(err)
-					//return err
+					// return err
 				}
 
 				// ... then detach volume

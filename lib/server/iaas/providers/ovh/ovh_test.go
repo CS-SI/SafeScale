@@ -411,9 +411,9 @@ func Test_DeleteVolume(t *testing.T) {
 }
 
 // CreateVolumeAttachment attaches a volume to an host
-//- name of the volume attachment
-//- volume to attach
-//- host on which the volume is attached
+// - name of the volume attachment
+// - volume to attach
+// - host on which the volume is attached
 func Test_CreateVolumeAttachment(t *testing.T) {
 	// TODO Implement Test
 

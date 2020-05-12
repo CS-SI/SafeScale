@@ -34,7 +34,7 @@ const (
 type Location interface {
 	// ReadTenant(projectName string, provider string) (Config, error)
 	GetType() string
-	//Inspect() (map[string][]string, error)
+	// Inspect() (map[string][]string, error)
 	// SumSize() string
 	// Count(key string, pattern string) (int, error)
 	// WaitAllPutITemTerminated(key string, valuePattern string) error

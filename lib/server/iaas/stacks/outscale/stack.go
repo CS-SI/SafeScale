@@ -11,13 +11,13 @@ import (
 	"github.com/outscale-dev/osc-sdk-go/osc"
 )
 
-//Credentials outscale credentials
+// Credentials outscale credentials
 type Credentials struct {
 	AccessKey string
 	SecretKey string
 }
 
-//ComputeConfiguration outscale compute configuration
+// ComputeConfiguration outscale compute configuration
 type ComputeConfiguration struct {
 	URL                     string
 	Region                  string
@@ -34,14 +34,14 @@ type ComputeConfiguration struct {
 	BlacklistImageRegexp    *regexp.Regexp
 }
 
-//NetworConfiguration outscale network configuration
+// NetworConfiguration outscale network configuration
 type NetworConfiguration struct {
 	VPCName string
 	VPCCIDR string
 	VPCID   string
 }
 
-//StorageConfiguration outscale storage configuration
+// StorageConfiguration outscale storage configuration
 type StorageConfiguration struct {
 	Type      string
 	Endpoint  string
@@ -49,7 +49,7 @@ type StorageConfiguration struct {
 	SecretKey string
 }
 
-//MetadataConfiguration metadata storage configuration
+// MetadataConfiguration metadata storage configuration
 type MetadataConfiguration struct {
 	Type      string
 	Endpoint  string
@@ -59,7 +59,7 @@ type MetadataConfiguration struct {
 	CryptKey  string
 }
 
-//ConfigurationOptions outscale stack configuration options
+// ConfigurationOptions outscale stack configuration options
 type ConfigurationOptions struct {
 	Identity      Credentials           `json:"identity,omitempty"`
 	Compute       ComputeConfiguration  `json:"compute,omitempty"`
@@ -68,7 +68,7 @@ type ConfigurationOptions struct {
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
-//Stack Outscale Stack to adapt outscale IaaS API
+// Stack Outscale Stack to adapt outscale IaaS API
 type Stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient
@@ -79,7 +79,7 @@ type Stack struct {
 	deviceNames          []string
 }
 
-//New creates a new Stack
+// New creates a new Stack
 func New(options *ConfigurationOptions) (*Stack, error) {
 	client := osc.NewAPIClient(osc.NewConfiguration())
 	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
@@ -135,7 +135,7 @@ func (s *Stack) initDefaultNetwork() error {
 		s.Options.Network.VPCCIDR = "192.168.0.0/16"
 	}
 	onet, err := s.getVpcByName(s.Options.Network.VPCName)
-	if err != nil || onet == nil { //Try to create the network
+	if err != nil || onet == nil { // Try to create the network
 		onet, err = s.createVpc(s.Options.Network.VPCName, s.Options.Network.VPCCIDR)
 		if err != nil {
 			return err
@@ -154,7 +154,7 @@ func deviceNames() []string {
 	return deviceNames
 }
 
-//ListRegions list available regions
+// ListRegions list available regions
 func (s *Stack) ListRegions() ([]string, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -167,7 +167,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 	}, nil
 }
 
-//ListAvailabilityZones returns availability zone in a set
+// ListAvailabilityZones returns availability zone in a set
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()

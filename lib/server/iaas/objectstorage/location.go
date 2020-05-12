@@ -180,7 +180,7 @@ func (l *location) GetBucket(bucketName string) (Bucket, error) {
 	}
 	b.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		//Note: No errors.Wrap here; error needs to be transmitted as-is
+		// Note: No errors.Wrap here; error needs to be transmitted as-is
 		return nil, err
 	}
 	return b, nil

@@ -62,15 +62,15 @@ func ClusterSwarm(t *testing.T, provider providers.Enum) {
 	_, err = GetOutput("safescale host check-feature gw-net-" + names.Clusters[0] + " kong")
 	require.Nil(t, err)
 
-	//need --param Password=
-	//_, err = GetOutput("safescale -v -d cluster add-feature " + names.Clusters[0] + " remotedesktop --skip-proxy")
-	//require.Nil(t, err)
+	// need --param Password=
+	// _, err = GetOutput("safescale -v -d cluster add-feature " + names.Clusters[0] + " remotedesktop --skip-proxy")
+	// require.Nil(t, err)
 
-	//_, err = GetOutput("safescale -v -d cluster check-feature " + names.Clusters[0] + " remotedesktop")
-	//require.Nil(t, err)
+	// _, err = GetOutput("safescale -v -d cluster check-feature " + names.Clusters[0] + " remotedesktop")
+	// require.Nil(t, err)
 
-	//_, err = GetOutput("safescale -v -d cluster delete-feature " + names.Clusters[0] + " remotedesktop")
-	//require.Nil(t, err)
+	// _, err = GetOutput("safescale -v -d cluster delete-feature " + names.Clusters[0] + " remotedesktop")
+	// require.Nil(t, err)
 
 	_, err = GetOutput("safescale cluster inspect " + names.Clusters[0])
 	require.Nil(t, err)

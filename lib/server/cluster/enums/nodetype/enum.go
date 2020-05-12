@@ -18,7 +18,7 @@ package nodetype
 
 //go:generate stringer -type=Enum
 
-//Enum represents the type of a node
+// Enum represents the type of a node
 type Enum int
 
 const (

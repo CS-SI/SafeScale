@@ -132,7 +132,7 @@ func httpForward(w http.ResponseWriter, req *http.Request, url *url.URL) {
 
 	req.Host = url.Host
 
-	//add CORS to the response header
+	// add CORS to the response header
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
 
@@ -141,7 +141,7 @@ func httpForward(w http.ResponseWriter, req *http.Request, url *url.URL) {
 
 }
 
-//httpProxyFunc forward authorized request to protected service
+// httpProxyFunc forward authorized request to protected service
 func httpProxyFunc(w http.ResponseWriter, r *http.Request) {
 
 	info := parseRequest(r)
@@ -239,9 +239,9 @@ func wsProxyFunc(w http.ResponseWriter, r *http.Request) {
 func proxify() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		if websocket.IsWebSocketUpgrade(r) { //Web socker connexion
+		if websocket.IsWebSocketUpgrade(r) { // Web socker connexion
 			wsProxyFunc(w, r)
-		} else { //HTTP request
+		} else { // HTTP request
 			httpProxyFunc(w, r)
 		}
 
@@ -291,7 +291,7 @@ func (p *proxyConfig) AuthenticationEnabled() bool {
 	return !(p.OpenIDURL == "" || p.OpenIDClientID == "")
 }
 
-//Start starts the security gateway
+// Start starts the security gateway
 func Start(bindingURL string, failure chan bool) {
 
 	cfg, err := loadConfig()
@@ -321,7 +321,7 @@ func Start(bindingURL string, failure chan bool) {
 		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 	}
 
-	//http.Handle("/", proxify(addCORS()))
+	// http.Handle("/", proxify(addCORS()))
 
 	err = http.ListenAndServeTLS(bindingURL, cfg.Certificate, cfg.PrivateKey, proxify())
 	if err != nil {

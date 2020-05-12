@@ -103,8 +103,8 @@ type Content struct {
 }
 
 var (
-	userdataPhase1Template atomic.Value //*template.Template
-	userdataPhase2Template atomic.Value //*template.Template
+	userdataPhase1Template atomic.Value // *template.Template
+	userdataPhase2Template atomic.Value // *template.Template
 )
 
 // NewContent ...

@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-//-------------Volumes Management---------------------------------------------------------------------------------------
+// -------------Volumes Management---------------------------------------------------------------------------------------
 
 // CreateVolume creates a block volume
 // - name is the name of the volume
@@ -140,7 +140,7 @@ func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, error) {
 	}
 }
 
-//ListVolumes return the list of all volume known on the current tenant
+// ListVolumes return the list of all volume known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()

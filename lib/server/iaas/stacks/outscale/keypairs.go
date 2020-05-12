@@ -68,8 +68,8 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if err != nil {
 		return nil, err
 	}
-	//kp.OK.Keypair.
-	//_ = ioutil.WriteFile("/tmp/key.pem", []byte(kp.OK.Keypair.PrivateKey), 0700)
+	// kp.OK.Keypair.
+	// _ = ioutil.WriteFile("/tmp/key.pem", []byte(kp.OK.Keypair.PrivateKey), 0700)
 
 	return &resources.KeyPair{
 		ID:         name,

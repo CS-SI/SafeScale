@@ -110,7 +110,7 @@ func volumeState(state string) volumestate.Enum {
 	return volumestate.OTHER
 }
 
-//WaitForVolumeState wait for volume to be in the specified state
+// WaitForVolumeState wait for volume to be in the specified state
 func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) error {
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		vol, err := s.GetVolume(volumeID)
@@ -161,7 +161,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	return volume, nil
 }
 
-//GetVolumeByName returns the volume with name name
+// GetVolumeByName returns the volume with name name
 func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -391,7 +391,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	return s.WaitForVolumeState(id, volumestate.AVAILABLE)
 }
 
-//func toVolumeSpeed(s string) volumespeed.Enum {
+// func toVolumeSpeed(s string) volumespeed.Enum {
 //	if s == "COLD" {
 //		return volumespeed.COLD
 //	}
@@ -402,4 +402,4 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 //		return volumespeed.SSD
 //	}
 //	return volumespeed.HDD
-//}
+// }

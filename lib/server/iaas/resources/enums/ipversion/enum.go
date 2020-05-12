@@ -23,13 +23,13 @@ import (
 
 //go:generate stringer -type=Enum
 
-//Enum is an enum defining IP versions
+// Enum is an enum defining IP versions
 type Enum int
 
 const (
-	//IPv4 is IP v4 version
+	// IPv4 is IP v4 version
 	IPv4 Enum = 4
-	//IPv6 is IP v6 version
+	// IPv6 is IP v6 version
 	IPv6 Enum = 6
 )
 

@@ -30,7 +30,7 @@ import (
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-//TemplateAPI defines API to manipulate hosts
+// TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
 	List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
 }

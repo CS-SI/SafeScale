@@ -44,7 +44,7 @@ func (s *Stack) deleteSubnetOnError(err error, subnet *osc.Subnet) error {
 }
 
 func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (*osc.Subnet, error) {
-	//Create a subnet with the same CIDR than the network
+	// Create a subnet with the same CIDR than the network
 	createSubnetRequest := osc.CreateSubnetRequest{
 		IpRange:       req.CIDR,
 		NetId:         vpcID,
@@ -64,7 +64,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (*osc.S
 	if err != nil {
 		return nil, s.deleteSubnetOnError(err, &resSubnet.Subnet)
 	}
-	//Prevent automatic assignment of public ip to VM created in the subnet
+	// Prevent automatic assignment of public ip to VM created in the subnet
 	updateSubnetRequest := osc.UpdateSubnetRequest{
 		MapPublicIpOnLaunch: false,
 		SubnetId:            resSubnet.Subnet.SubnetId,
@@ -84,7 +84,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	//update defaut security group to allow external trafic
+	// update defaut security group to allow external trafic
 	secgroup, err := s.getNetworkSecurityGroup(s.Options.Network.VPCID)
 	if err != nil {
 		return nil, err
@@ -169,7 +169,6 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
-
 		},
 	}
 	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
@@ -182,15 +181,15 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No network named %s", name))
 	}
 	var subnets []osc.Subnet
-	for _, subnet := range  res.Subnets{
-		if getResourceTag(subnet.Tags, "name", "") == name{
+	for _, subnet := range res.Subnets {
+		if getResourceTag(subnet.Tags, "name", "") == name {
 			subnets = append(subnets, subnet)
 		}
 	}
-	if len(subnets) > 1{
+	if len(subnets) > 1 {
 		return nil, scerr.InconsistentError(fmt.Sprintf("More than one subnet with name %s", name))
 	}
-	if len(subnets) == 0{
+	if len(subnets) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No ubnet with name %s", name))
 	}
 
@@ -283,7 +282,7 @@ func (s *Stack) deleteSecurityGroup(onet *osc.Net) error {
 }
 
 func (s *Stack) deleteSubnet(id string) error {
-	//Delete subnets
+	// Delete subnets
 	deleteSubnetRequest := osc.DeleteSubnetRequest{
 		SubnetId: id,
 	}
@@ -298,7 +297,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
-	//Reads NIS that belong to the subnet
+	// Reads NIS that belong to the subnet
 	readNicsRequest := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			SubnetIds: []string{id},
@@ -312,7 +311,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	}
 
 	if len(res.Nics) > 0 {
-		//Delete should succeed only when something goes wrong when deleting VMs
+		// Delete should succeed only when something goes wrong when deleting VMs
 		err = s.deleteNics(res.Nics)
 		if err == nil {
 			logrus.Debugf("Check if nothing goes wrong deleting a VM")

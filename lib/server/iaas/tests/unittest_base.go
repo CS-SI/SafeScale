@@ -101,7 +101,7 @@ func (tester *ServiceTester) ListImages(t *testing.T) {
 
 }
 
-//ListHostTemplates test
+// ListHostTemplates test
 func (tester *ServiceTester) ListHostTemplates(t *testing.T) {
 	tpls, err := tester.Service.ListTemplates(false)
 	assert.Nil(t, err)
@@ -116,7 +116,7 @@ func (tester *ServiceTester) ListHostTemplates(t *testing.T) {
 	}
 }
 
-//CreateKeyPair test
+// CreateKeyPair test
 func (tester *ServiceTester) CreateKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("kp")
 	assert.Nil(t, err)
@@ -140,7 +140,7 @@ func (tester *ServiceTester) CreateKeyPairAndLeaveItThere(t *testing.T) {
 	assert.NotEqual(t, kp.PublicKey, "")
 }
 
-//GetKeyPair test
+// GetKeyPair test
 func (tester *ServiceTester) GetKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("unit_test_kp")
 	require.Nil(t, err)
@@ -160,7 +160,7 @@ func (tester *ServiceTester) GetKeyPair(t *testing.T) {
 	}()
 }
 
-//ListKeyPairs test
+// ListKeyPairs test
 func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 	lst, err := tester.Service.ListKeyPairs()
 	assert.Nil(t, err)
@@ -195,7 +195,7 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 	}
 }
 
-//CreateNetwork creates a test network
+// CreateNetwork creates a test network
 func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*resources.Network, *resources.Host) {
 
 	network, err := tester.Service.CreateNetwork(resources.NetworkRequest{
@@ -259,7 +259,7 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *reso
 	return tester.Service.CreateHost(hostRequest)
 }
 
-//CreateGW creates a test GW
+// CreateGW creates a test GW
 func (tester *ServiceTester) CreateGW(t *testing.T, network *resources.Network) error {
 	tpls, err := tester.Service.SelectTemplatesBySize(resources.SizingRequirements{
 		MinCores:    1,
@@ -321,7 +321,7 @@ func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
 	}()
 }
 
-//Networks test
+// Networks test
 func (tester *ServiceTester) Networks(t *testing.T) {
 	// Get initial number of networks
 	nets, err := tester.Service.ListNetworks()
@@ -485,7 +485,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		//assert.Equal(t, host.State, hoststate.STOPPED)
+		// assert.Equal(t, host.State, hoststate.STOPPED)
 	}
 	{
 		err := tester.Service.StartHost(host.ID)
@@ -500,7 +500,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 
 }
 
-//Volume test
+// Volume test
 func (tester *ServiceTester) Volume(t *testing.T) {
 	// Get initial number of volumes
 	lst, err := tester.Service.ListVolumes()
@@ -556,7 +556,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	}
 }
 
-//VolumeAttachment test
+// VolumeAttachment test
 func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
 	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "192.168.8.0/24")
@@ -674,7 +674,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	assert.True(t, found1 && found2)
 }
 
-//Containers test
+// Containers test
 func (tester *ServiceTester) Containers(t *testing.T) {
 	_, err := tester.Service.CreateBucket("testC")
 	assert.NoError(t, err)
@@ -691,7 +691,7 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 	assert.NotContains(t, cl, "testC", "testC2")
 }
 
-//VPL: disabled, need overhaul
+// VPL: disabled, need overhaul
 // // Objects test
 // func (tester *ServiceTester) Objects(t *testing.T) {
 // 	_, err := tester.Service.CreateBucket("testC")

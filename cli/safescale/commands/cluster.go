@@ -71,7 +71,7 @@ var ClusterCommand = cli.Command{
 		clusterInspectCommand,
 		clusterStateCommand,
 		clusterRunCommand,
-		//clusterSshCommand,
+		// clusterSshCommand,
 		clusterStartCommand,
 		clusterStopCommand,
 		clusterExpandCommand,
@@ -298,7 +298,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	result["admin_login"] = "cladm"
 
 	// Add information not directly in cluster GetConfig()
-	//TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
+	// TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
 	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
 		remoteDesktops := map[string][]string{}
 		clientHost := client.New().Host
@@ -1442,7 +1442,7 @@ var clusterNodeListCommand = cli.Command{
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
-				//fmt.Println(msg)
+				// fmt.Println(msg)
 				logrus.Warnln(msg)
 				continue
 			}
@@ -1566,7 +1566,7 @@ var clusterNodeStartCommand = cli.Command{
 	Aliases: []string{"unfreeze"},
 	Usage:   "node start CLUSTERNAME HOSTNAME",
 
-	//Help: &cli.HelpContent{
+	// Help: &cli.HelpContent{
 	// 		Usage: `
 	// Usage: {{.ProgName}} [options] cluster <clustername> node <nodename> start|unfreeze`,
 	// 		Options: []string{`

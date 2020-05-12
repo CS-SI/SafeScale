@@ -81,7 +81,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdNetSpeed,
 )
 
-//CPUInfo stores CPU properties
+// CPUInfo stores CPU properties
 type CPUInfo struct {
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`

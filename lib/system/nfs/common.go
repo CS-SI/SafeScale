@@ -37,10 +37,10 @@ import (
 
 //go:generate rice embed-go
 
-//templateProvider is the instance of TemplateProvider used by package nfs
+// templateProvider is the instance of TemplateProvider used by package nfs
 var tmplBox *rice.Box
 
-//getTemplateProvider returns the instance of TemplateProvider
+// getTemplateProvider returns the instance of TemplateProvider
 func getTemplateBox() (*rice.Box, error) {
 	if tmplBox == nil {
 		var err error

@@ -41,22 +41,22 @@ type ExportOptions struct {
 
 // ExportACL ...
 type ExportACL struct {
-	//Host contains the pattern of hosts authorized (cf. exports man page)
+	// Host contains the pattern of hosts authorized (cf. exports man page)
 	Host string
-	//SecurityMode contains all the security mode allowed for the Host
+	// SecurityMode contains all the security mode allowed for the Host
 	SecurityModes []securityflavor.Enum
-	//Options contains the options of the export ACL
+	// Options contains the options of the export ACL
 	Options ExportOptions
 }
 
-//Share details the parameter of a NFS share
+// Share details the parameter of a NFS share
 type Share struct {
 	Server *Server
 	Path   string
 	ACLs   []ExportACL
 }
 
-//NewShare creates a share struct corresponding to the export of path on server
+// NewShare creates a share struct corresponding to the export of path on server
 func NewShare(server *Server, path string) (*Share, error) {
 	if path == "" {
 		return nil, fmt.Errorf("invalid parameter: 'path' cannot be empty")
@@ -78,7 +78,7 @@ func (s *Share) AddACL(acl ExportACL) {
 	s.ACLs = acls
 }
 
-//Add configures and exports the share
+// Add configures and exports the share
 func (s *Share) Add() error {
 	var acls string
 	for _, a := range s.ACLs {

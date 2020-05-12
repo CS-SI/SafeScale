@@ -17,9 +17,9 @@
 package metadata
 
 const (
-	//ByIDFolderName tells in what folder to put 'byID' information
+	// ByIDFolderName tells in what folder to put 'byID' information
 	ByIDFolderName = "byID"
-	//ByNameFolderName tells in what folder to store 'byName' information
+	// ByNameFolderName tells in what folder to store 'byName' information
 	ByNameFolderName = "byName"
 	// BucketNamePrefix is the beginning of the name of the bucket for Metadata
 	BucketNamePrefix = "0.safescale"

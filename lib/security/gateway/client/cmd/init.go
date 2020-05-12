@@ -1,3 +1,3 @@
 package cmd
 
-//safe-security init
+// safe-security init

@@ -63,22 +63,22 @@ func createHostTarget(host *pb.Host) (*HostTarget, error) {
 		index   uint8
 		methods = map[uint8]method.Enum{}
 	)
-	//TODO: LinuxKind field doesn't exist, it should contain the $LINUX_KIND value
-	//switch host.LinuxKind {
-	//case "centos":
+	// TODO: LinuxKind field doesn't exist, it should contain the $LINUX_KIND value
+	// switch host.LinuxKind {
+	// case "centos":
 	//	fallthrough
-	//case "redhat":
+	// case "redhat":
 	//	index++
 	//	methods[index] = method.Yum
-	//case "debian":
+	// case "debian":
 	//	fallthrough
-	//case "ubuntu":
+	// case "ubuntu":
 	index++
 	methods[index] = method.Apt
-	//case "fedora":
+	// case "fedora":
 	//	index++
 	//	methods[index] = method.Dnf
-	//}
+	// }
 	index++
 	methods[index] = method.Bash
 	return &HostTarget{

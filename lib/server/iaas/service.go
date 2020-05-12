@@ -306,7 +306,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		return nil, err
 	}
 	logSizingRequirement(sizing)
-	//if scanner db is found complement HostTemplate with scanner DB info
+	// if scanner db is found complement HostTemplate with scanner DB info
 	svc.tryReadInfoFromScannerDB(allTpls)
 
 	for _, t := range allTpls {
@@ -354,28 +354,27 @@ func logSizingRequirement(sizing resources.SizingRequirements) {
 		log.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
 	}
 }
-func templateFitStandardSizing(tpl *resources.HostTemplate, sizing resources.SizingRequirements) bool{
+func templateFitStandardSizing(tpl *resources.HostTemplate, sizing resources.SizingRequirements) bool {
 	fit := tpl.Cores >= sizing.MinCores || tpl.Cores <= sizing.MaxCores
 	fit = fit && tpl.RAMSize >= sizing.MinRAMSize && tpl.RAMSize <= sizing.MaxRAMSize
 	return fit
 }
 
 func templateFitAdditionalSizing(tpl *resources.HostTemplate, sizing resources.SizingRequirements) bool {
-	fit :=  tpl.CPUFreq >= sizing.MinFreq
+	fit := tpl.CPUFreq >= sizing.MinFreq
 	fit = fit && tpl.GPUNumber >= sizing.MinGPU
 	return fit
 }
 
-
-func addScannerInfo(tpl *resources.HostTemplate, images map[string]resources.StoredCPUInfo){
-	if img, ok := images[tpl.ID]; ok{
+func addScannerInfo(tpl *resources.HostTemplate, images map[string]resources.StoredCPUInfo) {
+	if img, ok := images[tpl.ID]; ok {
 		tpl.GPUNumber = img.GPU
 		tpl.CPUFreq = float32(img.CPUFrequency)
 		tpl.GPUType = img.GPUModel
 	}
 }
 
-func (svc *service) tryReadInfoFromScannerDB(allTpls []resources.HostTemplate)  {
+func (svc *service) tryReadInfoFromScannerDB(allTpls []resources.HostTemplate) {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {
@@ -404,7 +403,7 @@ func (svc *service) tryReadInfoFromScannerDB(allTpls []resources.HostTemplate)  
 		}
 		images[imageFound.ID] = imageFound
 	}
-	for i:=0; i<len(allTpls); i++{//overload values, do not use range
+	for i := 0; i < len(allTpls); i++ { // overload values, do not use range
 		addScannerInfo(&allTpls[i], images)
 	}
 
@@ -446,12 +445,12 @@ func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 		return imgs, nil
 	}
 	var simgs []scoredImage
-	//fields := strings.Split(strings.ToUpper(osname), " ")
+	// fields := strings.Split(strings.ToUpper(osname), " ")
 	for _, img := range imgs {
-		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
+		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
 		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(filter), 0.7, 5)
-		//score := matchScore(fields, strings.ToUpper(img.Name))
-		//score := SimilarityScore(filter, img.Name)
+		// score := matchScore(fields, strings.ToUpper(img.Name))
+		// score := SimilarityScore(filter, img.Name)
 		if score > 0.5 {
 			simgs = append(simgs, scoredImage{
 				Image: img,
@@ -539,20 +538,20 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 
 	maxscore := 0.0
 	maxi := -1
-	//fields := strings.Split(strings.ToUpper(osname), " ")
+	// fields := strings.Split(strings.ToUpper(osname), " ")
 	for i, img := range imgs {
-		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
+		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
 		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
-		//score := matchScore(fields, strings.ToUpper(img.Name))
-		//score := SimilarityScore(osname, img.Name)
+		// score := matchScore(fields, strings.ToUpper(img.Name))
+		// score := SimilarityScore(osname, img.Name)
 		if score > maxscore {
 			maxscore = score
 			maxi = i
 		}
 
 	}
-	//fmt.Println(fields, len(fields))
-	//fmt.Println(len(fields))
+	// fmt.Println(fields, len(fields))
+	// fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
 		return nil, fmt.Errorf("unable to find an image matching %s", osname)
 	}

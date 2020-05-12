@@ -325,7 +325,7 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	//FIXME: validate parameters
+	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()

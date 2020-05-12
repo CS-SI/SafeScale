@@ -29,7 +29,7 @@ import (
 	"strings"
 )
 
-//-------------Volumes Management---------------------------------------------------------------------------------------
+// -------------Volumes Management---------------------------------------------------------------------------------------
 
 // CreateVolume creates a block volume
 // - name is the name of the volume
@@ -124,7 +124,7 @@ func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
 	return &volume, nil
 }
 
-//ListVolumes return the list of all volume known on the current tenant
+// ListVolumes return the list of all volume known on the current tenant
 func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
 	logrus.Debug("ebrc.Client.ListVolumes() called")
 	defer logrus.Debug("ebrc.Client.ListVolumes() done")
@@ -192,7 +192,7 @@ func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentReq
 	defer logrus.Debugf("<<< stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 
 	if s == nil {
-		return "", fmt.Errorf("calling stacks.ebrc::CreateVolumeAttachment() from nil pointer!")
+		return "", fmt.Errorf("calling stacks.ebrc::CreateVolumeAttachment() from nil pointer")
 	}
 
 	vm, err := s.findVMByID(request.HostID)
@@ -224,7 +224,7 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 	defer logrus.Debugf("<<< stacks.ebrc::GetVolumeAttachment(%s)", id)
 
 	if s == nil {
-		return nil, fmt.Errorf("calling stacks.ebrc::GetVolumeAttachment() from nil pointer!")
+		return nil, fmt.Errorf("calling stacks.ebrc::GetVolumeAttachment() from nil pointer")
 	}
 
 	vats, err := s.ListVolumeAttachments(serverID)
@@ -247,7 +247,7 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 	defer logrus.Debugf("<<< stacks.ebrc::DeleteVolumeAttachment(%s)", id)
 
 	if s == nil {
-		return fmt.Errorf("calling stacks.ebrc::DeleteVolumeAttachment() from nil pointer!")
+		return fmt.Errorf("calling stacks.ebrc::DeleteVolumeAttachment() from nil pointer")
 	}
 
 	vm, err := s.findVMByID(serverID)

@@ -42,9 +42,9 @@ import (
 //
 //
 //
-//------------------- MISC -----------------------------------------------------------------------------------------------------------
+// ------------------- MISC -----------------------------------------------------------------------------------------------------------
 
-//Generate a random AES password
+// Generate a random AES password
 func generateAesPassword(withSymbols bool) (string, error) {
 	pass, err := password.Generate(64, 10, map[bool]int{true: 10, false: 0}[withSymbols], false, true)
 	if err != nil {
@@ -53,8 +53,8 @@ func generateAesPassword(withSymbols bool) (string, error) {
 	return pass, nil
 }
 
-//Load the RSA-2048 key stored into the file given in parameters (stored with x509.MarshalPKCS1PrivateKey)
-//If the file did not exists he will be created and a random RSA-2048 key will be stored in it
+// Load the RSA-2048 key stored into the file given in parameters (stored with x509.MarshalPKCS1PrivateKey)
+// If the file did not exists he will be created and a random RSA-2048 key will be stored in it
 func loadRsaPrivateKey(keyFilePath string) (*rsa.PrivateKey, error) {
 	var file *os.File
 
@@ -113,7 +113,7 @@ func Hash(reader io.Reader) string {
 //
 //
 //
-//------------------- BucketGenerator ------------------------------------------------------------------------------------------------
+// ------------------- BucketGenerator ------------------------------------------------------------------------------------------------
 
 // BucketGenerator ...
 type BucketGenerator struct {
@@ -130,7 +130,7 @@ func NewBucketGenerator(buckets []objectstorage.Bucket) *BucketGenerator {
 	}
 }
 
-//Next return the bucket currently pointed by the iterator and then iterate
+// Next return the bucket currently pointed by the iterator and then iterate
 func (bg *BucketGenerator) Next() objectstorage.Bucket {
 	bg.mutex.Lock()
 	iterator := bg.iterator
@@ -142,17 +142,17 @@ func (bg *BucketGenerator) Next() objectstorage.Bucket {
 //
 //
 //
-//------------------- Shard ----------------------------------------------------------------------------------------------------------
+// ------------------- Shard ----------------------------------------------------------------------------------------------------------
 
 // Shard ...
 type Shard struct {
-	//The name the shard have in the object storage
+	// The name the shard have in the object storage
 	Name string `json:"name,omitempty"`
-	//The name of the bucket where the shard is stored
+	// The name of the bucket where the shard is stored
 	BucketName string `json:"bucketName,omitempty"`
-	//The shard checkSum (after encryption)
+	// The shard checkSum (after encryption)
 	CheckSum string `json:"checkSum,omitempty"`
-	//The Nonce used to encrypt the shard
+	// The Nonce used to encrypt the shard
 	Nonce []byte `json:"nonce,omitempty"`
 }
 
@@ -170,7 +170,7 @@ func NewShard(bucket objectstorage.Bucket) (*Shard, error) {
 			continue
 		}
 		name += ".bin"
-		//TODO-AJ is it useful, as it could take up to 25 sec to check all the shards? (+- 0.10 sec / shard with 100ms ping)
+		// TODO-AJ is it useful, as it could take up to 25 sec to check all the shards? (+- 0.10 sec / shard with 100ms ping)
 		if obj, err := bucket.GetObject(name); err != nil && obj == nil {
 			break
 		}
@@ -197,7 +197,7 @@ func (s *Shard) GetNonce() []byte {
 	return s.Nonce
 }
 
-//GenerateNonce generate, set and return a nonce of the required size
+// GenerateNonce generate, set and return a nonce of the required size
 func (s *Shard) GenerateNonce(nonceSize int) ([]byte, error) {
 	s.Nonce = make([]byte, nonceSize)
 	if _, err := io.ReadFull(rand.Reader, s.Nonce); err != nil {
@@ -206,7 +206,7 @@ func (s *Shard) GenerateNonce(nonceSize int) ([]byte, error) {
 	return s.Nonce, nil
 }
 
-//SetCheckSum will hash the file in the reader and store the result as a string
+// SetCheckSum will hash the file in the reader and store the result as a string
 func (s *Shard) SetCheckSum(reader io.Reader) string {
 	s.CheckSum = Hash(reader)
 	return s.CheckSum
@@ -223,9 +223,9 @@ func (s *Shard) ToString() string {
 //
 //
 //
-//------------------- ChunkGroup -----------------------------------------------------------------------------------------------------
+// ------------------- ChunkGroup -----------------------------------------------------------------------------------------------------
 
-//ChunkGroup ...
+// ChunkGroup ...
 type ChunkGroup struct {
 	FileName    string `json:"filename,omitempty"`
 	FileSize    int64  `json:"filsize,omitempty"`
@@ -286,7 +286,7 @@ func (cg *ChunkGroup) GetBucketNames() []string {
 	return cg.BucketNames
 }
 
-//GetNonce return the nonce of a given shard
+// GetNonce return the nonce of a given shard
 func (cg *ChunkGroup) GetNonce(shardNum int) []byte {
 	if shardNum >= len(cg.Shards) {
 		return nil
@@ -294,7 +294,7 @@ func (cg *ChunkGroup) GetNonce(shardNum int) []byte {
 	return cg.Shards[shardNum].GetNonce()
 }
 
-//GetStorageInfo return the storageInfos of a given shard (fileName, bucketName)
+// GetStorageInfo return the storageInfos of a given shard (fileName, bucketName)
 func (cg *ChunkGroup) GetStorageInfo(shardNum int) (string, string) {
 	if shardNum >= len(cg.Shards) {
 		return "", ""
@@ -302,7 +302,7 @@ func (cg *ChunkGroup) GetStorageInfo(shardNum int) (string, string) {
 	return cg.Shards[shardNum].GetStorageInfo()
 }
 
-//GetCheckSum return the checkSum of a given shard
+// GetCheckSum return the checkSum of a given shard
 func (cg *ChunkGroup) GetCheckSum(shardNum int) string {
 	if shardNum >= len(cg.Shards) {
 		return ""
@@ -320,7 +320,7 @@ func (cg *ChunkGroup) GetNbBatchs() int {
 	return int(math.Ceil(float64(cg.NbDataShards) / float64(cg.NbDataShardsPerBatch)))
 }
 
-//InitShards initialize the shard array and return the number of data shards and parity shards
+// InitShards initialize the shard array and return the number of data shards and parity shards
 func (cg *ChunkGroup) InitShards(chunkSize int, maxBatchSize int, ratioNumerator int, ratioDenominator int, bucketGenerator *BucketGenerator) (dataShards int, parityShards int, err error) {
 	cg.ChunkSize = chunkSize
 	cg.PaddingSize = chunkSize - int(cg.FileSize%int64(chunkSize))
@@ -354,7 +354,7 @@ func (cg *ChunkGroup) InitShards(chunkSize int, maxBatchSize int, ratioNumerator
 	return cg.NbDataShards, cg.NbParityShards, nil
 }
 
-//ComputeShardCheckSum compute the check sum of a given shard, with a reader of the shard datas, return the checksum
+// ComputeShardCheckSum compute the check sum of a given shard, with a reader of the shard datas, return the checksum
 func (cg *ChunkGroup) ComputeShardCheckSum(shardNum int, reader io.Reader) (string, error) {
 	if shardNum >= len(cg.Shards) {
 		return "", fmt.Errorf("there is only %d shards", len(cg.Shards))
@@ -362,7 +362,7 @@ func (cg *ChunkGroup) ComputeShardCheckSum(shardNum int, reader io.Reader) (stri
 	return cg.Shards[shardNum].SetCheckSum(reader), nil
 }
 
-//GenerateNonce generate a nonce for a given shard, return the nonce
+// GenerateNonce generate a nonce for a given shard, return the nonce
 func (cg *ChunkGroup) GenerateNonce(shardNum int, nonceSize int) ([]byte, error) {
 	if shardNum >= len(cg.Shards) {
 		return nil, fmt.Errorf("there is only %d shards", len(cg.Shards))
@@ -472,7 +472,7 @@ func DecryptChunkGroup(encrypted []byte, ki *KeyInfo) (*ChunkGroup, error) {
 	return &cg, nil
 }
 
-//ToString return a string representation on a chunckGroup ready to be displayed
+// ToString return a string representation on a chunckGroup ready to be displayed
 func (cg *ChunkGroup) ToString() string {
 	str := fmt.Sprintf("ChunkGroup : \n fileName       : %s\n date           :%s\n fileSize       : %d\n aesPassword    : %s\n buckets        : \n", cg.FileName, cg.Date, cg.FileSize, cg.AesPassword)
 	for _, name := range cg.GetBucketNames() {
@@ -489,9 +489,9 @@ func (cg *ChunkGroup) ToString() string {
 //
 //
 //
-//------------------------------- KEYINFO ----------------------------------------------------------------------------
+// ------------------------------- KEYINFO ----------------------------------------------------------------------------
 
-//KeyInfo ...
+// KeyInfo ...
 type KeyInfo struct {
 	AesPassword string `json:"aespassword,omitempty"`
 	Nonce       []byte `json:"nonce,omitempty"`
@@ -509,7 +509,7 @@ func NewKeyInfo() (*KeyInfo, error) {
 	return &ki, nil
 }
 
-//GetNonce return the nonce
+// GetNonce return the nonce
 func (ki *KeyInfo) GetNonce() []byte {
 	return ki.Nonce
 }
@@ -569,7 +569,7 @@ func DecryptKeyInfo(encrypted []byte, keyFile string) (*KeyInfo, error) {
 	return &ki, nil
 }
 
-//ToString return a string representation on a keyInfo ready to be displayed
+// ToString return a string representation on a keyInfo ready to be displayed
 func (ki *KeyInfo) ToString() string {
 	str := fmt.Sprintf("KeyInfo : \n aesPassword     : %s\n nonce           :%x\n", ki.AesPassword, ki.Nonce)
 	return str

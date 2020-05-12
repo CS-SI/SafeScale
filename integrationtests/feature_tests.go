@@ -156,7 +156,7 @@ func RemoteDesktop(t *testing.T, provider providers.Enum) {
 	_, err = GetOutput("safescale host add-feature --skip-proxy --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.Nil(t, err)
 
-	//TODO : try to connect to the host through guacamole?
+	// TODO : try to connect to the host through guacamole?
 	out, err = GetOutput("wget " + host.PublicIP + ":9080/guacamole")
 	fmt.Print(out)
 	require.Nil(t, err)
