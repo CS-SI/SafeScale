@@ -46,7 +46,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 
 	password, err := utils.GeneratePassword(16)
 	if err != nil {
-		return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
+		return nil, userData, scerr.Wrap(err, fmt.Sprintf("failed to generate password: %s", err.Error()))
 	}
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,

@@ -112,13 +112,16 @@ func volumeState(state string) volumestate.Enum {
 
 // WaitForVolumeState wait for volume to be in the specified state
 func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		vol, err := s.GetVolume(volumeID)
 		if err != nil {
 			return scerr.AbortedError("", err)
 		}
 		if vol.State != state {
-			return fmt.Errorf("wrong state")
+			return scerr.Errorf("wrong state", nil)
 		}
 		return nil
 	}, temporal.GetHostTimeout())
