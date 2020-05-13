@@ -34,6 +34,7 @@ func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, error) {
 	_, ok := tags["name"]
 	return ok, nil
 }
+
 func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) error {
 	// Delete DHCP options
 	namedDHCPOptions, err := s.checkDHCPOptionsName(onet)
@@ -48,7 +49,6 @@ func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) error {
 		DeleteDhcpOptionsRequest: optional.NewInterface(deleteDhcpOptionsRequest),
 	})
 	return err
-
 }
 
 func (s *Stack) deleteInternetService(onet *osc.Net) error {
@@ -258,16 +258,7 @@ func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, error
 
 }
 
-func (s *Stack) deleteNetworkOnError(err error, onet *osc.Net) error {
-
-	err2 := s.DeleteNetwork(onet.NetId)
-	if err2 != nil {
-		return scerr.Wrap(err, err2.Error())
-	}
-	return err
-}
-
-func (s *Stack) createVpc(name, cidr string) (*osc.Net, error) {
+func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
 
 	createNetRequest := osc.CreateNetRequest{
 		IpRange: cidr,
@@ -281,11 +272,24 @@ func (s *Stack) createVpc(name, cidr string) (*osc.Net, error) {
 	}
 	onet := respNet.Net
 
+	defer func() {
+		if err != nil {
+			if !scerr.ImplementsCauser(err) {
+				err = scerr.Wrap(err, "")
+			}
+
+			derr := s.DeleteNetwork(onet.NetId)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	err = s.setResourceTags(onet.NetId, map[string]string{
 		"name": name,
 	})
 	if err != nil {
-		return nil, s.deleteNetworkOnError(err, &onet)
+		return nil, err
 	}
 
 	req := resources.NetworkRequest{
@@ -296,25 +300,25 @@ func (s *Stack) createVpc(name, cidr string) (*osc.Net, error) {
 	// update default security group to allow external traffic
 	securityGroup, err := s.getNetworkSecurityGroup(onet.NetId)
 	if err != nil {
-		return nil, s.deleteNetworkOnError(err, &onet)
+		return nil, err
 	}
 	if securityGroup == nil {
-		return nil, s.deleteNetworkOnError(scerr.InconsistentError("no default security group"), &onet)
+		return nil, scerr.InconsistentError("no default security group")
 	}
 
 	err = s.updateDefaultSecurityRules(securityGroup)
 	if err != nil {
-		return nil, s.deleteNetworkOnError(err, &onet)
+		return nil, err
 	}
 
 	err = s.createDHCPOptionSet(req, &onet)
 	if err != nil {
-		return nil, s.deleteNetworkOnError(err, &onet)
+		return nil, err
 	}
 
 	err = s.createInternetService(req, &onet)
 	if err != nil {
-		return nil, s.deleteNetworkOnError(err, &onet)
+		return nil, err
 	}
 
 	return &onet, nil
@@ -383,7 +387,11 @@ func (s *Stack) getDefaultDhcpNptpServers(net *osc.Net) ([]string, error) {
 	return res.DhcpOptionsSets[0].NtpServers, err
 }
 
-func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) error {
+func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) (err error) {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
+
 	if len(req.DNSServers) == 0 {
 		return nil
 	}
@@ -402,16 +410,25 @@ func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) 
 		return err
 	}
 
+	defer func() {
+		if err != nil {
+			if !scerr.ImplementsCauser(err) {
+				err = scerr.Wrap(err, "")
+			}
+
+			derr := s.deleteDhcpOptions(net, false)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	dhcpOptionID := dhcpOptions.DhcpOptionsSet.DhcpOptionsSetId
 	err = s.setResourceTags(dhcpOptionID, map[string]string{
 		"name": req.Name,
 	})
 	if err != nil {
-		err2 := s.deleteDhcpOptions(net, false)
-		if err2 != nil {
-			return scerr.Wrap(err, err2.Error())
-		}
-		return scerr.Wrap(err, "")
+		return err
 	}
 	updateNetRequest := osc.UpdateNetRequest{
 		DhcpOptionsSetId: dhcpOptionID,
