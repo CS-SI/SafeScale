@@ -293,6 +293,9 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	res, _, err := s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
 		ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
 			DryRun: false,
@@ -477,13 +480,16 @@ func (s *Stack) hostState(id string) (hoststate.Enum, error) {
 
 // WaitForHostState wait for host to be in the specifed state
 func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		hostState, err := s.hostState(hostID)
 		if err != nil {
 			return scerr.AbortedError("", err)
 		}
 		if state != hostState {
-			return fmt.Errorf("wrong state")
+			return scerr.Errorf("wrong state", nil)
 		}
 		if state == hoststate.ERROR {
 			return scerr.AbortedError("host in error state", err)

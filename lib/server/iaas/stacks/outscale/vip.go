@@ -28,6 +28,9 @@ import (
 
 // CreateVIP ...
 func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, error) {
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	subnet, err := s.getSubnet(subnetID)
 	if err != nil {
 		return nil, err
