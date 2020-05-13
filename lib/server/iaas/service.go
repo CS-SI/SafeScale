@@ -302,27 +302,96 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	}
 
 	allTpls, err := svc.ListTemplates(false)
+	scannerTpls := map[string]bool{}
 	if err != nil {
 		return nil, err
 	}
-	logSizingRequirement(sizing)
-	// if scanner db is found complement HostTemplate with scanner DB info
-	svc.tryReadInfoFromScannerDB(allTpls)
 
-	for _, t := range allTpls {
-		standardFit := templateFitStandardSizing(&t, sizing)
-		additionalFit := templateFitAdditionalSizing(&t, sizing)
-		if standardFit && (additionalFit || force) {
-			tpl := t
-			selectedTpls = append(selectedTpls, &tpl)
+	// FIXME Prevent GPUs when user sends a 0
+	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinFreq != 0
+	if askedForSpecificScannerInfo {
+		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
+		if err != nil {
+			if force {
+				log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+			} else {
+				var noHostError string
+				if sizing.MinFreq <= 0 {
+					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
+				} else {
+					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+				}
+				log.Error(noHostError)
+				return nil, fmt.Errorf(noHostError)
+			}
+		} else {
+			authOpts, err := svc.GetAuthenticationOptions()
+			if err != nil {
+				return nil, err
+			}
+			region, ok := authOpts.Get("Region")
+			if !ok {
+				return nil, fmt.Errorf("region value unset")
+			}
+			folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+
+			imageList, err := db.ReadAll(folder)
+			if err != nil {
+				if force {
+					log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+				} else {
+					var noHostError string
+					if sizing.MinFreq <= 0 {
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
+					} else {
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+					}
+					log.Error(noHostError)
+					return nil, fmt.Errorf(noHostError)
+				}
+			} else {
+				var images []resources.StoredCPUInfo
+				for _, f := range imageList {
+					imageFound := resources.StoredCPUInfo{}
+					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
+						log.Error(fmt.Sprintf("error unmarsalling image %s : %v", f, err))
+					}
+
+					// if the user asked explicitly no gpu
+					if sizing.MinGPU == 0 && imageFound.GPU != 0 {
+						continue
+					}
+
+					if imageFound.GPU < sizing.MinGPU {
+						continue
+					}
+
+					if imageFound.CPUFrequency < float64(sizing.MinFreq) {
+						continue
+					}
+
+					images = append(images, imageFound)
+				}
+
+				if !force && (len(images) == 0) {
+					var noHostError string
+					if sizing.MinFreq <= 0 {
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU)
+					} else {
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinFreq)
+					}
+					log.Error(noHostError)
+					return nil, fmt.Errorf(noHostError)
+				}
+
+				for _, image := range images {
+					scannerTpls[image.TemplateID] = true
+				}
+			}
 		}
 	}
 
-	sort.Sort(ByRankDRF(selectedTpls))
-	return selectedTpls, nil
-}
-
-func logSizingRequirement(sizing resources.SizingRequirements) {
 	if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
 		log.Debugf("Looking for a host template as small as possible")
 	} else {
@@ -353,61 +422,39 @@ func logSizingRequirement(sizing resources.SizingRequirements) {
 
 		log.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
 	}
-}
-func templateFitStandardSizing(tpl *resources.HostTemplate, sizing resources.SizingRequirements) bool {
-	fit := tpl.Cores >= sizing.MinCores || tpl.Cores <= sizing.MaxCores
-	fit = fit && tpl.RAMSize >= sizing.MinRAMSize && tpl.RAMSize <= sizing.MaxRAMSize
-	return fit
-}
 
-func templateFitAdditionalSizing(tpl *resources.HostTemplate, sizing resources.SizingRequirements) bool {
-	fit := tpl.CPUFreq >= sizing.MinFreq
-	fit = fit && tpl.GPUNumber >= sizing.MinGPU
-	return fit
-}
-
-func addScannerInfo(tpl *resources.HostTemplate, images map[string]resources.StoredCPUInfo) {
-	if img, ok := images[tpl.ID]; ok {
-		tpl.GPUNumber = img.GPU
-		tpl.CPUFreq = float32(img.CPUFrequency)
-		tpl.GPUType = img.GPUModel
-	}
-}
-
-func (svc *service) tryReadInfoFromScannerDB(allTpls []resources.HostTemplate) {
-	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
-	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
-	if err != nil {
-		return
-	}
-	authOpts, err := svc.GetAuthenticationOptions()
-	if err != nil {
-		return
-	}
-	region, ok := authOpts.Get("Region")
-	if !ok {
-		log.Error("region value unset")
-		return
-	}
-	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
-
-	imageList, err := db.ReadAll(folder)
-	if err != nil {
-		return
-	}
-	images := make(map[string]resources.StoredCPUInfo)
-	for _, f := range imageList {
-		imageFound := resources.StoredCPUInfo{}
-		if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-			log.Error(fmt.Sprintf("error unmarsalling image %s : %v", f, err))
+	for _, t := range allTpls {
+		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
+		msg += " %s"
+		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
+			log.Debugf(msg, "not enough cores")
+			continue
 		}
-		images[imageFound.ID] = imageFound
-	}
-	for i := 0; i < len(allTpls); i++ { // overload values, do not use range
-		addScannerInfo(&allTpls[i], images)
+		if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
+			log.Debugf(msg, "too many cores")
+			continue
+		}
+		if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
+			log.Debugf(msg, "not enough RAM")
+			continue
+		}
+		if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
+			log.Debugf(msg, "too many RAM")
+			continue
+		}
+		if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
+			log.Debugf(msg, "not enough disk")
+			continue
+		}
+
+		if _, ok := scannerTpls[t.ID]; ok || !askedForSpecificScannerInfo {
+			newT := t
+			selectedTpls = append(selectedTpls, &newT)
+		}
 	}
 
-	return
+	sort.Sort(ByRankDRF(selectedTpls))
+	return selectedTpls, nil
 }
 
 type scoredImage struct {
