@@ -37,7 +37,7 @@ const (
 	identityEndpointTemplate string = "https://iam.%s.otc.t-systems.com"
 )
 
-// provider is the providerementation of the OpenTelekom provider
+// provider is the provider implementation of the opentelekom provider
 type provider struct {
 	*huaweicloud.Stack
 

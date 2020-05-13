@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
@@ -36,7 +37,7 @@ import (
 // 	defaultSecurityGroup = "default"
 // )
 
-// provider is the providerementation of the openstack provider respecting api.Provider
+// provider is the provider implementation of the openstack provider respecting api.Provider
 type provider struct {
 	*openstack.Stack
 
@@ -143,7 +144,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, fmt.Errorf("invalid Region: '%s'", region)
+			return nil, scerr.InvalidParameterError("region", fmt.Sprintf("invalid Region: '%s'", region))
 		}
 	}
 
@@ -166,7 +167,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+			return nil, scerr.InvalidParameterError("zone", fmt.Sprintf("invalid Availability zone: '%s', valid zones are %v", zone, validZones))
 		}
 	}
 
