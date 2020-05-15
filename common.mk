@@ -53,7 +53,7 @@ GOFMT?=gofmt
 CP?=cp
 RM?=rm
 BROWSER?=firefox
-BUILDER?=mod
+BUILDTOOL?=mod
 
 ifeq ($(OS),Windows_NT)
 HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)

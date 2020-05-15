@@ -22,7 +22,6 @@ PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v version.go | grep 
 # List of packages to test
 TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v sandbox)
 
-
 # DEPENDENCIES MANAGEMENT
 STRINGER := golang.org/x/tools/cmd/stringer
 RICE := github.com/GeertJohan/go.rice github.com/GeertJohan/go.rice/rice
@@ -38,10 +37,6 @@ ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
-GOLANGCI := github.com/golangci/golangci-lint/cmd/golangci-lint
-
-DEVDEPSLIST := $(RICE) $(PROTOBUF) $(COVER) $(XUNIT) $(COVERTOOL) $(GOVENDOR)
-NEWDEVDEPSLIST := $(STRINGER) $(GOLANGCI) $(MOCKGEN) $(LINTER) $(CONVEY) $(ERRCHECK)
 
 BUILD_TAGS = ""
 export BUILD_TAGS
@@ -102,7 +97,7 @@ getdevdeps: begin ground
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) &>/dev/null || true; \
 	fi
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) get -u  $(GOLANGCI) &>/dev/null || true; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $($(GO) env GOPATH)/bin v1.26.0 || true; \
 	fi
 
 ensure: common
