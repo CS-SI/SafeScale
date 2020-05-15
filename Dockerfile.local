@@ -20,6 +20,7 @@ locate \
 build-essential \
 make \
 wget \
+curl \
 unzip \
 vim \
 git \
